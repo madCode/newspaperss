@@ -8,16 +8,21 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** EPUB design, round 1.
-- **Next:** the Sources page design, reading-list titles, the "Article text" label; then a resource-usage audit.
+- **In flight:** an app icon.
+- **Next:** webcomics (built, in review), the Sources page design, reading-list titles, the "Article text" label.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 13: EPUB design, round 1 (14:41–)
+### Cycle 14: an app icon (14:55–)
+- **From device testing:** the launcher showed Android's default icon, and you asked for something design-forward like the Termux shortcut's.
+- **Shipped:** an adaptive icon: a cream newspaper page with a navy masthead, a red photo and grey columns, on navy. Themed icons use the notification icon's newspaper as one shape.
+
+### Cycle 13: EPUB design, round 1 (14:41–14:55, [#30](https://github.com/madCode/newspaperss/pull/30))
 - **From device testing:** the EPUB wasn't as good-looking as rss-to-e-reader's; links were too dark in KOReader's night mode; the in-app article was a little wider than the phone.
 - **Shipped:** each article opens with its source as a small-caps kicker, the title, "By … · date · N min read" and a hairline rule; body text is justified and hyphenated; links and rules take the text's colour, so night mode inverts them too; "Read the original at propublica.org" replaces the full URL, which had nowhere to break; the contents page reads "In this edition" with plain titles and small source lines.
 - **Checks:** rendered at e-reader size in Chromium, light and night, before and after; a live edition passes epubcheck.
+- **Review caught:** the new styles weren't scoped, so an article's own `class="kicker"` would take the edition's look; contents entries had lost the underline that marks a link on e-ink. Both fixed.
 
 ### Cycle 12: see what's inside, delete an edition (14:24–14:40, [#29](https://github.com/madCode/newspaperss/pull/29))
 - **From device testing:** you couldn't find what went into an edition before sending it (tapping the title worked, but nothing said so), and couldn't delete one.
