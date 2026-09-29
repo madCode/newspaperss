@@ -24,7 +24,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
 
 ### From the persona audit (Day 2)
-- [ ] Put the date in edition titles and file names: weekly repeats ("Tuesday Morning Edition") collide in e-reader libraries and folders
 - [ ] A default-importance channel for "edition ready" (share delivery depends on it being seen)
 - [ ] Saved links in onboarding: Pocket/Instapaper import there, and a reading-list-only setup
 - [ ] Say why there's no edition: nothing new on schedule, all sources failed, waiting for a connection
@@ -90,6 +89,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Dated edition titles ("Tuesday Morning Edition, Sep 29"), so next week's Tuesday doesn't collide in libraries and folders
 - [x] Sending from the "ready" notification counts: choosing an app in the share sheet marks the edition delivered (it was released the next day and its articles repeated)
 - [x] Onboarding: import an OPML file or connect tt-rss on the sources step, instead of only after setup
 - [x] Research: competing and neighbouring apps, in [docs/research/competitors.md](research/competitors.md)

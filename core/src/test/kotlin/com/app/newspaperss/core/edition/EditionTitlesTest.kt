@@ -10,14 +10,20 @@ class EditionTitlesTest {
 
     @Test
     fun partOfDay() {
-        assertEquals("Tuesday Morning Edition", EditionTitles.title(tuesdayMorning, emptyList(), Locale.US))
-        assertEquals("Tuesday Afternoon Edition", EditionTitles.title(tuesdayMorning.withHour(13), emptyList(), Locale.US))
-        assertEquals("Tuesday Evening Edition", EditionTitles.title(tuesdayMorning.withHour(2), emptyList(), Locale.US))
+        assertEquals("Tuesday Morning Edition, Sep 29", EditionTitles.title(tuesdayMorning, emptyList(), Locale.US))
+        assertEquals("Tuesday Afternoon Edition, Sep 29", EditionTitles.title(tuesdayMorning.withHour(13), emptyList(), Locale.US))
+        assertEquals("Tuesday Evening Edition, Sep 29", EditionTitles.title(tuesdayMorning.withHour(2), emptyList(), Locale.US))
+    }
+
+    @Test
+    fun nextWeeksEditionHasItsOwnTitle() {
+        val lastWeek = EditionTitles.title(tuesdayMorning, emptyList(), Locale.US)
+        assertEquals("Tuesday Morning Edition, Oct 6", EditionTitles.title(tuesdayMorning.plusWeeks(1), listOf(lastWeek), Locale.US))
     }
 
     @Test
     fun repeatsGetANumber() {
-        val existing = listOf("Tuesday Morning Edition", "Tuesday Morning Edition (2)")
-        assertEquals("Tuesday Morning Edition (3)", EditionTitles.title(tuesdayMorning, existing, Locale.US))
+        val existing = listOf("Tuesday Morning Edition, Sep 29", "Tuesday Morning Edition, Sep 29 (2)")
+        assertEquals("Tuesday Morning Edition, Sep 29 (3)", EditionTitles.title(tuesdayMorning, existing, Locale.US))
     }
 }
