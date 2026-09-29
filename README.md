@@ -45,6 +45,7 @@ who'd rather not set up Python, a server and a scheduler.
 <p>
   <img src="docs/screenshots/05b-edition-detail.png" width="200" alt="Edition contents with bring back">
   <img src="docs/screenshots/06-sources.png" width="200" alt="Sources">
+  <img src="docs/screenshots/06b-source-detail.png" width="200" alt="One source's health and recent articles">
   <img src="docs/screenshots/07-settings.png" width="200" alt="Settings">
 </p>
 

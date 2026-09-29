@@ -19,6 +19,11 @@ class SourceRepository(private val db: AppDatabase) {
 
     fun observeActivity(): Flow<List<SourceActivity>> = db.articles().observeActivity()
 
+    fun observe(id: Long): Flow<SourceEntity?> = sources.observe(id)
+
+    /** The source's newest articles, newest first, whatever their state. */
+    fun observeRecentArticles(id: Long, limit: Int = 30): Flow<List<ArticleEntity>> = db.articles().observeRecentForSource(id, limit)
+
     /** Adds a feed unless one with this URL exists; returns its id either way. */
     suspend fun addFeed(url: String, title: String?, section: String? = null): Long {
         sources.byUrl(url)?.let { return it.id }
