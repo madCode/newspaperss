@@ -8,6 +8,7 @@ import com.app.newspaperss.core.net.OkHttpHttpClient
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.FeedSync
+import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.edition.AndroidImageEncoder
 import com.app.newspaperss.edition.ArticleContentProvider
@@ -18,6 +19,9 @@ import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
 class AppContainer(
@@ -27,7 +31,10 @@ class AppContainer(
     content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()),
 ) {
     private val editionsDir = File(context.filesDir, "editions")
+    /** For work that must outlive the screen that started it, like saving a shared link. */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val sources = SourceRepository(db)
+    val readingList = ReadingListRepository(db)
     val editions = EditionRepository(db, editionsDir)
     val feedFinder = FeedFinder(http)
     val feedSync = FeedSync(db, http)

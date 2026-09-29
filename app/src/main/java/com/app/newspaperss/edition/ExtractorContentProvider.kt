@@ -9,6 +9,7 @@ import com.app.newspaperss.core.images.ImageEncoder
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.data.SourceKind
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -30,7 +31,7 @@ class ExtractorContentProvider(
     // Downloads overlap but decoding doesn't: a decoded photo can take tens of MB of heap.
     private val encoding = Mutex()
 
-    override suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance): ArticleContent {
+    override suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance): ArticleContent? {
         val extracted = extractor.extract(
             ExtractInput(
                 url = article.url,
@@ -40,6 +41,9 @@ class ExtractorContentProvider(
                 mode = source.contentMode,
             ),
         )
+        // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
+        // reader saved on purpose waits for the next edition instead of being used up as a stub.
+        if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
         val encoded = download(ArticleImages.wanted(extracted.imageUrls), refererFor(article.url), images)
         val embedded = ArticleImages.embed(extracted.html, "a${article.id}", encoded)
         return ArticleContent(

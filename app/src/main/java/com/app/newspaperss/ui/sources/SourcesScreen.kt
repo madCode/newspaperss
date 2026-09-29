@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -49,7 +50,7 @@ import com.app.newspaperss.data.SourceRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SourcesScreen(viewModel: SourcesViewModel) {
+fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {}) {
     val rows by viewModel.rows.collectAsState()
     val add by viewModel.add.collectAsState()
     Scaffold(
@@ -72,8 +73,12 @@ fun SourcesScreen(viewModel: SourcesViewModel) {
         val list = rows
         when {
             list == null -> Box(Modifier.fillMaxSize().padding(padding))
-            list.isEmpty() -> EmptySources(Modifier.padding(padding))
+            list.isEmpty() -> Column(Modifier.padding(padding)) {
+                ReadingListRow(onOpenReadingList)
+                EmptySources(Modifier)
+            }
             else -> LazyColumn(contentPadding = PaddingValues(bottom = 96.dp), modifier = Modifier.padding(padding)) {
+                item { ReadingListRow(onOpenReadingList) }
                 items(list, key = { it.source.id }) { row ->
                     SourceItem(row, onRemove = { viewModel.remove(row.source) }, onTogglePause = { viewModel.togglePaused(row.source) })
                     HorizontalDivider()
@@ -82,6 +87,17 @@ fun SourcesScreen(viewModel: SourcesViewModel) {
         }
     }
     AddSourceDialog(add, viewModel)
+}
+
+@Composable
+private fun ReadingListRow(onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text("Your reading list") },
+        supportingContent = { Text("Links you share to newspaperss from any app") },
+        leadingContent = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
+        modifier = Modifier.clickable(onClickLabel = "Open reading list", onClick = onClick),
+    )
+    HorizontalDivider()
 }
 
 @Composable

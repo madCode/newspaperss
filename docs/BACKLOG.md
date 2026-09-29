@@ -24,8 +24,9 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] Hold the splash screen until settings load instead of a blank first frame
 - [ ] Robolectric test launching MainActivity: onboarding vs the app
 
-### M6 Reading list
-- [ ] Share target for URLs; reading list screen; markdown checklist import/export
+### M6 leftovers
+- [ ] Curated list sources (a scraper per site, like rss-to-e-reader's Arts & Letters Daily queue) with keep-newest-N
+- [ ] Fetch a saved link's title in the background so the list shows it before the edition does
 
 ### M7 Polish
 - [ ] Source health view; remove-and-re-add shouldn't re-deliver (soft delete sources)
@@ -42,6 +43,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 - [x] M1 Skeleton: Gradle (AGP 9.1, Kotlin 2.3, Compose), `:core` + `:app`, CI, design doc (#1)
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)
+- [x] M6 Reading list: share target, reading list screen, markdown checklist import/export compatible with rss-to-e-reader (#4)
 - [x] M5 Onboarding: device, starter packs, paste a site, size and schedule, first edition (#3)
 - [x] Images in editions: 1200px JPEG, per-edition allowance so over-budget images aren't downloaded (#3)
 - [x] M4 Settings, scheduled editions (timer chain that never skips an overdue edition), folder delivery, notifications (#2)

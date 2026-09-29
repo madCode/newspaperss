@@ -6,6 +6,7 @@ import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.transparentPng
@@ -44,7 +45,7 @@ class ExtractorContentProviderTest {
             <p><img src="https://cdn.example/diagram.svg" alt="diagram"/><img src="https://cdn.example/chart" alt="chart"/></p>
         """.trimIndent()
 
-        val content = provider.contentFor(article(html), source, ImageAllowance())
+        val content = provider.contentFor(article(html), source, ImageAllowance())!!
 
         val image = content.images.single()
         assertEquals("images/a42-1.jpg", image.href)
@@ -82,9 +83,28 @@ class ExtractorContentProviderTest {
         val html = "<p>Words.</p><p><img src=\"https://cdn.example/1.jpg\"/></p>"
         val full = ImageAllowance(maxBytes = 0)
 
-        val content = provider.contentFor(article(html), source, full)
+        val content = provider.contentFor(article(html), source, full)!!
 
         assertTrue(http.bytesRequests.isEmpty())
         assertTrue(content.images.isEmpty())
+    }
+
+    private val readingList = SourceEntity(id = 2, kind = SourceKind.READING_LIST, url = "newspaperss:reading-list", title = "Saved", contentMode = ContentMode.PAGE)
+
+    @Test
+    fun aSavedLinkWithoutATitleGetsThePagesOwn() = runTest {
+        val words = (1..400).joinToString(" ") { "word$it" }
+        http.page("https://example.com/story", "<html><head><title>The real headline</title></head><body><article><h1>The real headline</h1><p>$words</p></article></body></html>")
+        val saved = ArticleEntity(id = 7, sourceId = 2, guid = "https://example.com/story", url = "https://example.com/story", title = "")
+
+        val content = provider.contentFor(saved, readingList, ImageAllowance())!!
+
+        assertEquals("The real headline", content.title)
+    }
+
+    @Test
+    fun aSavedLinkThatCantBeFetchedWaitsInsteadOfBeingUsedUp() = runTest {
+        val saved = ArticleEntity(id = 8, sourceId = 2, guid = "https://example.com/gone", url = "https://example.com/gone", title = "")
+        assertEquals(null, provider.contentFor(saved, readingList, ImageAllowance()))
     }
 }
