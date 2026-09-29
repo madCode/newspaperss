@@ -15,6 +15,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -32,6 +33,8 @@ import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.work.EditionScheduler
+import com.app.newspaperss.ui.onboarding.OnboardingScreen
+import com.app.newspaperss.ui.onboarding.OnboardingViewModel
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.work.SyncWorker
@@ -48,7 +51,23 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val container = (application as NewspaperssApp).container
         setContent {
-            NewspaperssTheme { App(container) }
+            NewspaperssTheme {
+                val settings by container.settings.settings.collectAsState(initial = null)
+                when (settings?.onboarded) {
+                    null -> {}
+                    false -> {
+                        val context = LocalContext.current.applicationContext
+                        val vm = viewModel {
+                            OnboardingViewModel(container.settings, container.sources, container.feedFinder) { saved ->
+                                EditionScheduler.reschedule(context, saved)
+                                EditionWorker.buildNow(context)
+                            }
+                        }
+                        OnboardingScreen(vm)
+                    }
+                    true -> App(container)
+                }
+            }
         }
     }
 }
