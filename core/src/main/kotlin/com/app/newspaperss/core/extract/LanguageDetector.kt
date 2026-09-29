@@ -22,16 +22,17 @@ object LanguageDetector {
         val page = normalize(declared)
         return when (val guess = guess(text)) {
             Guess.Unknown -> page
-            // Latin text in a language not detected: a page's non-Latin tag is a site-wide
+            // Latin text in a language not detected: a page's right-to-left tag is a site-wide
             // default, not this article's, and would turn an English caption right to left.
-            Guess.UnknownLatin -> page?.takeUnless { primary(it) in NON_LATIN }
+            Guess.UnknownLatin -> page?.takeUnless { isRightToLeft(it) }
             is Guess.Known -> when {
                 page == null -> guess.tag
                 // Kept when it agrees: it can be more precise ("pt-BR", "fa" for Arabic script).
                 primary(page) in compatibleWith(guess.tag) -> page
-                // A Latin-script language not detected (Galician, Afrikaans, Catalan) reads as its
-                // nearest neighbour here, so the page knows better; unless the text is plainly English.
-                guess.tag in LATIN && guess.tag != "en" && primary(page) !in LATIN && primary(page) !in NON_LATIN -> page
+                // A Latin-script language not detected (Galician, Serbian, Danish) reads as a
+                // neighbour here, so the page knows better; unless the text is plainly English.
+                guess.tag in LATIN && primary(page) !in LATIN && canBeLatin(page) &&
+                    (guess.tag != "en" || guess.share < PLAINLY_ENGLISH) -> page
                 else -> guess.tag
             }
         }
@@ -45,11 +46,11 @@ object LanguageDetector {
     fun normalize(tag: String?): String? {
         val parts = tag?.trim()?.replace('_', '-')?.split('-') ?: return null
         val primary = parts.first().lowercase()
-        if (!PRIMARY.matches(primary) || primary == "und") return null
+        if (!PRIMARY.matches(primary) || primary == "und" || (primary.length == 2 && primary !in LANGUAGES)) return null
         val out = mutableListOf(primary)
         var rest = parts.drop(1)
-        rest.firstOrNull()?.takeIf { SCRIPT.matches(it) }?.let { script ->
-            out += script.lowercase().replaceFirstChar(Char::uppercaseChar)
+        rest.firstOrNull()?.lowercase()?.replaceFirstChar(Char::uppercaseChar)?.takeIf { it in SCRIPTS }?.let { script ->
+            out += script
             rest = rest.drop(1)
         }
         rest.firstOrNull()?.uppercase()?.takeIf { it in COUNTRIES }?.let { out += it }
@@ -60,7 +61,8 @@ object LanguageDetector {
     fun isRightToLeft(tag: String): Boolean = primary(tag) in RTL
 
     private sealed interface Guess {
-        data class Known(val tag: String) : Guess
+        /** @property share how much of the text marked it (Latin languages only; 1 for a script). */
+        data class Known(val tag: String, val share: Double = 1.0) : Guess
         /** Mostly Latin letters, in a language the word lists don't know (or too little text). */
         data object UnknownLatin : Guess
         data object Unknown : Guess
@@ -81,7 +83,7 @@ object LanguageDetector {
             i += Character.charCount(cp)
         }
         val latin = scripts[UnicodeScript.LATIN] ?: 0
-        if (latin * 2 >= letters && letters > 0) return latinLanguage(sample)?.let(Guess::Known) ?: Guess.UnknownLatin
+        if (latin * 2 >= letters && letters > 0) return latinLanguage(sample) ?: Guess.UnknownLatin
         if (letters < MIN_LETTERS) return Guess.Unknown
         val kana = (scripts[UnicodeScript.HIRAGANA] ?: 0) + (scripts[UnicodeScript.KATAKANA] ?: 0)
         val han = scripts[UnicodeScript.HAN] ?: 0
@@ -99,7 +101,7 @@ object LanguageDetector {
         return SCRIPT_LANGUAGE[top]?.takeIf { count * 2 >= letters }?.let(Guess::Known) ?: Guess.Unknown
     }
 
-    private fun latinLanguage(text: String): String? {
+    private fun latinLanguage(text: String): Guess.Known? {
         val words = WORD.findAll(text.lowercase()).map { it.value }.toList()
         if (words.size < MIN_WORDS) return null
         val scores = HashMap<String, Double>()
@@ -113,10 +115,14 @@ object LanguageDetector {
         val ranked = scores.entries.sortedByDescending { it.value }
         val best = ranked.firstOrNull() ?: return null
         val runnerUp = ranked.getOrNull(1)?.value ?: 0.0
-        return best.key.takeIf { best.value >= MIN_SHARE * words.size && best.value >= MARGIN * runnerUp }
+        val share = best.value / words.size
+        return Guess.Known(best.key, share).takeIf { share >= MIN_SHARE && best.value >= MARGIN * runnerUp }
     }
 
     private fun primary(tag: String) = tag.substringBefore('-').lowercase()
+
+    /** Latin text can be in [tag]'s language: it says Latin script, or isn't a language of another script. */
+    private fun canBeLatin(tag: String) = "-Latn" in tag || primary(tag) !in NON_LATIN
 
     private fun compatibleWith(guess: String): Set<String> =
         // Japanese written mostly in kanji reads as Chinese; a page saying Japanese is right.
@@ -124,7 +130,11 @@ object LanguageDetector {
         else FAMILIES.firstOrNull { guess in it } ?: setOf(guess)
 
     private val PRIMARY = Regex("[a-z]{2,3}")
-    private val SCRIPT = Regex("[A-Za-z]{4}")
+    // ISO 639-1 for two letters, so "jp" or "gr" (country codes) aren't taken for languages.
+    private val LANGUAGES = java.util.Locale.getISOLanguages().toSet() + "he"
+    private val SCRIPTS = setOf(
+        "Latn", "Cyrl", "Arab", "Hebr", "Grek", "Hans", "Hant", "Jpan", "Kore", "Deva", "Beng", "Taml", "Thai", "Geor", "Armn", "Ethi",
+    )
     private val COUNTRIES = java.util.Locale.getISOCountries().toSet()
     private val WORD = Regex("\\p{L}+")
     private const val SAMPLE_CHARS = 6_000
@@ -134,6 +144,8 @@ object LanguageDetector {
     // well under that and the text is probably something else.
     private const val MIN_SHARE = 0.05
     private const val MARGIN = 1.5
+    // English text scores 0.3 or more; a Scandinavian text, sharing a few short words, well under.
+    private const val PLAINLY_ENGLISH = 0.15
 
     private val RTL = setOf("ar", "fa", "ur", "ps", "sd", "ug", "he", "iw", "yi", "dv")
 
@@ -161,8 +173,9 @@ object LanguageDetector {
 
     // Each language's most frequent words, shared ones included: leaving out "la" or "de" because
     // several languages use them hands those words to whichever list does have them.
+    // Except English "at" and "for", which are as common in Danish and Norwegian and made them English.
     private val STOPWORDS = mapOf(
-        "en" to "the of and to a in is that it was for on are with as be by this have not but at from they his her",
+        "en" to "the of and to a in is that it was on are with as be by this have not but from they his her",
         "fr" to "le la les de des et est un une que qui dans pour pas sur au du ce il elle avec sont mais en ne se plus",
         "es" to "el la los las de del y que en un una por con para es se su al como más pero lo fue no le ha",
         "it" to "il la le di della del e che un una per non sono con gli nel alla anche è come più ma dei si ha lo",
@@ -173,7 +186,7 @@ object LanguageDetector {
     private val LATIN = STOPWORDS.keys
 
     // Languages written in another script, whose tag on Latin text is a mistake.
-    private val NON_LATIN = FAMILIES.flatten().toSet() + SCRIPT_LANGUAGE.values +
+    private val NON_LATIN = FAMILIES.flatten().toSet() + SCRIPT_LANGUAGE.values + RTL +
         setOf("ja", "ko", "am", "km", "lo", "my", "si", "te", "kn", "ml", "gu", "pa", "or", "dz", "bo")
 
     private val STOPWORD_LANGUAGES: Map<String, List<String>> = buildMap<String, MutableList<String>> {

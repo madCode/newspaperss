@@ -133,4 +133,27 @@ class LanguageDetectorTest {
         assertEquals("en-GB", LanguageDetector.detect(english, "en-GB"))
         assertEquals("en", LanguageDetector.detect(english, "en-UK"))
     }
+
+    @Test
+    fun serbianAndDanishKeepThePagesTag() {
+        val serbian = "Vlada Srbije je danas usvojila novi zakon o stanovanju, a opozicija kaže da su mere zakasnile i da građani " +
+            "nisu bili konsultovani o projektu. Ministar je na konferenciji rekao da se zakon primenjuje od januara."
+        assertEquals("sr-Latn", LanguageDetector.detect(serbian, "sr-Latn"))
+        val danish = "Regeringen har i dag fremlagt et nyt forslag om at sænke skatten for familier med børn, men oppositionen " +
+            "siger at forslaget kommer for sent og at det er for dyrt for kommunerne at gennemføre i år."
+        assertEquals("da", LanguageDetector.detect(danish, "da"))
+    }
+
+    @Test
+    fun aShortMostlyLatinHeadlineKeepsAPageSayingJapanese() {
+        assertEquals("ja", LanguageDetector.detect("Nintendo Switch 2 発売日決定", "ja"))
+        assertNull(LanguageDetector.detect("A cartoon about the week.", "dv"))
+    }
+
+    @Test
+    fun madeUpScriptsAndCountryCodesAsLanguagesAreDropped() {
+        assertEquals("en", LanguageDetector.normalize("en-Test"))
+        assertNull(LanguageDetector.normalize("jp"))
+        assertEquals("he", LanguageDetector.normalize("he"))
+    }
 }
