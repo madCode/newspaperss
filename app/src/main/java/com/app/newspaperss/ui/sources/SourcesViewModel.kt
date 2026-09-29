@@ -6,6 +6,7 @@ import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.core.feed.FindResult
 import com.app.newspaperss.core.feed.FoundFeed
 import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +33,7 @@ class SourcesViewModel(
 ) : ViewModel() {
     val rows: StateFlow<List<SourceRow>?> = combine(repository.observe(), repository.observeWaitingCounts()) { sources, counts ->
         val bySource = counts.associate { it.sourceId to it.count }
-        sources.map { SourceRow(it, bySource[it.id] ?: 0) }
+        sources.filter { it.kind == SourceKind.FEED }.map { SourceRow(it, bySource[it.id] ?: 0) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _add = MutableStateFlow<AddState>(AddState.Closed)

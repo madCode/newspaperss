@@ -3,7 +3,6 @@ package com.app.newspaperss
 import android.app.Application
 import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.work.SyncWorker
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 open class NewspaperssApp : Application() {
@@ -22,6 +21,6 @@ open class NewspaperssApp : Application() {
         SyncWorker.schedulePeriodic(this)
         // Arms the timer if none is pending (first run, after an update or a
         // restore); a pending or overdue one is left alone.
-        MainScope().launch { EditionScheduler.reschedule(this@NewspaperssApp, container.settings.current()) }
+        container.appScope.launch { EditionScheduler.reschedule(this@NewspaperssApp, container.settings.current()) }
     }
 }

@@ -70,6 +70,15 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE id = :id")
     suspend fun byId(id: Long): ArticleEntity?
 
+    @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt DESC, id DESC")
+    fun observeAllForSource(sourceId: Long): Flow<List<ArticleEntity>>
+
+    @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt, id")
+    suspend fun allForSource(sourceId: Long): List<ArticleEntity>
+
+    @Query("DELETE FROM articles WHERE id = :id")
+    suspend fun delete(id: Long)
+
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY COALESCE(published, discoveredAt) DESC LIMIT :limit")
     fun observeForSource(sourceId: Long, limit: Int = 50): Flow<List<ArticleEntity>>
 

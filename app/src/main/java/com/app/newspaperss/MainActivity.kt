@@ -35,6 +35,8 @@ import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
+import com.app.newspaperss.ui.readinglist.ReadingListScreen
+import com.app.newspaperss.ui.readinglist.ReadingListViewModel
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.work.SyncWorker
@@ -44,6 +46,8 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
     SOURCES("sources", "Sources", Icons.AutoMirrored.Filled.List),
     SETTINGS("settings", "Settings", Icons.Default.Settings),
 }
+
+private const val READING_LIST = "reading-list"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,7 +85,7 @@ private fun App(container: AppContainer) {
             NavigationBar {
                 Tab.entries.forEach { tab ->
                     NavigationBarItem(
-                        selected = current?.destination?.route == tab.route,
+                        selected = current?.destination?.route.let { it == tab.route || (tab == Tab.SOURCES && it == READING_LIST) },
                         onClick = {
                             nav.navigate(tab.route) {
                                 popUpTo(nav.graph.findStartDestination().id) { saveState = true }
@@ -105,7 +109,11 @@ private fun App(container: AppContainer) {
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { SourcesViewModel(container.sources, container.feedFinder) { SyncWorker.syncNow(context) } }
-                SourcesScreen(vm)
+                SourcesScreen(vm, onOpenReadingList = { nav.navigate(READING_LIST) })
+            }
+            composable(READING_LIST) {
+                val vm = viewModel { ReadingListViewModel(container.readingList) }
+                ReadingListScreen(vm, onBack = { nav.popBackStack() })
             }
             composable(Tab.SETTINGS.route) {
                 val context = LocalContext.current.applicationContext
