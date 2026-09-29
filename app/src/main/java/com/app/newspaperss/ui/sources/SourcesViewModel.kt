@@ -8,7 +8,14 @@ import com.app.newspaperss.core.feed.FoundFeed
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
+import android.content.ContentResolver
+import android.net.Uri
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import java.time.Instant
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class SourceRow(val source: SourceEntity, val waiting: Int)
+data class SourceRow(val source: SourceEntity, val lastNew: Instant?)
 
 sealed interface AddState {
     data object Closed : AddState
@@ -31,9 +38,9 @@ class SourcesViewModel(
     private val finder: FeedFinder,
     private val onSourcesChanged: () -> Unit,
 ) : ViewModel() {
-    val rows: StateFlow<List<SourceRow>?> = combine(repository.observe(), repository.observeWaitingCounts()) { sources, counts ->
-        val bySource = counts.associate { it.sourceId to it.count }
-        sources.filter { it.kind == SourceKind.FEED }.map { SourceRow(it, bySource[it.id] ?: 0) }
+    val rows: StateFlow<List<SourceRow>?> = combine(repository.observe(), repository.observeActivity()) { sources, activity ->
+        val bySource = activity.associate { it.sourceId to it.lastNew }
+        sources.filter { it.kind == SourceKind.FEED }.map { SourceRow(it, bySource[it.id]) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _add = MutableStateFlow<AddState>(AddState.Closed)
@@ -81,6 +88,48 @@ class SourcesViewModel(
     }
 
     fun refresh() = onSourcesChanged()
+
+    private val _message = MutableStateFlow<String?>(null)
+    /** A one-line result to show the reader, e.g. after an import. */
+    val message: StateFlow<String?> = _message.asStateFlow()
+
+    fun dismissMessage() { _message.value = null }
+
+    // Files come from the system picker, often a cloud provider: reads and writes can be slow or fail.
+    fun importOpml(resolver: ContentResolver, uri: Uri) {
+        viewModelScope.launch {
+            _message.value = try {
+                val text = withContext(Dispatchers.IO) {
+                    resolver.openInputStream(uri)?.use { it.bufferedReader().readText() } ?: throw IOException("empty")
+                }
+                val added = repository.importOpml(text)
+                if (added > 0) onSourcesChanged()
+                when (added) {
+                    0 -> "No new sites in that file."
+                    1 -> "Added 1 site."
+                    else -> "Added $added sites."
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                "Couldn't read that file. Is it an OPML export from another reader?"
+            }
+        }
+    }
+
+    fun exportOpml(resolver: ContentResolver, uri: Uri) {
+        viewModelScope.launch {
+            _message.value = try {
+                val text = repository.exportOpml()
+                withContext(Dispatchers.IO) {
+                    resolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray()) } ?: throw IOException("no stream")
+                }
+                "Your sites are saved."
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                "Couldn't save the file."
+            }
+        }
+    }
 
     private suspend fun subscribe(feed: FoundFeed) {
         repository.addFeed(feed.url, feed.title)

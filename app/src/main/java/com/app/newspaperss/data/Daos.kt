@@ -54,7 +54,7 @@ interface SourceDao {
     suspend fun delete(source: SourceEntity)
 }
 
-data class SourceCount(val sourceId: Long, val count: Int)
+data class SourceActivity(val sourceId: Long, val lastNew: Instant?)
 
 @Dao
 interface ArticleDao {
@@ -80,8 +80,8 @@ interface ArticleDao {
     @Query("DELETE FROM articles WHERE id = :id")
     suspend fun delete(id: Long)
 
-    @Query("SELECT sourceId, COUNT(*) AS count FROM articles WHERE state = 'NEW' GROUP BY sourceId")
-    fun observeWaitingCounts(): Flow<List<SourceCount>>
+    @Query("SELECT sourceId, MAX(discoveredAt) AS lastNew FROM articles GROUP BY sourceId")
+    fun observeActivity(): Flow<List<SourceActivity>>
 
     @Query("UPDATE articles SET state = :state, broughtBack = 0 WHERE id IN (:ids)")
     suspend fun setState(ids: List<Long>, state: ArticleState)

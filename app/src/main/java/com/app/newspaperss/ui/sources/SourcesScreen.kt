@@ -18,7 +18,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,6 +51,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import java.time.Instant
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import com.app.newspaperss.data.SourceRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,12 +61,41 @@ import com.app.newspaperss.data.SourceRepository
 fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {}) {
     val rows by viewModel.rows.collectAsState()
     val add by viewModel.add.collectAsState()
+    val message by viewModel.message.collectAsState()
+    val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    var menu by remember { mutableStateOf(false) }
+    val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importOpml(context.contentResolver, uri)
+    }
+    val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/x-opml")) { uri ->
+        if (uri != null) viewModel.exportOpml(context.contentResolver, uri)
+    }
+    LaunchedEffect(message) {
+        message?.let {
+            snackbar.showSnackbar(it)
+            viewModel.dismissMessage()
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Sources") },
                 actions = {
                     IconButton(onClick = viewModel::refresh) { Icon(Icons.Default.Refresh, contentDescription = "Check for new articles") }
+                    Box {
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Import from another reader (OPML)") },
+                                onClick = { menu = false; importFile.launch(arrayOf("*/*")) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Export your sites (OPML)") },
+                                onClick = { menu = false; exportFile.launch("newspaperss-sources.opml") },
+                            )
+                        }
+                    }
                 },
             )
         },
@@ -68,6 +106,7 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
                 text = { Text("Add a source") },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val list = rows
         when {
@@ -123,7 +162,7 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
         s.paused -> "Paused"
         s.lastError != null -> s.lastError
         s.lastFetchedAt == null -> "Checking…"
-        else -> "Working"
+        else -> freshness(row.lastNew)
     }
     ListItem(
         headlineContent = { Text(s.title) },
@@ -191,4 +230,15 @@ private fun AddSourceDialog(state: AddState, viewModel: SourcesViewModel) {
         },
         dismissButton = { TextButton(onClick = viewModel::closeAdd) { Text("Cancel") } },
     )
+}
+
+/** How recently a site published, so a quiet or dead one stands out without counting what's unread. */
+internal fun freshness(lastNew: Instant?, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String {
+    if (lastNew == null) return "No articles yet"
+    val days = ChronoUnit.DAYS.between(lastNew.atZone(zone).toLocalDate(), now.atZone(zone).toLocalDate())
+    return when {
+        days <= 0 -> "New articles today"
+        days == 1L -> "Last new article yesterday"
+        else -> "Last new article $days days ago"
+    }
 }
