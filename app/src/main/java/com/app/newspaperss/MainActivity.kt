@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -27,6 +28,8 @@ import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.theme.NewspaperssTheme
 import com.app.newspaperss.ui.today.TodayScreen
+import com.app.newspaperss.ui.today.TodayViewModel
+import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.work.SyncWorker
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
@@ -70,9 +73,13 @@ private fun App(container: AppContainer) {
         },
     ) { padding ->
         NavHost(nav, startDestination = Tab.TODAY.route, modifier = Modifier.padding(padding)) {
-            composable(Tab.TODAY.route) { TodayScreen() }
+            composable(Tab.TODAY.route) {
+                val context = LocalContext.current.applicationContext
+                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context)) { EditionWorker.buildNow(context) } }
+                TodayScreen(vm)
+            }
             composable(Tab.SOURCES.route) {
-                val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+                val context = LocalContext.current.applicationContext
                 val vm = viewModel { SourcesViewModel(container.sources, container.feedFinder) { SyncWorker.syncNow(context) } }
                 SourcesScreen(vm)
             }

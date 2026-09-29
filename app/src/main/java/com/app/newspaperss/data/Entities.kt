@@ -30,6 +30,8 @@ data class SourceEntity(
 
 enum class ArticleState {
     NEW,
+    /** In an edition that hasn't been delivered yet; goes back to NEW if it never is. */
+    IN_EDITION,
     DELIVERED,
     /** The reader dismissed it. */
     SKIPPED,

@@ -88,6 +88,9 @@ interface EditionDao {
     @Query("SELECT title FROM editions WHERE createdAt >= :since")
     suspend fun titlesSince(since: Instant): List<String>
 
+    @Query("SELECT * FROM editions WHERE status = :status")
+    suspend fun withStatus(status: EditionStatus): List<EditionEntity>
+
     @Query("SELECT COUNT(*) FROM editions")
     suspend fun count(): Int
 
