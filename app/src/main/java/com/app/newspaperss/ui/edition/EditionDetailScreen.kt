@@ -111,7 +111,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                 Header(
                     edition,
                     fileMissing = current.file == null,
-                    onSend = { current.file?.let { launch(EditionIntents.share(context, it, edition.title)) } },
+                    onSend = { current.file?.let { launch(EditionIntents.share(context, it, edition.title, edition.id)) } },
                     onOpen = { current.file?.let { launch(EditionIntents.open(context, it)) } },
                     onSent = viewModel::markSent,
                 )

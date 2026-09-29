@@ -23,7 +23,20 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M8 Advanced
 - [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
 
+### From the persona audit (Day 2)
+- [ ] Put the date in edition titles and file names: weekly repeats ("Tuesday Morning Edition") collide in e-reader libraries and folders
+- [ ] A default-importance channel for "edition ready" (share delivery depends on it being seen)
+- [ ] Saved links in onboarding: Pocket/Instapaper import there, and a reading-list-only setup
+- [ ] Say why there's no edition: nothing new on schedule, all sources failed, waiting for a connection
+- [ ] Boox: offer folder delivery into the Books folder, so editions stay in the library
+- [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs
+- [ ] "No feed found": offer to save the page to the reading list instead
+- [ ] TalkBack: live-region build status, step "2 of 4" on the onboarding progress, a click label on the edition card; move Add out of the text field for large fonts
+- [ ] Change the device in Settings after onboarding
+- [ ] A short Kindle how-to (same Amazon account, Library › Docs)
+
 ### Tech debt
+- [ ] `SettingsScreenTest` can fail under full-suite load: DataStore "Unable to rename s.preferences_pb.tmp", likely a write still running when the temp folder is deleted. Give test DataStores a scope that's finished before cleanup
 
 ## Feature proposals
 
@@ -77,6 +90,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Sending from the "ready" notification counts: choosing an app in the share sheet marks the edition delivered (it was released the next day and its articles repeated)
 - [x] Onboarding: import an OPML file or connect tt-rss on the sources step, instead of only after setup
 - [x] Research: competing and neighbouring apps, in [docs/research/competitors.md](research/competitors.md)
 - [x] Timed editions start 30 minutes before they're due, so Doze's hold on delayed work becomes lead time instead of a late paper

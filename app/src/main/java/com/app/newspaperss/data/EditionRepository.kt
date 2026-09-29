@@ -29,6 +29,14 @@ class EditionRepository(
 
     fun fileOf(edition: EditionEntity): File? = edition.fileName?.let { File(editionsDir, it) }?.takeIf { it.exists() }
 
+    /**
+     * The reader handed a ready edition to an app. An edition already delivered, or released
+     * because it wasn't sent in time, is left alone: its articles may be in a newer one now.
+     */
+    suspend fun markSent(id: Long) {
+        if (db.editions().byId(id)?.status == EditionStatus.READY) markDelivered(id)
+    }
+
     /** Delivery succeeded: only now are the edition's articles used up. */
     suspend fun markDelivered(id: Long) {
         val delivered = db.withTransaction {

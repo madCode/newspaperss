@@ -13,8 +13,12 @@ object EditionIntents {
     fun uriFor(context: Context, file: File): Uri =
         FileProvider.getUriForFile(context, "${context.packageName}.files", file)
 
-    /** The share sheet, where the Kindle app appears as "Send to Kindle". */
-    fun share(context: Context, file: File, title: String): Intent {
+    /**
+     * The share sheet, where the Kindle app appears as "Send to Kindle".
+     *
+     * @param editionId marks that edition sent once the reader picks an app; see [EditionSentReceiver].
+     */
+    fun share(context: Context, file: File, title: String, editionId: Long? = null): Intent {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = EPUB_MIME
             putExtra(Intent.EXTRA_STREAM, uriFor(context, file))
@@ -22,7 +26,7 @@ object EditionIntents {
             putExtra(Intent.EXTRA_TITLE, title)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        return Intent.createChooser(send, "Send “$title” to your e-reader")
+        return Intent.createChooser(send, "Send “$title” to your e-reader", editionId?.let { EditionSentReceiver.callback(context, it) })
     }
 
     /** The share sheet for an edition's reading notes, e.g. to a notes app or Files. */

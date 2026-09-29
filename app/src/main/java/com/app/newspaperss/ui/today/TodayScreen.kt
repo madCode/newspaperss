@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
@@ -21,10 +20,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,35 +38,15 @@ import kotlin.math.roundToInt
 fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), onOpenEdition: (Long) -> Unit = {}) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    fun launch(intent: android.content.Intent) {
-        try {
-            context.startActivity(intent)
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "No reading app on this phone can open the edition. Try Send instead.", Toast.LENGTH_LONG).show()
-        }
-    }
-    // After the share sheet, ask whether the edition arrived: without the answer its
-    // articles aren't used up, and people rarely come back to find "I've sent it".
-    var awaitingConfirmation by rememberSaveable { mutableStateOf<Long?>(null) }
-    var leftForShare by rememberSaveable { mutableStateOf(false) }
-    var askNow by rememberSaveable { mutableStateOf(false) }
-    LifecycleResumeEffect(Unit) {
-        if (awaitingConfirmation != null && leftForShare) askNow = true
-        onPauseOrDispose { if (awaitingConfirmation != null) leftForShare = true }
+    fun launch(intent: android.content.Intent): Boolean = try {
+        context.startActivity(intent)
+        true
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, "No reading app on this phone can open the edition. Try Send instead.", Toast.LENGTH_LONG).show()
+        false
     }
     val editions = state.editions.orEmpty()
     val latest = editions.firstOrNull()
-    val pending = awaitingConfirmation
-    if (askNow && pending != null) {
-        val done = { awaitingConfirmation = null; askNow = false; leftForShare = false }
-        AlertDialog(
-            onDismissRequest = done,
-            title = { Text("Did it reach your ${state.deviceName}?") },
-            text = { Text("Once it's there, these articles won't come back in later editions.") },
-            confirmButton = { Button(onClick = { viewModel.markSent(pending); done() }) { Text("Yes, it's there") } },
-            dismissButton = { TextButton(onClick = done) { Text("Not yet") } },
-        )
-    }
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item { Masthead(today, Modifier.padding(top = 24.dp, bottom = 16.dp)) }
         state.next?.let { next ->
@@ -99,13 +74,13 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                     preferOpen = state.preferOpen,
                     onRetry = viewModel::makeOneNow,
                     onDetails = { onOpenEdition(latest.id) },
-                    onSend = {
+                    onSend = { viewModel.fileOf(latest)?.let { launch(EditionIntents.share(context, it, latest.title, latest.id)) } },
+                    onOpen = {
                         viewModel.fileOf(latest)?.let {
-                            launch(EditionIntents.share(context, it, latest.title))
-                            if (latest.status == EditionStatus.READY) awaitingConfirmation = latest.id
+                            // Reading here is how an edition reaches a Boox.
+                            if (launch(EditionIntents.open(context, it)) && state.preferOpen) viewModel.markSent(latest)
                         }
                     },
-                    onOpen = { viewModel.fileOf(latest)?.let { launch(EditionIntents.open(context, it)) } },
                     onSent = { viewModel.markSent(latest) },
                 )
             }
@@ -206,7 +181,8 @@ private fun LatestEdition(
                         }
                     }
                     Text(
-                        "Once it's on your e-reader, tell us so these articles don't come back.",
+                        if (preferOpen) "Opening it here counts as delivered. Read it another way? Tell us so these articles don't come back."
+                        else "Choosing an app to send it with counts as delivered. Sent it another way? Tell us so these articles don't come back.",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 12.dp),
                     )
