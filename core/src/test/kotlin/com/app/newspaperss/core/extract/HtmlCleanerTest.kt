@@ -172,6 +172,8 @@ class HtmlCleanerTest {
         assertEquals(body + body, clean("$body<h2>Recommended Stories</h2>$body"))
         val links = "<ul><li><a href=\"https://example.com/a\">Story A</a></li><li><a href=\"https://example.com/b\">Story B</a></li></ul>"
         assertEquals(body, clean("$body<div class=\"more\"><h3>Related stories</h3>$links$links</div>"))
+        // Feed HTML has line breaks between tags.
+        assertEquals(body, clean("$body\n<h2>Read next</h2>\n$links\n"))
     }
 
     @Test
@@ -179,6 +181,10 @@ class HtmlCleanerTest {
         assertEquals(
             "<p>Text <a href=\"https://example.com/f.pdf\">Download PDF</a> end.</p>",
             clean("<p>Text <a href=\"https://example.com/f.pdf\"><span class=\"sr-only\">Download PDF</span></a> end.</p>"),
+        )
+        assertEquals(
+            "<p><a href=\"https://example.com/m\">Open menu</a></p>",
+            clean("<p><a href=\"https://example.com/m\"><span class=\"sr-only\">Open</span> <span class=\"sr-only\">menu</span></a></p>"),
         )
     }
 

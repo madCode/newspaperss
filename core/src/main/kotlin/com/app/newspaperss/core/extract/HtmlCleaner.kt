@@ -203,10 +203,15 @@ object HtmlCleaner {
         }
     }
 
-    /** Whether [el] is all the text a link or button has, as on an icon link: removed, the link would be empty. */
+    /**
+     * Whether [el] is part of all the text a link or button has, as on an icon link: without its
+     * screen-reader text, the link would be empty.
+     */
     private fun isOnlyLabel(el: Element): Boolean {
         val control = el.parents().firstOrNull { it.tagName() == "a" || it.tagName() == "button" } ?: return false
-        return control.text().trim() == el.text().trim()
+        val visible = control.clone()
+        visible.select("*").filter { e -> e.classNames().any { it.lowercase() in SCREEN_READER_ONLY } }.forEach { it.remove() }
+        return visible.text().isBlank()
     }
 
     /**
