@@ -55,18 +55,19 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, onReadArticle: (position: Int) -> Unit = {}) {
+/** @param preferOpen the reader reads on this device (a Boox), so opening an edition delivers it. */
+fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, onReadArticle: (position: Int) -> Unit = {}, preferOpen: Boolean = false) {
     val detail by viewModel.detail.collectAsState()
     val selected by viewModel.selected.collectAsState()
     val message by viewModel.message.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
-    fun launch(intent: Intent) {
-        try {
-            context.startActivity(intent)
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "No reading app on this phone can open the edition. Try Send instead.", Toast.LENGTH_LONG).show()
-        }
+    fun launch(intent: Intent): Boolean = try {
+        context.startActivity(intent)
+        true
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, "No reading app on this phone can open the edition. Try Send instead.", Toast.LENGTH_LONG).show()
+        false
     }
     val notesFile by viewModel.notesFile.collectAsState()
     LaunchedEffect(notesFile) {
@@ -112,7 +113,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                     edition,
                     fileMissing = current.file == null,
                     onSend = { current.file?.let { launch(EditionIntents.share(context, it, edition.title, edition.id)) } },
-                    onOpen = { current.file?.let { launch(EditionIntents.open(context, it)) } },
+                    onOpen = { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } },
                     onSent = viewModel::markSent,
                 )
             }

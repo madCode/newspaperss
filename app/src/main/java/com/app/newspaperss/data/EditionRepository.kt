@@ -33,14 +33,14 @@ class EditionRepository(
      * The reader handed a ready edition to an app. An edition already delivered, or released
      * because it wasn't sent in time, is left alone: its articles may be in a newer one now.
      */
-    suspend fun markSent(id: Long) {
-        if (db.editions().byId(id)?.status == EditionStatus.READY) markDelivered(id)
-    }
+    suspend fun markSent(id: Long) = markDelivered(id, onlyIfReady = true)
 
     /** Delivery succeeded: only now are the edition's articles used up. */
-    suspend fun markDelivered(id: Long) {
+    suspend fun markDelivered(id: Long, onlyIfReady: Boolean = false) {
         val delivered = db.withTransaction {
             val edition = db.editions().byId(id) ?: return@withTransaction false
+            // Checked inside the transaction: a build may be releasing unsent editions at the same time.
+            if (onlyIfReady && edition.status != EditionStatus.READY) return@withTransaction false
             val articleIds = db.editions().articleIds(id)
             db.articles().setState(articleIds, ArticleState.DELIVERED)
             db.articles().rememberDelivered(articleIds, clock.instant())

@@ -12,7 +12,6 @@ import com.app.newspaperss.testutil.idleUntil
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,8 +42,8 @@ class EditionSentTest {
         // The share sheet calls back through this sender once the reader picks an app.
         val chooser = EditionIntents.share(app, file, "Tuesday Morning Edition", ready)
         val extras = chooser.extras!!
-        assertTrue(extras.keySet().any { extras.get(it) is android.content.IntentSender })
-        app.sendBroadcast(Intent(app, EditionSentReceiver::class.java).putExtra(EditionSentReceiver.EXTRA_EDITION_ID, ready))
+        val callback = extras.keySet().map { extras.get(it) }.filterIsInstance<android.content.IntentSender>().single()
+        callback.sendIntent(app, 0, null, null, null)
 
         idleUntil { statusOf(ready) == EditionStatus.DELIVERED }
     }
