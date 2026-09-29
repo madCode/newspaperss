@@ -97,4 +97,10 @@ class FeedFinderTest {
             FeedFinder.linkedFeeds(page, "https://www.webtoons.com/en/comedy/princess/list?title_no=1537"),
         )
     }
+
+    @Test
+    fun theSitesOwnLinkedFeedComesBeforeATagsOrTheComments() {
+        val page = "<a href=\"/comments/feed\">Comments</a><a href=\"/tag/cats/feed\">Cats</a><a href=\"/feed\">Posts</a>"
+        assertEquals(listOf("https://blog.example/feed", "https://blog.example/tag/cats/feed"), FeedFinder.linkedFeeds(page, "https://blog.example/"))
+    }
 }

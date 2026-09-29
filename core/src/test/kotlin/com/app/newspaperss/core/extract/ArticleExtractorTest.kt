@@ -79,6 +79,17 @@ class ArticleExtractorTest {
     }
 
     @Test
+    fun aComicsCaptionAndEveryPanelSurvive() = runTest {
+        val feedItem = "<figure><img src=\"https://example.com/thumbs/strip.png\"><figcaption>The joke, told in the caption.</figcaption></figure>"
+        val page = "<html><body><div id=\"comic\"><img src=\"https://example.com/strips/panel-1.png\"><img src=\"https://example.com/strips/panel-2.png\"></div>" +
+            "$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(feedItem))
+
+        assertEquals(listOf("https://example.com/strips/panel-1.png", "https://example.com/strips/panel-2.png"), article.imageUrls)
+        assertTrue("told in the caption" in article.html)
+    }
+
+    @Test
     fun aCartoonPageGivesItsImageNotItsFooter() = runTest {
         val cartoon = "<html><head><meta property=\"og:description\" content=\"A drawing about the news.\"></head><body>" +
             "<header><img alt=\"Example\" class=\"logo\" src=\"/logo.png\"></header><article><h1>Daily Cartoon</h1>" +

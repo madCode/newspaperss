@@ -68,7 +68,8 @@ class FeedFinder(private val http: HttpClient) {
 
         /**
          * Links on the page whose last path segment names a feed ("/comic/rss", "/feed.xml",
-         * "/series/rss?title_no=1"), on the page's own site, in page order.
+         * "/series/rss?title_no=1"), on the page's own site. Shortest path first, so the site's
+         * feed comes before a tag's or a category's; comment feeds are left out.
          */
         internal fun linkedFeeds(html: String, pageUrl: String): List<String> {
             val host = runCatching { URI(pageUrl).host?.removePrefix("www.") }.getOrNull() ?: return emptyList()
@@ -76,9 +77,11 @@ class FeedFinder(private val http: HttpClient) {
                 .filter { href ->
                     val uri = runCatching { URI(href) }.getOrNull() ?: return@filter false
                     val last = uri.path.orEmpty().trimEnd('/').substringAfterLast('/').lowercase()
-                    uri.host?.removePrefix("www.") == host && last in FEED_LINK_NAMES
+                    val segments = uri.path.orEmpty().lowercase().split('/')
+                    uri.host?.removePrefix("www.") == host && last in FEED_LINK_NAMES && "comments" !in segments
                 }
                 .distinct()
+                .sortedBy { runCatching { URI(it).path.orEmpty().count { c -> c == '/' } }.getOrDefault(Int.MAX_VALUE) }
         }
 
         // Absolute paths: a feed usually lives at the site root, not under the page typed.

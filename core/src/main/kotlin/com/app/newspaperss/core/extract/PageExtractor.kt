@@ -25,7 +25,7 @@ internal data class PageContent(
     val articleText: String? = null,
     /** `og:description`, a stand-in caption for an image post. */
     val description: String? = null,
-    /** A webcomic's own comic image as a `<figure>`, where its page marks one (ComicControl's `#cc-comic`, xkcd's `#comic`). */
+    /** A webcomic's own comic, each panel in a `<figure>`, where its page marks it (ComicControl's `#cc-comic`, xkcd's `#comic`). */
     val comicImage: String? = null,
 )
 
@@ -42,6 +42,7 @@ internal data class PageContent(
 internal object PageExtractor {
     const val MIN_WORDS = 150
     private const val MAIN_IMAGE_MIN_PX = 200
+    private const val MAX_COMIC_PANELS = 20
     // Where webcomic engines put the comic: ComicControl (Hiveworks sites), xkcd and similar.
     private const val COMIC_IMAGE = "img#cc-comic, #cc-comicbody img, #comic img, img#comic, #comic-image img"
 
@@ -94,7 +95,7 @@ internal object PageExtractor {
             mainImage = main?.let(::mainImage),
             articleText = main?.text()?.takeIf { it.isNotBlank() },
             description = doc.metaContent("og:description"),
-            comicImage = doc.select(COMIC_IMAGE).firstOrNull()?.let(::figureOf),
+            comicImage = doc.select(COMIC_IMAGE).take(MAX_COMIC_PANELS).joinToString("") { figureOf(it) }.ifEmpty { null },
         )
     }
 

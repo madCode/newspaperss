@@ -90,7 +90,9 @@ class ArticleExtractor(private val http: HttpClient) {
                     val missed = missedTheArticle(page)
                     if (feed != null && feed.imageUrls.isNotEmpty() && feedWords <= IMAGE_CAPTION_WORDS && (missed || words < FEED_IMAGE_PAGE_WORDS)) {
                         // The page's own comic beats the feed's image, which is often a thumbnail.
-                        page.content.comicImage?.let { comic -> imagePost(input, page, comic, feed, feedAuthor, feedWords)?.let { return it } }
+                        page.content.comicImage?.let { comic ->
+                            imagePost(input, page, comic, feed, feedAuthor, feedWords, feedImagesAreThumbnails = true)?.let { return it }
+                        }
                         return fromFeed(feed, null, words)
                     }
                     if (missed) {
@@ -183,11 +185,21 @@ class ArticleExtractor(private val http: HttpClient) {
 
     private fun normalized(text: String) = text.lowercase().replace(NOT_LETTERS, "")
 
-    /** [image] from the page, captioned by the feed's text or the page's description; null if it can't be used. */
-    private fun imagePost(input: ExtractInput, page: PageResult.Fetched, image: String, feed: CleanResult?, feedAuthor: String?, feedWords: Int): ExtractedArticle? {
-        // Text only: a feed item's own image is usually a thumbnail of this one.
-        val caption = feed?.html?.let { html -> Jsoup.parseBodyFragment(html).body().apply { select("img, figure, picture").remove() }.html() }
-            ?: page.content.description?.let { "<p>${Entities.escape(it)}</p>" }.orEmpty()
+    /**
+     * [image] from the page, captioned by the feed's content or else the page's description; null
+     * if it can't be used. With [feedImagesAreThumbnails], the feed's images are left out: they're
+     * smaller copies of [image].
+     */
+    private fun imagePost(
+        input: ExtractInput, page: PageResult.Fetched, image: String, feed: CleanResult?, feedAuthor: String?, feedWords: Int,
+        feedImagesAreThumbnails: Boolean = false,
+    ): ExtractedArticle? {
+        val fromFeed = feed?.html?.let { html ->
+            if (!feedImagesAreThumbnails) html
+            // Only the images: a <figcaption> is often the joke. HtmlCleaner drops what's left empty.
+            else Jsoup.parseBodyFragment(html).body().apply { select("img, picture").remove() }.html()
+        }?.takeIf { Jsoup.parse(it).text().isNotBlank() || !feedImagesAreThumbnails }
+        val caption = fromFeed ?: page.content.description?.let { "<p>${Entities.escape(it)}</p>" }.orEmpty()
         val title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) }
         val clean = HtmlCleaner.clean(image + caption, page.url, title)
         if (clean.imageUrls.isEmpty()) return null
