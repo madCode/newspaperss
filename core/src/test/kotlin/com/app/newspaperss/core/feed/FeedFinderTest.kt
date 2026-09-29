@@ -20,6 +20,7 @@ class FeedFinderTest {
             return HttpResponse(200, url, null, body)
         }
         override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = throw IOException("not used")
+        override suspend fun postJson(url: String, body: String): HttpResponse = throw IOException("not used")
     }
 
     private val feedXml = "<rss version=\"2.0\"><channel><title>Site feed</title></channel></rss>"

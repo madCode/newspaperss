@@ -19,6 +19,7 @@ class ArticleExtractorTest {
             return responses[url] ?: throw IOException("no route to host")
         }
         override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = throw IOException("not used")
+        override suspend fun postJson(url: String, body: String): HttpResponse = throw IOException("not used")
     }
 
     private val url = "https://example.com/culture/slow"
