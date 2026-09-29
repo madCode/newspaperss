@@ -53,14 +53,29 @@ class EditionPlannerTest {
     @Test
     fun capsPerSourceAndAFailedFetchLetsTheSourcesNextArticleIn() = runTest {
         val ordered = EditionPlanner.order(pool, abc, Ordering.TAKE_TURNS)
-        val result = EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(10), maxPerSource = 1), { 1.0 }) { cand ->
+        val result = EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(3), maxPerSource = 1), { 1.0 }) { cand ->
             cand.id.takeUnless { it == "c2" }
         }
         assertEquals(listOf("a3", "b1", "c1"), result)
     }
 
     @Test
-    fun aSourcesOwnCapReplacesTheEditionsInEitherDirection() = runTest {
+    fun withRoomLeftTheCapGivesWayInTheSameOrder() = runTest {
+        // One source, as for a reader who only follows the New Yorker: the cap mustn't make a
+        // 30-minute edition out of one article.
+        val single = listOf(Candidate("n1", "n", null), Candidate("n2", "n", null), Candidate("n3", "n", null))
+        assertEquals(listOf("n1", "n2"), EditionPlanner.fill<String>(single, PlanRules(Budget.Minutes(15.0), maxPerSource = 1), { 10.0 }) { it.id })
+
+        val ordered = EditionPlanner.order(pool, abc, Ordering.TAKE_TURNS)
+        assertEquals(
+            "every source gets its turn before any gets a second",
+            listOf("a3", "b1", "c2", "a2", "c1"),
+            EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(5), maxPerSource = 1), { 1.0 }) { it.id },
+        )
+    }
+
+    @Test
+    fun aSourcesOwnCapReplacesTheEditionsInEitherDirectionAndIsAHardLimit() = runTest {
         val ordered = EditionPlanner.order(pool, abc, Ordering.TAKE_TURNS)
         val rules = PlanRules(Budget.Articles(10), maxPerSource = 2, sourceCaps = mapOf("a" to 3, "c" to 1))
         assertEquals(listOf("a3", "b1", "c2", "a2", "a1"), EditionPlanner.fill<String>(ordered, rules, { 1.0 }) { it.id })

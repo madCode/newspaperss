@@ -7,13 +7,14 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### From device testing (Day 2)
-- [ ] Fill the time budget past the per-site cap: with one source (the New Yorker) an edition held one article
 - [ ] Images missing from comic posts (the New Yorker's cartoon, a webcomic): find where their images live
 - [ ] Make "what's in this edition" obvious before sending, and allow deleting an edition
 - [ ] EPUB design pass (the rss-to-e-reader output is the bar); links inherit the text colour, so KOReader's dark mode stays readable
 - [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
 - [ ] Reading list: fetch each link's title and reading time; tap to open in the browser
 - [ ] Label the "Article text" option with what it sets
+- [ ] In-app article view is slightly wider than the phone (a long "Original:" URL or a wide table); the first tap on an article may not open it
+- [ ] Decide what tapping an article in a source's list does: open the original in the browser, render it, or offer "add to the next edition"
 
 ### M4 leftovers
 - [ ] If lead time isn't enough on a real device, wake for timed editions with an exact alarm (Doze defers WorkManager; expedited work was rejected: its API 31+ quota can silently restart a long build)
@@ -46,6 +47,16 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] `SettingsScreenTest` can fail under full-suite load: DataStore "Unable to rename s.preferences_pb.tmp", likely a write still running when the temp folder is deleted. Give test DataStores a scope that's finished before cleanup
 
 ## Feature proposals
+
+### What you found thought-provoking
+Let the reader mark articles that stayed with them (in the app, or by finishing or highlighting them on
+the e-reader), and let the planner lean towards similar ones from their own feeds. It stays on the phone,
+is visible and adjustable, and mustn't narrow the paper into an echo chamber: "nobody's algorithm" is the
+pitch, so it has to be the reader's own.
+
+### Sharing an article
+Share an article with someone. The link is easy; the full extracted text raises copyright questions and
+shouldn't become a way around paywalls. A likely middle: the link plus a short excerpt.
 
 ### Notes: what should they be?
 The edition notes export (a markdown checklist of each edition's articles) went in without much thought
@@ -110,6 +121,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] The per-site cap gives way when there's room: with one source (the New Yorker) an edition held one article
 - [x] "Edition ready" makes a sound (its own default-importance channel); "delivered" stays quiet
 - [x] Dated edition titles ("Tuesday Morning Edition, Sep 29"), so next week's Tuesday doesn't collide in libraries and folders
 - [x] Sending from the "ready" notification counts: choosing an app in the share sheet marks the edition delivered (it was released the next day and its articles repeated)

@@ -27,7 +27,11 @@ enum class Ordering {
 
 data class PlanRules(
     val budget: Budget,
-    /** At most this many articles per source; null for no cap. */
+    /**
+     * Articles per source before any source gets more; null for no cap. It keeps one source from
+     * crowding out the rest, so it gives way once every source has had its turn and the budget
+     * still has room.
+     */
     val maxPerSource: Int? = 1,
     val ordering: Ordering = Ordering.TAKE_TURNS,
     /** Caps for particular sources, by [Candidate.sourceId], in place of [maxPerSource]. */
@@ -81,6 +85,8 @@ object EditionPlanner {
     /**
      * Fetches [ordered] candidates one at a time until the budget is met,
      * taking at most `maxPerSource` from each source (or its own entry in `sourceCaps`).
+     * If that leaves the budget unfilled, the articles `maxPerSource` held back are
+     * tried next, in the same order. A source's own cap is a hard limit.
      *
      * The budget is checked before each fetch, so a minutes budget is
      * exceeded by at most one article, and a larger pool doesn't mean more
@@ -95,20 +101,33 @@ object EditionPlanner {
     ): List<T> {
         val picked = mutableListOf<T>()
         val perSource = mutableMapOf<String, Int>()
+        val heldBack = mutableListOf<Candidate>()
         var minutes = 0.0
-        for (candidate in ordered) {
-            val full = when (val budget = rules.budget) {
-                is Budget.Articles -> picked.size >= budget.count
-                is Budget.Minutes -> minutes >= budget.minutes
-            }
-            if (full) break
-            val taken = perSource[candidate.sourceId] ?: 0
-            val cap = rules.sourceCaps[candidate.sourceId] ?: rules.maxPerSource
-            if (cap != null && taken >= cap) continue
-            val article = fetch(candidate) ?: continue
+        fun full() = when (val budget = rules.budget) {
+            is Budget.Articles -> picked.size >= budget.count
+            is Budget.Minutes -> minutes >= budget.minutes
+        }
+        suspend fun take(candidate: Candidate) {
+            val article = fetch(candidate) ?: return
             picked += article
-            perSource[candidate.sourceId] = taken + 1
             minutes += minutesOf(article)
+        }
+        for (candidate in ordered) {
+            if (full()) break
+            val taken = perSource[candidate.sourceId] ?: 0
+            val ownCap = rules.sourceCaps[candidate.sourceId]
+            val cap = ownCap ?: rules.maxPerSource
+            if (cap != null && taken >= cap) {
+                if (ownCap == null) heldBack += candidate
+                continue
+            }
+            val before = picked.size
+            take(candidate)
+            if (picked.size > before) perSource[candidate.sourceId] = taken + 1
+        }
+        for (candidate in heldBack) {
+            if (full()) break
+            take(candidate)
         }
         return picked
     }

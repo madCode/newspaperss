@@ -150,16 +150,16 @@ class EditionBuilderTest {
     }
 
     @Test
-    fun aSourcesOwnCapReplacesTheEditionsOne() = runTest {
+    fun aSourcesOwnCapIsAHardLimitWhereTheEditionsGivesWay() = runTest {
         val a = source("a", null, "a1", "a2", "a3")
         source("b", null, "b1", "b2")
         sources.setMaxArticles(a, 2)
 
-        val built = builder.build(EditionSettings(maxPerSource = 1)) as BuildResult.Built
+        val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 1)) as BuildResult.Built
 
         val titles = editions.observeArticles(built.editionId).first().map { it.title }
-        assertEquals(2, titles.count { it.startsWith("a ") })
-        assertEquals(1, titles.count { it.startsWith("b ") })
+        assertEquals("a's own cap of 2 holds with room left", 2, titles.count { it.startsWith("a ") })
+        assertEquals("the edition's cap of 1 gives way when there's room", 2, titles.count { it.startsWith("b ") })
     }
 
     @Test
@@ -382,7 +382,8 @@ class EditionBuilderTest {
         source("a", null, "a1", "a2")
         ttrss("n1" to ("1" to "Example News"), "n2" to ("1" to "Example News"), "b1" to ("2" to "A Blog"))
 
-        val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 1, wordsPerMinute = 200)) as BuildResult.Built
+        // Room for three 10-minute articles: one per publication, if each is capped on its own.
+        val built = builder.build(EditionSettings(minutes = 30, maxPerSource = 1, wordsPerMinute = 200)) as BuildResult.Built
 
         val contents = editions.observeArticles(built.editionId).first()
         assertEquals(listOf("a", "Example News", "A Blog").sorted(), contents.map { it.sourceTitle }.sorted())
