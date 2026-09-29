@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.clearFileProviderCache
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -32,18 +33,25 @@ class NotifierTest {
         return shown.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
     }
 
+    @After fun freshFileProvider() = clearFileProviderCache()
+
+    private fun importanceOfShown(): Int {
+        val system = app.getSystemService(NotificationManager::class.java)
+        return system.getNotificationChannel(shadowOf(system).allNotifications.single().channelId).importance
+    }
+
     @Test
-    fun readyMakesASoundButDeliveredStaysQuiet() {
+    fun readyMakesASound() {
         clearFileProviderCache()
         val file = java.io.File(app.filesDir, "editions/e.epub").apply { parentFile!!.mkdirs(); writeText("epub") }
-        val system = app.getSystemService(NotificationManager::class.java)
-
         notifier.editionReady(EditionEntity(id = 1, title = "Tuesday Morning Edition", articleCount = 7, minutes = 30.0), file)
+        assertEquals(NotificationManager.IMPORTANCE_DEFAULT, importanceOfShown())
+    }
 
-        val shown = shadowOf(system).allNotifications.single()
-        assertEquals(NotificationManager.IMPORTANCE_DEFAULT, system.getNotificationChannel(shown.channelId).importance)
-        assertEquals(NotificationManager.IMPORTANCE_LOW, system.getNotificationChannel(Notifier.EDITIONS).importance)
-        clearFileProviderCache()
+    @Test
+    fun deliveredStaysQuiet() {
+        notifier.editionDelivered(EditionEntity(title = "Tuesday Morning Edition", articleCount = 7, minutes = 30.0), "Books")
+        assertEquals(NotificationManager.IMPORTANCE_LOW, importanceOfShown())
     }
 
     @Test
