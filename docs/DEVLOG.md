@@ -19,6 +19,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
   - xkcd-style feed items are just the image, and an item with no words was treated as empty;
   - on an image-only page the article extractor gave up and took the footer ("58 words" of legal links on the New Yorker's cartoon page).
 - **Shipped:** an image-only feed item is kept, and wins over a page with little text and no image. When only the page has the image, its main image inside `<article>` becomes the post, captioned by the page's own article text or else the feed's description.
+- **Review caught** (two rounds): the first version made any short, image-less page an image post, so a news brief could open with the site's share card or a headshot, a teaser's thumbnail could beat a short page, a paywall prompt could become the caption, and related-story cards could lend their thumbnails. It now needs strong signs: a feed item that's just the image, or page text that plainly isn't from the page's only article.
 - **Checks:** the real New Yorker cartoon and xkcd now come through; a live edition passes epubcheck.
 
 ### Cycle 10: a one-source paper fills its time (14:02–14:12, [#27](https://github.com/madCode/newspaperss/pull/27))

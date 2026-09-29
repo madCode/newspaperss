@@ -96,13 +96,22 @@ class ArticleExtractorTest {
     }
 
     @Test
-    fun aTeaserWithAThumbnailDoesntBeatTheShortPage() = runTest {
-        val thumbTeaser = "<p>${"The council met again this week to talk about the library and its future plans. ".repeat(3)}</p>" +
-            "<img src=\"https://example.com/thumbs/library.jpg\">"
-        val page = "<html><body><article><h1>Library stays open</h1>$brief$brief</article>$footer</body></html>"
+    fun aOneLineTeaserWithAThumbnailDoesntBeatTheShortPage() = runTest {
+        val thumbTeaser = "<p>The council met again this week to talk about the library.</p><img src=\"https://example.com/thumbs/library.jpg\">"
+        val page = "<html><body><div class=\"story\"><h1>Library stays open</h1>$brief$brief$brief</div>$footer</body></html>"
         val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(thumbTeaser))
 
         assertFalse(article.usedFeedContent)
+        assertTrue("library open" in article.html)
+    }
+
+    @Test
+    fun relatedStoryCardsDontLendTheirThumbnails() = runTest {
+        val card = "<article class=\"card\"><img src=\"https://example.com/thumbs/other.jpg\" width=\"600\"><h3>Another story entirely</h3></article>"
+        val page = "<html><body><div class=\"story\"><h1>Library stays open</h1>$brief$brief</div><section>$card$card</section>$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(teaser))
+
+        assertEquals(emptyList<String>(), article.imageUrls)
         assertTrue("library open" in article.html)
     }
 

@@ -10,7 +10,6 @@ import net.dankito.readability4j.extended.Readability4JExtended
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import org.jsoup.select.Elements
 import java.net.URI
 
 /** The article found in a web page, not yet cleaned for e-ink (see [HtmlCleaner]). */
@@ -41,7 +40,7 @@ internal data class PageContent(
 internal object PageExtractor {
     const val MIN_WORDS = 150
     private const val MAIN_IMAGE_MIN_PX = 200
-    private val NOT_MAIN_IMAGE = listOf("logo", "avatar", "headshot", "author", "profile", "icon")
+    private val NOT_MAIN_IMAGE = setOf("logo", "avatar", "headshot", "author", "profile", "icon", "icons")
     private const val JSON_LD_PREFERENCE_RATIO = 1.5
 
     fun extract(html: String, url: String): PageContent {
@@ -83,10 +82,12 @@ internal object PageExtractor {
             else -> listOfNotNull(fromReadability, fromJsonLd).maxByOrNull { it.wordCount }
                 ?: PageContent(doc.body().html(), title, author, "body", HtmlCleaner.countWords(doc.body()))
         }
-        val main = doc.select("article, main")
+        // <main>, or a lone <article>: several <article>s are usually related-story cards, whose
+        // thumbnails aren't this page's.
+        val main = doc.selectFirst("main") ?: doc.select("article").singleOrNull()
         return chosen.copy(
-            mainImage = mainImage(main),
-            articleText = main.text().takeIf { it.isNotBlank() },
+            mainImage = main?.let(::mainImage),
+            articleText = main?.text()?.takeIf { it.isNotBlank() },
             description = doc.metaContent("og:description"),
         )
     }
@@ -96,10 +97,11 @@ internal object PageExtractor {
      * attributes [HtmlCleaner] reads. Not `og:image`: many sites use one share card on every page.
      * Logos, avatars, SVGs and images declared small don't count.
      */
-    private fun mainImage(main: Elements): String? {
+    private fun mainImage(main: Element): String? {
         val img = main.select("img").firstOrNull { img ->
-            // Class and address only: a cartoon's alt text can say "an iconic moment".
-            val marks = "${img.className()} ${img.attr("src")}".lowercase()
+            // Whole words of the class and address only: a cartoon's alt text can say "an iconic
+            // moment", and "silicon-valley.jpg" isn't an icon.
+            val marks = "${img.className()} ${img.attr("src")}".lowercase().split(NON_ALNUM).toSet()
             val sources = listOf("src", "srcset", "data-src", "data-srcset").map { img.attr(it) }.filter { it.isNotBlank() && !it.startsWith("data:") }
             val small = listOf("width", "height").any { dim -> img.attr(dim).toIntOrNull()?.let { it < MAIN_IMAGE_MIN_PX } == true }
             sources.isNotEmpty() && !small && NOT_MAIN_IMAGE.none { it in marks } &&
