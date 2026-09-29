@@ -47,6 +47,17 @@ class PageExtractorTest {
         assertTrue(sentence.trim() in cleaned)
     }
 
+    /** Some paywalls hide the article body with a screen-reader class; on a page heavy with navigation it's a small share of the page. */
+    @Test
+    fun aHiddenArticleBodyOnABusyPageIsKept() {
+        val nav = (1..60).joinToString("") { "<li><a href=\"/s$it\">Section number $it of the site</a></li>" }
+        val body = (1..4).joinToString("") { "<p>$sentence</p>" }
+        val html = """<html><head><title>Story</title></head><body><nav><ul>$nav</ul></nav>
+            <article><h1>Story</h1><div class="visually-hidden">$body</div></article></body></html>"""
+
+        assertTrue(sentence.trim() in PageExtractor.extract(html, url).html)
+    }
+
     @Test
     fun cookieBannersAndDialogsAreRemovedBeforeExtraction() {
         val modal = "<div aria-modal=\"true\"><p>${"Subscribe to our newsletter for more great content today. ".repeat(3)}</p></div>"

@@ -195,7 +195,11 @@ object HtmlCleaner {
             if (el === root || !el.isAttached()) continue
             // By length, not share of the page: before Readability the page includes navigation and
             // comments, and a paywalled article body can sit in one of these classes.
-            if (el.classNames().any { it.lowercase() in SCREEN_READER_ONLY } && countWords(el) <= SCREEN_READER_MAX_WORDS) el.remove()
+            if (el.classNames().any { it.lowercase() in SCREEN_READER_ONLY } && countWords(el) <= SCREEN_READER_MAX_WORDS &&
+                el.selectFirst("img") == null
+            ) {
+                el.remove()
+            }
         }
     }
 

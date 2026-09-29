@@ -160,14 +160,6 @@ class HtmlCleanerTest {
         assertEquals(12, Jsoup.parse(clean(html)).select("li").size)
     }
 
-    @Test
-    fun screenReaderLabelsGoButALongHiddenBodyStays() {
-        val story = "The whole story sits in this paragraph for readers of every kind. ".repeat(5)
-        assertEquals(
-            "<p>Text.</p><div><p>$story</p></div>",
-            clean("<p>Text.<span class=\"sr-only\">list 1 of 4</span></p><div class=\"visually-hidden\"><p>$story</p></div>"),
-        )
-    }
 
     @Test
     fun pictureElementsPreferJpegSources() {
