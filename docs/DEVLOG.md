@@ -8,18 +8,39 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** a fixed download link for the debug APK, one signing key for debug builds, and the newspapeRSS name.
-- **Next:** port yesterday's extraction review fixes to the app; expedite scheduled builds; stream images to disk.
-- **Waiting on you:** a Dropbox app key, for automatic Kobo delivery (optional).
+- **In flight:** extraction fixes from the rss-to-e-reader review, ported to the app.
+- **Next:** expedite scheduled builds; stream images to disk; the competitor research.
+- **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 1: APK link, signing key, name (11:51–)
+### Cycle 2: extraction fixes from the library review (12:15–)
+- **Shipped:** the app gets the fixes the rss-to-e-reader review found in the same code:
+  - A short "Further reading" list or a section titled "More on the method" is no longer removed.
+  - A heading is never left without its list.
+  - Screen-reader text that is an icon link's only label stays.
+- **Checks:** a live edition from the starter feeds passes epubcheck with no junk left.
+
+### Cycle 1: APK link, signing key, name (11:51–12:13, [#17](https://github.com/madCode/newspaperss/pull/17))
 - **Shipped:**
   - Every merge to main publishes the debug APK to a rolling `latest-debug` release, with the fixed link above.
   - Debug builds use one committed signing key, so a newer build installs over an older one.
   - The app now shows itself as newspapeRSS.
-- **Friction:** the debug APK was only uploaded for pull requests, so the first link I sent pointed at a run without one.
+- **Review caught:**
+  - The release-writing token sat on the build job, where every Gradle plugin and dependency could use it.
+  - Two quick merges could race and leave the link broken.
+  - The debug build's name and the README missed the rename.
+- **Friction:**
+  - The debug APK was only uploaded for pull requests, so the first link I sent pointed at a run without one.
+  - A review agent left my checkout on a detached HEAD, so the fix commit sat unpushed for a while. Review agents now get a throwaway checkout of their own.
+
+### Also: five rss-to-e-reader bug-fix PRs (#24–#28)
+Ported from the app, each with a test that fails on main, a review and a second look:
+- **#24:** reading-time budget.
+- **#25:** tt-rss password replay on redirect.
+- **#26:** invalid captions.
+- **#27:** screen-reader text and related-links boxes.
+- **#28:** optional cross-collector dedupe. It's off by default, because it would interact badly with a since-id cursor.
 
 ## Day 1 · Tue 29 Sep, overnight (summary)
 

@@ -152,6 +152,36 @@ class HtmlCleanerTest {
         assertEquals("a list of pictures isn't a list of links", body + gallery, clean(body + gallery))
     }
 
+    @Test
+    fun anAuthorsOwnListsAndSectionTitlesStay() {
+        val body = "<p>" + "Words of the article itself. ".repeat(30) + "</p>"
+        val kept = listOf(
+            "<h2>Further reading</h2><ul><li><a href=\"https://example.com/1\">A paper</a></li><li><a href=\"https://example.com/2\">A book</a></li></ul>",
+            "<h2>Read more</h2>Two earlier pieces on this:<ul><li><a href=\"https://example.com/1\">One</a></li></ul>",
+            "<h2>More on the method</h2><p>We sampled weekly.</p>",
+            "<h2>Read more</h2><p>Our findings are below.</p>",
+            "<h2>Recommended</h2><ul><li>Plain advice</li><li>Without links</li></ul>",
+        )
+        for (section in kept) assertEquals(section, body + section, clean(body + section))
+    }
+
+    /** An extractor can drop a box's links but keep its heading, over the article's next paragraph. */
+    @Test
+    fun aFurnitureHeadingLeftWithoutItsLinksGoesAndABoxGoesWhole() {
+        val body = "<p>" + "Words of the article itself. ".repeat(30) + "</p>"
+        assertEquals(body + body, clean("$body<h2>Recommended Stories</h2>$body"))
+        val links = "<ul><li><a href=\"https://example.com/a\">Story A</a></li><li><a href=\"https://example.com/b\">Story B</a></li></ul>"
+        assertEquals(body, clean("$body<div class=\"more\"><h3>Related stories</h3>$links$links</div>"))
+    }
+
+    @Test
+    fun screenReaderTextThatLabelsAnIconLinkStays() {
+        assertEquals(
+            "<p>Text <a href=\"https://example.com/f.pdf\">Download PDF</a> end.</p>",
+            clean("<p>Text <a href=\"https://example.com/f.pdf\"><span class=\"sr-only\">Download PDF</span></a> end.</p>"),
+        )
+    }
+
     /** A long reading list that is the article, as in a newsletter item or an essay's references, stays. */
     @Test
     fun aLongListUnderARelatedHeadingIsKept() {
