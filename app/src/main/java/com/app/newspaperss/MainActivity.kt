@@ -123,7 +123,7 @@ private fun App(container: AppContainer) {
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { SourcesViewModel(container.sources, container.feedFinder) { SyncWorker.syncNow(context) } }
+                val vm = viewModel { SourcesViewModel(container.sources, container.feedFinder, container.ttrss) { SyncWorker.syncNow(context) } }
                 SourcesScreen(vm, onOpenReadingList = { nav.navigate(READING_LIST) })
             }
             composable(READING_LIST) {

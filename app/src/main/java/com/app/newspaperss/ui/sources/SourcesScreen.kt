@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.data.SourceRepository
@@ -59,6 +60,15 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
                 title = { Text("Sources") },
                 actions = {
                     IconButton(onClick = viewModel::refresh) { Icon(Icons.Default.Refresh, contentDescription = "Check for new articles") }
+                    if (viewModel.canAddTtrss) {
+                        var menu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(text = { Text("Add tt-rss account") }, onClick = { menu = false; viewModel.openTtrss() })
+                            }
+                        }
+                    }
                 },
             )
         },
@@ -87,6 +97,70 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
         }
     }
     AddSourceDialog(add, viewModel)
+    val ttrssForm by viewModel.ttrssForm.collectAsState()
+    ttrssForm?.let { TtrssDialog(it, viewModel) }
+}
+
+@Composable
+private fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::closeTtrss,
+        title = { Text("Add tt-rss account") },
+        text = {
+            Column {
+                Text(
+                    "If you run Tiny Tiny RSS, newspaperss can make editions from your unread articles and mark them read there once an edition is delivered.",
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                OutlinedTextField(
+                    value = form.address,
+                    onValueChange = { viewModel.editTtrss(form.copy(address = it)) },
+                    label = { Text("Address") },
+                    placeholder = { Text("rss.example.com/tt-rss") },
+                    singleLine = true,
+                    enabled = !form.testing,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = form.user,
+                    onValueChange = { viewModel.editTtrss(form.copy(user = it)) },
+                    label = { Text("Username") },
+                    singleLine = true,
+                    enabled = !form.testing,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = form.password,
+                    onValueChange = { viewModel.editTtrss(form.copy(password = it)) },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    enabled = !form.testing,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+                    keyboardActions = KeyboardActions(onGo = { viewModel.connectTtrss() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                when {
+                    form.testing -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
+                        CircularProgressIndicator(Modifier.padding(end = 16.dp))
+                        Text("Signing in…")
+                    }
+                    form.error != null -> Text(
+                        form.error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = viewModel::connectTtrss, enabled = form.address.isNotBlank() && !form.testing) { Text("Test and add") }
+        },
+        dismissButton = { TextButton(onClick = viewModel::closeTtrss) { Text("Cancel") } },
+    )
 }
 
 @Composable

@@ -31,7 +31,9 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] OPML import/export UI
 
 ### M8 Advanced
-- [ ] tt-rss source (mark read on server after delivery); SMTP delivery; notes export
+- [x] tt-rss source: one account, all unread articles, marked read on the server after delivery
+- [ ] tt-rss: pick a category instead of all unread; a setting to leave articles unread on the server (DESIGN §5 calls it an option)
+- [ ] SMTP delivery; notes export
 
 ### UX (from the persona audit)
 - [ ] E-ink: replace indeterminate spinners with stepped text ("Fetching 7 of 12…"); no nav transitions when animations are off
