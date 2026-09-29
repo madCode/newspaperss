@@ -111,7 +111,10 @@ class EditionBuilder(
         var fetched = 0
         val allowance = ImageAllowance(imageBudgetBytes)
         fun minutesOf(c: ArticleContent) = ReadingTime.minutes(c.wordCount, settings.wordsPerMinute)
-        val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, settings.rules, { minutesOf(it.second) }) { c ->
+        // tt-rss candidates are keyed by publication, so an account-wide cap wouldn't match any of them.
+        val caps = sources.filter { it.kind != SourceKind.TTRSS }.mapNotNull { s -> s.maxArticles?.let { s.id.toString() to it } }.toMap()
+        val rules = settings.rules.copy(sourceCaps = caps)
+        val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, rules, { minutesOf(it.second) }) { c ->
             val article = byId.getValue(c.id.toLong())
             val result = try {
                 content.contentFor(article, sourcesById.getValue(article.sourceId), allowance)?.let { article to it }

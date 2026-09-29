@@ -38,6 +38,8 @@ data class SourceEntity(
     /** The epoch day the last piece of full-text evidence was counted. */
     val fullTextDay: Long? = null,
     val paused: Boolean = false,
+    /** At most this many articles per edition from this source; null follows the edition setting. Not used for tt-rss. */
+    val maxArticles: Int? = null,
     val addedAt: Instant = Instant.now(),
     val lastFetchedAt: Instant? = null,
     /** The last sync error, cleared by the next successful sync. */

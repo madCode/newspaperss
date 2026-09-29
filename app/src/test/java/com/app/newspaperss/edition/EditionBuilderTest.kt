@@ -134,6 +134,19 @@ class EditionBuilderTest {
     }
 
     @Test
+    fun aSourcesOwnCapReplacesTheEditionsOne() = runTest {
+        val a = source("a", null, "a1", "a2", "a3")
+        source("b", null, "b1", "b2")
+        sources.setMaxArticles(a, 2)
+
+        val built = builder.build(EditionSettings(maxPerSource = 1)) as BuildResult.Built
+
+        val titles = editions.observeArticles(built.editionId).first().map { it.title }
+        assertEquals(2, titles.count { it.startsWith("a ") })
+        assertEquals(1, titles.count { it.startsWith("b ") })
+    }
+
+    @Test
     fun aLinkInTwoSourcesGoesInOnce() = runTest {
         source("a", null, "a1")
         val b = sources.addFeed("https://b.example/feed", "b")

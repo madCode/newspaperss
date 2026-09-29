@@ -22,6 +22,8 @@ import com.app.newspaperss.ui.sources.SourceDetailScreen
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.failingLine
 import com.app.newspaperss.ui.sources.lastCheckedLine
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -64,7 +66,7 @@ class SourceDetailScreenTest {
             id
         }
         var back = false
-        val vm = SourceDetailViewModel(repo, id)
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
         compose.setContent { SourceDetailScreen(vm, onBack = { back = true }) }
         idleUntil { visible("Couldn't reach the site.") }
 
@@ -87,6 +89,28 @@ class SourceDetailScreenTest {
         idleUntil { compose.waitForIdle(); back }
 
         assertEquals(emptyList<Any>(), runBlocking { db.sources().all() })
+    }
+
+    /** Landing back on the edition's own number clears the override, so the site follows that setting later. */
+    @Test
+    fun aSiteCanHaveMoreOrFewerArticlesThanTheRest() {
+        val id = runBlocking { repo.addFeed("https://example.com/feed", "Example") }
+        val defaultMax = MutableStateFlow(2)
+        val vm = SourceDetailViewModel(repo, id, defaultMax)
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { visible("Up to 2 articles in each edition") }
+        compose.onNodeWithText("Same as your other sites").assertExists()
+
+        compose.onNodeWithText("+").performClick()
+        idleUntil { compose.waitForIdle(); visible("Up to 3 articles") }
+        compose.onNodeWithText("Your other sites: up to 2").assertExists()
+        assertEquals(3, runBlocking { db.sources().byId(id)!!.maxArticles })
+
+        compose.onNodeWithText("−").performClick()
+        idleUntil { compose.waitForIdle(); visible("Same as your other sites") }
+        assertNull(runBlocking { db.sources().byId(id)!!.maxArticles })
+        defaultMax.value = 1
+        idleUntil { compose.waitForIdle(); visible("Up to 1 article in each edition") }
     }
 
     @Test

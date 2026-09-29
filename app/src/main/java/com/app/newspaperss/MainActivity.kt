@@ -53,6 +53,7 @@ import com.app.newspaperss.ui.readinglist.ReadingListViewModel
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.work.SyncWorker
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
@@ -176,7 +177,7 @@ private fun App(container: AppContainer) {
             }
             composable(SOURCE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.ttrss) }
+                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, container.ttrss) }
                 SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) })
             }
             composable(READING_LIST) {

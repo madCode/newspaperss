@@ -173,7 +173,7 @@ class ScreenshotTest {
             db.sources().setFullText(id, ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3, null)
             id
         }
-        val vm = SourceDetailViewModel(repo, id)
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
         shoot("06b-source-detail", ready = { vm.detail.value?.articles?.isNotEmpty() == true }) { SourceDetailScreen(vm, onBack = {}) }
     }
 

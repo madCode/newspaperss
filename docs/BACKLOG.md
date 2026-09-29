@@ -19,7 +19,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M6 leftovers
 
 ### M7 Polish
-- [ ] Per-source cap override (DESIGN §7 lists it on the source screen)
 
 ### M8 Advanced
 - [ ] tt-rss: pick a category instead of all unread; a setting to leave articles unread on the server (DESIGN §5 calls it an option)
@@ -29,6 +28,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ## Done
 
+- [x] Per-source article cap on the source screen, replacing the edition's "up to N from each site" for that site (not for tt-rss, which is capped per publication)
 - [x] Source detail: tap a source for its health (status, failing for N days, last checked, where its text comes from), its recent articles and what happened to each, pause, article text and remove with a confirmation
 - [x] Delivered links are remembered for a year, so removing and re-adding a source, or the same story in two sources, doesn't deliver it twice
 - [x] Real-world check: a live edition from the starter feeds passes epubcheck (stray figcaptions fixed; `./gradlew :core:liveEdition`); a source settled on the feed's text keeps probing short items, so a lifted block is noticed

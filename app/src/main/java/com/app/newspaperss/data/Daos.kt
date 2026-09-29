@@ -65,6 +65,9 @@ interface SourceDao {
     @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen, fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL WHERE id = :id")
     suspend fun setContentMode(id: Long, mode: ContentMode, chosen: Boolean)
 
+    @Query("UPDATE sources SET maxArticles = :max WHERE id = :id")
+    suspend fun setMaxArticles(id: Long, max: Int?)
+
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 
