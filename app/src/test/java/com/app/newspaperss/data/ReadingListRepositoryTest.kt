@@ -1,6 +1,7 @@
 package com.app.newspaperss.data
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.newspaperss.core.feed.ReadingListFile
 import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
@@ -23,7 +24,10 @@ import java.time.ZoneOffset
 class ReadingListRepositoryTest {
     @get:Rule val dbRule = DbRule()
     private val db = dbRule.db
-    private val list = ReadingListRepository(db)
+    private val untitled = mutableListOf<Long>()
+    private val list = ReadingListRepository(db, onUntitled = { untitled += it })
+
+    private suspend fun byUrl(url: String) = db.articles().allForSource(list.sourceId()).single { it.url == url }
 
     @Test
     fun savingTwiceKeepsOne() = runTest {
@@ -33,8 +37,40 @@ class ReadingListRepositoryTest {
     }
 
     @Test
+    fun onlyLinksSavedWithoutATitleAreLookedUp() = runTest {
+        list.save("https://a.example/titled", "The reader's title")
+        list.save("https://a.example/bare")
+        list.save("https://a.example/blank", "  ")
+        list.save("https://a.example/bare")
+        assertEquals(listOf(byUrl("https://a.example/bare").id, byUrl("https://a.example/blank").id), untitled)
+    }
+
+    @Test
+    fun aPocketExportKeepsTitlesAndArrivesWithTheArchiveAlreadyRead() = runTest {
+        val csv = "title,url,time_added,tags,status\n" +
+            "\"Tides, explained\",https://a.example/tides,1712345678,,unread\n" +
+            ",https://a.example/untitled,1712345000,,unread\n" +
+            "Old news,https://a.example/old,1600000000,,archive\n" +
+            ",https://a.example/old-untitled,1600000000,,archive\n"
+        val result = list.import(csv)
+        assertEquals(ReadingListRepository.Imported(ReadingListFile.Format.POCKET_CSV, added = 4), result)
+        assertEquals("Tides, explained", byUrl("https://a.example/tides").title)
+        assertEquals(ArticleState.DELIVERED, byUrl("https://a.example/old").state)
+        assertEquals(setOf("https://a.example/tides", "https://a.example/untitled"), db.articles().candidates().map { it.url }.toSet())
+        // Read ones won't be in an edition, so there's no point fetching their pages.
+        assertEquals(listOf(byUrl("https://a.example/untitled").id), untitled)
+    }
+
+    @Test
+    fun aLinkArchivedInInstapaperIsMarkedReadHere() = runTest {
+        list.save("https://a.example/1", "One")
+        list.import("URL,Title,Selection,Folder,Timestamp\nhttps://a.example/1,One,,Archive,1712345678\n")
+        assertTrue(db.articles().candidates().isEmpty())
+    }
+
+    @Test
     fun importedTickedItemsDontComeBackAndExportTicksWhatWasDelivered() = runTest {
-        val added = list.importMarkdown("- [ ] https://a.example/1\n- [x] https://a.example/2\n- [ ] https://a.example/3\n")
+        val added = list.import("- [ ] https://a.example/1\n- [x] https://a.example/2\n- [ ] https://a.example/3\n").added
         assertEquals(3, added)
         assertEquals(setOf("https://a.example/1", "https://a.example/3"), db.articles().candidates().map { it.url }.toSet())
 
@@ -49,8 +85,8 @@ class ReadingListRepositoryTest {
 
     @Test
     fun aLinkTickedElsewhereIsMarkedReadOnReimport() = runTest {
-        list.importMarkdown("- [ ] https://a.example/1\n")
-        list.importMarkdown("- [x] https://a.example/1 (error 404)\n")
+        list.import("- [ ] https://a.example/1\n")
+        list.import("- [x] https://a.example/1 (error 404)\n")
         assertTrue(db.articles().candidates().isEmpty())
     }
 

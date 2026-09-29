@@ -3,6 +3,7 @@ package com.app.newspaperss.edition
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.SourceEntity
@@ -25,7 +26,8 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ExtractorContentProviderTest {
     private val http = FakeHttp()
-    private val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder())
+    private val evidence = mutableListOf<Pair<Long, FullTextEvidence>>()
+    private val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { id, e -> evidence += id to e }
     private val source = SourceEntity(id = 1, url = "https://example.com/feed", title = "Example", contentMode = ContentMode.FEED)
 
     private fun article(feedHtml: String) = ArticleEntity(
@@ -106,5 +108,24 @@ class ExtractorContentProviderTest {
     fun aSavedLinkThatCantBeFetchedWaitsInsteadOfBeingUsedUp() = runTest {
         val saved = ArticleEntity(id = 8, sourceId = 2, guid = "https://example.com/gone", url = "https://example.com/gone", title = "")
         assertEquals(null, provider.contentFor(saved, readingList, ImageAllowance()))
+    }
+
+    @Test
+    fun eachArticleReportsWhatItShowedAboutItsSource() = runTest {
+        val auto = source.copy(contentMode = ContentMode.AUTO)
+        val words = (1..600).joinToString(" ") { "word$it" }
+        http.page("https://example.com/story", "<html><body><article><p>$words</p></article></body></html>")
+        http.page("https://example.com/blocked", "<html>Forbidden</html>", code = 403)
+        http.unreachable += "https://example.com/offline"
+
+        provider.contentFor(article("<p>A short teaser.</p>"), auto, ImageAllowance())
+        provider.contentFor(article("<p>A short teaser.</p>").copy(url = "https://example.com/blocked"), auto, ImageAllowance())
+        provider.contentFor(article("<p>A short teaser.</p>").copy(url = "https://example.com/offline"), auto, ImageAllowance())
+
+        assertEquals(
+            "an unreachable page could just be the phone being offline, so it isn't evidence",
+            listOf(1L to FullTextEvidence.PAGE_LONGER, 1L to FullTextEvidence.BLOCKED),
+            evidence,
+        )
     }
 }

@@ -13,7 +13,11 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.feed.FeedFinder
+import com.app.newspaperss.data.SourceEntity
+import kotlinx.coroutines.runBlocking
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssAccountStore
@@ -27,6 +31,7 @@ import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -122,5 +127,24 @@ class SourcesScreenTest {
         http.page("https://example.com", "<html></html>")
         addSource("example.com")
         waitFor("No feed found")
+    }
+
+    @Test
+    fun aSitesArticleTextIsShownAndTheReadersChoiceIsSaved() {
+        val id = runBlocking {
+            db.sources().insert(
+                SourceEntity(url = "https://walled.example/feed", title = "Walled", contentMode = ContentMode.FEED, fullTextEvidence = FullTextEvidence.BLOCKED, fullTextStreak = 3),
+            )
+        }
+        waitFor("Site blocks fetching")
+
+        compose.onNodeWithContentDescription("More for Walled").performClick()
+        compose.onNodeWithText("Article text").performClick()
+        compose.onNodeWithText("Always fetch the full page").performClick()
+
+        waitFor("Always fetches the full page (your choice)")
+        val saved = runBlocking { db.sources().byId(id)!! }
+        assertEquals(ContentMode.PAGE, saved.contentMode)
+        assertTrue(saved.contentModeChosen)
     }
 }

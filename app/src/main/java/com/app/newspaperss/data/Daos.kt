@@ -8,6 +8,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextEvidence
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
@@ -56,6 +58,12 @@ interface SourceDao {
     @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
     suspend fun setServerNote(id: Long, note: String?)
 
+    @Query("UPDATE sources SET contentMode = :mode, fullTextEvidence = :evidence, fullTextStreak = :streak, fullTextDay = :day WHERE id = :id")
+    suspend fun setFullText(id: Long, mode: ContentMode, evidence: FullTextEvidence?, streak: Int, day: Long?)
+
+    @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen, fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL WHERE id = :id")
+    suspend fun setContentMode(id: Long, mode: ContentMode, chosen: Boolean)
+
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 
@@ -88,6 +96,10 @@ interface ArticleDao {
 
     @Query("DELETE FROM articles WHERE id = :id")
     suspend fun delete(id: Long)
+
+    /** Only while the article is untitled and waiting: never over a title the reader gave, or one in an edition. */
+    @Query("UPDATE articles SET title = :title WHERE id = :id AND title = '' AND state = 'NEW'")
+    suspend fun setTitleIfUntitled(id: Long, title: String): Int
 
     @Query("SELECT sourceId, MAX(discoveredAt) AS lastNew FROM articles GROUP BY sourceId")
     fun observeActivity(): Flow<List<SourceActivity>>

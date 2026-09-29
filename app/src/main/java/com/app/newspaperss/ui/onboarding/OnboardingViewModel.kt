@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui.onboarding
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.edition.Schedule
@@ -51,11 +52,17 @@ class OnboardingViewModel(
     private val settings: SettingsStore,
     private val sources: SourceRepository,
     private val finder: FeedFinder,
+    /** Survives process death: the folder picker or the Play Store can get the app killed mid-flow. */
+    private val saved: SavedStateHandle = SavedStateHandle(),
     /** Schedules the timer and starts the first edition once onboarding is saved. */
     private val onFinished: (Settings) -> Unit,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(OnboardingState())
+    private val _state = MutableStateFlow(restore(saved))
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch { _state.collect { store(it, saved) } }
+    }
 
     fun next() = _state.update { s -> if (!s.canContinue) s else s.copy(step = Step.entries.getOrElse(s.step.ordinal + 1) { s.step }) }
     fun back() = _state.update { s -> s.copy(step = Step.entries.getOrElse(s.step.ordinal - 1) { s.step }) }
@@ -115,4 +122,37 @@ class OnboardingViewModel(
             onFinished(settings.current())
         }
     }
+}
+
+private const val KEY = "onboarding."
+
+private fun store(s: OnboardingState, saved: SavedStateHandle) {
+    saved[KEY + "step"] = s.step.name
+    saved[KEY + "device"] = s.device?.name
+    saved[KEY + "folderUri"] = s.folderUri
+    saved[KEY + "folderName"] = s.folderName
+    saved[KEY + "chosen"] = ArrayList(s.chosen)
+    saved[KEY + "foundUrls"] = ArrayList(s.found.map { it.url })
+    saved[KEY + "foundTitles"] = ArrayList(s.found.map { it.title })
+    saved[KEY + "minutes"] = s.minutes
+    saved[KEY + "scheduleEnabled"] = s.scheduleEnabled
+    saved[KEY + "time"] = s.time.toString()
+}
+
+private fun restore(saved: SavedStateHandle): OnboardingState {
+    val d = OnboardingState()
+    val step = saved.get<String>(KEY + "step") ?: return d
+    val urls = saved.get<ArrayList<String>>(KEY + "foundUrls").orEmpty()
+    val titles = saved.get<ArrayList<String>>(KEY + "foundTitles").orEmpty()
+    return d.copy(
+        step = runCatching { Step.valueOf(step) }.getOrDefault(Step.WELCOME),
+        device = saved.get<String>(KEY + "device")?.let { runCatching { Device.valueOf(it) }.getOrNull() },
+        folderUri = saved[KEY + "folderUri"],
+        folderName = saved[KEY + "folderName"],
+        chosen = saved.get<ArrayList<String>>(KEY + "chosen").orEmpty().toSet(),
+        found = urls.zip(titles) { url, title -> StarterFeed(title, url) },
+        minutes = saved[KEY + "minutes"] ?: d.minutes,
+        scheduleEnabled = saved[KEY + "scheduleEnabled"] ?: d.scheduleEnabled,
+        time = saved.get<String>(KEY + "time")?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: d.time,
+    )
 }

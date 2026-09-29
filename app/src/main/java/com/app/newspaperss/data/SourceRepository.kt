@@ -1,9 +1,14 @@
 package com.app.newspaperss.data
 
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextCheck
+import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.core.extract.FullTextState
 import com.app.newspaperss.core.feed.Opml
 import com.app.newspaperss.core.feed.OpmlFeed
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
 class SourceRepository(private val db: AppDatabase) {
     private val sources = db.sources()
@@ -36,6 +41,22 @@ class SourceRepository(private val db: AppDatabase) {
     suspend fun setPaused(id: Long, paused: Boolean) = sources.setPaused(id, paused)
 
     suspend fun remove(source: SourceEntity) = sources.delete(source)
+
+    /**
+     * Sets how a source's articles get their text. [ContentMode.AUTO] hands the choice back to
+     * the automatic check, which starts over; any other mode is the reader's and stays.
+     */
+    suspend fun chooseContentMode(id: Long, mode: ContentMode) = sources.setContentMode(id, mode, chosen = mode != ContentMode.AUTO)
+
+    /** Adds one article's evidence to its source's full-text check (see [FullTextCheck]). */
+    suspend fun recordFullText(sourceId: Long, evidence: FullTextEvidence, day: Long = LocalDate.now().toEpochDay()) = db.withTransaction {
+        val source = sources.byId(sourceId) ?: return@withTransaction
+        // A reading list or tt-rss account mixes many sites: one article says nothing about the next.
+        if (source.kind != SourceKind.FEED || source.contentModeChosen) return@withTransaction
+        val state = FullTextState(source.contentMode, source.fullTextEvidence, source.fullTextStreak, source.fullTextDay)
+        val next = FullTextCheck.next(state, evidence, day)
+        if (next != state) sources.setFullText(sourceId, next.mode, next.evidence, next.streak, next.day)
+    }
 
     /** Returns how many feeds were new. */
     suspend fun importOpml(xml: String): Int {

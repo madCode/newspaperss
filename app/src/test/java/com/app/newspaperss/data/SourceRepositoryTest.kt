@@ -3,10 +3,14 @@ package com.app.newspaperss.data
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.TestApp
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,5 +54,51 @@ class SourceRepositoryTest {
             .allowMainThreadQueries().build()
         assertEquals(2, SourceRepository(other).importOpml(repo.exportOpml()))
         other.close()
+    }
+
+    private var day = 20_000L
+
+    /** [times] pieces of evidence, one a day. */
+    private suspend fun record(id: Long, evidence: FullTextEvidence, times: Int) = repeat(times) { repo.recordFullText(id, evidence, day++) }
+
+    private suspend fun source(id: Long) = db.sources().byId(id)!!
+
+    @Test
+    fun threeTeasersInARowSwitchAFeedToFetchingPages() = runTest {
+        val id = repo.addFeed("https://a.example/feed", "A")
+        record(id, FullTextEvidence.PAGE_LONGER, 2)
+        assertEquals(ContentMode.AUTO, source(id).contentMode)
+        record(id, FullTextEvidence.PAGE_LONGER, 1)
+        assertEquals(ContentMode.PAGE, source(id).contentMode)
+    }
+
+    @Test
+    fun aModeTheReaderChoseIsNeverChangedByTheCheck() = runTest {
+        val id = repo.addFeed("https://a.example/feed", "A")
+        repo.chooseContentMode(id, ContentMode.FEED)
+        record(id, FullTextEvidence.PAGE_LONGER, 5)
+        assertEquals(ContentMode.FEED, source(id).contentMode)
+        assertTrue(source(id).contentModeChosen)
+    }
+
+    @Test
+    fun choosingAutomaticAgainStartsTheCheckOver() = runTest {
+        val id = repo.addFeed("https://a.example/feed", "A")
+        record(id, FullTextEvidence.BLOCKED, 3)
+        assertEquals(ContentMode.FEED, source(id).contentMode)
+
+        repo.chooseContentMode(id, ContentMode.AUTO)
+
+        assertEquals(ContentMode.AUTO, source(id).contentMode)
+        assertFalse(source(id).contentModeChosen)
+        record(id, FullTextEvidence.PAGE_LONGER, 2)
+        assertEquals("earlier evidence doesn't count towards the new run", ContentMode.AUTO, source(id).contentMode)
+    }
+
+    @Test
+    fun sourcesMixingManySitesAreLeftAlone() = runTest {
+        val ttrss = repo.addTtrss("https://rss.example/api/")
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 3)
+        assertEquals(ContentMode.AUTO, source(ttrss).contentMode)
     }
 }

@@ -2,6 +2,9 @@ package com.app.newspaperss.edition
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
+import com.app.newspaperss.core.extract.ArticleExtractor
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionEntity
@@ -374,5 +377,43 @@ class EditionBuilderTest {
         delivering.markDelivered(built.editionId)
         assertEquals(EditionStatus.DELIVERED, db.editions().byId(built.editionId)!!.status)
         assertEquals(ArticleState.DELIVERED, stateOf("n1"))
+    }
+
+    @Test
+    fun oneMorningOfBotChecksDoesntSettleASite() = runTest {
+        val http = FakeHttp()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), sources::recordFullText)
+        val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
+        val id = sources.addFeed("https://blocked.example/feed", "Blocked")
+        db.articles().insertNew(
+            listOf("1", "2", "3").map { g ->
+                http.page("https://blocked.example/$g", "<html>Forbidden</html>", code = 403)
+                ArticleEntity(sourceId = id, guid = g, url = "https://blocked.example/$g", title = "Story $g", feedHtml = "<p>The first lines of story $g.</p>")
+            },
+        )
+
+        tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals(ContentMode.AUTO, db.sources().byId(id)!!.contentMode)
+    }
+
+    @Test
+    fun aSiteSettledOnItsSummariesIsRecheckedAndCanMoveToFullPages() = runTest {
+        val http = FakeHttp()
+        var day = 20_000L
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, e ->
+            sources.recordFullText(sourceId, e, day)
+        }
+        val id = sources.addFeed("https://unblocked.example/feed", "Unblocked")
+        db.sources().setFullText(id, ContentMode.FEED, com.app.newspaperss.core.extract.FullTextEvidence.BLOCKED, 3, day)
+        val words = (1..800).joinToString(" ") { "word$it" }
+        repeat(3) { i ->
+            day++
+            http.page("https://unblocked.example/$i", "<html><body><article><h1>Story</h1><p>$words</p></article></body></html>")
+            val article = ArticleEntity(id = 100L + i, sourceId = id, guid = "$i", url = "https://unblocked.example/$i", title = "Story $i", feedHtml = "<p>A teaser.</p>")
+            provider.contentFor(article, db.sources().byId(id)!!, com.app.newspaperss.core.images.ImageAllowance())
+        }
+
+        assertEquals(ContentMode.PAGE, db.sources().byId(id)!!.contentMode)
     }
 }

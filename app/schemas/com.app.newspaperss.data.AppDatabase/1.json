@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "e86778290a5c6558e0aab71bed1563b7",
+    "identityHash": "0f2b67f768b47a2aabaaf6275d3f681c",
     "entities": [
       {
         "tableName": "sources",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `paused` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `serverNote` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `contentModeChosen` INTEGER NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `paused` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `serverNote` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -53,6 +53,28 @@
             "columnName": "contentMode",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "contentModeChosen",
+            "columnName": "contentModeChosen",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fullTextEvidence",
+            "columnName": "fullTextEvidence",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fullTextStreak",
+            "columnName": "fullTextStreak",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fullTextDay",
+            "columnName": "fullTextDay",
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "paused",
@@ -391,7 +413,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e86778290a5c6558e0aab71bed1563b7')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0f2b67f768b47a2aabaaf6275d3f681c')"
     ]
   }
 }
