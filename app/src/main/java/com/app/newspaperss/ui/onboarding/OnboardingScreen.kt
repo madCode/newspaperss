@@ -27,7 +27,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -94,8 +93,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel) {
                 when (s.step) {
                     Step.WELCOME -> Button(onClick = viewModel::next) { Text("Get started") }
                     Step.SIZE -> Button(onClick = finish, enabled = s.canContinue) {
-                        if (s.finishing) CircularProgressIndicator(Modifier.padding(end = 8.dp).size(18.dp), strokeWidth = 2.dp)
-                        Text("Make my first edition")
+                        Text(if (s.finishing) "Setting up…" else "Make my first edition")
                     }
                     else -> Button(onClick = viewModel::next, enabled = s.canContinue) { Text("Next") }
                 }
@@ -174,7 +172,7 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel) {
         isError = s.findError != null,
         supportingText = s.findError?.let { { Text(it) } },
         trailingIcon = {
-            if (s.searching) CircularProgressIndicator(Modifier.padding(8.dp)) else TextButton(onClick = vm::findPasted, enabled = s.pasted.isNotBlank()) { Text("Add") }
+            if (s.searching) Text("Checking…", Modifier.padding(end = 12.dp)) else TextButton(onClick = vm::findPasted, enabled = s.pasted.isNotBlank()) { Text("Add") }
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { vm.findPasted() }),

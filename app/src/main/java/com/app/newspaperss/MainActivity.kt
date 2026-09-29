@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -110,7 +112,14 @@ private fun App(container: AppContainer) {
             }
         },
     ) { padding ->
-        NavHost(nav, startDestination = Tab.TODAY.route, modifier = Modifier.padding(padding)) {
+        // No transitions: animations smear on e-ink readers, and a calm app doesn't need them.
+        NavHost(
+            nav,
+            startDestination = Tab.TODAY.route,
+            modifier = Modifier.padding(padding),
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+        ) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings) { EditionWorker.buildNow(context) } }

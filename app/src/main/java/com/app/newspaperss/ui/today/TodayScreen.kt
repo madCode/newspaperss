@@ -14,7 +14,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -95,7 +94,10 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
             item {
                 LatestEdition(
                     latest,
+                    first = editions.size == 1,
+                    deviceName = state.deviceName,
                     preferOpen = state.preferOpen,
+                    onRetry = viewModel::makeOneNow,
                     onDetails = { onOpenEdition(latest.id) },
                     onSend = {
                         viewModel.fileOf(latest)?.let {
@@ -140,11 +142,15 @@ private fun BuildPanel(build: BuildState, primary: Boolean, onMake: () -> Unit) 
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         when (build) {
             BuildState.Syncing, is BuildState.Fetching -> {
+                // Stepped text rather than a spinner: an endless animation smears on e-ink screens.
                 Text(
-                    if (build is BuildState.Fetching) "Fetching articles… ${build.done} so far" else "Checking your sources…",
+                    when {
+                        build is BuildState.Fetching && build.done == 1 -> "Making your edition: 1 article read so far"
+                        build is BuildState.Fetching -> "Making your edition: ${build.done} articles read so far"
+                        else -> "Checking your sources for new articles…"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
             }
             else -> {
                 if (primary) Button(onClick = onMake) { Text("Make an edition now") }
@@ -165,7 +171,10 @@ private fun BuildPanel(build: BuildState, primary: Boolean, onMake: () -> Unit) 
 @Composable
 private fun LatestEdition(
     edition: EditionEntity,
+    first: Boolean,
+    deviceName: String,
     preferOpen: Boolean,
+    onRetry: () -> Unit,
     onDetails: () -> Unit,
     onSend: () -> Unit,
     onOpen: () -> Unit,
@@ -179,6 +188,14 @@ private fun LatestEdition(
             }
             when (edition.status) {
                 EditionStatus.READY -> {
+                    if (first) {
+                        Text(
+                            if (preferOpen) "Your first edition is ready. Tap Open to start reading."
+                            else "Your first edition is ready. Tap Send to put it on your $deviceName.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (preferOpen) {
                             Button(onClick = onOpen) { Text("Open") }
@@ -199,11 +216,14 @@ private fun LatestEdition(
                     OutlinedButton(onClick = onSend) { Text("Send again") }
                     OutlinedButton(onClick = onOpen) { Text("Open") }
                 }
-                EditionStatus.FAILED -> Text(
-                    edition.error ?: "This edition couldn't be made.",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
+                EditionStatus.FAILED -> {
+                    Text(
+                        edition.error ?: "This edition couldn't be made.",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") }
+                }
                 EditionStatus.BUILDING -> {}
             }
         }
