@@ -83,10 +83,9 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
     Text("About ${minutes.roundToInt()} minutes of reading")
     Slider(
         value = minutes,
-        onValueChange = { minutes = it },
+        onValueChange = { minutes = ((it / 5).roundToInt() * 5).toFloat() },
         onValueChangeFinished = { vm.setMinutes(minutes.roundToInt()) },
         valueRange = SettingsViewModel.MIN_MINUTES.toFloat()..SettingsViewModel.MAX_MINUTES.toFloat(),
-        steps = (SettingsViewModel.MAX_MINUTES - SettingsViewModel.MIN_MINUTES) / 5 - 1,
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("At most ${s.edition.maxPerSource} from each source", Modifier.weight(1f))

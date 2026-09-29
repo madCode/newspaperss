@@ -200,7 +200,6 @@ private fun SizeStep(s: OnboardingState, vm: OnboardingViewModel) {
         value = s.minutes.toFloat(),
         onValueChange = { vm.setMinutes((it / 5).roundToInt() * 5) },
         valueRange = 10f..90f,
-        steps = 15,
     )
     Text(
         when {
