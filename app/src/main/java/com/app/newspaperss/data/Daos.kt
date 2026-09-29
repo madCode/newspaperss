@@ -176,6 +176,16 @@ interface ArticleDao {
     suspend fun expireOlderThan(before: Instant): Int
 
     /**
+     * Old articles keep their row, whose guid stops a feed offering them again, but not the
+     * feed's copy of their text, which would otherwise grow the database without end.
+     */
+    @Query(
+        """UPDATE articles SET feedHtml = NULL WHERE feedHtml IS NOT NULL
+           AND state IN ('DELIVERED', 'EXPIRED', 'SKIPPED') AND discoveredAt < :before""",
+    )
+    suspend fun dropOldFeedHtml(before: Instant): Int
+
+    /**
      * Expires all but the newest [keep] unpicked articles of a source, so a list that grows
      * faster than it's read stays bounded. Brought-back articles are the reader's and stay.
      */
@@ -236,6 +246,12 @@ interface EditionDao {
 
     @Update
     suspend fun update(edition: EditionEntity)
+
+    @Query("SELECT * FROM editions WHERE fileName IS NOT NULL ORDER BY createdAt DESC")
+    suspend fun withFiles(): List<EditionEntity>
+
+    @Query("UPDATE editions SET fileName = NULL WHERE id = :id")
+    suspend fun clearFile(id: Long)
 
     @Query("DELETE FROM edition_articles WHERE editionId = :editionId")
     suspend fun deleteArticles(editionId: Long)

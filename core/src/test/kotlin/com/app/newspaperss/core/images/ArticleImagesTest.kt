@@ -96,4 +96,17 @@ class ArticleImagesTest {
         assertTrue(allowance.take(40))
         assertTrue(allowance.exhausted)
     }
+
+    @Test
+    fun aLeftoverTooSmallForAnImageCountsAsSpent() {
+        // Otherwise every later article would download its images only to drop them.
+        val nearlyFull = ImageAllowance(maxBytes = 15_000_000)
+        assertTrue(nearlyFull.take(14_960_000))
+        assertTrue(nearlyFull.exhausted)
+
+        val refusing = ImageAllowance(maxBytes = 15_000_000)
+        assertTrue(refusing.take(14_000_000))
+        repeat(3) { assertFalse(refusing.take(2_000_000)) }
+        assertTrue("three refusals in a row", refusing.exhausted)
+    }
 }
