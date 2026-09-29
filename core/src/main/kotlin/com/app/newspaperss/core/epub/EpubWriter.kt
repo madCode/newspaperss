@@ -178,7 +178,7 @@ object EpubWriter {
                     for (article in section.articles) {
                         val meta = listOf(article.sourceTitle.trim(), ReadingTime.format(article.minutes))
                             .filter { it.isNotEmpty() }.joinToString(" · ")
-                        append("<li><a href=\"${articleHrefs[index]}\">${esc(articleTitle(index))}</a>")
+                        append("<li><a href=\"${articleHrefs[index]}\"${languageAttributes(article.language, lang)}>${esc(articleTitle(index))}</a>")
                         append("<br/><span class=\"meta\">${esc(meta)}</span></li>\n")
                         index++
                     }
@@ -200,11 +200,12 @@ object EpubWriter {
             val imageHrefs = article.images.map { it.href }.toSet()
             val body = buildString {
                 if (source.isNotEmpty()) append("<p class=\"kicker\">${esc(source)}</p>\n")
-                append("<h1 class=\"article-title\">${esc(title)}</h1>\n")
+                val langAttrs = languageAttributes(article.language, lang)
+                append("<h1 class=\"article-title\"$langAttrs>${esc(title)}</h1>\n")
                 append("<p class=\"byline\">${esc(byline)}</p>\n")
                 append("<hr class=\"rule\"/>\n")
                 article.note?.trim()?.takeIf { it.isNotEmpty() }?.let { append("<p class=\"note\">${esc(it)}</p>\n") }
-                append("<div class=\"article-body\">")
+                append("<div class=\"article-body\"$langAttrs>")
                 append(ArticleBody.toXhtml(article.bodyHtml, "a${index + 1}-", imageHrefs))
                 append("</div>\n")
                 val url = article.url.trim()
@@ -220,7 +221,7 @@ object EpubWriter {
                     }
                 }
                 if (index + 1 < articles.size) {
-                    append("<p class=\"article-nav\">Next: <a href=\"${articleHrefs[index + 1]}\">")
+                    append("<p class=\"article-nav\">Next: <a href=\"${articleHrefs[index + 1]}\"${languageAttributes(articles[index + 1].language, lang)}>")
                     append("${esc(articleTitle(index + 1))}</a></p>\n")
                 }
             }

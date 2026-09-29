@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.epub
 
+import com.app.newspaperss.core.extract.LanguageDetector
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -60,6 +61,17 @@ internal fun externalHref(url: String): String? {
         "mailto" -> fixed
         else -> null
     }
+}
+
+/**
+ * ` xml:lang="…" lang="…"` for an element whose text is in [language], or "" where the page's
+ * [pageLanguage] already covers it. Right-to-left languages also get `dir="rtl"`.
+ */
+internal fun languageAttributes(language: String?, pageLanguage: String): String {
+    val tag = LanguageDetector.normalize(language) ?: return ""
+    if (tag.equals(pageLanguage, ignoreCase = true)) return ""
+    val dir = if (LanguageDetector.isRightToLeft(tag)) " dir=\"rtl\"" else ""
+    return " xml:lang=\"${esc(tag)}\" lang=\"${esc(tag)}\"$dir"
 }
 
 /** A complete XHTML content document around [body], which must already be escaped markup. */

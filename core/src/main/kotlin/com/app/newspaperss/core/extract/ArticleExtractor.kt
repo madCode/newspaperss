@@ -48,6 +48,8 @@ data class ExtractedArticle(
     val pageWordCount: Int?,
     /** The site turned the page request away or answered with a bot check. */
     val pageBlocked: Boolean = false,
+    /** The article's language as a BCP 47 tag, if the text or the page says. */
+    val language: String? = null,
 )
 
 /**
@@ -68,8 +70,8 @@ class ArticleExtractor(private val http: HttpClient) {
         val feedWords = feed?.wordCount ?: 0
         val feedAuthor = PageExtractor.cleanAuthor(input.feedAuthor)
 
-        fun fromFeed(clean: CleanResult, note: String?, pageWords: Int?, blocked: Boolean = false) =
-            article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked)
+        fun fromFeed(clean: CleanResult, note: String?, pageWords: Int?, blocked: Boolean = false, declaredLanguage: String? = null) =
+            article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked, declaredLanguage)
 
         // A FEED source's item with no content still gets its page fetched: better than an empty article.
         if (feed != null && (input.mode == ContentMode.FEED || (input.mode == ContentMode.AUTO && feedWords >= FULL_TEXT_WORDS))) {
@@ -93,7 +95,7 @@ class ArticleExtractor(private val http: HttpClient) {
                         page.content.comicImage?.let { comic ->
                             imagePost(input, page, comic, feed, feedAuthor, feedWords, feedImagesAreThumbnails = true)?.let { return it }
                         }
-                        return fromFeed(feed, null, words)
+                        return fromFeed(feed, null, words, declaredLanguage = page.content.language)
                     }
                     if (missed) {
                         val image = page.content.mainImage ?: page.content.comicImage
@@ -102,7 +104,7 @@ class ArticleExtractor(private val http: HttpClient) {
                 }
                 when {
                     // Extraction that keeps well under the feed's text missed the article; the feed is better.
-                    feed != null && words < KEEP_FEED_RATIO * feedWords -> fromFeed(feed, null, words)
+                    feed != null && words < KEEP_FEED_RATIO * feedWords -> fromFeed(feed, null, words, declaredLanguage = page.content.language)
                     words == 0 -> failed(input, "no article text found on the page")
                     else -> article(
                         title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) },
@@ -112,6 +114,7 @@ class ArticleExtractor(private val http: HttpClient) {
                         note = null,
                         feedWords = feedWords,
                         pageWords = words,
+                        declaredLanguage = page.content.language,
                     )
                 }
             }
@@ -203,12 +206,12 @@ class ArticleExtractor(private val http: HttpClient) {
         val title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) }
         val clean = HtmlCleaner.clean(image + caption, page.url, title)
         if (clean.imageUrls.isEmpty()) return null
-        return article(title, feedAuthor ?: page.content.author, clean, false, null, feedWords, page.clean.wordCount)
+        return article(title, feedAuthor ?: page.content.author, clean, false, null, feedWords, page.clean.wordCount, declaredLanguage = page.content.language)
     }
 
     private fun article(
         title: String, author: String?, clean: CleanResult, usedFeed: Boolean, note: String?, feedWords: Int, pageWords: Int?,
-        blocked: Boolean = false,
+        blocked: Boolean = false, declaredLanguage: String? = null,
     ) = ExtractedArticle(
         title = title.replace(WHITESPACE, " ").trim(),
         author = author,
@@ -221,6 +224,7 @@ class ArticleExtractor(private val http: HttpClient) {
         feedWordCount = feedWords,
         pageWordCount = pageWords,
         pageBlocked = blocked,
+        language = LanguageDetector.detect(title + "\n" + Jsoup.parse(clean.html).text(), declaredLanguage),
     )
 
     companion object {

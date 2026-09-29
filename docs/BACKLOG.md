@@ -37,6 +37,15 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] Change the device in Settings after onboarding
 - [ ] A short Kindle how-to (same Amazon account, Library › Docs)
 
+### Accessibility audit (asked for, Day 2)
+A full pass over the app and the book, not just spot fixes:
+- [ ] App: TalkBack walk-through of every screen (labels, headings, focus order, live regions), font scale at 200%, display size, touch targets ≥ 48dp, contrast in light and dark, e-ink (Boox) readability, and no meaning carried by colour or animation alone (respect "remove animations")
+- [ ] Book: EPUB Accessibility 1.1 metadata (`schema:accessMode`, `accessibilityFeature`, `accessibilitySummary`), image alt text carried through, a page-list or landmarks where they help, and reading order checked with a screen reader (VoiceOver Books, TalkBack with an EPUB reader)
+- [ ] Tooling: Compose accessibility checks in the Robolectric tests (`enableAccessibilityChecks`), Accessibility Scanner on a device, Ace by DAISY on a live edition
+
+### From live editions (Day 2)
+- [ ] Le Monde serves a script wall ("A required part of this site couldn't load", `id="loading-error"`) with a 200; count it as a bot check so the feed's text is used and the source learns it's blocked
+
 ### From the resource audit (Day 2)
 - [ ] tt-rss: pass sinceId, so each sync doesn't re-download the same 200 unread items. Careful: a since-id cursor changes what "unread" returns (category switches, items marked unread again); rss-to-e-reader's #28 hit a similar trap
 - [ ] Strip script/style/svg before the Readability DOM clone, and cap article pages at ~4 MB (the worst-case memory peak)
@@ -99,15 +108,18 @@ What to do with non-English sources and readers. Today:
 - the page text (contents, "min read") is English;
 - reading time assumes English words per minute.
 
+Done: each article is tagged with its own language (`xml:lang`, and `dir="rtl"` for Arabic,
+Hebrew, Persian), detected from its text with the page's declaration as a tiebreaker.
+
 Questions:
-- tag each article with its own language (`xml:lang`), so e-readers hyphenate and pick fonts correctly;
 - reading time for languages that aren't space-separated (Chinese, Japanese), which is roughly
-  characters per minute;
+  characters per minute. A live NHK article counted as "1 word";
+- the book's `dc:language` when a whole edition is in one language other than English (Kindle
+  picks its dictionary from it);
 - right-to-left layout;
 - whether the app UI and the book's own text should be translated;
 - whether an edition should mix languages or keep them in sections.
 
-A small first step: detect each article's language and tag it.
 
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
@@ -126,6 +138,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Each article is tagged with its language (`xml:lang`, `dir="rtl"`), detected from its text (writing system, common words) with the page's declared language as a tiebreaker
 - [x] The article preview shows at once and reads the book in the background, with one open zip per screen (the "first tap doesn't open it" report). The side-scroll came from the old EPUB's long URL line, already gone
 - [x] An HTTP cache: feeds are revalidated (If-None-Match), and unchanged ones answer 304 instead of the whole feed; the background sync runs every 12 hours with the battery not low
 - [x] Housekeeping from the resource audit: only the newest 14 editions keep their EPUB; old articles drop their feed text (a month after delivery); the image budget counts as spent when nothing more fits. Streaming images to disk dropped: at most 15 MB, not the real peak

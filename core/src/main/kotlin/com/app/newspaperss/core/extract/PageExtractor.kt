@@ -27,6 +27,8 @@ internal data class PageContent(
     val description: String? = null,
     /** A webcomic's own comic, each panel in a `<figure>`, where its page marks it (ComicControl's `#cc-comic`, xkcd's `#comic`). */
     val comicImage: String? = null,
+    /** The language the page declares, as written (`<html lang>`, else `og:locale`). */
+    val language: String? = null,
 )
 
 /**
@@ -96,6 +98,8 @@ internal object PageExtractor {
             articleText = main?.text()?.takeIf { it.isNotBlank() },
             description = doc.metaContent("og:description"),
             comicImage = doc.select(COMIC_IMAGE).take(MAX_COMIC_PANELS).joinToString("") { figureOf(it) }.ifEmpty { null },
+            language = doc.selectFirst("html")?.let { html -> html.attr("lang").ifBlank { html.attr("xml:lang") } }?.ifBlank { null }
+                ?: doc.metaContent("og:locale"),
         )
     }
 

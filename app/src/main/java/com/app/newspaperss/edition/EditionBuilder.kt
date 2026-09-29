@@ -262,6 +262,7 @@ class EditionBuilder(
         published = a.published?.atZone(zone)?.toLocalDate(),
         note = c.note,
         images = c.images,
+        language = c.language,
     )
 
     /** The planner's source for [a]: the publication it came from within an aggregator, else its source. */

@@ -55,6 +55,8 @@ data class EditionSection(
  * @property note a notice shown above the body, for example that the full article couldn't be
  *   fetched.
  * @property images the images [bodyHtml] references, by the same href.
+ * @property language the article's BCP 47 language tag, if known. Its headline and body are
+ *   tagged with it where it differs from the book's [EditionDoc.language].
  */
 data class EditionArticle(
     val title: String,
@@ -66,6 +68,7 @@ data class EditionArticle(
     val published: LocalDate? = null,
     val note: String? = null,
     val images: List<EpubImage> = emptyList(),
+    val language: String? = null,
 )
 
 /**
