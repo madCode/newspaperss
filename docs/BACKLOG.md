@@ -6,6 +6,15 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ## Next
 
+### From device testing (Day 2)
+- [ ] Fill the time budget past the per-site cap: with one source (the New Yorker) an edition held one article
+- [ ] Images missing from comic posts (the New Yorker's cartoon, a webcomic): find where their images live
+- [ ] Make "what's in this edition" obvious before sending, and allow deleting an edition
+- [ ] EPUB design pass (the rss-to-e-reader output is the bar); links inherit the text colour, so KOReader's dark mode stays readable
+- [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
+- [ ] Reading list: fetch each link's title and reading time; tap to open in the browser
+- [ ] Label the "Article text" option with what it sets
+
 ### M4 leftovers
 - [ ] If lead time isn't enough on a real device, wake for timed editions with an exact alarm (Doze defers WorkManager; expedited work was rejected: its API 31+ quota can silently restart a long build)
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
@@ -37,6 +46,19 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] `SettingsScreenTest` can fail under full-suite load: DataStore "Unable to rename s.preferences_pb.tmp", likely a write still running when the temp folder is deleted. Give test DataStores a scope that's finished before cleanup
 
 ## Feature proposals
+
+### Notes: what should they be?
+The edition notes export (a markdown checklist of each edition's articles) went in without much thought
+about who uses it. Research first: what people do with a read list; whether to import highlights from
+Kindle (My Clippings), Kobo or KOReader; where notes should live (the app, or a markdown file elsewhere).
+
+### More than one schedule, and one-off editions
+Several timed editions (a weekday morning paper and Sunday long reads), and a one-off custom edition
+(pick sources, size) without changing the defaults.
+
+### tt-rss categories as sections
+newspapeRSS sits on top of a reader rather than replacing it. tt-rss is one source today, optionally
+one category; its categories could become the paper's sections.
 
 Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
 

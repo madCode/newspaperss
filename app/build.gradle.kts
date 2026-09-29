@@ -5,6 +5,9 @@ plugins {
     alias(libs.plugins.kover)
 }
 
+val ciRun = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val ciCommit = System.getenv("GITHUB_SHA")?.take(7)
+
 android {
     namespace = "com.app.newspaperss"
     compileSdk = 37
@@ -41,7 +44,8 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            // "0.1.0-debug.142+ab12cd3": which CI run and commit a tester has, shown in Settings.
+            versionNameSuffix = "-debug" + (ciRun?.let { ".$it" } ?: "") + (ciCommit?.let { "+$it" } ?: "")
         }
         release {
             isMinifyEnabled = false
@@ -122,4 +126,12 @@ dependencies {
     testImplementation(libs.compose.ui.test.junit4)
     // Compose UI test pulls an older Espresso that crashes on API 37.
     testImplementation(libs.espresso.core)
+}
+
+// Debug builds only: CI's run number, so each build from CI installs over the one before it.
+// Release builds keep their own version code, which stores and F-Droid need to control.
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        ciRun?.let { run -> variant.outputs.forEach { it.versionCode.set(run) } }
+    }
 }
