@@ -177,7 +177,7 @@ private fun App(container: AppContainer) {
             composable(SOURCE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
                 val vm = viewModel { SourceDetailViewModel(container.sources, id, container.ttrss) }
-                SourceDetailScreen(vm, onBack = { nav.navigateUp() })
+                SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) })
             }
             composable(READING_LIST) {
                 val vm = viewModel { ReadingListViewModel(container.readingList) }

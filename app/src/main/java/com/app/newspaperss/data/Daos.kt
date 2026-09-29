@@ -41,7 +41,8 @@ interface SourceDao {
 
     // Targeted updates: a sync holds a source row for up to a minute, and
     // writing the whole row back would undo a pause or rename made meanwhile.
-    @Query("UPDATE sources SET paused = :paused WHERE id = :id")
+    // A pause ends a run of failures: time spent paused isn't time spent failing.
+    @Query("UPDATE sources SET paused = :paused, failingSince = NULL WHERE id = :id")
     suspend fun setPaused(id: Long, paused: Boolean)
 
     @Query(
@@ -54,9 +55,6 @@ interface SourceDao {
 
     @Query("UPDATE sources SET lastFetchedAt = :at, lastError = :error, failingSince = COALESCE(failingSince, :at) WHERE id = :id")
     suspend fun recordFailure(id: Long, at: Instant, error: String)
-
-    @Query("UPDATE sources SET lastError = :error WHERE id = :id")
-    suspend fun setError(id: Long, error: String)
 
     @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
     suspend fun setServerNote(id: Long, note: String?)

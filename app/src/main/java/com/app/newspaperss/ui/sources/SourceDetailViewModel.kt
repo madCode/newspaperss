@@ -36,11 +36,11 @@ class SourceDetailViewModel(
         viewModelScope.launch { repository.chooseContentMode(id, mode) }
     }
 
-    fun remove(onRemoved: () -> Unit) {
+    /** The screen leaves by itself once [detail] shows the source gone. */
+    fun remove() {
         val source = detail.value?.source ?: return
         viewModelScope.launch {
             if (source.kind == SourceKind.TTRSS && ttrss != null) ttrss.forget(source) else repository.remove(source)
-            onRemoved()
         }
     }
 }

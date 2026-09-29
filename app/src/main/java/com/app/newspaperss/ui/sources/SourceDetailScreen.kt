@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -25,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
@@ -42,23 +44,29 @@ import com.app.newspaperss.data.SourceRepository
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /** One source's health and its recent articles, so the reader can see what it has been sending. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit) {
+/**
+ * @param onGone leaves the screen once the source is removed, from here or elsewhere. It runs
+ *   after the removal finishes, when the reader may already have left, so it mustn't just go up.
+ */
+fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onGone: () -> Unit = onBack) {
     val detail by viewModel.detail.collectAsState()
     val source = detail?.source
     val locale = LocalConfiguration.current.locales[0]
+    val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
     var removing by remember { mutableStateOf(false) }
     var choosingMode by remember { mutableStateOf(false) }
+    val gone = detail != null && source == null
+    LaunchedEffect(gone) { if (gone) onGone() }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(source?.title.orEmpty(), maxLines = 1) },
+                title = { Text(source?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
             )
         },
@@ -70,7 +78,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit) {
         val articles = detail?.articles.orEmpty()
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
             item {
-                Health(source, articles.maxOfOrNull { it.discoveredAt }, locale)
+                Health(source, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
                 FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
                     if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text") }
@@ -90,24 +98,18 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit) {
         ContentModeDialog(source, onChoose = { choosingMode = false; viewModel.chooseContentMode(it) }, onDismiss = { choosingMode = false })
     }
     if (removing && source != null) {
-        AlertDialog(
-            onDismissRequest = { removing = false },
-            title = { Text("Remove ${source.title}?") },
-            text = { Text("Its waiting articles go with it. If you add it again, articles you already got won't be sent again.") },
-            confirmButton = { TextButton(onClick = { removing = false; viewModel.remove(onBack) }) { Text("Remove") } },
-            dismissButton = { TextButton(onClick = { removing = false }) { Text("Cancel") } },
-        )
+        RemoveSourceDialog(source, onConfirm = { removing = false; viewModel.remove() }, onDismiss = { removing = false })
     }
 }
 
 @Composable
-private fun Health(source: SourceEntity, lastNew: Instant?, locale: Locale) {
+private fun Health(source: SourceEntity, lastNew: Instant?, locale: Locale, is24Hour: Boolean) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(SourceRepository.hostOf(source.siteUrl ?: source.url), style = MaterialTheme.typography.bodyMedium, color = muted)
         Text(statusLine(source, lastNew), color = if (hasProblem(source)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
         if (!source.paused) failingLine(source.failingSince, locale)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        lastCheckedLine(source.lastFetchedAt, locale)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
+        lastCheckedLine(source.lastFetchedAt, locale, is24Hour)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
         textLine(source)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
     }
 }
@@ -144,11 +146,12 @@ internal fun failingLine(since: Instant?, locale: Locale, now: Instant = Instant
     }
 }
 
-internal fun lastCheckedLine(at: Instant?, locale: Locale, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? {
+internal fun lastCheckedLine(at: Instant?, locale: Locale, is24Hour: Boolean, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? {
     if (at == null) return null
     val date = at.atZone(zone)
     return if (date.toLocalDate() == now.atZone(zone).toLocalDate()) {
-        "Last checked today at ${DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).format(date)}"
+        val pattern = DateFormat.getBestDateTimePattern(locale, if (is24Hour) "Hm" else "hma")
+        "Last checked today at ${DateTimeFormatter.ofPattern(pattern, locale).format(date)}"
     } else {
         "Last checked ${shortDate(at, locale, zone)}"
     }

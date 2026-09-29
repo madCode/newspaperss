@@ -69,6 +69,11 @@ class SourceDetailScreenTest {
         idleUntil { visible("Couldn't reach the site.") }
 
         compose.onNodeWithText("Failing for 3 days", substring = true).assertExists()
+        compose.onNodeWithText("Pause").performClick()
+        idleUntil { !visible("Failing for") }
+        assertNull("time spent paused isn't time spent failing", runBlocking { db.sources().byId(id)!!.failingSince })
+        compose.onNodeWithText("Resume").performClick()
+        idleUntil { visible("Pause") }
         val list = compose.onNode(hasScrollAction())
         list.performScrollToNode(hasText("Went out"))
         compose.onNodeWithText("Delivered", substring = true).assertExists()
@@ -78,7 +83,8 @@ class SourceDetailScreenTest {
         compose.onNodeWithText("Remove").performClick()
         compose.onNodeWithText("Remove Example?").assertExists()
         compose.onNode(hasText("Remove") and hasAnyAncestor(isDialog())).performClick()
-        idleUntil { back }
+        // Compose only recomposes for the removal when its test clock runs.
+        idleUntil { compose.waitForIdle(); back }
 
         assertEquals(emptyList<Any>(), runBlocking { db.sources().all() })
     }
@@ -90,7 +96,10 @@ class SourceDetailScreenTest {
         assertNull(failingLine(Instant.parse("2026-09-29T01:00:00Z"), Locale.US, now, utc))
         assertEquals("Failing since yesterday", failingLine(Instant.parse("2026-09-28T23:00:00Z"), Locale.US, now, utc))
         assertEquals("Failing for 3 days, since Sep 26", failingLine(Instant.parse("2026-09-26T08:00:00Z"), Locale.US, now, utc))
-        assertEquals("Last checked today at 6:02 AM", lastCheckedLine(Instant.parse("2026-09-29T06:02:00Z"), Locale.US, now, utc)?.replace(' ', ' '))
-        assertEquals("Last checked Sep 27", lastCheckedLine(Instant.parse("2026-09-27T06:02:00Z"), Locale.US, now, utc))
+        val evening = Instant.parse("2026-09-29T18:02:00Z")
+        val later = Instant.parse("2026-09-29T20:00:00Z")
+        assertEquals("Last checked today at 6:02 PM", lastCheckedLine(evening, Locale.US, is24Hour = false, now = later, zone = utc)?.replace('\u202f', ' '))
+        assertEquals("the phone's 24-hour setting wins", "Last checked today at 18:02", lastCheckedLine(evening, Locale.US, is24Hour = true, now = later, zone = utc))
+        assertEquals("Last checked Sep 27", lastCheckedLine(Instant.parse("2026-09-27T06:02:00Z"), Locale.US, is24Hour = false, now = now, zone = utc))
     }
 }

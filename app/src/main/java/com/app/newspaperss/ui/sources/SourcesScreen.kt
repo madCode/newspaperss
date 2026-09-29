@@ -242,6 +242,7 @@ private fun EmptySources(modifier: Modifier) {
 private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit, onTogglePause: () -> Unit, onChooseMode: (ContentMode) -> Unit) {
     var menu by remember { mutableStateOf(false) }
     var choosingMode by remember { mutableStateOf(false) }
+    var removing by remember { mutableStateOf(false) }
     val s = row.source
     val fullText = fullTextLine(s)
     val status = statusLine(s, row.lastNew)
@@ -269,7 +270,7 @@ private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit,
                     if (s.kind == SourceKind.FEED) {
                         DropdownMenuItem(text = { Text("Article text") }, onClick = { menu = false; choosingMode = true })
                     }
-                    DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; onRemove() })
+                    DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; removing = true })
                 }
             }
         },
@@ -277,6 +278,27 @@ private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit,
     if (choosingMode) {
         ContentModeDialog(s, onChoose = { choosingMode = false; onChooseMode(it) }, onDismiss = { choosingMode = false })
     }
+    if (removing) {
+        RemoveSourceDialog(s, onConfirm = { removing = false; onRemove() }, onDismiss = { removing = false })
+    }
+}
+
+@Composable
+internal fun RemoveSourceDialog(source: SourceEntity, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Remove ${source.title}?") },
+        text = {
+            Text(
+                when (source.kind) {
+                    SourceKind.TTRSS -> "This also signs newspaperss out of your tt-rss account. Your articles stay on the server."
+                    else -> "Its waiting articles go with it. If you add it again, articles you already got won't be sent again."
+                },
+            )
+        },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Remove") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

@@ -2,7 +2,9 @@ package com.app.newspaperss.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -50,13 +52,14 @@ class SourcesScreenTest {
         .allowMainThreadQueries().build()
     private val http = FakeHttp()
     private var syncRequests = 0
+    private var opened: Long? = null
 
     @Before
     fun show() {
         val sources = SourceRepository(db)
         val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
         val vm = SourcesViewModel(sources, FeedFinder(http), TtrssRepository(db, http, accounts, sources)) { syncRequests++ }
-        compose.setContent { SourcesScreen(vm) }
+        compose.setContent { SourcesScreen(vm, onOpenSource = { opened = it }) }
         // Room delivers on its own executor, which Compose's idling doesn't track.
         waitFor("No sources yet")
     }
@@ -105,6 +108,25 @@ class SourcesScreenTest {
         waitFor("Posts")
         compose.onNodeWithText("Posts").assertIsDisplayed()
         assertEquals(1, syncRequests)
+    }
+
+    @Test
+    fun tappingASourceOpensItAndRemovingOneAsksFirst() {
+        val id = runBlocking { SourceRepository(db).addFeed("https://example.com/feed", "Posts") }
+        waitFor("Posts")
+
+        compose.onNodeWithText("Posts").performClick()
+        assertEquals(id, opened)
+
+        compose.onNodeWithContentDescription("More for Posts").performClick()
+        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithText("Cancel").performClick()
+        assertEquals(1, runBlocking { db.sources().all().size })
+
+        compose.onNodeWithContentDescription("More for Posts").performClick()
+        compose.onNodeWithText("Remove").performClick()
+        compose.onNode(hasText("Remove") and hasAnyAncestor(isDialog())).performClick()
+        waitFor("Posts", present = false)
     }
 
     @Test
