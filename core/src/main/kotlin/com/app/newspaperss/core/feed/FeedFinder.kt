@@ -1,0 +1,75 @@
+package com.app.newspaperss.core.feed
+
+import com.app.newspaperss.core.net.HttpClient
+import org.jsoup.Jsoup
+import java.io.IOException
+
+data class FoundFeed(val url: String, val title: String?)
+
+sealed interface FindResult {
+    data class Found(val feeds: List<FoundFeed>) : FindResult
+    data class NotFound(val reason: String) : FindResult
+}
+
+/**
+ * Turns whatever a person types ("example.com", a page, a feed URL) into
+ * feed URLs: the address itself if it is a feed, else the feeds the page
+ * advertises, else the usual feed paths on the site.
+ */
+class FeedFinder(private val http: HttpClient) {
+
+    suspend fun find(input: String): FindResult {
+        val url = normalize(input) ?: return FindResult.NotFound("That doesn't look like a web address.")
+        val response = try {
+            http.get(url)
+        } catch (e: IOException) {
+            return FindResult.NotFound("Couldn't reach $url.")
+        }
+        if (!response.isSuccessful) return FindResult.NotFound("$url answered with error ${response.code}.")
+
+        if (FeedParser.looksLikeFeed(response.body)) {
+            val title = runCatching { FeedParser.parse(response.body, response.finalUrl).title }.getOrNull()
+            return FindResult.Found(listOf(FoundFeed(response.finalUrl, title)))
+        }
+
+        val advertised = advertisedFeeds(response.body, response.finalUrl)
+        if (advertised.isNotEmpty()) return FindResult.Found(advertised)
+
+        for (path in COMMON_PATHS) {
+            val candidate = resolveUrl(response.finalUrl, path)
+            val r = try { http.get(candidate) } catch (_: IOException) { continue }
+            if (r.isSuccessful && FeedParser.looksLikeFeed(r.body)) {
+                val title = runCatching { FeedParser.parse(r.body, r.finalUrl).title }.getOrNull()
+                return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)))
+            }
+        }
+        return FindResult.NotFound("No feed found at $url.")
+    }
+
+    companion object {
+        private val FEED_TYPES = setOf(
+            "application/rss+xml", "application/atom+xml", "application/feed+json",
+            "application/json", "application/rdf+xml", "text/xml", "application/xml",
+        )
+
+        // Absolute paths: a feed usually lives at the site root, not under the page typed.
+        internal val COMMON_PATHS = listOf("/feed", "/rss", "/feed.xml", "/rss.xml", "/atom.xml", "/index.xml", "/feed.json")
+
+        internal fun normalize(input: String): String? {
+            val t = input.trim()
+            if (t.isEmpty() || t.contains(' ')) return null
+            val withScheme = if (Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(t)) t else "https://$t"
+            if (!withScheme.startsWith("http://") && !withScheme.startsWith("https://")) return null
+            val host = withScheme.substringAfter("://").substringBefore('/').substringBefore('?')
+            return if (host.contains('.') || host.startsWith("localhost")) withScheme else null
+        }
+
+        internal fun advertisedFeeds(html: String, pageUrl: String): List<FoundFeed> =
+            Jsoup.parse(html, pageUrl).select("link[rel~=(?i)alternate][href]")
+                .filter { it.attr("type").lowercase().substringBefore(';').trim() in FEED_TYPES }
+                // Comment feeds are rarely what someone subscribing to a site wants.
+                .filterNot { it.attr("title").contains("comments", ignoreCase = true) }
+                .map { FoundFeed(it.absUrl("href"), it.attr("title").ifBlank { null }) }
+                .distinctBy { it.url }
+    }
+}
