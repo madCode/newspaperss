@@ -1,6 +1,5 @@
 package com.app.newspaperss.core.extract
 
-import com.app.newspaperss.core.images.ImageRules
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -41,6 +40,8 @@ internal data class PageContent(
  */
 internal object PageExtractor {
     const val MIN_WORDS = 150
+    private const val MAIN_IMAGE_MIN_PX = 200
+    private val NOT_MAIN_IMAGE = listOf("logo", "avatar", "headshot", "author", "profile", "icon")
     private const val JSON_LD_PREFERENCE_RATIO = 1.5
 
     fun extract(html: String, url: String): PageContent {
@@ -84,32 +85,29 @@ internal object PageExtractor {
         }
         val main = doc.select("article, main")
         return chosen.copy(
-            mainImage = mainImage(main, doc),
+            mainImage = mainImage(main),
             articleText = main.text().takeIf { it.isNotBlank() },
             description = doc.metaContent("og:description"),
         )
     }
 
     /**
-     * The first sizeable image in the page's `<article>` or `<main>`, else `og:image`, as a
-     * `<figure>` with just the attributes [HtmlCleaner] reads. Logos and SVGs don't count.
+     * The first sizeable image in the page's `<article>` or `<main>`, as a `<figure>` with just the
+     * attributes [HtmlCleaner] reads. Not `og:image`: many sites use one share card on every page.
+     * Logos, avatars, SVGs and images declared small don't count.
      */
-    private fun mainImage(main: Elements, doc: Document): String? {
+    private fun mainImage(main: Elements): String? {
         val img = main.select("img").firstOrNull { img ->
-            val marks = "${img.attr("alt")} ${img.className()} ${img.attr("src")}".lowercase()
+            // Class and address only: a cartoon's alt text can say "an iconic moment".
+            val marks = "${img.className()} ${img.attr("src")}".lowercase()
             val sources = listOf("src", "srcset", "data-src", "data-srcset").map { img.attr(it) }.filter { it.isNotBlank() && !it.startsWith("data:") }
-            val width = img.attr("width").toIntOrNull()
-            sources.isNotEmpty() && "logo" !in marks && sources.none { it.substringBefore('?').lowercase().endsWith(".svg") } &&
-                (width == null || width >= ImageRules.MIN_DIMENSION * 4)
-        }
+            val small = listOf("width", "height").any { dim -> img.attr(dim).toIntOrNull()?.let { it < MAIN_IMAGE_MIN_PX } == true }
+            sources.isNotEmpty() && !small && NOT_MAIN_IMAGE.none { it in marks } &&
+                sources.none { it.substringBefore('?').lowercase().endsWith(".svg") }
+        } ?: return null
         val figure = Element("figure")
-        if (img != null) {
-            val copy = figure.appendElement("img")
-            for (name in listOf("src", "srcset", "data-src", "data-srcset", "alt")) img.attr(name).takeIf { it.isNotBlank() }?.let { copy.attr(name, it) }
-            return figure.outerHtml()
-        }
-        val og = doc.metaContent("og:image") ?: return null
-        figure.appendElement("img").attr("src", og).attr("alt", doc.metaContent("og:image:alt").orEmpty())
+        val copy = figure.appendElement("img")
+        for (name in listOf("src", "srcset", "data-src", "data-srcset", "alt")) img.attr(name).takeIf { it.isNotBlank() }?.let { copy.attr(name, it) }
         return figure.outerHtml()
     }
 

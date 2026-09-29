@@ -69,7 +69,8 @@ class ArticleExtractorTest {
     @Test
     fun aCartoonPageGivesItsImageNotItsFooter() = runTest {
         val cartoon = "<html><head><meta property=\"og:description\" content=\"A drawing about the news.\"></head><body>" +
-            "<header><img alt=\"Example\" class=\"logo\" src=\"/logo.png\"></header><article><h1>Daily Cartoon</h1><picture>" +
+            "<header><img alt=\"Example\" class=\"logo\" src=\"/logo.png\"></header><article><h1>Daily Cartoon</h1>" +
+            "<img class=\"byline-avatar\" src=\"https://cdn.example.com/people/jo.jpg\"><picture>" +
             "<img alt=\"Two fans in the stands.\" loading=\"lazy\" srcset=\"https://cdn.example.com/c/w_600/a.jpg 600w, " +
             "https://cdn.example.com/c/w_1200/a.jpg 1200w\"></picture></article>$footer</body></html>"
         val http = FakeHttp(mapOf(url to page(cartoon)))
@@ -77,8 +78,41 @@ class ArticleExtractorTest {
         val article = ArticleExtractor(http).extract(input("<p>A drawing that riffs on the news.</p>"))
 
         assertEquals(listOf("https://cdn.example.com/c/w_1200/a.jpg"), article.imageUrls)
-        assertTrue("riffs on the news" in article.html || "Two fans" in article.html)
+        assertTrue("the feed's line is the caption", "riffs on the news" in article.html)
         assertFalse("footer text isn't the caption", "All rights reserved" in article.html)
+    }
+
+    private val brief = "<p>The council voted on Tuesday, after a long and heated debate, to keep the library open " +
+        "on Sundays. The decision, which surprised many, takes effect next month, and staff say they are ready.</p>"
+
+    @Test
+    fun aShortBriefDoesntGetTheSitesShareCard() = runTest {
+        val page = "<html><head><meta property=\"og:image\" content=\"https://example.com/share-card.png\"></head><body>" +
+            "<article><h1>Library stays open</h1>$brief$brief</article>$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(teaser))
+
+        assertEquals(emptyList<String>(), article.imageUrls)
+        assertTrue("library open" in article.html)
+    }
+
+    @Test
+    fun aTeaserWithAThumbnailDoesntBeatTheShortPage() = runTest {
+        val thumbTeaser = "<p>${"The council met again this week to talk about the library and its future plans. ".repeat(3)}</p>" +
+            "<img src=\"https://example.com/thumbs/library.jpg\">"
+        val page = "<html><body><article><h1>Library stays open</h1>$brief$brief</article>$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(thumbTeaser))
+
+        assertFalse(article.usedFeedContent)
+        assertTrue("library open" in article.html)
+    }
+
+    @Test
+    fun aPageWithNoTextStillSaysItCouldntBeRead() = runTest {
+        val page = "<html><body><article><img src=\"https://example.com/big.jpg\" width=\"1200\"></article></body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(null))
+
+        assertEquals(emptyList<String>(), article.imageUrls)
+        assertTrue(article.html, "example.com/culture/slow" in article.html)
     }
 
     @Test
