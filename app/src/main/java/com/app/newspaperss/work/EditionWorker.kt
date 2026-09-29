@@ -12,6 +12,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.app.newspaperss.NewspaperssApp
 import com.app.newspaperss.edition.BuildResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -19,10 +20,18 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun doWork(): Result {
         val container = (applicationContext as NewspaperssApp).container
         setProgress(workDataOf(STAGE to STAGE_SYNCING))
-        val result = container.editionRun.run(
-            scheduled = inputData.getBoolean(SCHEDULED, false),
-            onProgress = { done -> setProgressAsync(workDataOf(STAGE to STAGE_FETCHING, FETCHED to done)) },
-        )
+        // Thrown out of doWork, an exception fails the work with no output, so the Today screen
+        // could only say "Something went wrong."
+        val result = try {
+            container.editionRun.run(
+                scheduled = inputData.getBoolean(SCHEDULED, false),
+                onProgress = { done -> setProgressAsync(workDataOf(STAGE to STAGE_FETCHING, FETCHED to done)) },
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return Result.failure(workDataOf(ERROR to "Couldn't make the edition (${e.message ?: e.javaClass.simpleName})."))
+        }
         return when (result) {
             is BuildResult.Built -> Result.success(workDataOf(EDITION_ID to result.editionId))
             BuildResult.NothingNew -> Result.success(workDataOf(NOTHING_NEW to true))

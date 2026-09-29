@@ -11,12 +11,13 @@ import android.text.TextPaint
 import android.text.TextUtils
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withTranslation
+import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.epub.EpubImage
+import com.app.newspaperss.core.plural
 import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.roundToLong
 
 /**
  * What an edition's cover shows.
@@ -124,14 +125,10 @@ class CoverRenderer {
         return top + thickness
     }
 
-    private fun totals(info: CoverInfo): String {
-        val articles = if (info.articleCount == 1) "1 article" else "${info.articleCount} articles"
-        val minutes = maxOf(1L, info.minutes.roundToLong())
-        val time = if (minutes < 60) "$minutes min" else "${minutes / 60} hr ${minutes % 60} min"
-        return "$articles · about $time"
-    }
-
     companion object {
+        /** The cover's footer line. */
+        internal fun totals(info: CoverInfo) = "${plural(info.articleCount, "article")} · about ${ReadingTime.format(info.minutes)}"
+
         /** A portrait e-reader screen (Kobo/Paperwhite class), as rss-to-e-reader uses; not KDP's 1600x2560. */
         const val WIDTH = 1264
         const val HEIGHT = 1680

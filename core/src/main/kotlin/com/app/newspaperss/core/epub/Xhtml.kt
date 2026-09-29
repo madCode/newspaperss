@@ -2,7 +2,6 @@ package com.app.newspaperss.core.epub
 
 import java.net.URI
 import java.net.URISyntaxException
-import kotlin.math.roundToLong
 
 /** Escapes [text] for XML text or a double- or single-quoted attribute value. */
 internal fun esc(text: String): String {
@@ -39,17 +38,6 @@ internal fun stripInvalidXmlChars(text: String): String {
 private fun isXmlChar(cp: Int): Boolean =
     cp == 0x9 || cp == 0xA || cp == 0xD ||
         cp in 0x20..0xD7FF || cp in 0xE000..0xFFFD || cp in 0x10000..0x10FFFF
-
-/**
- * Minutes as the reader sees them: rounded, but never "0 min" for something that takes any time
- * to read, and hours past 60.
- */
-internal fun formatMinutes(minutes: Double): String {
-    val whole = if (minutes <= 0.0) 0L else maxOf(1L, minutes.roundToLong())
-    return if (whole < 60) "$whole min" else "${whole / 60} hr ${whole % 60} min"
-}
-
-internal fun plural(count: Int, noun: String): String = if (count == 1) "1 $noun" else "$count ${noun}s"
 
 /**
  * [url] as an href an EPUB can carry, or null. Send to Kindle and EPUB validators reject hrefs

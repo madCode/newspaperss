@@ -44,6 +44,7 @@ import com.app.newspaperss.ui.readinglist.ReadingListViewModel
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.work.SyncWorker
+import kotlinx.coroutines.launch
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     TODAY("today", "Today", Icons.Default.Newspaper),
@@ -68,7 +69,7 @@ class MainActivity : ComponentActivity() {
                         val context = LocalContext.current.applicationContext
                         val vm = viewModel {
                             OnboardingViewModel(container.settings, container.sources, container.feedFinder) { saved ->
-                                EditionScheduler.reschedule(context, saved)
+                                container.appScope.launch { EditionScheduler.reschedule(context, saved) }
                                 EditionWorker.buildNow(context)
                             }
                         }
@@ -131,7 +132,7 @@ private fun App(container: AppContainer) {
             }
             composable(Tab.SETTINGS.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { SettingsViewModel(container.settings) { EditionScheduler.reschedule(context, it) } }
+                val vm = viewModel { SettingsViewModel(container.settings) { container.appScope.launch { EditionScheduler.reschedule(context, it) } } }
                 SettingsScreen(vm)
             }
         }

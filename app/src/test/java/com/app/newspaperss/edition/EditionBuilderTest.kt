@@ -1,19 +1,21 @@
 package com.app.newspaperss.edition
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
-import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
+import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.TestApp
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -31,18 +33,18 @@ import java.util.zip.ZipFile
 class EditionBuilderTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
-        .allowMainThreadQueries().build()
+    @get:Rule val dbRule = DbRule()
+    private val db = dbRule.db
     private val clock = Clock.fixed(Instant.parse("2026-09-29T06:30:00Z"), ZoneOffset.UTC)
     private val sources = SourceRepository(db)
     private val unreadable = mutableSetOf<String>()
+    private val broken = mutableSetOf<String>()
     private val content = ArticleContentProvider { a, _, _ ->
+        if (a.guid in broken) throw IllegalStateException("parser crashed on ${a.url}")
         if (a.guid in unreadable) null else ArticleContent(a.title, null, "<p>${a.title} body</p>", wordCount = 2000)
     }
     private val builder by lazy { EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) }
     private val editions by lazy { EditionRepository(db, tmp.root, clock) }
-
-    @After fun close() = db.close()
 
     private suspend fun source(name: String, section: String? = null, vararg guids: String): Long {
         val id = sources.addFeed("https://$name.example/feed", name, section)
@@ -249,5 +251,71 @@ class EditionBuilderTest {
         sources.remove(db.sources().byId(id)!!)
 
         assertEquals(listOf("a a1"), editions.observeArticles(built.editionId).first().map { it.title })
+    }
+
+    @Test
+    fun anArticleThatCrashesTheProviderIsSkipped() = runTest {
+        source("a", null, "a1", "a2", "a3")
+        broken += "a2"
+
+        val built = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+
+        assertEquals(EditionStatus.READY, db.editions().byId(built.editionId)!!.status)
+        assertEquals(setOf("a a1", "a a3"), editions.observeArticles(built.editionId).first().map { it.title }.toSet())
+        assertEquals(ArticleState.NEW, stateOf("a2"))
+    }
+
+    @Test
+    fun anEditionWhoseEveryArticleCrashesFailsInsteadOfStayingBuilding() = runTest {
+        source("a", null, "a1", "a2")
+        broken += setOf("a1", "a2")
+
+        val failed = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Failed
+
+        assertEquals(EditionStatus.FAILED, db.editions().byId(failed.editionId)!!.status)
+        assertEquals(ArticleState.NEW, stateOf("a1"))
+    }
+
+    @Test
+    fun anUnexpectedErrorFailsTheEditionAndLeavesItsArticlesForTheNextOne() = runTest {
+        source("a", null, "a1")
+
+        val failed = builder.build(EditionSettings()) { error("progress reporting broke") } as BuildResult.Failed
+
+        val edition = db.editions().byId(failed.editionId)!!
+        assertEquals(EditionStatus.FAILED, edition.status)
+        assertTrue(edition.error!!.contains("progress reporting broke"))
+        assertEquals(ArticleState.NEW, stateOf("a1"))
+        assertTrue(builder.build(EditionSettings()) is BuildResult.Built)
+    }
+
+    @Test
+    fun aCancelledBuildIsMarkedFailed() = runTest {
+        source("a", null, "a1")
+        val fetching = CompletableDeferred<Unit>()
+        val hanging = ArticleContentProvider { _, _, _ ->
+            fetching.complete(Unit)
+            awaitCancellation()
+        }
+        val job = launch { EditionBuilder(db, hanging, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings()) }
+        fetching.await()
+
+        job.cancelAndJoin()
+
+        val edition = db.editions().withStatus(EditionStatus.FAILED).single()
+        assertEquals(EditionBuilder.STOPPED, edition.error)
+        assertEquals(ArticleState.NEW, stateOf("a1"))
+    }
+
+    @Test
+    fun anEditionLeftBuildingByADeadProcessIsMarkedFailedByTheNextBuild() = runTest {
+        val stuck = db.editions().insert(EditionEntity(title = "Monday Evening Edition", status = EditionStatus.BUILDING))
+        source("a", null, "a1")
+
+        builder.build(EditionSettings()) as BuildResult.Built
+
+        val edition = db.editions().byId(stuck)!!
+        assertEquals(EditionStatus.FAILED, edition.status)
+        assertEquals(EditionBuilder.INTERRUPTED, edition.error)
     }
 }

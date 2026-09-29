@@ -1,10 +1,7 @@
 package com.app.newspaperss.edition
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
@@ -14,11 +11,11 @@ import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.notify.EditionNotifier
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.SettingsStore
+import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.rss
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -33,8 +30,8 @@ import java.io.File
 class EditionRunTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
-        .allowMainThreadQueries().build()
+    @get:Rule val dbRule = DbRule()
+    private val db = dbRule.db
     private val http = FakeHttp()
     private val settings by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("settings.preferences_pb") }) }
     private val editions by lazy { EditionRepository(db, tmp.newFolder("editions")) }
@@ -53,8 +50,6 @@ class EditionRunTest {
             { file, uri, title -> saved += "$uri/$title:${file.length() > 0}"; folderError }, notifier,
         )
     }
-
-    @After fun close() = db.close()
 
     private suspend fun oneSource() {
         SourceRepository(db).addFeed("https://example.com/feed", "Blog")

@@ -1,5 +1,7 @@
 package com.app.newspaperss.core.epub
 
+import com.app.newspaperss.core.ReadingTime
+import com.app.newspaperss.core.plural
 import java.io.OutputStream
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -161,7 +163,7 @@ object EpubWriter {
             return Page("cover", COVER, doc.title, xhtmlPage(doc.title, lang, body))
         }
 
-        private fun totalsLine() = "${plural(articles.size, "article")} · ${formatMinutes(totalMinutes)}"
+        private fun totalsLine() = "${plural(articles.size, "article")} · ${ReadingTime.format(totalMinutes)}"
 
         private fun contentsPage(): Page {
             val body = buildString {
@@ -173,7 +175,7 @@ object EpubWriter {
                     if (title.isNotEmpty()) append("<h2 id=\"${sectionId(sectionIndex)}\">${esc(title)}</h2>\n")
                     append("<ol class=\"contents\" start=\"${index + 1}\">\n")
                     for (article in section.articles) {
-                        val meta = listOf(article.sourceTitle.trim(), formatMinutes(article.minutes))
+                        val meta = listOf(article.sourceTitle.trim(), ReadingTime.format(article.minutes))
                             .filter { it.isNotEmpty() }.joinToString(" · ")
                         append("<li><a href=\"${articleHrefs[index]}\">${esc(articleTitle(index))}</a>")
                         append("<br/><span class=\"meta\">${esc(meta)}</span></li>\n")
@@ -192,7 +194,7 @@ object EpubWriter {
                 article.sourceTitle.trim().ifEmpty { null },
                 article.author?.trim()?.ifEmpty { null },
                 article.published?.let { BYLINE_DATE.format(it) },
-                formatMinutes(article.minutes),
+                ReadingTime.format(article.minutes),
             ).joinToString(" · ")
             val imageHrefs = article.images.map { it.href }.toSet()
             val body = buildString {

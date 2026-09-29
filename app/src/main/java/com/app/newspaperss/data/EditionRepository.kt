@@ -29,7 +29,9 @@ class EditionRepository(
         db.editions().update(edition.copy(status = EditionStatus.DELIVERED, deliveredAt = clock.instant(), error = null))
     }
 
-    /** Puts articles the reader didn't get to back in the pool, ahead of newer ones. */
-    /** Returns how many actually went back. */
+    /**
+     * Puts delivered articles the reader didn't get to back in the pool, ahead of newer ones.
+     * Returns how many actually went back.
+     */
     suspend fun bringBack(articleIds: List<Long>): Int = db.articles().bringBackDelivered(articleIds)
 }
