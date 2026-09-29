@@ -43,3 +43,15 @@ commit message. Public API KDoc stays accurate when signatures change.
 A test should be able to catch a plausible regression. Test behaviour, not
 structure. Don't feed code inputs it can never receive. When a change has
 no behaviour to test, say so in the PR instead of inventing a test.
+
+## Pull requests
+
+Before opening a PR that changes behaviour, have a fresh-eyes subagent
+review the diff. Point it at the risky parts (how the change interacts
+with other features touching the same data, sync and delivery, removal
+and re-adding, cancellation, e-ink and accessibility), and ask for
+concrete findings only: file:line and a failure scenario, most severe
+first, no edits. Verify each finding before acting on it, and say in the
+PR what the review found and what was fixed or deliberately left. Docs-,
+comment- and config-only changes can skip this; after fixing the
+findings, a short second look at just the new diff is enough.
