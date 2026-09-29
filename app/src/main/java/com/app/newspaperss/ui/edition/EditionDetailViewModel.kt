@@ -62,8 +62,12 @@ class EditionDetailViewModel(private val editions: EditionRepository, private va
         if (ids.isEmpty()) return
         _selected.value = emptySet()
         viewModelScope.launch {
-            editions.bringBack(ids)
-            _message.value = if (ids.size == 1) "1 article will be in your next edition" else "${ids.size} articles will be in your next edition"
+            val moved = editions.bringBack(ids)
+            _message.value = when (moved) {
+                0 -> "Those articles are already on their way back"
+                1 -> "1 article will be in your next edition"
+                else -> "$moved articles will be in your next edition"
+            }
         }
     }
 }

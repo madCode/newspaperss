@@ -113,12 +113,12 @@ private fun App(container: AppContainer) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context)) { EditionWorker.buildNow(context) } }
-                TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") })
+                TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
                 val vm = viewModel { EditionDetailViewModel(container.editions, id) }
-                EditionDetailScreen(vm, onBack = { nav.popBackStack() })
+                EditionDetailScreen(vm, onBack = { nav.navigateUp() })
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
@@ -127,7 +127,7 @@ private fun App(container: AppContainer) {
             }
             composable(READING_LIST) {
                 val vm = viewModel { ReadingListViewModel(container.readingList) }
-                ReadingListScreen(vm, onBack = { nav.popBackStack() })
+                ReadingListScreen(vm, onBack = { nav.navigateUp() })
             }
             composable(Tab.SETTINGS.route) {
                 val context = LocalContext.current.applicationContext

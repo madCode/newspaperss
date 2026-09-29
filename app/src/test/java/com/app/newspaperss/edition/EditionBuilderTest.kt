@@ -228,6 +228,19 @@ class EditionBuilderTest {
     }
 
     @Test
+    fun onlyDeliveredArticlesCanBeBroughtBack() = runTest {
+        source("a", null, "a1")
+        val built = builder.build(EditionSettings()) as BuildResult.Built
+        val ids = db.editions().articleIds(built.editionId)
+
+        assertEquals("still in an unsent edition", 0, editions.bringBack(ids))
+        assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
+        editions.markDelivered(built.editionId)
+        assertEquals(1, editions.bringBack(ids))
+        assertEquals(0, editions.bringBack(ids))
+    }
+
+    @Test
     fun removingASourceKeepsPastEditionsContents() = runTest {
         val id = source("a", null, "a1")
         val built = builder.build(EditionSettings()) as BuildResult.Built

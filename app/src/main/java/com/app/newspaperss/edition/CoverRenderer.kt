@@ -132,7 +132,7 @@ class CoverRenderer {
     }
 
     companion object {
-        /** Kindle's recommended cover size, as in rss-to-e-reader. */
+        /** A portrait e-reader screen (Kobo/Paperwhite class), as rss-to-e-reader uses; not KDP's 1600x2560. */
         const val WIDTH = 1264
         const val HEIGHT = 1680
         const val HREF = "images/cover.jpg"

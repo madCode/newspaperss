@@ -92,6 +92,10 @@ interface ArticleDao {
     @Query("UPDATE articles SET state = 'NEW', broughtBack = 1 WHERE id IN (:ids)")
     suspend fun bringBack(ids: List<Long>)
 
+    /** Only articles still marked delivered: one already back in the pool or in a newer edition stays put. */
+    @Query("UPDATE articles SET state = 'NEW', broughtBack = 1 WHERE id IN (:ids) AND state = 'DELIVERED'")
+    suspend fun bringBackDelivered(ids: List<Long>): Int
+
     /** Expires unpicked articles discovered before [before], except reading-list items. */
     @Query(
         """UPDATE articles SET state = 'EXPIRED' WHERE state = 'NEW' AND broughtBack = 0 AND discoveredAt < :before
