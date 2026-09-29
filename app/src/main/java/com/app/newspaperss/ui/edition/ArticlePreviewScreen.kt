@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,7 +75,8 @@ fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: St
             Preview.Missing -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("This edition's file is gone, so the article can't be shown.")
             }
-            is Preview.Ready -> BookView(p.pages, p.xhtml, Modifier.fillMaxSize().padding(padding))
+            // Keyed: the WebView is built once, so a new article needs a new one.
+            is Preview.Ready -> key(p) { BookView(p.pages, p.xhtml, Modifier.fillMaxSize().padding(padding)) }
         }
     }
 }

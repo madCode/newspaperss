@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -155,10 +156,11 @@ private fun App(container: AppContainer, preferOpen: Boolean) {
                 val id = entry.arguments?.getLong("id") ?: 0L
                 val position = entry.arguments?.getInt("position") ?: 0
                 val contents by container.editions.observeContents(id).collectAsState(initial = emptyList())
+                val editionTitle by produceState<String?>(null, id) { value = container.editions.byId(id)?.title }
                 ArticlePreviewScreen(
                     loadFile = { container.editions.byId(id)?.let(container.editions::fileOf) },
                     position = position,
-                    title = contents.getOrNull(position)?.entry?.title.orEmpty(),
+                    title = contents.getOrNull(position)?.entry?.title ?: editionTitle.orEmpty(),
                     onBack = { nav.navigateUp() },
                 )
             }
