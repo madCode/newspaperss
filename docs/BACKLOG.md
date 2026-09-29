@@ -9,7 +9,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### From device testing (Day 2)
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap; the app's user agent is redirected to m.webtoons.com, whose series page doesn't link the feed. Support strips properly
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
-- [ ] The first tap on an article in the app may not open it
 - [ ] Decide what tapping an article in a source's list does: open the original in the browser, render it, or offer "add to the next edition"
 
 ### M4 leftovers
@@ -42,7 +41,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] tt-rss: pass sinceId, so each sync doesn't re-download the same 200 unread items. Careful: a since-id cursor changes what "unread" returns (category switches, items marked unread again); rss-to-e-reader's #28 hit a similar trap
 - [ ] Strip script/style/svg before the Readability DOM clone, and cap article pages at ~4 MB (the worst-case memory peak)
 - [ ] Load build candidates without feedHtml; fetch it per article
-- [ ] Article preview: open the EPUB off the main thread, one ZipFile per screen
 - [ ] EPUB zip: buffered output, JPEGs stored uncompressed
 
 ### Tech debt
@@ -128,6 +126,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] The article preview shows at once and reads the book in the background, with one open zip per screen (the "first tap doesn't open it" report). The side-scroll came from the old EPUB's long URL line, already gone
 - [x] An HTTP cache: feeds are revalidated (If-None-Match), and unchanged ones answer 304 instead of the whole feed; the background sync runs every 12 hours with the battery not low
 - [x] Housekeeping from the resource audit: only the newest 14 editions keep their EPUB; old articles drop their feed text (a month after delivery); the image budget counts as spent when nothing more fits. Streaming images to disk dropped: at most 15 MB, not the real peak
 - [x] Reading list: every saved link's page is measured for a reading time (database version 2, the first migration), rows open in the browser, and an untitled row shows a title made from its address

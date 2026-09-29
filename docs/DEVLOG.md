@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** a feed cache and a gentler background sync.
-- **Next:** the first tap on an article; language tagging; the audit's memory items (page DOM trimming).
+- **In flight:** the article preview opens at once.
+- **Next:** language tagging; the audit's memory items (page DOM trimming); what tapping a source's article does.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 19: fewer downloads, fewer wakeups (15:44–)
+### Cycle 20: the first tap on an article (16:00–)
+- **From device testing:** the first tap on an article seemed not to open it, and the article was a little wider than the phone.
+- **Found:** the width came from this morning's EPUB, which printed the full original URL on its own line with no word breaking; the EPUB design round replaced both. A fresh live edition (11 articles, cover and contents) rendered at 360px wide has nothing wider than the screen. The tap wasn't being dropped: the preview read the EPUB during composition, and the first WebView of a session starts slowly, so the screen held still long enough to look ignored.
+- **Shipped:** the preview appears at once with a progress bar, and the book is read in the background. One open zip serves the page and all its images, instead of reopening the zip for each one.
+
+### Cycle 19: fewer downloads, fewer wakeups (15:44–16:00, [#36](https://github.com/madCode/newspaperss/pull/36))
 - **Shipped:** a 10 MB HTTP cache, with every feed and page request revalidated (If-None-Match), so an unchanged feed answers 304 instead of downloading again (about 180 MB a month at 20 feeds). The background sync runs every 12 hours with the battery not low, instead of every 4: each edition syncs right before it's built.
 - **Review caught:** OkHttp would serve a feed it judged "fresh" without asking at all (max-age, or a guess from Last-Modified), so a new post could miss an edition. Requests now ask for max-age=0, which forces the conditional request (no-cache would skip the cache altogether, as the test found). Re-applying the schedule with UPDATE on every start cost wakeups; it's a new name with KEEP.
 - **Left:** tt-rss `sinceId`: a since-id cursor changes what "unread" returns, the trap rss-to-e-reader's #28 hit. In the backlog with that note.
