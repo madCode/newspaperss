@@ -1,8 +1,8 @@
 # Backlog
 
-The running plan. Each work cycle picks the top unblocked item, builds it
-with tests, and moves it to Done with its PR. Milestones are from
-[DESIGN.md §10](DESIGN.md#10-milestones).
+The running plan. Each work cycle picks what matters most for readers right now (device feedback
+first, then research and judgment), builds it with tests, and moves it to Done. Milestones are from
+[DESIGN.md §10](DESIGN.md#10-milestones). Sections below Next are proposals, not commitments.
 
 ## Next
 
@@ -15,14 +15,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] If lead time isn't enough on a real device, wake for timed editions with an exact alarm (Doze defers WorkManager; expedited work was rejected: its API 31+ quota can silently restart a long build)
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
 - [ ] Verify folder delivery + chooser-from-notification on a real device
-
-### M3 leftovers
-
-### M5 leftovers
-
-### M6 leftovers
-
-### M7 Polish
 
 ### M8 Advanced
 - [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
@@ -108,17 +100,15 @@ What to do with non-English sources and readers. Today:
 - reading time assumes English words per minute.
 
 Done: each article is tagged with its own language (`xml:lang`, and `dir="rtl"` for Arabic,
-Hebrew, Persian), detected from its text with the page's declaration as a tiebreaker.
+Hebrew, Persian), so e-readers hyphenate and lay it out correctly.
 
 Questions:
 - reading time for languages that aren't space-separated (Chinese, Japanese), which is roughly
   characters per minute. A live NHK article counted as "1 word";
 - the book's `dc:language` when a whole edition is in one language other than English (Kindle
   picks its dictionary from it);
-- right-to-left layout;
 - whether the app UI and the book's own text should be translated;
 - whether an edition should mix languages or keep them in sections.
-
 
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
