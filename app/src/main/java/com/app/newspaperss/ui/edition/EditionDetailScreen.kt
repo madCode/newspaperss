@@ -53,9 +53,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
+/** @param preferOpen the reader reads on this device (a Boox), so opening an edition delivers it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-/** @param preferOpen the reader reads on this device (a Boox), so opening an edition delivers it. */
 fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, onReadArticle: (position: Int) -> Unit = {}, preferOpen: Boolean = false) {
     val detail by viewModel.detail.collectAsState()
     val selected by viewModel.selected.collectAsState()

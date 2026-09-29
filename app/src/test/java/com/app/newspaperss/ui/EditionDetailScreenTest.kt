@@ -26,6 +26,7 @@ import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.testutil.TestApp
+import com.app.newspaperss.testutil.clearFileProviderCache
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
@@ -34,6 +35,7 @@ import com.app.newspaperss.ui.today.TodayViewModel
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -56,7 +58,8 @@ class EditionDetailScreenTest {
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
-    private val editionsDir by lazy { tmp.newFolder("editions") }
+    // In the app's files dir, like the notes: Open and Send hand the file out through its FileProvider.
+    private val editionsDir by lazy { File(ApplicationProvider.getApplicationContext<Application>().filesDir, "editions").apply { mkdirs() } }
     private val repo by lazy { EditionRepository(db, editionsDir) }
     // In the app's files dir: the share sheet's FileProvider only serves files from there.
     private val notes by lazy {
@@ -64,6 +67,8 @@ class EditionDetailScreenTest {
     }
 
     @After fun close() = db.close()
+
+    @Before @After fun freshFileProvider() = clearFileProviderCache()
 
     /** An edition of [titles] (in reading order), all in [articleState]; returns the edition and article ids. */
     private fun edition(
@@ -87,9 +92,9 @@ class EditionDetailScreenTest {
         editionId to ids
     }
 
-    private fun show(editionId: Long): EditionDetailViewModel {
+    private fun show(editionId: Long, preferOpen: Boolean = false): EditionDetailViewModel {
         val vm = EditionDetailViewModel(repo, editionId, notes)
-        compose.setContent { EditionDetailScreen(vm, onBack = {}) }
+        compose.setContent { EditionDetailScreen(vm, onBack = {}, preferOpen = preferOpen) }
         idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
         return vm
     }
@@ -136,6 +141,26 @@ class EditionDetailScreenTest {
         compose.onNodeWithText("Unsent story").performClick()
         compose.waitForIdle()
         assertEquals(0, compose.onAllNodes(hasText("Bring back", substring = true)).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun openingOnAPhoneDoesntCountAsDelivered() {
+        val (onPhone, _) = edition(EditionStatus.READY, listOf("A story"))
+        show(onPhone)
+        compose.onNodeWithText("Open").performClick()
+        assertEquals(Intent.ACTION_VIEW, shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity.action)
+        assertEquals("a phone may just be previewing it", EditionStatus.READY, runBlocking { db.editions().byId(onPhone) }?.status)
+    }
+
+    @Test
+    fun openingOnABooxCountsAsDelivered() {
+        val (id, articles) = edition(EditionStatus.READY, listOf("A story"))
+        show(id, preferOpen = true)
+
+        compose.onNodeWithText("Open").performClick()
+
+        idleUntil { runBlocking { db.editions().byId(id) }?.status == EditionStatus.DELIVERED }
+        assertEquals(ArticleState.DELIVERED, runBlocking { db.articles().byId(articles[0]) }?.state)
     }
 
     @Test
