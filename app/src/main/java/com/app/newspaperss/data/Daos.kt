@@ -58,10 +58,10 @@ interface SourceDao {
     @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
     suspend fun setServerNote(id: Long, note: String?)
 
-    @Query("UPDATE sources SET contentMode = :mode, fullTextEvidence = :evidence, fullTextStreak = :streak WHERE id = :id")
-    suspend fun setFullText(id: Long, mode: ContentMode, evidence: FullTextEvidence, streak: Int)
+    @Query("UPDATE sources SET contentMode = :mode, fullTextEvidence = :evidence, fullTextStreak = :streak, fullTextDay = :day WHERE id = :id")
+    suspend fun setFullText(id: Long, mode: ContentMode, evidence: FullTextEvidence?, streak: Int, day: Long?)
 
-    @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen, fullTextEvidence = NULL, fullTextStreak = 0 WHERE id = :id")
+    @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen, fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL WHERE id = :id")
     suspend fun setContentMode(id: Long, mode: ContentMode, chosen: Boolean)
 
     @Query("SELECT * FROM sources WHERE kind = :kind")

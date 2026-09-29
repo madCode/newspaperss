@@ -115,4 +115,9 @@ class ReadLaterImportTest {
             ReadLaterImport.csv("a,\"b, c\",\"say \"\"hi\"\"\"\r\n\"line\r\nbreak\",,end"),
         )
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun anUnclosedQuoteIsAnErrorNotAnEmptyImport() {
+        ReadLaterImport.csv("url,title\nhttps://a.example/,\"Never closed\nhttps://b.example/,B\n")
+    }
 }

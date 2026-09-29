@@ -30,6 +30,8 @@ data class SourceEntity(
     /** The latest article's [FullTextEvidence] and the run behind it; see [com.app.newspaperss.core.extract.FullTextCheck]. */
     val fullTextEvidence: FullTextEvidence? = null,
     val fullTextStreak: Int = 0,
+    /** The epoch day the last piece of full-text evidence was counted. */
+    val fullTextDay: Long? = null,
     val paused: Boolean = false,
     val addedAt: Instant = Instant.now(),
     val lastFetchedAt: Instant? = null,

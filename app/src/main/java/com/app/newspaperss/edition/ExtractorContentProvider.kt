@@ -1,6 +1,8 @@
 package com.app.newspaperss.edition
 
 import com.app.newspaperss.core.extract.ArticleExtractor
+import com.app.newspaperss.core.extract.ContentMode
+import org.jsoup.Jsoup
 import com.app.newspaperss.core.extract.ExtractInput
 import com.app.newspaperss.core.extract.FullTextCheck
 import com.app.newspaperss.core.extract.FullTextEvidence
@@ -44,7 +46,7 @@ class ExtractorContentProvider(
                 feedTitle = article.title,
                 feedHtml = article.feedHtml,
                 feedAuthor = article.author,
-                mode = source.contentMode,
+                mode = modeFor(article, source),
             ),
         )
         FullTextCheck.evidence(extracted)?.let { onEvidence(source.id, it) }
@@ -82,6 +84,17 @@ class ExtractorContentProvider(
     }
 
     private companion object {
+        /**
+         * A source the check settled on the feed's text still has its short items checked against
+         * the page: otherwise it could never find out that the site stopped blocking or started
+         * sending teasers. A mode the reader chose is used as is.
+         */
+        fun modeFor(article: ArticleEntity, source: SourceEntity): ContentMode {
+            if (source.contentModeChosen || source.contentMode != ContentMode.FEED) return source.contentMode
+            val words = article.feedHtml?.let { Jsoup.parse(it).text().split(Regex("\\s+")).count(String::isNotBlank) } ?: 0
+            return if (words < ArticleExtractor.FULL_TEXT_WORDS) ContentMode.AUTO else ContentMode.FEED
+        }
+
         /**
          * Only the article's origin, as browsers send across sites: the full URL can carry
          * tokens and tracking parameters, and hotlink checks only look at the host.

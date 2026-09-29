@@ -70,7 +70,7 @@ object ReadLaterImport {
 
     private fun csvHeader(text: String): Set<String>? {
         val firstLine = text.lineSequence().firstOrNull { it.isNotBlank() } ?: return null
-        val names = csv(firstLine).firstOrNull()?.map { it.trim().lowercase() }?.toSet() ?: return null
+        val names = runCatching { csv(firstLine) }.getOrNull()?.firstOrNull()?.map { it.trim().lowercase() }?.toSet() ?: return null
         return names.takeIf { "url" in it && "title" in it }
     }
 
@@ -109,6 +109,9 @@ object ReadLaterImport {
             }
             i++
         }
+        // An unclosed quote would swallow the rest of the file into one field and "import"
+        // nothing; failing lets the reader hear that the file couldn't be read.
+        require(!quoted) { "Unclosed quote in CSV" }
         if (field.isNotEmpty() || row.isNotEmpty()) endRow()
         return rows
     }

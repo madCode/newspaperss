@@ -56,7 +56,10 @@ class SourceRepositoryTest {
         other.close()
     }
 
-    private suspend fun record(id: Long, evidence: FullTextEvidence, times: Int) = repeat(times) { repo.recordFullText(id, evidence) }
+    private var day = 20_000L
+
+    /** [times] pieces of evidence, one a day. */
+    private suspend fun record(id: Long, evidence: FullTextEvidence, times: Int) = repeat(times) { repo.recordFullText(id, evidence, day++) }
 
     private suspend fun source(id: Long) = db.sources().byId(id)!!
 

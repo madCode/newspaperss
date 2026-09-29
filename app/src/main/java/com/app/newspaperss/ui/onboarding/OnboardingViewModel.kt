@@ -52,9 +52,9 @@ class OnboardingViewModel(
     private val settings: SettingsStore,
     private val sources: SourceRepository,
     private val finder: FeedFinder,
-    /** Schedules the timer and starts the first edition once onboarding is saved. */
     /** Survives process death: the folder picker or the Play Store can get the app killed mid-flow. */
     private val saved: SavedStateHandle = SavedStateHandle(),
+    /** Schedules the timer and starts the first edition once onboarding is saved. */
     private val onFinished: (Settings) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(restore(saved))

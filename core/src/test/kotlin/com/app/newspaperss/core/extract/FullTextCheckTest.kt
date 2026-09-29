@@ -31,17 +31,33 @@ class FullTextCheckTest {
         assertNull("page about as long as the feed", FullTextCheck.evidence(extracted(200, 300, usedFeed = false)))
         assertNull("no feed text to compare", FullTextCheck.evidence(extracted(0, 900, usedFeed = false)))
         assertNull("couldn't connect: maybe the phone was offline", FullTextCheck.evidence(extracted(40, null, usedFeed = true, note = "Couldn't fetch")))
+        assertNull(
+            "blocked with no feed text: there were no summaries to fall back on",
+            FullTextCheck.evidence(extracted(0, null, usedFeed = false, note = "Couldn't fetch").copy(pageBlocked = true)),
+        )
     }
 
-    private fun run(start: FullTextState, vararg evidence: FullTextEvidence) = evidence.fold(start) { s, e -> FullTextCheck.next(s, e) }
+    /** One piece of evidence per day, on consecutive days. */
+    private fun run(start: FullTextState, vararg evidence: FullTextEvidence) =
+        evidence.foldIndexed(start) { i, s, e -> FullTextCheck.next(s, e, (start.day ?: 0) + i + 1) }
+
+    private fun FullTextState.nextDay(e: FullTextEvidence) = FullTextCheck.next(this, e, (day ?: 0) + 1)
 
     private val fresh = FullTextState(ContentMode.AUTO, null, 0)
 
     @Test
-    fun settlesAfterThreeArticlesInARow() {
+    fun settlesAfterThreeDaysInARow() {
         val two = run(fresh, FullTextEvidence.PAGE_LONGER, FullTextEvidence.PAGE_LONGER)
         assertEquals(ContentMode.AUTO, two.mode)
-        assertEquals(ContentMode.PAGE, FullTextCheck.next(two, FullTextEvidence.PAGE_LONGER).mode)
+        assertEquals(ContentMode.PAGE, two.nextDay(FullTextEvidence.PAGE_LONGER).mode)
+    }
+
+    @Test
+    fun oneBadMorningCountsOnce() {
+        val morning = listOf(FullTextEvidence.BLOCKED, FullTextEvidence.BLOCKED, FullTextEvidence.BLOCKED)
+            .fold(fresh) { s, e -> FullTextCheck.next(s, e, day = 20_000) }
+        assertEquals(ContentMode.AUTO, morning.mode)
+        assertEquals(1, morning.streak)
     }
 
     @Test
@@ -66,6 +82,6 @@ class FullTextCheckTest {
         val page = FullTextState(ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3)
         val oneOff = run(page, FullTextEvidence.BLOCKED, FullTextEvidence.PAGE_LONGER, FullTextEvidence.BLOCKED, FullTextEvidence.BLOCKED)
         assertEquals(ContentMode.PAGE, oneOff.mode)
-        assertEquals(ContentMode.FEED, FullTextCheck.next(oneOff, FullTextEvidence.BLOCKED).mode)
+        assertEquals(ContentMode.FEED, oneOff.nextDay(FullTextEvidence.BLOCKED).mode)
     }
 }
