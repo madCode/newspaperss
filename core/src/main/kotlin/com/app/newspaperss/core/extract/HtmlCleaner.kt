@@ -1,0 +1,428 @@
+package com.app.newspaperss.core.extract
+
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Comment
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
+import org.jsoup.nodes.Entities
+import org.jsoup.nodes.Node
+import org.jsoup.nodes.TextNode
+import java.net.URI
+import java.net.URISyntaxException
+
+data class CleanResult(
+    /** An XHTML-serialized fragment (`<br />`, `<img ... />`) ready to go into an EPUB chapter. */
+    val html: String,
+    val wordCount: Int,
+    /** Absolute http(s) URLs of the images left in [html], in document order, without duplicates. */
+    val imageUrls: List<String>,
+)
+
+/**
+ * Strips article HTML down to what reads well on e-ink: paragraphs,
+ * headings, lists, quotes, images and the occasional data table. Web pages
+ * bring layout divs, lazy-loaded images, share buttons and newsletter
+ * sign-ups; this removes them, fixes images and links so they work outside
+ * the site, and unwraps any tag it doesn't know so its text survives.
+ */
+object HtmlCleaner {
+
+    /**
+     * @param html a fragment or whole document; plain text is split into paragraphs.
+     * @param baseUrl where the HTML came from, for making links and images absolute.
+     * @param title the article's title: a heading repeating it at the very start is removed.
+     */
+    fun clean(html: String, baseUrl: String, title: String? = null): CleanResult {
+        if (html.isBlank()) return CleanResult("", 0, emptyList())
+        val source = if (HTML_TAG.containsMatchIn(html)) html else textToHtml(html)
+
+        val doc = Jsoup.parse(source, baseUrl)
+        val body = doc.body()
+        removeComments(body)
+        body.select(REMOVE_TAGS.joinToString(",")).remove()
+        removeHidden(body)
+        removeJunk(body)
+        removeBoilerplate(body)
+        fixPictures(body)
+        fixImages(body, baseUrl)
+        body.select("source").remove()
+        flattenLayoutTables(body)
+        stripTagsAndAttributes(body)
+        fixLinks(body, baseUrl)
+        if (!title.isNullOrBlank()) removeLeadingTitle(body, title)
+        normalizeHeadings(body)
+        removeEmpty(body)
+        collapseBlankLines(body)
+
+        doc.outputSettings()
+            .prettyPrint(false)
+            .syntax(Document.OutputSettings.Syntax.xml)
+            .escapeMode(Entities.EscapeMode.xhtml)
+        return CleanResult(
+            html = body.html().trim(),
+            wordCount = countWords(body),
+            imageUrls = body.select("img").map { it.attr("src") }.distinct(),
+        )
+    }
+
+    /** Wraps plain text in paragraphs, taking blank lines as paragraph breaks. */
+    fun textToHtml(text: String): String = text.split(BLANK_LINE)
+        .map { it.trim().replace(WHITESPACE, " ") }
+        .filter { it.isNotEmpty() }
+        .joinToString("") { "<p>${Entities.escape(it)}</p>" }
+
+    internal fun countWords(element: Element): Int = element.text().split(WHITESPACE).count { it.isNotEmpty() }
+
+    internal fun countWords(html: String): Int = countWords(Jsoup.parse(html).body())
+
+    /**
+     * Picks a srcset candidate big enough for an e-reader screen without
+     * being huge: images are re-encoded to at most 1200px later, so a 4000px
+     * original only costs download time.
+     */
+    internal fun bestSrcsetCandidate(srcset: String): String? {
+        val candidates = srcset.trim().split(SRCSET_SEPARATOR).mapNotNull { candidate ->
+            val parts = candidate.trim().split(WHITESPACE)
+            val url = parts.firstOrNull()?.trimEnd(',')?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            val descriptor = parts.getOrNull(1)?.let { DESCRIPTOR.matchEntire(it) }
+            SrcsetCandidate(url, descriptor?.groupValues?.get(1)?.toDoubleOrNull() ?: 1.0, descriptor?.groupValues?.get(2) ?: "")
+        }
+        if (candidates.isEmpty()) return null
+        val widths = candidates.filter { it.unit == "w" }
+        if (widths.isNotEmpty()) {
+            return (widths.filter { it.value >= PREFERRED_IMAGE_WIDTH }.minByOrNull { it.value }
+                ?: widths.maxBy { it.value }).url
+        }
+        // Past 2x the image is far bigger than any e-reader needs.
+        return (candidates.filter { it.value <= 2 }.maxByOrNull { it.value } ?: candidates.first()).url
+    }
+
+    /**
+     * Makes [url] absolute against [baseUrl] and percent-encodes characters
+     * URLs can't contain (spaces, braces, a second '#'), which EPUB checkers
+     * and Send to Kindle reject. Returns null for anything that isn't an
+     * absolute URL with one of [schemes], including mangled markup.
+     */
+    internal fun absoluteUrl(url: String, baseUrl: String, schemes: Set<String> = WEB_SCHEMES): String? {
+        val reference = encodeUrl(url) ?: return null
+        return try {
+            val base = encodeUrl(baseUrl)?.let { URI(it) }?.takeIf { it.isAbsolute }
+            val resolved = when {
+                base == null -> URI(reference)
+                // URI.resolve against "https://host" (no path) would glue the reference onto the host name.
+                base.rawPath.isNullOrEmpty() && !base.isOpaque -> base.resolve("/").resolve(reference)
+                else -> base.resolve(reference)
+            }
+            val scheme = resolved.scheme?.lowercase() ?: return null
+            if (scheme !in schemes) return null
+            if (scheme != "mailto" && resolved.host.isNullOrEmpty()) return null
+            resolved.toString()
+        } catch (_: URISyntaxException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    private fun encodeUrl(raw: String): String? {
+        val url = raw.trim()
+        if (url.isEmpty() || MANGLED_URL.containsMatchIn(url)) return null
+        val hash = url.indexOf('#')
+        if (hash < 0) return percentEncode(url)
+        return percentEncode(url.substring(0, hash)) + "#" + percentEncode(url.substring(hash + 1).replace("#", "%23"))
+    }
+
+    private fun percentEncode(s: String): String {
+        val out = StringBuilder()
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            when {
+                c == '%' && isHex(s.getOrNull(i + 1)) && isHex(s.getOrNull(i + 2)) -> out.append(c)
+                c.code < 128 && c in URL_SAFE -> out.append(c)
+                else -> {
+                    val end = if (Character.isHighSurrogate(c) && i + 1 < s.length) i + 2 else i + 1
+                    for (b in s.substring(i, end).toByteArray(Charsets.UTF_8)) {
+                        out.append('%').append("%02X".format(b.toInt() and 0xFF))
+                    }
+                    i = end
+                    continue
+                }
+            }
+            i++
+        }
+        return out.toString()
+    }
+
+    private fun isHex(c: Char?) = c != null && (c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F')
+
+    private fun removeComments(root: Element) {
+        val comments = mutableListOf<Node>()
+        root.traverse { node, _ -> if (node is Comment) comments += node }
+        comments.forEach { it.remove() }
+    }
+
+    /**
+     * Elements removed by an earlier iteration keep their own parent links, so
+     * "is it still in the document" means its root is still the document.
+     */
+    private fun Element.isAttached() = ownerDocument() != null
+
+    private fun removeHidden(body: Element) {
+        val total = countWords(body).coerceAtLeast(1)
+        for (el in body.select("*")) {
+            if (el === body || !el.isAttached()) continue
+            val style = el.attr("style").replace(" ", "").lowercase()
+            if (el.hasAttr("hidden") || "display:none" in style || "visibility:hidden" in style) {
+                el.remove()
+            } else if (el.attr("aria-hidden") == "true" && isSmallPart(el, total)) {
+                // Paywall scripts mark the whole article body aria-hidden, so only small parts go.
+                el.remove()
+            }
+        }
+    }
+
+    private fun removeJunk(body: Element) {
+        val total = countWords(body).coerceAtLeast(1)
+        for (el in body.select("*")) {
+            if (el === body || el.tagName() == "img" || !el.isAttached()) continue
+            val isJunk = el.attr("role") in JUNK_ROLES || classAndIdTokens(el).any { it in JUNK_TOKENS }
+            if (isJunk && isSmallPart(el, total)) el.remove()
+        }
+    }
+
+    /** Safety net: an unlucky class name must never take most of the article with it. */
+    internal fun isSmallPart(el: Element, totalWords: Int) = countWords(el).toDouble() / totalWords < SAFETY_NET_SHARE
+
+    private fun classAndIdTokens(el: Element): List<String> =
+        "${el.className()} ${el.id()}".lowercase().split(TOKEN_SEPARATOR).filter { it.isNotEmpty() }
+
+    private fun removeBoilerplate(body: Element) {
+        for (el in body.select("p, div, li, span, h2, h3, h4, h5, h6")) {
+            if (!el.isAttached()) continue
+            val text = el.text().trim()
+            if (text.split(WHITESPACE).size <= BOILERPLATE_MAX_WORDS && BOILERPLATE.containsMatchIn(text)) el.remove()
+        }
+    }
+
+    private fun isPlaceholder(src: String) = src.startsWith("data:") && src.length < 1000
+
+    private fun imageSource(img: Element): String? {
+        for (attribute in listOf("data-srcset", "srcset")) {
+            val best = img.attr(attribute).takeIf { it.isNotBlank() }?.let { bestSrcsetCandidate(it) }
+            if (best != null && !isPlaceholder(best)) return best
+        }
+        return (LAZY_IMAGE_ATTRIBUTES + "src")
+            .map { img.attr(it).trim() }
+            .firstOrNull { it.isNotEmpty() && !isPlaceholder(it) }
+    }
+
+    private fun fixPictures(body: Element) {
+        for (picture in body.select("picture")) {
+            val img = picture.selectFirst("img") ?: Element("img")
+            if (imageSource(img) == null) {
+                // JPEG and PNG before WebP/AVIF: fewer conversions, and some readers choke on the rest.
+                val srcset = picture.select("source")
+                    .sortedBy { s -> if (MODERN_FORMATS.any { it in s.attr("type") }) 1 else 0 }
+                    .map { it.attr("srcset").ifBlank { it.attr("data-srcset") } }
+                    .firstOrNull { it.isNotBlank() }
+                if (srcset != null) img.attr("srcset", srcset)
+            }
+            picture.replaceWith(img)
+        }
+    }
+
+    private fun fixImages(body: Element, baseUrl: String) {
+        for (img in body.select("img")) {
+            val isTrackingPixel = listOf("width", "height").any { dim ->
+                img.attr(dim).trim().removeSuffix("px").toIntOrNull()?.let { it <= 2 } == true
+            }
+            val src = if (isTrackingPixel) null else imageSource(img)?.let { absoluteUrl(it, baseUrl) }
+            if (src == null) {
+                img.remove()
+                continue
+            }
+            val alt = img.attr("alt").trim()
+            img.clearAttributes()
+            img.attr("src", src).attr("alt", alt)
+        }
+    }
+
+    private fun isLayoutTable(table: Element): Boolean {
+        if (table.attr("role") == "presentation" || table.selectFirst("table table") != null) return true
+        val rows = table.select("tr")
+        if (rows.isNotEmpty() && rows.all { row -> row.children().count { it.tagName() in CELL_TAGS } <= 1 }) return true
+        return table.select("td, th").any { countWords(it) > LAYOUT_TABLE_CELL_WORDS }
+    }
+
+    /** Newsletters lay out whole pages with tables, which e-readers render as cramped grids. */
+    private fun flattenLayoutTables(body: Element) {
+        for (table in body.select("table")) {
+            if (!table.isAttached() || table.parents().any { it.tagName() == "table" } || !isLayoutTable(table)) continue
+            for (el in table.select("table, thead, tbody, tfoot, tr, td, th, caption")) {
+                el.tagName("div")
+                el.clearAttributes()
+            }
+        }
+    }
+
+    private fun stripTagsAndAttributes(body: Element) {
+        for (el in body.select("*")) {
+            if (el === body) continue
+            val tag = el.tagName()
+            if (tag !in ALLOWED_TAGS) {
+                el.unwrap()
+                continue
+            }
+            val allowed = ALLOWED_ATTRIBUTES[tag].orEmpty() + "id"
+            el.attributes().asList().map { it.key }.filter { it !in allowed }.forEach { el.removeAttr(it) }
+        }
+    }
+
+    private fun fixLinks(body: Element, baseUrl: String) {
+        val ids = mutableMapOf<String, String>()
+        for (el in body.select("[id]")) {
+            val old = el.id()
+            var new = old.replace(INVALID_ID_CHARS, "-")
+            if (new.firstOrNull()?.isLetter() != true) new = "id-$new"
+            // Duplicate ids make the XHTML invalid.
+            if (old in ids || new in ids.values) {
+                el.removeAttr("id")
+                continue
+            }
+            ids[old] = new
+            el.attr("id", new)
+        }
+        for (link in body.select("a")) {
+            val href = link.attr("href").trim()
+            val target = when {
+                href.isEmpty() -> null
+                href.startsWith("#") -> ids[href.substring(1)]?.let { "#$it" }
+                else -> absoluteUrl(href, baseUrl, LINK_SCHEMES)
+            }
+            if (target == null) link.unwrap() else link.attr("href", target)
+        }
+    }
+
+    private fun normalizedText(text: String) = text.lowercase().replace(NON_WORD, " ").trim()
+
+    /** Renderers print the title themselves, so a heading repeating it at the very start is a duplicate. */
+    private fun removeLeadingTitle(body: Element, title: String) {
+        val heading = body.selectFirst("h1, h2, h3") ?: return
+        val all = body.select("*")
+        val headingIndex = all.indexOf(heading)
+        val textBefore = all.take(headingIndex)
+            .filter { it.tagName() in setOf("p", "li", "blockquote") }
+            .any { it.text().isNotBlank() }
+        if (!textBefore && normalizedText(heading.text()) == normalizedText(title)) heading.remove()
+    }
+
+    /** The article title is the chapter's only h1, so content headings shift down to start at h2. */
+    private fun normalizeHeadings(body: Element) {
+        val headings = body.select("h1, h2, h3, h4, h5, h6")
+        val top = headings.minOfOrNull { it.tagName()[1].digitToInt() } ?: return
+        val shift = 2 - top
+        if (shift <= 0) return
+        for (h in headings) h.tagName("h${minOf(6, h.tagName()[1].digitToInt() + shift)}")
+    }
+
+    private fun removeEmpty(body: Element) {
+        for (el in body.select("*").reversed()) {
+            if (el === body || el.tagName() !in EMPTY_REMOVABLE_TAGS) continue
+            if (el.text().isNotBlank() || el.selectFirst("img, hr, table") != null) continue
+            if (el.tagName() == "a" && el.hasAttr("id")) continue
+            el.remove()
+        }
+    }
+
+    private fun collapseBlankLines(body: Element) {
+        // Removed elements leave neighbouring whitespace behind as separate text nodes; merge them first.
+        for (el in body.select("*")) {
+            for (node in el.childNodes().toList()) {
+                val previous = node.previousSibling()
+                if (node is TextNode && previous is TextNode) {
+                    previous.text(previous.wholeText + node.wholeText)
+                    node.remove()
+                }
+            }
+        }
+        val blanks = mutableListOf<TextNode>()
+        body.traverse { node, _ ->
+            if (node is TextNode && node.isBlank && '\n' in node.wholeText &&
+                (node.parent() as? Element)?.closest("pre") == null
+            ) blanks += node
+        }
+        blanks.forEach { it.text("\n") }
+    }
+
+    private data class SrcsetCandidate(val url: String, val value: Double, val unit: String)
+
+    private const val SAFETY_NET_SHARE = 0.4
+    private const val PREFERRED_IMAGE_WIDTH = 1000
+    private const val LAYOUT_TABLE_CELL_WORDS = 80
+    private const val BOILERPLATE_MAX_WORDS = 12
+
+    private val REMOVE_TAGS = setOf(
+        "script", "style", "noscript", "iframe", "object", "embed", "applet", "form", "input", "button",
+        "select", "textarea", "label", "nav", "aside", "footer", "svg", "canvas", "video", "audio", "track",
+        "template", "link", "meta", "title", "base", "dialog", "menu", "map", "area",
+    )
+
+    // div stays: unwrapping it would run neighbouring blocks (and flattened table cells) together.
+    private val ALLOWED_TAGS = setOf(
+        "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6", "div",
+        "em", "i", "strong", "b", "u", "s", "del", "ins", "sub", "sup", "small", "mark",
+        "code", "pre", "kbd", "samp", "var", "blockquote", "q", "cite", "abbr",
+        "a", "ul", "ol", "li", "dl", "dt", "dd", "figure", "figcaption", "img",
+        "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption",
+    )
+
+    private val ALLOWED_ATTRIBUTES = mapOf(
+        "a" to setOf("href"),
+        "img" to setOf("src", "alt"),
+        "td" to setOf("colspan", "rowspan"),
+        "th" to setOf("colspan", "rowspan"),
+        "ol" to setOf("start"),
+    )
+
+    // Not "paywall": some sites put it on the containers of the article's own paragraphs.
+    private val JUNK_TOKENS = setOf(
+        "ad", "ads", "advert", "advertisement", "adsbygoogle", "promo", "promotion", "newsletter", "subscribe",
+        "subscription", "signup", "share", "sharing", "social", "related", "recommended", "recommendations",
+        "comments", "comment", "sidebar", "popup", "modal", "cookie", "cookies", "banner", "sponsored",
+        "outbrain", "taboola", "breadcrumb", "breadcrumbs", "toolbar",
+    )
+    private val JUNK_ROLES = setOf("navigation", "complementary", "banner", "contentinfo", "dialog")
+
+    private val LAZY_IMAGE_ATTRIBUTES = listOf(
+        "data-src", "data-original", "data-lazy-src", "data-hi-res-src", "data-full-src", "data-url",
+    )
+    private val MODERN_FORMATS = listOf("webp", "avif")
+
+    private val EMPTY_REMOVABLE_TAGS = setOf(
+        "p", "div", "li", "ul", "ol", "dl", "h1", "h2", "h3", "h4", "h5", "h6", "a", "figure", "figcaption",
+        "blockquote", "em", "i", "strong", "b", "u", "small", "table", "tr", "td", "th", "tbody", "thead",
+    )
+    private val CELL_TAGS = setOf("td", "th")
+
+    private val BOILERPLATE = Regex(
+        "^(listen to (this|the) (article|essay|story|episode)|\\d+[ -]min(ute)?s? (read|listen)|share (this|on)\\b|" +
+            "advertisement$|sign up (for|to)\\b|subscribe (to|now|today)\\b|read more:|related:|recommended:|" +
+            "click here to\\b|follow us on\\b|skip past newsletter|after newsletter promotion)",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private val HTML_TAG = Regex("<\\s*[a-zA-Z!/]")
+    private val WHITESPACE = Regex("\\s+")
+    private val BLANK_LINE = Regex("\\n\\s*\\n")
+    private val TOKEN_SEPARATOR = Regex("[\\s_\\-]+")
+    private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
+    private val INVALID_ID_CHARS = Regex("[^A-Za-z0-9_.\\-]")
+    // Candidates are separated by a comma *and* whitespace: image CDNs put bare commas inside URLs.
+    private val SRCSET_SEPARATOR = Regex(",\\s+")
+    private val DESCRIPTOR = Regex("([\\d.]+)([wx])")
+    private val MANGLED_URL = Regex("[\"\\\\<>]")
+    private val URL_SAFE = ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" + "-._~:/?@!$&'()*+,;=").toSet()
+    private val WEB_SCHEMES = setOf("http", "https")
+    private val LINK_SCHEMES = setOf("http", "https", "mailto")
+}
