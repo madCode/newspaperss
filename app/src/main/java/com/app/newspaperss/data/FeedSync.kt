@@ -177,8 +177,8 @@ class FeedSync(
 
     companion object {
         const val LIST_LAYOUT_CHANGED =
-            "This page has changed its layout, so newspaperss can't tell which links are new and took none. An app update should fix it."
-        const val LIST_UNSUPPORTED = "This version of newspaperss can't read this list any more. Remove it or update the app."
+            "This page has changed its layout, so newspapeRSS can't tell which links are new and took none. An app update should fix it."
+        const val LIST_UNSUPPORTED = "This version of newspapeRSS can't read this list any more. Remove it or update the app."
 
         val REMEMBER_DELIVERED: Duration = Duration.ofDays(365)
 

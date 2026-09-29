@@ -1,4 +1,4 @@
-# newspaperss
+# newspapeRSS
 
 Your own newspaper, on your e-reader.
 

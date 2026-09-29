@@ -28,7 +28,7 @@
         <activity
             android:name=".ShareActivity"
             android:exported="true"
-            android:label="Read in newspaperss"
+            android:label="Read in newspapeRSS"
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">

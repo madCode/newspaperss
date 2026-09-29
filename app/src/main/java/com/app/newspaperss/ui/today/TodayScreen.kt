@@ -130,7 +130,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
 @Composable
 fun Masthead(date: LocalDate, modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("newspaperss", style = MaterialTheme.typography.displaySmall)
+        Text("newspapeRSS", style = MaterialTheme.typography.displaySmall)
         HorizontalDivider(Modifier.padding(vertical = 4.dp), thickness = 2.dp)
         Text(date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)), style = MaterialTheme.typography.labelLarge)
         HorizontalDivider(Modifier.padding(vertical = 4.dp))

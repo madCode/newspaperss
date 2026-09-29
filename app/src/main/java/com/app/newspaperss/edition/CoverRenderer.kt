@@ -63,7 +63,7 @@ class CoverRenderer {
         val width = WIDTH - 2 * MARGIN
         var y = MARGIN.toFloat()
 
-        y = drawText(canvas, "newspaperss", paint(136f, SERIF_BOLD), width, y, Layout.Alignment.ALIGN_CENTER, 1)
+        y = drawText(canvas, "newspapeRSS", paint(136f, SERIF_BOLD), width, y, Layout.Alignment.ALIGN_CENTER, 1)
         y += 24f
         y = rule(canvas, y, 10f) + 10f
         y = rule(canvas, y, 3f) + 30f

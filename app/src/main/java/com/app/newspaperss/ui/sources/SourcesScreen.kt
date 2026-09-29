@@ -102,7 +102,7 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
                             )
                             DropdownMenuItem(
                                 text = { Text("Export your sites (OPML)") },
-                                onClick = { menu = false; exportFile.launch("newspaperss-sources.opml") },
+                                onClick = { menu = false; exportFile.launch("newspapeRSS-sources.opml") },
                             )
                             if (viewModel.canAddTtrss) {
                                 DropdownMenuItem(text = { Text("Add tt-rss account") }, onClick = { menu = false; viewModel.openTtrss() })
@@ -157,7 +157,7 @@ private fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
         text = {
             Column {
                 Text(
-                    "If you run Tiny Tiny RSS, newspaperss can make editions from your unread articles and mark them read there once an edition is delivered.",
+                    "If you run Tiny Tiny RSS, newspapeRSS can make editions from your unread articles and mark them read there once an edition is delivered.",
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
                 OutlinedTextField(
@@ -215,7 +215,7 @@ private fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
 private fun ReadingListRow(onClick: () -> Unit) {
     ListItem(
         headlineContent = { Text("Your reading list") },
-        supportingContent = { Text("Links you share to newspaperss from any app") },
+        supportingContent = { Text("Links you share to newspapeRSS from any app") },
         leadingContent = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
         modifier = Modifier.clickable(onClickLabel = "Open reading list", onClick = onClick),
     )
@@ -231,7 +231,7 @@ private fun EmptySources(modifier: Modifier) {
     ) {
         Text("No sources yet", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Add a website you like to read. Paste its address and newspaperss does the rest.",
+            "Add a website you like to read. Paste its address and newspapeRSS does the rest.",
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
         )
@@ -291,7 +291,7 @@ internal fun RemoveSourceDialog(source: SourceEntity, onConfirm: () -> Unit, onD
         text = {
             Text(
                 when (source.kind) {
-                    SourceKind.TTRSS -> "This also signs newspaperss out of your tt-rss account. Your articles stay on the server."
+                    SourceKind.TTRSS -> "This also signs newspapeRSS out of your tt-rss account. Your articles stay on the server."
                     else -> "Its waiting articles go with it. If you add it again, articles you already got won't be sent again."
                 },
             )
