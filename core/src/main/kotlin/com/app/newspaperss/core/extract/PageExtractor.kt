@@ -39,6 +39,7 @@ internal object PageExtractor {
         val jsonLd = jsonLdObjects(doc)
         val siteName = doc.metaContent("og:site_name") ?: jsonLd.firstNotNullOfOrNull { (it["publisher"] as? JsonObject)?.string("name") }
         removeOverlays(doc)
+        HtmlCleaner.removeScreenReaderOnly(doc.body())
 
         val readability = runCatching { Readability4JExtended(url, doc.clone()).parse() }.getOrNull()
         val author = listOfNotNull(

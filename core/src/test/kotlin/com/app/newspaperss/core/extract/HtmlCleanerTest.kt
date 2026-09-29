@@ -139,6 +139,17 @@ class HtmlCleanerTest {
     }
 
     @Test
+    fun aRelatedLinksListGoesButARelatedSectionOfTheArticleStays() {
+        val body = "<p>" + "Words of the article itself. ".repeat(30) + "</p>"
+        assertEquals(
+            body,
+            clean("$body<h2>Read next</h2><ul><li><a href=\"/a\">Story A</a></li><li><a href=\"/b\">Story B</a></li></ul>"),
+        )
+        val ownSection = "<h2>Related research</h2><p>Earlier studies found the same effect in mice.</p>"
+        assertEquals(body + ownSection, clean(body + ownSection))
+    }
+
+    @Test
     fun pictureElementsPreferJpegSources() {
         val html = "<figure><picture><source srcset=\"/a.webp\" type=\"image/webp\">" +
             "<source srcset=\"/a.jpg 1x, /a@2x.jpg 2x\" type=\"image/jpeg\"><img alt=\"pic\"></picture><figcaption>Cap</figcaption></figure>"

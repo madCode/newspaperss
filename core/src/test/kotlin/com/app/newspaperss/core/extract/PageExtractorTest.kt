@@ -24,6 +24,29 @@ class PageExtractorTest {
         assertFalse("readability-page" in page.html)
     }
 
+    /** Shaped like Al Jazeera's markup: screen-reader labels and a "Recommended Stories" box between paragraphs. */
+    @Test
+    fun screenReaderLabelsAndRecommendedStoriesDontReachTheEdition() {
+        val paragraphs = (1..8).joinToString("") { "<p>$sentence</p>" }
+        val html = """<html><head><title>Story</title></head><body><main><article>
+            <h1>Story</h1><span class="screen-reader-text">Skip links</span>$paragraphs
+            <section class="more-on"><h2 class="more-on__heading">Recommended Stories</h2>
+              <span class="screen-reader-text">list of 2 items</span>
+              <ul class="more-on__list">
+                <li><span class="screen-reader-text">list 1 of 2</span><a href="/a">Another story entirely</a></li>
+                <li><span class="screen-reader-text">list 2 of 2</span><a href="/b">And one more story</a></li>
+              </ul><span class="screen-reader-text">end of list</span></section>
+            $paragraphs</article></main></body></html>"""
+
+        val content = PageExtractor.extract(html, url)
+        val cleaned = HtmlCleaner.clean(content.html, url, content.title).html
+
+        for (junk in listOf("list 1 of 2", "list of 2 items", "end of list", "Skip links", "Recommended Stories", "Another story entirely")) {
+            assertFalse(junk, junk in cleaned)
+        }
+        assertTrue(sentence.trim() in cleaned)
+    }
+
     @Test
     fun cookieBannersAndDialogsAreRemovedBeforeExtraction() {
         val modal = "<div aria-modal=\"true\"><p>${"Subscribe to our newsletter for more great content today. ".repeat(3)}</p></div>"
