@@ -3,6 +3,7 @@ package com.app.newspaperss.core.feed
 import com.app.newspaperss.core.net.HttpClient
 import org.jsoup.Jsoup
 import java.io.IOException
+import java.net.URI
 
 data class FoundFeed(val url: String, val title: String?)
 
@@ -35,6 +36,16 @@ class FeedFinder(private val http: HttpClient) {
         val advertised = advertisedFeeds(response.body, response.finalUrl)
         if (advertised.isNotEmpty()) return FindResult.Found(advertised)
 
+        // Some sites only link their feed from the page (a webcomic's "RSS" button), with no
+        // <link rel="alternate"> in the head.
+        for (candidate in linkedFeeds(response.body, response.finalUrl).take(MAX_LINKED_TRIES)) {
+            val r = try { http.get(candidate) } catch (_: IOException) { continue }
+            if (r.isSuccessful && FeedParser.looksLikeFeed(r.body)) {
+                val title = runCatching { FeedParser.parse(r.body, r.finalUrl).title }.getOrNull()
+                return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)))
+            }
+        }
+
         for (path in COMMON_PATHS) {
             val candidate = resolveUrl(response.finalUrl, path)
             val r = try { http.get(candidate) } catch (_: IOException) { continue }
@@ -51,6 +62,24 @@ class FeedFinder(private val http: HttpClient) {
             "application/rss+xml", "application/atom+xml", "application/feed+json",
             "application/json", "application/rdf+xml", "text/xml", "application/xml",
         )
+
+        private const val MAX_LINKED_TRIES = 3
+        private val FEED_LINK_NAMES = setOf("rss", "feed", "atom", "rss.xml", "feed.xml", "atom.xml", "index.xml", "rss2")
+
+        /**
+         * Links on the page whose last path segment names a feed ("/comic/rss", "/feed.xml",
+         * "/series/rss?title_no=1"), on the page's own site, in page order.
+         */
+        internal fun linkedFeeds(html: String, pageUrl: String): List<String> {
+            val host = runCatching { URI(pageUrl).host?.removePrefix("www.") }.getOrNull() ?: return emptyList()
+            return Jsoup.parse(html, pageUrl).select("a[href]").map { it.absUrl("href") }
+                .filter { href ->
+                    val uri = runCatching { URI(href) }.getOrNull() ?: return@filter false
+                    val last = uri.path.orEmpty().trimEnd('/').substringAfterLast('/').lowercase()
+                    uri.host?.removePrefix("www.") == host && last in FEED_LINK_NAMES
+                }
+                .distinct()
+        }
 
         // Absolute paths: a feed usually lives at the site root, not under the page typed.
         internal val COMMON_PATHS = listOf("/feed", "/rss", "/feed.xml", "/rss.xml", "/atom.xml", "/index.xml", "/feed.json")

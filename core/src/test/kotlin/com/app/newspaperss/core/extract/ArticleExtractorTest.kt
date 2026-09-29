@@ -67,6 +67,18 @@ class ArticleExtractorTest {
     }
 
     @Test
+    fun aWebcomicsOwnComicBeatsTheFeedsThumbnail() = runTest {
+        // ComicControl feeds carry a thumbnail; the page has the comic in img#cc-comic.
+        val feedItem = "<a href=\"$url\"><img src=\"https://example.com/comicsthumbs/1-page.png\" /><br />New comic!</a><p>Edith has ideas.</p>"
+        val page = "<html><body><div id=\"cc-comicbody\"><img title=\"The building\" src=\"https://example.com/comics/1-page.png\" id=\"cc-comic\"/></div>" +
+            "$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(feedItem))
+
+        assertEquals(listOf("https://example.com/comics/1-page.png"), article.imageUrls)
+        assertTrue("the feed's words are the caption", "Edith has ideas" in article.html)
+    }
+
+    @Test
     fun aCartoonPageGivesItsImageNotItsFooter() = runTest {
         val cartoon = "<html><head><meta property=\"og:description\" content=\"A drawing about the news.\"></head><body>" +
             "<header><img alt=\"Example\" class=\"logo\" src=\"/logo.png\"></header><article><h1>Daily Cartoon</h1>" +

@@ -25,6 +25,8 @@ internal data class PageContent(
     val articleText: String? = null,
     /** `og:description`, a stand-in caption for an image post. */
     val description: String? = null,
+    /** A webcomic's own comic image as a `<figure>`, where its page marks one (ComicControl's `#cc-comic`, xkcd's `#comic`). */
+    val comicImage: String? = null,
 )
 
 /**
@@ -40,6 +42,9 @@ internal data class PageContent(
 internal object PageExtractor {
     const val MIN_WORDS = 150
     private const val MAIN_IMAGE_MIN_PX = 200
+    // Where webcomic engines put the comic: ComicControl (Hiveworks sites), xkcd and similar.
+    private const val COMIC_IMAGE = "img#cc-comic, #cc-comicbody img, #comic img, img#comic, #comic-image img"
+
     private val NOT_MAIN_IMAGE = setOf("logo", "avatar", "headshot", "author", "profile", "icon", "icons")
     private const val JSON_LD_PREFERENCE_RATIO = 1.5
 
@@ -89,6 +94,7 @@ internal object PageExtractor {
             mainImage = main?.let(::mainImage),
             articleText = main?.text()?.takeIf { it.isNotBlank() },
             description = doc.metaContent("og:description"),
+            comicImage = doc.select(COMIC_IMAGE).firstOrNull()?.let(::figureOf),
         )
     }
 
@@ -107,6 +113,11 @@ internal object PageExtractor {
             sources.isNotEmpty() && !small && NOT_MAIN_IMAGE.none { it in marks } &&
                 sources.none { it.substringBefore('?').lowercase().endsWith(".svg") }
         } ?: return null
+        return figureOf(img)
+    }
+
+    /** [img] alone in a `<figure>`, with just the attributes [HtmlCleaner] reads. */
+    private fun figureOf(img: Element): String {
         val figure = Element("figure")
         val copy = figure.appendElement("img")
         for (name in listOf("src", "srcset", "data-src", "data-srcset", "alt")) img.attr(name).takeIf { it.isNotBlank() }?.let { copy.attr(name, it) }
