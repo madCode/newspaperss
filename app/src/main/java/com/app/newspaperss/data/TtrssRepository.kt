@@ -29,7 +29,13 @@ class TtrssRepository(
         } finally {
             logOut(client)
         }
-        accounts.save(account)
+        try {
+            accounts.save(account)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // Some devices' Keystore throws runtime exceptions of its own.
+            return "Couldn't store the password securely on this phone."
+        }
         sources.addTtrss(account.apiUrl)
         return null
     }
@@ -50,13 +56,14 @@ class TtrssRepository(
         val sourceIds = articles.map { it.sourceId }.distinct()
         val account = (accounts.load() as? StoredAccount.Ready)?.account
         if (account == null) {
-            sourceIds.forEach { db.sources().setError(it, FeedSync.SIGN_IN_AGAIN) }
+            sourceIds.forEach { db.sources().setServerNote(it, FeedSync.SIGN_IN_AGAIN) }
             return true
         }
         val ids = articles.mapNotNull { it.guid.removePrefix(FeedSync.TTRSS_GUID_PREFIX).toLongOrNull() }
         val client = account.client(http)
         val (problem, retry) = try {
             client.markRead(ids)
+            sourceIds.forEach { db.sources().setServerNote(it, null) }
             return true
         } catch (e: CancellationException) {
             throw e
@@ -67,7 +74,7 @@ class TtrssRepository(
         } finally {
             logOut(client)
         }
-        sourceIds.forEach { db.sources().setError(it, "Delivered articles weren't marked read in tt-rss. $problem") }
+        sourceIds.forEach { db.sources().setServerNote(it, "Delivered articles weren't marked read in tt-rss. $problem") }
         return !retry
     }
 }

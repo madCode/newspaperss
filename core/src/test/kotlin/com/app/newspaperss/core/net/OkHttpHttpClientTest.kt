@@ -85,6 +85,16 @@ class OkHttpHttpClientTest {
         assertTrue(request.headers["User-Agent"]!!.contains("newspaperss"))
     }
 
+    @Test
+    fun aPostIsNeverRepeatedToWhereARedirectPoints() = runTest {
+        // A 308 would make OkHttp re-send the body, credentials included, to the new address.
+        server.enqueue(MockResponse.Builder().code(308).addHeader("Location", "http://elsewhere.example/api/").build())
+        val r = OkHttpHttpClient().postJson(server.url("/api/").toString(), """{"op":"login","password":"secret"}""")
+        assertEquals(308, r.code)
+        assertEquals("http://elsewhere.example/api/", r.finalUrl)
+        assertEquals(1, server.requestCount)
+    }
+
     @Test(expected = IOException::class)
     fun malformedUrlIsAnIOException() = runTest {
         OkHttpHttpClient().get("not a url")

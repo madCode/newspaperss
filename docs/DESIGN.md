@@ -122,8 +122,9 @@ non-coder won't know to do it. newspaperss defaults to:
   keep window (default 7 days for news feeds, never for reading lists)
   quietly disappear. No backlog guilt.
 
-tt-rss sources keep the library's behaviour as an option: mark read on the
-server when an edition is delivered.
+tt-rss sources keep the library's behaviour: articles are marked read on the
+server when an edition is delivered (always, for now; a setting is in the
+backlog).
 
 ## 6. Delivery
 

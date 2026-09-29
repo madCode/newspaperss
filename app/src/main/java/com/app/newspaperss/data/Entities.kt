@@ -29,6 +29,12 @@ data class SourceEntity(
     val lastFetchedAt: Instant? = null,
     /** The last sync error, cleared by the next successful sync. */
     val lastError: String? = null,
+    /**
+     * A problem reporting back to the service (tt-rss not marking delivered articles read).
+     * Kept apart from [lastError] so a successful sync doesn't hide it; cleared when reporting
+     * back succeeds.
+     */
+    val serverNote: String? = null,
 )
 
 /** Stored by name, and the DAO queries spell names out as SQL strings ('NEW'): renaming one breaks them. */

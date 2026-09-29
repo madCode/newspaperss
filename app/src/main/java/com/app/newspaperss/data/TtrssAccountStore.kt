@@ -11,7 +11,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.ttrss.TtrssClient
 import kotlinx.coroutines.flow.first
-import java.security.GeneralSecurityException
 import java.util.Base64
 
 /** A tt-rss login. [apiUrl] is the API endpoint, as [TtrssClient.apiUrl] makes it. */
@@ -51,9 +50,9 @@ class TtrssAccountStore(private val store: DataStore<Preferences>, private val c
         val sealed = p[Keys.password] ?: return StoredAccount.Locked
         val password = try {
             String(cipher.decrypt(Base64.getDecoder().decode(sealed)), Charsets.UTF_8)
-        } catch (e: GeneralSecurityException) {
-            return StoredAccount.Locked
-        } catch (e: IllegalArgumentException) {
+        } catch (e: Exception) {
+            // GeneralSecurityException, bad Base64, or a device Keystore's own runtime exceptions:
+            // any of them means the password can't be read, and the reader signs in again.
             return StoredAccount.Locked
         }
         return StoredAccount.Ready(TtrssAccount(url, p[Keys.user] ?: "", password))

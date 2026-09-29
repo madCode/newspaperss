@@ -53,6 +53,9 @@ interface SourceDao {
     @Query("UPDATE sources SET lastError = :error WHERE id = :id")
     suspend fun setError(id: Long, error: String)
 
+    @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
+    suspend fun setServerNote(id: Long, note: String?)
+
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 

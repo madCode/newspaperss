@@ -181,7 +181,7 @@ class TtrssClientTest {
     @Test
     fun aRedirectIsReportedWithTheNewAddress() = runTest {
         server.finalUrl = "https://rss.example.com/api/"
-        server.reply(error("NOT_LOGGED_IN"))
+        server.reply("", code = 308)
         val e = runCatching { client().login() }.exceptionOrNull()
         assertEquals("https://rss.example.com/api/", (e as TtrssException.Redirected).to)
     }

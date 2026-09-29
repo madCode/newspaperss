@@ -37,4 +37,22 @@ class EpubPagesTest {
     fun aMissingFileReadsAsNothing() {
         assertNull(EpubPages(tmp.root.resolve("gone.epub")).article(0))
     }
+
+    @Test
+    fun thePreviewServesOnlyTheBookAndNeverPassesARequestOn() {
+        val file = tmp.newFile("b.epub")
+        val article = EditionArticle(title = "A", sourceTitle = "S", url = "https://a.example/", bodyHtml = "<p>x</p>", minutes = 1.0)
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:2", listOf(EditionSection(null, listOf(article)))), it)
+        }
+        val pages = EpubPages(file)
+
+        val (cssType, css) = com.app.newspaperss.ui.edition.bookResponse(com.app.newspaperss.ui.edition.BOOK_ORIGIN + "style.css", pages)
+        assertTrue(css.isNotEmpty())
+        assertTrue(cssType == "text/css")
+        val (_, pixel) = com.app.newspaperss.ui.edition.bookResponse("https://tracker.example/pixel.gif", pages)
+        assertTrue("outside the book: empty, not fetched", pixel.isEmpty())
+        val (_, missing) = com.app.newspaperss.ui.edition.bookResponse(com.app.newspaperss.ui.edition.BOOK_ORIGIN + "images/none.jpg", pages)
+        assertTrue(missing.isEmpty())
+    }
 }

@@ -132,7 +132,7 @@ class TtrssClient(
     /** The response's `content`; throws [TtrssException] for an API error. */
     private suspend fun post(body: JsonObject): JsonElement {
         val response = http.postJson(apiUrl, body.toString())
-        if (!sameUrl(response.finalUrl, apiUrl)) throw TtrssException.Redirected(response.finalUrl)
+        if (response.code in 300..399) throw TtrssException.Redirected(response.finalUrl)
         if (!response.isSuccessful) throw TtrssException.HttpError(response.code)
         val json = try {
             Json.parseToJsonElement(response.body) as? JsonObject
@@ -183,8 +183,5 @@ class TtrssClient(
             return "$url/"
         }
 
-        // After a redirect OkHttp turns a POST into a GET, which tt-rss answers as if logged
-        // out, so a moved server has to be reported rather than followed.
-        private fun sameUrl(a: String, b: String) = a.trimEnd('/').equals(b.trimEnd('/'), ignoreCase = true)
     }
 }

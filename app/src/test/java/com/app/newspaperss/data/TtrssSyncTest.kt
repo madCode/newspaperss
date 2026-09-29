@@ -11,6 +11,7 @@ import com.app.newspaperss.testutil.testCipher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -171,12 +172,15 @@ class TtrssSyncTest {
 
         http.unreachable += server.apiUrl
         assertFalse("unreachable is worth retrying", ttrss.markRead(editionId))
-        assertEquals("Delivered articles weren't marked read in tt-rss. Couldn't reach tt-rss.", db.sources().byId(source.id)!!.lastError)
+        assertEquals("Delivered articles weren't marked read in tt-rss. Couldn't reach tt-rss.", db.sources().byId(source.id)!!.serverNote)
+        sync.syncAll()
+        assertNotNull("a successful sync doesn't hide it", db.sources().byId(source.id)!!.serverNote)
 
         http.unreachable.clear()
         server.password = "changed"
         assertTrue("a rejected login won't fix itself", ttrss.markRead(editionId))
         assertTrue(server.markedRead.isEmpty())
+
     }
 
     @Test

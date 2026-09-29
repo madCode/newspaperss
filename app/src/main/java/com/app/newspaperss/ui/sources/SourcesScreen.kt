@@ -151,6 +151,9 @@ private fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
                     placeholder = { Text("rss.example.com/tt-rss") },
                     singleLine = true,
                     enabled = !form.testing,
+                    supportingText = if (form.address.trim().startsWith("http://", ignoreCase = true)) {
+                        { Text("This address isn't encrypted: your password would be sent in the clear. Use https:// if your server supports it.") }
+                    } else null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -226,6 +229,7 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
     val status = when {
         s.paused -> "Paused"
         s.lastError != null -> s.lastError
+        s.serverNote != null -> s.serverNote
         s.lastFetchedAt == null -> "Checking…"
         else -> freshness(row.lastNew)
     }
@@ -237,7 +241,7 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
                 Text(
                     status,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (s.lastError != null && !s.paused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if ((s.lastError != null || s.serverNote != null) && !s.paused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
