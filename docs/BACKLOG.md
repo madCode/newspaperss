@@ -7,11 +7,11 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### From device testing (Day 2)
-- [ ] EPUB design pass (the rss-to-e-reader output is the bar); links inherit the text colour, so KOReader's dark mode stays readable
+- [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
 - [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
 - [ ] Reading list: fetch each link's title and reading time; tap to open in the browser
 - [ ] Label the "Article text" option with what it sets
-- [ ] In-app article view is slightly wider than the phone (a long "Original:" URL or a wide table); the first tap on an article may not open it
+- [ ] The first tap on an article in the app may not open it
 - [ ] Decide what tapping an article in a source's list does: open the original in the browser, render it, or offer "add to the next edition"
 
 ### M4 leftovers
@@ -121,6 +121,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] EPUB design, round 1: source kicker, byline and rule, justified hyphenated text, links and rules in the text's colour (KOReader night mode), "Read the original at site.com" (no long URL widening the page), a cleaner contents page
 - [x] "See what's inside" on Today, and deleting an edition (its title stays taken, so Send to Kindle doesn't drop a remake)
 - [x] Comics and cartoons keep their image: an image-only feed item isn't dropped as empty, and a cartoon page gives its main image instead of its footer
 - [x] The per-site cap gives way when there's room: with one source (the New Yorker) an edition held one article

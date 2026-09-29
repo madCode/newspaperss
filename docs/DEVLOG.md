@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** "See what's inside" and deleting an edition.
-- **Next:** your device-testing list: an EPUB design pass (and the too-wide in-app article, KOReader's dark-mode links), the Sources page, reading-list titles.
+- **In flight:** EPUB design, round 1.
+- **Next:** the Sources page design, reading-list titles, the "Article text" label; then a resource-usage audit.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 12: see what's inside, delete an edition (14:24–)
+### Cycle 13: EPUB design, round 1 (14:41–)
+- **From device testing:** the EPUB wasn't as good-looking as rss-to-e-reader's; links were too dark in KOReader's night mode; the in-app article was a little wider than the phone.
+- **Shipped:** each article opens with its source as a small-caps kicker, the title, "By … · date · N min read" and a hairline rule; body text is justified and hyphenated; links and rules take the text's colour, so night mode inverts them too; "Read the original at propublica.org" replaces the full URL, which had nowhere to break; the contents page reads "In this edition" with plain titles and small source lines.
+- **Checks:** rendered at e-reader size in Chromium, light and night, before and after; a live edition passes epubcheck.
+
+### Cycle 12: see what's inside, delete an edition (14:24–14:40, [#29](https://github.com/madCode/newspaperss/pull/29))
 - **From device testing:** you couldn't find what went into an edition before sending it (tapping the title worked, but nothing said so), and couldn't delete one.
 - **Shipped:** a "See what's inside" button on the Today card, and Delete on the edition screen. An unsent edition's articles go into the next one; a sent one's stay used.
 - **Review caught:** deleting freed the title, so a remake the same morning got the exact same title and Send to Kindle would drop it silently. The row now stays as a hidden "deleted" marker holding the title.
