@@ -39,10 +39,15 @@ class TodayViewModelTest {
     fun nextEditionReadsLikeASentence() {
         val now = java.time.ZonedDateTime.of(2026, 9, 29, 7, 0, 0, 0, java.time.ZoneOffset.UTC)
         val on = com.app.newspaperss.settings.Settings(scheduleEnabled = true)
+        val saved = java.util.Locale.getDefault()
         java.util.Locale.setDefault(java.util.Locale.US)
+        try {
         assertEquals("Tomorrow at 6:30\u202fAM \u00b7 about 30 min", TodayViewModel.nextEdition(on, now))
         assertEquals(null, TodayViewModel.nextEdition(on.copy(scheduleEnabled = false), now))
         val weekends = on.copy(schedule = on.schedule.copy(days = setOf(java.time.DayOfWeek.SATURDAY)))
         assertEquals("Saturday at 6:30\u202fAM \u00b7 about 30 min", TodayViewModel.nextEdition(weekends, now))
+        } finally {
+            java.util.Locale.setDefault(saved)
+        }
     }
 }

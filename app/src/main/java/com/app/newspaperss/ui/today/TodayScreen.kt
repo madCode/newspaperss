@@ -69,7 +69,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
             onDismissRequest = done,
             title = { Text("Did it reach your ${state.deviceName}?") },
             text = { Text("Once it's there, these articles won't come back in later editions.") },
-            confirmButton = { Button(onClick = { editions.firstOrNull { it.id == pending }?.let(viewModel::markSent); done() }) { Text("Yes, it's there") } },
+            confirmButton = { Button(onClick = { viewModel.markSent(pending); done() }) { Text("Yes, it's there") } },
             dismissButton = { TextButton(onClick = done) { Text("Not yet") } },
         )
     }

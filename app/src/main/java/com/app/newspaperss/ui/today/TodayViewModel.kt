@@ -67,8 +67,10 @@ class TodayViewModel(
 
     fun fileOf(edition: EditionEntity): File? = editions.fileOf(edition)
 
-    fun markSent(edition: EditionEntity) {
-        viewModelScope.launch { editions.markDelivered(edition.id) }
+    fun markSent(edition: EditionEntity) = markSent(edition.id)
+
+    fun markSent(editionId: Long) {
+        viewModelScope.launch { editions.markDelivered(editionId) }
     }
 
     companion object {

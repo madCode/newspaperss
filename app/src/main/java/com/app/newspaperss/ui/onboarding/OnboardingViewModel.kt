@@ -93,7 +93,9 @@ class OnboardingViewModel(
 
     fun finish() {
         val s = state.value
-        if (s.finishing) return
+        // A permission result delivered after process death lands on a fresh, empty state;
+        // saving that would finish onboarding with nothing chosen.
+        if (s.finishing || s.chosen.isEmpty()) return
         _state.update { it.copy(finishing = true) }
         viewModelScope.launch {
             val titles = (StarterPacks.all.flatMap { it.feeds } + s.found).associate { it.url to it.title }
