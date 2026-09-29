@@ -97,7 +97,7 @@ class ImageAllowance(maxBytes: Long = ImageRules.MAX_EDITION_BYTES) {
      * last few were all refused. Waiting for exactly zero would never happen, since [take]
      * refuses what doesn't fit, and every later article would download images only to drop them.
      */
-    val exhausted get() = remaining.get() < useful || refusedInARow.get() >= MAX_REFUSALS
+    val exhausted get() = remaining.get().let { it <= 0 || it < useful } || refusedInARow.get() >= MAX_REFUSALS
 
     /** Takes [bytes] if they fit; false leaves the allowance unchanged. */
     fun take(bytes: Long): Boolean {
