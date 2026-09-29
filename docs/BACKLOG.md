@@ -75,7 +75,9 @@ Several timed editions (a weekday morning paper and Sunday long reads), and a on
 
 ### tt-rss categories as sections
 newspapeRSS sits on top of a reader rather than replacing it. tt-rss is one source today, optionally
-one category; its categories could become the paper's sections.
+one category; its categories could become the paper's sections. This is the direction rather than
+making the app a full client, and it pairs with "Add sources to tt-rss": sources found here get
+subscribed on the server, and the server's categories come back as the paper's sections.
 
 Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
 
