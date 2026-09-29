@@ -1,0 +1,10 @@
+<resources>
+    <!-- Shown until settings have loaded, so the first frame is never a blank screen that then
+         jumps to onboarding or to Today. -->
+    <style name="Theme.Newspaperss.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#F7F4EC</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_notification</item>
+        <item name="windowSplashScreenIconBackgroundColor">#8C2F1B</item>
+        <item name="postSplashScreenTheme">@android:style/Theme.Material.Light.NoActionBar</item>
+    </style>
+</resources>

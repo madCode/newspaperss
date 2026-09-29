@@ -1,6 +1,7 @@
 package com.app.newspaperss
 
 import android.os.Bundle
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,6 +26,7 @@ import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -62,19 +64,23 @@ private const val EDITION = "edition/{id}"
 private const val ARTICLE = "edition/{id}/article/{position}"
 
 class MainActivity : ComponentActivity() {
+    @Volatile private var settingsLoaded = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen().setKeepOnScreenCondition { !settingsLoaded }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as NewspaperssApp).container
         setContent {
             NewspaperssTheme {
                 val settings by container.settings.settings.collectAsState(initial = null)
+                if (settings != null) settingsLoaded = true
                 when (settings?.onboarded) {
                     null -> {}
                     false -> {
                         val context = LocalContext.current.applicationContext
                         val vm = viewModel {
-                            OnboardingViewModel(container.settings, container.sources, container.feedFinder) { saved ->
+                            OnboardingViewModel(container.settings, container.sources, container.feedFinder, createSavedStateHandle()) { saved ->
                                 container.appScope.launch { EditionScheduler.reschedule(context, saved) }
                                 EditionWorker.buildNow(context)
                             }

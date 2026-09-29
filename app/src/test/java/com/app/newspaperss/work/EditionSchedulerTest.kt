@@ -76,4 +76,25 @@ class EditionSchedulerTest {
         assertEquals(armed, timers().single().id)
         assertEquals(sixThirty, prefs.getLong(EditionScheduler.PENDING, 0))
     }
+
+    @Test
+    fun aTimeZoneChangeMovesTheTimerToTheNewLocalTime() = runTest {
+        val app = ApplicationProvider.getApplicationContext<TestApp>()
+        app.container.settings.update { settings }
+        val original = java.util.TimeZone.getDefault()
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"))
+            EditionScheduler.reschedule(context, settings)
+            val before = prefs.getLong(EditionScheduler.PENDING, 0)
+
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Tokyo"))
+            context.sendBroadcast(android.content.Intent(android.content.Intent.ACTION_TIMEZONE_CHANGED).setClass(context, ClockChangeReceiver::class.java))
+
+            com.app.newspaperss.testutil.idleUntil { prefs.getLong(EditionScheduler.PENDING, 0) != before }
+            val after = java.time.Instant.ofEpochMilli(prefs.getLong(EditionScheduler.PENDING, 0))
+            assertEquals(LocalTime.of(6, 30), after.atZone(java.time.ZoneId.of("Asia/Tokyo")).toLocalTime())
+        } finally {
+            java.util.TimeZone.setDefault(original)
+        }
+    }
 }

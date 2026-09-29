@@ -108,4 +108,25 @@ class OnboardingTest {
         assertEquals(DeliveryMethod.FOLDER, finished!!.delivery)
         assertEquals("Books", finished!!.folderName)
     }
+
+    @Test
+    fun choicesSurviveTheAppBeingKilled() {
+        val handle = androidx.lifecycle.SavedStateHandle()
+        val first = OnboardingViewModel(store, SourceRepository(db), FeedFinder(http), handle) {}
+        first.next()
+        first.chooseDevice(Device.KOREADER)
+        first.chooseFolder("content://tree/books", "Books")
+        first.toggleFeed(StarterPacks.all.first().feeds.first().url)
+        first.setMinutes(45)
+        idleUntil { handle.get<Int>("onboarding.minutes") == 45 }
+
+        // A new process gets the same saved handle and nothing else.
+        val restored = OnboardingViewModel(store, SourceRepository(db), FeedFinder(http), androidx.lifecycle.SavedStateHandle(handle.keys().associateWith { handle.get<Any>(it) })) {}.state.value
+
+        assertEquals(Step.DEVICE, restored.step)
+        assertEquals(Device.KOREADER, restored.device)
+        assertEquals("Books", restored.folderName)
+        assertEquals(setOf(StarterPacks.all.first().feeds.first().url), restored.chosen)
+        assertEquals(45, restored.minutes)
+    }
 }

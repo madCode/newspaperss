@@ -7,20 +7,15 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### M4 leftovers
-- [ ] Re-arm the edition timer on ACTION_TIMEZONE_CHANGED / ACTION_TIME_CHANGED
 - [ ] Expedite scheduled builds (needs getForegroundInfo for API < 31)
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
 - [ ] Verify folder delivery + chooser-from-notification on a real device
-- [ ] Tests for EditionScheduler with work-testing's TestDriver
 
 ### M3 leftovers
 - [ ] Write encoded images to a cache dir and stream them into the zip (lower peak memory)
 - [ ] Auto-tune source ContentMode from ExtractedArticle feed/page word counts (`ArticleExtractor.suggestMode`)
 
 ### M5 leftovers
-- [ ] Keep onboarding state across process death (SavedStateHandle); the folder picker or Play Store can kill the app mid-flow
-- [ ] Hold the splash screen until settings load instead of a blank first frame
-- [ ] Robolectric test launching MainActivity: onboarding vs the app
 
 ### M6 leftovers
 - [ ] Curated list sources (a scraper per site, like rss-to-e-reader's Arts & Letters Daily queue) with keep-newest-N
@@ -43,6 +38,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ## Done
 
+- [x] App shell: splash until settings load, onboarding survives process death, timer re-armed on time-zone change, launch test
 - [x] tt-rss source (one account, all unread, marked read after delivery); in-app article preview (#9)
 - [x] M1 Skeleton: Gradle (AGP 9.1, Kotlin 2.3, Compose), `:core` + `:app`, CI, design doc (#1)
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)
