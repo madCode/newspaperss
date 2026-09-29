@@ -33,6 +33,22 @@ interface SourceDao {
     @Update
     suspend fun update(source: SourceEntity)
 
+    // Targeted updates: a sync holds a source row for up to a minute, and
+    // writing the whole row back would undo a pause or rename made meanwhile.
+    @Query("UPDATE sources SET paused = :paused WHERE id = :id")
+    suspend fun setPaused(id: Long, paused: Boolean)
+
+    @Query(
+        """UPDATE sources SET lastFetchedAt = :at, lastError = NULL,
+           siteUrl = COALESCE(siteUrl, :siteUrl),
+           title = CASE WHEN title = :placeholderTitle AND :feedTitle IS NOT NULL THEN :feedTitle ELSE title END
+           WHERE id = :id""",
+    )
+    suspend fun recordSuccess(id: Long, at: Instant, feedTitle: String?, siteUrl: String?, placeholderTitle: String)
+
+    @Query("UPDATE sources SET lastFetchedAt = :at, lastError = :error WHERE id = :id")
+    suspend fun recordFailure(id: Long, at: Instant, error: String)
+
     @Delete
     suspend fun delete(source: SourceEntity)
 }
@@ -106,6 +122,6 @@ interface EditionDao {
     @Query("SELECT * FROM edition_articles WHERE editionId = :editionId ORDER BY position")
     fun observeArticles(editionId: Long): Flow<List<EditionArticleEntity>>
 
-    @Query("SELECT articleId FROM edition_articles WHERE editionId = :editionId")
+    @Query("SELECT articleId FROM edition_articles WHERE editionId = :editionId AND articleId IS NOT NULL ORDER BY position")
     suspend fun articleIds(editionId: Long): List<Long>
 }

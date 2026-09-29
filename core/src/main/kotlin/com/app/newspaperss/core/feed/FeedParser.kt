@@ -18,6 +18,10 @@ object FeedParser {
     private const val DC_NS = "http://purl.org/dc/elements/1.1/"
     private const val ATOM_NS = "http://www.w3.org/2005/Atom"
     private const val XHTML_NS = "http://www.w3.org/1999/xhtml"
+    private const val RSS1_NS = "http://purl.org/rss/1.0/"
+    // media:content, itunes:summary and the like share local names with the
+    // elements read here, so only RSS/Atom's own namespaces count.
+    private val FEED_NAMESPACES = setOf("", RSS1_NS, ATOM_NS)
 
     /**
      * Parameters
@@ -71,6 +75,7 @@ object FeedParser {
                         sawRoot = true
                     }
                     name == "item" || name == "entry" -> readItem(name)?.let(items::add)
+                    p.namespace !in FEED_NAMESPACES -> {}
                     name == "title" && feedTitle == null && p.depth <= 3 -> feedTitle = cleanTitle(readText())
                     name == "link" && siteUrl == null && p.depth <= 3 -> readLink()?.let { siteUrl = it }
                 }
@@ -94,8 +99,12 @@ object FeedParser {
                 if (p.eventType == XmlPullParser.END_DOCUMENT) break
                 if (p.eventType != XmlPullParser.START_TAG || p.depth != depth + 1) continue
                 val ns = p.namespace
+                if (ns !in FEED_NAMESPACES && ns != CONTENT_NS && ns != DC_NS) {
+                    skip()
+                    continue
+                }
                 when (p.name) {
-                    "title" -> title = readText()
+                    "title" -> if (ns in FEED_NAMESPACES) title = readText() else skip()
                     "link" -> readLink()?.let { if (link == null) link = it }
                     "guid" -> {
                         guidIsLink = p.getAttributeValue(null, "isPermaLink") != "false"
@@ -103,10 +112,10 @@ object FeedParser {
                     }
                     "id" -> guid = readText()
                     "encoded" -> if (ns == CONTENT_NS) content = readText() else skip()
-                    "content" -> content = readAtomContent()
-                    "description", "summary" -> summary = readAtomContent()
+                    "content" -> if (ns in FEED_NAMESPACES) content = readAtomContent() else skip()
+                    "description", "summary" -> if (ns in FEED_NAMESPACES) summary = readAtomContent() else skip()
                     "creator" -> if (ns == DC_NS) author = readText() else skip()
-                    "author" -> author = readAuthor()
+                    "author" -> if (ns in FEED_NAMESPACES) author = readAuthor() else skip()
                     "pubDate", "published", "issued" -> published = readText()
                     "date" -> if (ns == DC_NS) published = readText() else skip()
                     "updated", "modified" -> updated = readText()

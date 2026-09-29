@@ -7,6 +7,7 @@ import com.app.newspaperss.core.feed.FindResult
 import com.app.newspaperss.core.feed.FoundFeed
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,13 +39,18 @@ class SourcesViewModel(
     val add: StateFlow<AddState> = _add.asStateFlow()
 
     fun openAdd() { _add.value = AddState.Editing() }
-    fun closeAdd() { _add.value = AddState.Closed }
+    private var search: Job? = null
+
+    fun closeAdd() {
+        search?.cancel()
+        _add.value = AddState.Closed
+    }
     fun editInput(text: String) { _add.value = AddState.Editing(text) }
 
     fun find() {
         val input = (add.value as? AddState.Editing)?.input ?: return
         _add.value = AddState.Searching(input)
-        viewModelScope.launch {
+        search = viewModelScope.launch {
             _add.value = when (val result = finder.find(input)) {
                 is FindResult.NotFound -> AddState.Editing(input, result.reason)
                 is FindResult.Found ->
@@ -70,7 +76,7 @@ class SourcesViewModel(
     }
 
     fun togglePaused(source: SourceEntity) {
-        viewModelScope.launch { repository.update(source.copy(paused = !source.paused)) }
+        viewModelScope.launch { repository.setPaused(source.id, !source.paused) }
     }
 
     fun refresh() = onSourcesChanged()

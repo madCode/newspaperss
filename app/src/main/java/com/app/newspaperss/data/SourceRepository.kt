@@ -22,6 +22,8 @@ class SourceRepository(private val db: AppDatabase) {
 
     suspend fun update(source: SourceEntity) = sources.update(source)
 
+    suspend fun setPaused(id: Long, paused: Boolean) = sources.setPaused(id, paused)
+
     suspend fun remove(source: SourceEntity) = sources.delete(source)
 
     /** Returns how many feeds were new. */

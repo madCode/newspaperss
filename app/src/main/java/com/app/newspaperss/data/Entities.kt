@@ -75,16 +75,18 @@ data class EditionEntity(
 
 @Entity(
     tableName = "edition_articles",
-    primaryKeys = ["editionId", "articleId"],
     foreignKeys = [
         ForeignKey(entity = EditionEntity::class, parentColumns = ["id"], childColumns = ["editionId"], onDelete = ForeignKey.CASCADE),
-        ForeignKey(entity = ArticleEntity::class, parentColumns = ["id"], childColumns = ["articleId"], onDelete = ForeignKey.CASCADE),
+        // SET_NULL, not CASCADE: removing a source mustn't erase past editions' contents.
+        ForeignKey(entity = ArticleEntity::class, parentColumns = ["id"], childColumns = ["articleId"], onDelete = ForeignKey.SET_NULL),
     ],
-    indices = [Index("articleId")],
+    indices = [Index("editionId"), Index("articleId")],
 )
 data class EditionArticleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val editionId: Long,
-    val articleId: Long,
+    /** Null once the article's source has been removed. */
+    val articleId: Long?,
     val position: Int,
     // Copied so an edition's contents survive its source being deleted.
     val title: String,

@@ -101,4 +101,30 @@ class FeedSyncTest {
 
         assertEquals(setOf("kept", "new"), db.articles().candidates().map { it.guid }.toSet())
     }
+
+    @Test
+    fun aPauseMadeDuringASyncIsNotUndone() = runTest {
+        val id = repo.addFeed(url, "Blog")
+        val source = db.sources().byId(id)!!
+        http.page(url, rss("Blog", "1" to "One"))
+        http.beforeResponse = { repo.setPaused(id, true) }
+
+        sync.sync(source)
+
+        assertEquals(true, db.sources().byId(id)!!.paused)
+    }
+
+    @Test
+    fun aSourceRemovedDuringASyncDoesntBreakTheOthers() = runTest {
+        val goneId = repo.addFeed(url, "Gone")
+        repo.addFeed("https://other.example/feed", "Other")
+        http.page(url, rss("Gone", "1" to "One"))
+        http.page("https://other.example/feed", rss("Other", "2" to "Two"))
+        http.beforeResponse = { u -> if (u == url) repo.remove(db.sources().byId(goneId)!!) }
+
+        val result = sync.syncAll()
+
+        assertEquals(1, result.newArticles)
+        assertEquals(listOf("Two"), db.articles().candidates().map { it.title })
+    }
 }

@@ -144,4 +144,15 @@ class EditionBuilderTest {
         val second = builder.build(EditionSettings()) as BuildResult.Built
         assertEquals(delivered, db.editions().articleIds(second.editionId))
     }
+
+    @Test
+    fun removingASourceKeepsPastEditionsContents() = runTest {
+        val id = source("a", null, "a1")
+        val built = builder.build(EditionSettings()) as BuildResult.Built
+        editions.markDelivered(built.editionId)
+
+        sources.remove(db.sources().byId(id)!!)
+
+        assertEquals(listOf("a a1"), editions.observeArticles(built.editionId).first().map { it.title })
+    }
 }

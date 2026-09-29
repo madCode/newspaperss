@@ -8,6 +8,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import android.database.sqlite.SQLiteConstraintException
+import kotlinx.coroutines.CancellationException
 import java.io.IOException
 import java.time.Clock
 import java.time.Duration
@@ -44,18 +46,25 @@ class FeedSync(
                         )
                     },
                 )
-                // Replace the placeholder (host name) title with the feed's own once it's known.
-                val title = if (source.title == SourceRepository.hostOf(source.url)) feed.title ?: source.title else source.title
-                db.sources().update(source.copy(title = title, siteUrl = source.siteUrl ?: feed.siteUrl, lastFetchedAt = now, lastError = null))
+                // A title that is still the host-name placeholder gives way to the feed's own.
+                db.sources().recordSuccess(source.id, now, feed.title, feed.siteUrl, SourceRepository.hostOf(source.url))
                 return added
             }
             "The site answered with error ${response.code}."
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: IOException) {
             "Couldn't reach the site."
         } catch (e: FeedParseException) {
             "This address no longer gives a feed."
+        } catch (e: SQLiteConstraintException) {
+            // The source was removed while it was being fetched.
+            return null
+        } catch (e: Exception) {
+            // One bad feed mustn't stop the others from syncing.
+            "Something went wrong reading this feed."
         }
-        db.sources().update(source.copy(lastFetchedAt = now, lastError = error))
+        db.sources().recordFailure(source.id, now, error)
         return null
     }
 }

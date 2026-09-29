@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "4b7364124c9258e4cf2152c4a08fb742",
+    "identityHash": "058d02d3682f2147207814bdf5d98d00",
     "entities": [
       {
         "tableName": "sources",
@@ -278,8 +278,14 @@
       },
       {
         "tableName": "edition_articles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`editionId` INTEGER NOT NULL, `articleId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `title` TEXT NOT NULL, `sourceTitle` TEXT NOT NULL, `minutes` REAL NOT NULL, PRIMARY KEY(`editionId`, `articleId`), FOREIGN KEY(`editionId`) REFERENCES `editions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`articleId`) REFERENCES `articles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `editionId` INTEGER NOT NULL, `articleId` INTEGER, `position` INTEGER NOT NULL, `title` TEXT NOT NULL, `sourceTitle` TEXT NOT NULL, `minutes` REAL NOT NULL, FOREIGN KEY(`editionId`) REFERENCES `editions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`articleId`) REFERENCES `articles`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
           {
             "fieldPath": "editionId",
             "columnName": "editionId",
@@ -289,8 +295,7 @@
           {
             "fieldPath": "articleId",
             "columnName": "articleId",
-            "affinity": "INTEGER",
-            "notNull": true
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "position",
@@ -318,13 +323,21 @@
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
+          "autoGenerate": true,
           "columnNames": [
-            "editionId",
-            "articleId"
+            "id"
           ]
         },
         "indices": [
+          {
+            "name": "index_edition_articles_editionId",
+            "unique": false,
+            "columnNames": [
+              "editionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_edition_articles_editionId` ON `${TABLE_NAME}` (`editionId`)"
+          },
           {
             "name": "index_edition_articles_articleId",
             "unique": false,
@@ -349,7 +362,7 @@
           },
           {
             "table": "articles",
-            "onDelete": "CASCADE",
+            "onDelete": "SET NULL",
             "onUpdate": "NO ACTION",
             "columns": [
               "articleId"
@@ -363,7 +376,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4b7364124c9258e4cf2152c4a08fb742')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '058d02d3682f2147207814bdf5d98d00')"
     ]
   }
 }

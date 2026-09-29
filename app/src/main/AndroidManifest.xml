@@ -3,7 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Cleartext is allowed on purpose: many small blogs still serve their feeds
+         over plain http, and a reader that silently can't fetch them looks broken.
+         Everything fetched is public; nothing private is sent. -->
     <application
+        android:usesCleartextTraffic="true"
         android:name=".NewspaperssApp"
         android:allowBackup="true"
         android:label="@string/app_name"

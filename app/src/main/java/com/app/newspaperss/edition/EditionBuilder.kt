@@ -52,11 +52,11 @@ class EditionBuilder(
         val ordered = EditionPlanner.order(
             candidates = articles.map { Candidate(it.id.toString(), it.sourceId.toString(), it.published ?: it.discoveredAt, it.broughtBack) },
             sourceOrder = sources.map { it.id.toString() },
-            rules = settings.rules,
+            ordering = settings.ordering,
             rotation = rotation,
         )
         var fetched = 0
-        val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, settings.rules.budget, { it.second.minutes }) { c ->
+        val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, settings.rules, { it.second.minutes }) { c ->
             val article = byId.getValue(c.id.toLong())
             val result = content.contentFor(article, sourcesById.getValue(article.sourceId))?.let { article to it }
             onProgress(++fetched)
@@ -95,7 +95,7 @@ class EditionBuilder(
         db.withTransaction {
             db.editions().insertArticles(
                 arranged.mapIndexed { i, (a, c) ->
-                    EditionArticleEntity(editionId, a.id, i, c.title, sourcesById.getValue(a.sourceId).title, c.minutes)
+                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = sourcesById.getValue(a.sourceId).title, minutes = c.minutes)
                 },
             )
             db.articles().setState(arranged.map { it.first.id }, ArticleState.IN_EDITION)

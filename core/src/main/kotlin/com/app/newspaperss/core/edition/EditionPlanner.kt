@@ -34,9 +34,9 @@ data class PlanRules(
 
 object EditionPlanner {
     /**
-     * The order in which candidates should be tried for an edition, with the
-     * per-source cap applied. The budget is applied later by [fill], because
-     * reading time is only known once an article has been fetched.
+     * The order in which candidates should be tried for an edition. The cap
+     * and budget are applied by [fill], since an article only counts once it
+     * has been fetched successfully.
      *
      * Parameters
      * ----------
@@ -48,7 +48,7 @@ object EditionPlanner {
     fun order(
         candidates: List<Candidate>,
         sourceOrder: List<String>,
-        rules: PlanRules,
+        ordering: Ordering,
         rotation: Int = 0,
         random: Random = Random.Default,
     ): List<Candidate> {
@@ -60,12 +60,11 @@ object EditionPlanner {
             sources.drop(shift) + sources.take(shift)
         }
         val queues = rotated.map { id ->
-            val newestFirst = bySource.getValue(id).sortedWith(
+            bySource.getValue(id).sortedWith(
                 compareByDescending<Candidate> { it.broughtBack }.thenByDescending { it.published ?: Instant.MIN },
             )
-            rules.maxPerSource?.let { newestFirst.take(it) } ?: newestFirst
         }
-        return when (rules.ordering) {
+        return when (ordering) {
             Ordering.IN_ORDER -> queues.flatten()
             Ordering.SHUFFLE -> queues.flatten().shuffled(random)
             Ordering.TAKE_TURNS -> buildList {
@@ -78,29 +77,34 @@ object EditionPlanner {
     }
 
     /**
-     * Fetches [ordered] candidates one at a time until [budget] is met.
+     * Fetches [ordered] candidates one at a time until the budget is met,
+     * taking at most `maxPerSource` from each source.
      *
      * The budget is checked before each fetch, so a minutes budget is
      * exceeded by at most one article, and a larger pool doesn't mean more
      * fetching. Candidates [fetch] returns null for (gone, not an article)
-     * are skipped without counting.
+     * are skipped without counting, so the source's next article gets its slot.
      */
     suspend fun <T> fill(
         ordered: List<Candidate>,
-        budget: Budget,
+        rules: PlanRules,
         minutesOf: (T) -> Double,
         fetch: suspend (Candidate) -> T?,
     ): List<T> {
         val picked = mutableListOf<T>()
+        val perSource = mutableMapOf<String, Int>()
         var minutes = 0.0
         for (candidate in ordered) {
-            val full = when (budget) {
+            val full = when (val budget = rules.budget) {
                 is Budget.Articles -> picked.size >= budget.count
                 is Budget.Minutes -> minutes >= budget.minutes
             }
             if (full) break
+            val taken = perSource[candidate.sourceId] ?: 0
+            if (rules.maxPerSource != null && taken >= rules.maxPerSource) continue
             val article = fetch(candidate) ?: continue
             picked += article
+            perSource[candidate.sourceId] = taken + 1
             minutes += minutesOf(article)
         }
         return picked

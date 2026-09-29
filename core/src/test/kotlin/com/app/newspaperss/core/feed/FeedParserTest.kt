@@ -125,6 +125,33 @@ class FeedParserTest {
         assertEquals("Jo", item.author)
     }
 
+    @Test
+    fun mediaAndItunesElementsDontOverrideTheArticle() {
+        val xml = """
+            <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"
+                 xmlns:media="http://search.yahoo.com/mrss/" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+              <channel><title>News</title><itunes:title>Podcast name</itunes:title>
+                <item>
+                  <title>Real title</title>
+                  <link>https://n.example/1</link>
+                  <content:encoded><![CDATA[<p>Full text</p>]]></content:encoded>
+                  <media:content url="https://n.example/1.jpg"><media:credit>Photograph: X</media:credit></media:content>
+                  <media:title>Photo title</media:title>
+                  <itunes:author>Someone else</itunes:author>
+                  <itunes:summary>Podcast summary</itunes:summary>
+                  <author>writer@n.example (Writer)</author>
+                </item>
+              </channel>
+            </rss>
+        """.trimIndent()
+        val feed = FeedParser.parse(xml, "https://n.example/feed")
+        assertEquals("News", feed.title)
+        val item = feed.items.single()
+        assertEquals("Real title", item.title)
+        assertEquals("<p>Full text</p>", item.contentHtml)
+        assertEquals("writer@n.example (Writer)", item.author)
+    }
+
     @Test(expected = FeedParseException::class)
     fun htmlPageIsRejected() {
         FeedParser.parse("<!doctype html><html><body>hi</body></html>", "https://x.example/")

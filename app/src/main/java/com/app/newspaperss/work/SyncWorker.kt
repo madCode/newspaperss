@@ -31,7 +31,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
 
         fun syncNow(context: Context) {
             val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(network).build()
-            WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.KEEP, request)
+            // Append, not KEEP: a sync already running read the source list before
+            // a newly added source existed, so it wouldn't fetch it.
+            WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
         }
     }
 }
