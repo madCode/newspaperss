@@ -56,13 +56,13 @@ class FeedSync(
         } catch (e: IOException) {
             "Couldn't reach the site."
         } catch (e: FeedParseException) {
-            "This address no longer gives a feed."
+            "We can't get new articles from this site any more. It may have moved; try adding it again."
         } catch (e: SQLiteConstraintException) {
             // The source was removed while it was being fetched.
             return null
         } catch (e: Exception) {
             // One bad feed mustn't stop the others from syncing.
-            "Something went wrong reading this feed."
+            "Something went wrong reading this site."
         }
         db.sources().recordFailure(source.id, now, error)
         return null

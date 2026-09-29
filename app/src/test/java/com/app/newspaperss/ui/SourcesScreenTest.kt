@@ -53,7 +53,7 @@ class SourcesScreenTest {
     private fun addSource(input: String) {
         compose.onNodeWithText("Add a source", useUnmergedTree = true).performClick()
         compose.onNode(hasSetTextAction()).performTextInput(input)
-        compose.onNodeWithText("Find feed").performClick()
+        compose.onNodeWithText("Add").performClick()
         compose.waitForIdle()
     }
 
@@ -79,9 +79,9 @@ class SourcesScreenTest {
                </head></html>""",
         )
         addSource("example.com")
-        waitFor("Which feed?")
+        waitFor("Which part of this site?")
         compose.onNodeWithText("Essays").performClick()
-        waitFor("Which feed?", present = false)
+        waitFor("Which part of this site?", present = false)
         compose.onNodeWithText("Essays").assertIsDisplayed()
     }
 

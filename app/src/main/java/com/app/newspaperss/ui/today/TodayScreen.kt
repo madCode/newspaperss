@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
@@ -21,6 +22,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,25 +48,67 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         try {
             context.startActivity(intent)
         } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "No app on this phone can open an EPUB.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "No reading app on this phone can open the edition. Try Send instead.", Toast.LENGTH_LONG).show()
         }
+    }
+    // After the share sheet, ask whether the edition arrived: without the answer its
+    // articles aren't used up, and people rarely come back to find "I've sent it".
+    var awaitingConfirmation by rememberSaveable { mutableStateOf<Long?>(null) }
+    var leftForShare by rememberSaveable { mutableStateOf(false) }
+    var askNow by rememberSaveable { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        if (awaitingConfirmation != null && leftForShare) askNow = true
+        onPauseOrDispose { if (awaitingConfirmation != null) leftForShare = true }
+    }
+    val editions = state.editions.orEmpty()
+    val latest = editions.firstOrNull()
+    val pending = awaitingConfirmation
+    if (askNow && pending != null) {
+        val done = { awaitingConfirmation = null; askNow = false; leftForShare = false }
+        AlertDialog(
+            onDismissRequest = done,
+            title = { Text("Did it reach your ${state.deviceName}?") },
+            text = { Text("Once it's there, these articles won't come back in later editions.") },
+            confirmButton = { Button(onClick = { viewModel.markSent(pending); done() }) { Text("Yes, it's there") } },
+            dismissButton = { TextButton(onClick = done) { Text("Not yet") } },
+        )
     }
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item { Masthead(today, Modifier.padding(top = 24.dp, bottom = 16.dp)) }
-        item { BuildPanel(state.build, onMake = viewModel::makeOneNow) }
-        val editions = state.editions.orEmpty()
-        val latest = editions.firstOrNull()
+        state.next?.let { next ->
+            item { Text("Next edition: $next", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp)) }
+        }
+        if (state.editions != null && latest == null && state.build == BuildState.Idle) {
+            item {
+                Text(
+                    if (state.next != null) "Your first edition arrives on schedule. Or make one now." else "Make your first edition whenever you're ready.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(vertical = 16.dp),
+                )
+            }
+        }
+        // A ready edition waiting to be sent comes first; making another is secondary.
+        val readyWaiting = latest?.status == EditionStatus.READY
+        if (!readyWaiting) item { BuildPanel(state.build, primary = true, onMake = viewModel::makeOneNow) }
         if (latest != null) {
             item {
                 LatestEdition(
                     latest,
+                    preferOpen = state.preferOpen,
                     onDetails = { onOpenEdition(latest.id) },
-                    onSend = { viewModel.fileOf(latest)?.let { launch(EditionIntents.share(context, it, latest.title)) } },
+                    onSend = {
+                        viewModel.fileOf(latest)?.let {
+                            launch(EditionIntents.share(context, it, latest.title))
+                            if (latest.status == EditionStatus.READY) awaitingConfirmation = latest.id
+                        }
+                    },
                     onOpen = { viewModel.fileOf(latest)?.let { launch(EditionIntents.open(context, it)) } },
                     onSent = { viewModel.markSent(latest) },
                 )
             }
         }
+        if (readyWaiting) item { BuildPanel(state.build, primary = false, onMake = viewModel::makeOneNow) }
         if (editions.size > 1) {
             item {
                 Text(
@@ -89,7 +136,7 @@ fun Masthead(date: LocalDate, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun BuildPanel(build: BuildState, onMake: () -> Unit) {
+private fun BuildPanel(build: BuildState, primary: Boolean, onMake: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         when (build) {
             BuildState.Syncing, is BuildState.Fetching -> {
@@ -100,7 +147,8 @@ private fun BuildPanel(build: BuildState, onMake: () -> Unit) {
                 LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
             }
             else -> {
-                Button(onClick = onMake) { Text("Make an edition now") }
+                if (primary) Button(onClick = onMake) { Text("Make an edition now") }
+                else TextButton(onClick = onMake, modifier = Modifier.padding(top = 8.dp)) { Text("Make another edition") }
                 val message = when (build) {
                     BuildState.NothingNew -> "Nothing new to read yet. Add sources, or check back later."
                     is BuildState.Failed -> build.reason
@@ -115,7 +163,14 @@ private fun BuildPanel(build: BuildState, onMake: () -> Unit) {
 }
 
 @Composable
-private fun LatestEdition(edition: EditionEntity, onDetails: () -> Unit, onSend: () -> Unit, onOpen: () -> Unit, onSent: () -> Unit) {
+private fun LatestEdition(
+    edition: EditionEntity,
+    preferOpen: Boolean,
+    onDetails: () -> Unit,
+    onSend: () -> Unit,
+    onOpen: () -> Unit,
+    onSent: () -> Unit,
+) {
     Card(Modifier.fillMaxWidth().padding(top = 16.dp)) {
         Column(Modifier.padding(16.dp)) {
             Column(Modifier.fillMaxWidth().clickable(onClick = onDetails)) {
@@ -125,8 +180,13 @@ private fun LatestEdition(edition: EditionEntity, onDetails: () -> Unit, onSend:
             when (edition.status) {
                 EditionStatus.READY -> {
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onSend) { Text("Send") }
-                        OutlinedButton(onClick = onOpen) { Text("Open") }
+                        if (preferOpen) {
+                            Button(onClick = onOpen) { Text("Open") }
+                            OutlinedButton(onClick = onSend) { Text("Send") }
+                        } else {
+                            Button(onClick = onSend) { Text("Send") }
+                            OutlinedButton(onClick = onOpen) { Text("Open") }
+                        }
                     }
                     Text(
                         "Once it's on your e-reader, tell us so these articles don't come back.",

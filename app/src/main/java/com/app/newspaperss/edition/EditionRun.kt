@@ -5,6 +5,7 @@ import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.delivery.FolderWriter
 import com.app.newspaperss.notify.EditionNotifier
 import com.app.newspaperss.settings.DeliveryMethod
+import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.SettingsStore
 
 /** One edition from start to finish: sync, build, deliver, tell the reader. */
@@ -27,14 +28,21 @@ class EditionRun(
         onSyncDone()
         val result = builder.build(s.edition, onProgress)
         when (result) {
-            is BuildResult.Built -> deliver(result.editionId, s.delivery, s.folderUri, s.folderName, scheduled)
+            is BuildResult.Built -> deliver(result.editionId, s.delivery, s.folderUri, s.folderName, scheduled, openInstead = s.device == Device.BOOX)
             is BuildResult.Failed -> if (scheduled) notifier.problem("Today's edition couldn't be made", result.reason)
             BuildResult.NothingNew -> {}
         }
         return result
     }
 
-    private suspend fun deliver(editionId: Long, method: DeliveryMethod, folderUri: String?, folderName: String?, scheduled: Boolean) {
+    private suspend fun deliver(
+        editionId: Long,
+        method: DeliveryMethod,
+        folderUri: String?,
+        folderName: String?,
+        scheduled: Boolean,
+        openInstead: Boolean,
+    ) {
         val edition = editions.byId(editionId) ?: return
         val file = editions.fileOf(edition) ?: return
         if (method == DeliveryMethod.FOLDER && folderUri != null) {
@@ -47,7 +55,7 @@ class EditionRun(
                 notifier.problem("${edition.title} wasn't delivered", error)
             }
         } else if (scheduled) {
-            notifier.editionReady(edition, file)
+            notifier.editionReady(edition, file, openInstead)
         }
     }
 }

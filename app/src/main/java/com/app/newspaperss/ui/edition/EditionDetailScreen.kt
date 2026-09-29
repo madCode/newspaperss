@@ -62,7 +62,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit) {
         try {
             context.startActivity(intent)
         } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "No app on this phone can open an EPUB.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "No reading app on this phone can open the edition. Try Send instead.", Toast.LENGTH_LONG).show()
         }
     }
     LaunchedEffect(message) {

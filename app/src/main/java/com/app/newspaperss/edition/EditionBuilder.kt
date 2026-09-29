@@ -121,7 +121,7 @@ class EditionBuilder(
             )
             File(editionsDir, fileName).outputStream().use { EpubWriter.write(doc, it) }
         } catch (e: Exception) {
-            return fail(editionId, "Couldn't write the edition: ${e.message}")
+            return fail(editionId, "Something went wrong making this edition. Your articles are safe and will be in the next one.")
         }
 
         db.withTransaction {

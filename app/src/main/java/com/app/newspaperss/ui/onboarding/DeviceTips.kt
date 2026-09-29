@@ -8,8 +8,9 @@ object DeviceTips {
             "When an edition is ready, tap Send and choose the Kindle app (“Send to Kindle”). " +
                 "If it isn't on your phone, install Kindle from the Play Store and sign in."
         Device.KOBO ->
-            "Connect Dropbox on your Kobo first. When an edition is ready, tap Send, choose Dropbox and save " +
-                "it in Apps \u203a Rakuten Kobo. It appears on your Kobo when it syncs."
+            "Once, on your Kobo: More \u203a Settings \u203a Dropbox \u203a Link, and sign in. Then, when an edition " +
+                "is ready, tap Send, choose Dropbox and save it in Apps \u203a Rakuten Kobo. It appears on your Kobo " +
+                "when it syncs."
         Device.BOOX ->
             "Install newspaperss on the Boox itself and tap Open to read each edition in its reader, " +
                 "or send editions over with BooxDrop."

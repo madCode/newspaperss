@@ -1,12 +1,13 @@
 package com.app.newspaperss.ui.onboarding
 
+import android.Manifest
 import android.app.TimePickerDialog
+import android.os.Build
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -27,7 +28,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.feed.StarterPacks
 import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.ui.components.CheckChip
 import com.app.newspaperss.ui.today.Masthead
 import java.time.LocalDate
 import java.time.LocalTime
@@ -64,6 +65,13 @@ import kotlin.math.roundToInt
 fun OnboardingScreen(viewModel: OnboardingViewModel) {
     val s by viewModel.state.collectAsState()
     BackHandler(enabled = s.step != Step.WELCOME) { viewModel.back() }
+    // Asked here, as the first edition is made, because a scheduled edition is only
+    // announced by notification; the answer doesn't change what happens next.
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.finish() }
+    val finish = {
+        if (s.scheduleEnabled && Build.VERSION.SDK_INT >= 33) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        else viewModel.finish()
+    }
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             if (s.step != Step.WELCOME) {
@@ -85,7 +93,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel) {
                 Spacer(Modifier.weight(1f))
                 when (s.step) {
                     Step.WELCOME -> Button(onClick = viewModel::next) { Text("Get started") }
-                    Step.SIZE -> Button(onClick = viewModel::finish, enabled = s.canContinue) {
+                    Step.SIZE -> Button(onClick = finish, enabled = s.canContinue) {
                         if (s.finishing) CircularProgressIndicator(Modifier.padding(end = 8.dp).size(18.dp), strokeWidth = 2.dp)
                         Text("Make my first edition")
                     }
@@ -151,6 +159,12 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
 private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel) {
     Title("What do you like to read?")
     Text("Pick a few to start. You can change them any time.", style = MaterialTheme.typography.bodyMedium)
+    Text(
+        "Saw something to read later? In any app, tap Share and choose \u201cRead in newspaperss\u201d.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp),
+    )
     OutlinedTextField(
         value = s.pasted,
         onValueChange = vm::editPasted,
@@ -174,16 +188,16 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel) {
                 Text(pack.name, style = MaterialTheme.typography.titleLarge)
                 Text(pack.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            FilterChip(
+            CheckChip(
                 selected = s.chosen.containsAll(urls),
                 onClick = { vm.togglePack(pack.name) },
-                label = { Text("All") },
+                label = "All",
                 modifier = Modifier.semantics { contentDescription = "All of ${pack.name}" },
             )
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             pack.feeds.forEach { feed ->
-                FilterChip(selected = feed.url in s.chosen, onClick = { vm.toggleFeed(feed.url) }, label = { Text(feed.title) })
+                CheckChip(selected = feed.url in s.chosen, onClick = { vm.toggleFeed(feed.url) }, label = feed.title)
             }
         }
     }
@@ -229,14 +243,14 @@ private fun SizeStep(s: OnboardingState, vm: OnboardingViewModel) {
     if (s.scheduleEnabled) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Ready by", Modifier.weight(1f))
-            Text(
-                s.time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Change time") {
-                    TimePickerDialog(context, { _, h, m -> vm.setTime(LocalTime.of(h, m)) }, s.time.hour, s.time.minute, android.text.format.DateFormat.is24HourFormat(context)).show()
-                }.padding(8.dp),
-            )
+            OutlinedButton(onClick = {
+                TimePickerDialog(context, { _, h, m -> vm.setTime(LocalTime.of(h, m)) }, s.time.hour, s.time.minute, android.text.format.DateFormat.is24HourFormat(context)).show()
+            }) { Text(s.time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))) }
         }
-        Text("You can pick days and change this in Settings.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "We'll send a notification when each edition is ready. Nothing else, ever. You can pick days in Settings.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
