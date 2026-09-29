@@ -53,6 +53,7 @@ object HtmlCleaner {
         normalizeHeadings(body)
         removeEmpty(body)
         collapseBlankLines(body)
+        demoteStrayCaptions(body)
 
         doc.outputSettings()
             .prettyPrint(false)
@@ -332,6 +333,22 @@ object HtmlCleaner {
             if (el.text().isNotBlank() || el.selectFirst("img, hr, table") != null) continue
             if (el.tagName() == "a" && el.hasAttr("id")) continue
             el.remove()
+        }
+    }
+
+    /**
+     * A figcaption is only valid as the first or last child of a figure, and
+     * one per figure; epubcheck rejects the book otherwise. Sites nest
+     * captions in layout divs, which unwrapping or removing can't always
+     * fix, so a caption anywhere else becomes a plain div.
+     */
+    private fun demoteStrayCaptions(body: Element) {
+        for (caption in body.select("figcaption")) {
+            val figure = caption.parent()
+            val valid = figure != null && figure.tagName() == "figure" &&
+                (caption === figure.firstElementChild() || caption === figure.lastElementChild()) &&
+                figure.children().count { it.tagName() == "figcaption" } == 1
+            if (!valid) caption.tagName("div")
         }
     }
 

@@ -120,6 +120,20 @@ class HtmlCleanerTest {
     }
 
     @Test
+    fun captionsOutsideTheEdgeOfAFigureBecomeDivs() {
+        // Nested in a layout div inside the figure (seen on Quanta Magazine).
+        assertEquals(
+            "<figure><img src=\"https://example.com/a.jpg\" alt=\"\" /><div><div><div><p>Photo: A. Person</p></div></div></div></figure>",
+            clean("<figure><img src=\"/a.jpg\"><div><figcaption><div><p>Photo: A. Person</p></div></figcaption></div></figure>"),
+        )
+        assertEquals("<div>Loose caption</div><p>Text.</p>", clean("<figcaption>Loose caption</figcaption><p>Text.</p>"))
+        assertEquals(
+            "<figure><div>One</div><img src=\"https://example.com/a.jpg\" alt=\"\" /><figcaption>Two</figcaption></figure>",
+            clean("<figure><figcaption>One</figcaption><img src=\"/a.jpg\"><figcaption>Two</figcaption></figure>"),
+        )
+    }
+
+    @Test
     fun pictureElementsPreferJpegSources() {
         val html = "<figure><picture><source srcset=\"/a.webp\" type=\"image/webp\">" +
             "<source srcset=\"/a.jpg 1x, /a@2x.jpg 2x\" type=\"image/jpeg\"><img alt=\"pic\"></picture><figcaption>Cap</figcaption></figure>"

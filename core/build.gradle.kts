@@ -18,3 +18,10 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
 }
+
+// A developer tool, not part of the build: see LiveEdition.kt.
+tasks.register<JavaExec>("liveEdition") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.app.newspaperss.core.tools.LiveEditionKt")
+    workingDir = projectDir
+}
