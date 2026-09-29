@@ -8,14 +8,19 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** build numbers you can see (Settings shows `0.1.0-debug.<run>+<commit>`).
-- **Next:** your device-testing list: fill the budget past the per-site cap, missing comic images, edition preview and delete, an EPUB design pass, the Sources page.
+- **In flight:** filling the budget past the per-site cap (the one-article New Yorker edition).
+- **Next:** your device-testing list: missing comic images, edition preview and delete, an EPUB design pass (and the too-wide in-app article), the Sources page.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 9: which build is this? (13:50–)
+### Cycle 10: a one-source paper fills its time (14:02–)
+- **From device testing:** a New Yorker-only edition held one comic. The per-site cap (1 by default) stopped it with the half hour unfilled. The cap is for fairness between sites, so once each has had its turn, what it held back fills the rest. A site's own number stays a hard limit, and its screen now says which it has.
+- **Review caught:** the site screen still said "Up to 1 article", and a noisy site couldn't be held to 1.
+
+### Cycle 9: which build is this? (13:50–14:01, [#26](https://github.com/madCode/newspaperss/pull/26))
 - **From device testing:** every debug build said "0.1.0-debug", so feedback couldn't name one. CI builds now get the run number as their version code (each installs over the last) and `0.1.0-debug.<run>+<commit>` as their name, shown at the bottom of Settings.
+- **Review caught:** release builds would have taken the run number too (F-Droid needs its own), and re-running an old CI run would have published a build phones couldn't install over a newer one.
 - **Also:** your device-testing notes are in the backlog (a new "From device testing" list at the top, plus proposals for notes, multiple schedules and tt-rss categories as sections).
 
 ### Cycle 8: "ready" makes a sound (13:41–13:49, [#25](https://github.com/madCode/newspaperss/pull/25))

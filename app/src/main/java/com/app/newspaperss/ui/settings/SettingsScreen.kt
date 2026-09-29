@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.edition.Ordering
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.ui.components.CheckChip
 import com.app.newspaperss.settings.DeliveryMethod
@@ -98,7 +99,7 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            if (s.edition.maxPerSource == 1) "Up to 1 article from each site" else "Up to ${s.edition.maxPerSource} articles from each site",
+            "${plural(s.edition.maxPerSource, "article")} from each site, then more if there's room",
             Modifier.weight(1f),
         )
         OutlinedButton(onClick = { vm.setMaxPerSource(s.edition.maxPerSource - 1) }, enabled = s.edition.maxPerSource > 1) { Text("−") }

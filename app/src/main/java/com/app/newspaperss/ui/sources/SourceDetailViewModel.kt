@@ -48,7 +48,10 @@ class SourceDetailViewModel(
         combine(repository.observe(id), repository.observeRecentArticles(id), defaultMax) { source, articles, max -> SourceDetail(source, articles, max) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** Gives this source its own number of articles per edition, one more or fewer than it has now. */
+    /**
+     * Gives this source its own number of articles per edition, one more or fewer than it has now.
+     * Never below 1, so "fewer" at the edition's default of 1 makes that soft number a hard limit.
+     */
     fun stepMaxArticles(delta: Int) {
         val default = detail.value?.defaultMax ?: return
         viewModelScope.launch { repository.stepMaxArticles(id, delta, default, SettingsViewModel.MAX_PER_SOURCE) }

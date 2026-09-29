@@ -79,6 +79,6 @@ class SettingsScreenTest {
     @Test
     fun perSourceCapCanBeRaised() {
         compose.onNodeWithText("+").performClick()
-        waitFor("Up to 2 articles from each site")
+        waitFor("2 articles from each site, then more")
     }
 }
