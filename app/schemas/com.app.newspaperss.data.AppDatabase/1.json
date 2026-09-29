@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "7facb10f27ce097575ebcfa0c861b4c0",
+    "identityHash": "29af30a9f4f50826da8d0adc77238119",
     "entities": [
       {
         "tableName": "sources",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `contentModeChosen` INTEGER NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `paused` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `failingSince` INTEGER, `serverNote` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `contentModeChosen` INTEGER NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `paused` INTEGER NOT NULL, `maxArticles` INTEGER, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `failingSince` INTEGER, `serverNote` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -81,6 +81,11 @@
             "columnName": "paused",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "maxArticles",
+            "columnName": "maxArticles",
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "addedAt",
@@ -442,7 +447,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7facb10f27ce097575ebcfa0c861b4c0')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '29af30a9f4f50826da8d0adc77238119')"
     ]
   }
 }

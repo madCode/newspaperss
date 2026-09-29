@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,10 +31,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
@@ -41,6 +45,7 @@ import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.ui.settings.SettingsViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -84,6 +89,9 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text") }
                     TextButton(onClick = { removing = true }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
                 }
+                if (source.kind != SourceKind.TTRSS) {
+                    ArticleCap(source.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
+                }
                 HorizontalDivider(Modifier.padding(top = 16.dp))
                 Text("Recent articles", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(16.dp))
                 if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
@@ -111,6 +119,32 @@ private fun Health(source: SourceEntity, lastNew: Instant?, locale: Locale, is24
         if (!source.paused) failingLine(source.failingSince, locale)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         lastCheckedLine(source.lastFetchedAt, locale, is24Hour)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
         textLine(source)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
+    }
+}
+
+@Composable
+private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowDefault: () -> Unit) {
+    val max = own ?: default
+    Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(if (max == 1) "Up to 1 article in each edition" else "Up to $max articles in each edition")
+            Text(
+                if (own == null) "Your edition setting" else "Your edition setting: up to $default",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        OutlinedButton(onClick = { onStep(-1) }, enabled = max > 1, modifier = Modifier.semantics { contentDescription = "Fewer articles from this site" }) {
+            Text("−")
+        }
+        OutlinedButton(
+            onClick = { onStep(1) },
+            enabled = max < SettingsViewModel.MAX_PER_SOURCE,
+            modifier = Modifier.padding(start = 8.dp).semantics { contentDescription = "More articles from this site" },
+        ) { Text("+") }
+    }
+    if (own != null) {
+        TextButton(onClick = onFollowDefault, modifier = Modifier.padding(horizontal = 4.dp)) { Text("Use your edition setting") }
     }
 }
 

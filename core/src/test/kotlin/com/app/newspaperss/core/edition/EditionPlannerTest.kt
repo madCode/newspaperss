@@ -59,6 +59,13 @@ class EditionPlannerTest {
         assertEquals(listOf("a3", "b1", "c1"), result)
     }
 
+    @Test
+    fun aSourcesOwnCapReplacesTheEditionsInEitherDirection() = runTest {
+        val ordered = EditionPlanner.order(pool, abc, Ordering.TAKE_TURNS)
+        val rules = PlanRules(Budget.Articles(10), maxPerSource = 2, sourceCaps = mapOf("a" to 3, "c" to 1))
+        assertEquals(listOf("a3", "b1", "c2", "a2", "a1"), EditionPlanner.fill<String>(ordered, rules, { 1.0 }) { it.id })
+    }
+
     private data class Fetched(val id: String, val minutes: Double)
 
     @Test

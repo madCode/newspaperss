@@ -65,6 +65,13 @@ interface SourceDao {
     @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen, fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL WHERE id = :id")
     suspend fun setContentMode(id: Long, mode: ContentMode, chosen: Boolean)
 
+    @Query("UPDATE sources SET maxArticles = :max WHERE id = :id")
+    suspend fun setMaxArticles(id: Long, max: Int?)
+
+    /** Steps from the source's own cap, or from [default] if it has none, within 1..[limit]; in SQL so quick taps each count. */
+    @Query("UPDATE sources SET maxArticles = MAX(1, MIN(:limit, COALESCE(maxArticles, :default) + :delta)) WHERE id = :id")
+    suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int)
+
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 

@@ -30,6 +30,8 @@ data class PlanRules(
     /** At most this many articles per source; null for no cap. */
     val maxPerSource: Int? = 1,
     val ordering: Ordering = Ordering.TAKE_TURNS,
+    /** Caps for particular sources, by [Candidate.sourceId], in place of [maxPerSource]. */
+    val sourceCaps: Map<String, Int> = emptyMap(),
 )
 
 object EditionPlanner {
@@ -78,7 +80,7 @@ object EditionPlanner {
 
     /**
      * Fetches [ordered] candidates one at a time until the budget is met,
-     * taking at most `maxPerSource` from each source.
+     * taking at most `maxPerSource` from each source (or its own entry in `sourceCaps`).
      *
      * The budget is checked before each fetch, so a minutes budget is
      * exceeded by at most one article, and a larger pool doesn't mean more
@@ -101,7 +103,8 @@ object EditionPlanner {
             }
             if (full) break
             val taken = perSource[candidate.sourceId] ?: 0
-            if (rules.maxPerSource != null && taken >= rules.maxPerSource) continue
+            val cap = rules.sourceCaps[candidate.sourceId] ?: rules.maxPerSource
+            if (cap != null && taken >= cap) continue
             val article = fetch(candidate) ?: continue
             picked += article
             perSource[candidate.sourceId] = taken + 1

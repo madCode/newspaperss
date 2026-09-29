@@ -61,6 +61,10 @@ class SourceRepository(private val db: AppDatabase) {
 
     suspend fun setPaused(id: Long, paused: Boolean) = sources.setPaused(id, paused)
 
+    suspend fun setMaxArticles(id: Long, max: Int?) = sources.setMaxArticles(id, max)
+
+    suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int) = sources.stepMaxArticles(id, delta, default, limit)
+
     suspend fun remove(source: SourceEntity) = sources.delete(source)
 
     /**

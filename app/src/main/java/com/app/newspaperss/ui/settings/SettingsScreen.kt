@@ -99,6 +99,11 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
             modifier = Modifier.padding(start = 8.dp),
         ) { Text("+") }
     }
+    Text(
+        "A site can have its own number: tap it in Sources.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     Text("Order", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
     listOf(
         Ordering.TAKE_TURNS to "Take turns between sources",
