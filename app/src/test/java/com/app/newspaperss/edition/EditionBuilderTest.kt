@@ -171,6 +171,63 @@ class EditionBuilderTest {
     }
 
     @Test
+    fun theCoverShowsTheEditionInReadingOrderAndGoesIntoTheEpub() = runTest {
+        source("a", "World", "a1")
+        source("b", "Culture", "b1")
+        source("c", "World", "c1")
+        val coverBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1)
+        var drawn: CoverInfo? = null
+        val built = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) { info ->
+            drawn = info
+            EpubImage("images/cover.jpg", "image/jpeg", coverBytes)
+        }.build(EditionSettings(maxPerSource = 5, wordsPerMinute = 200)) as BuildResult.Built
+
+        val edition = db.editions().byId(built.editionId)!!
+        val info = drawn!!
+        assertEquals(edition.title, info.title)
+        assertEquals(java.time.LocalDate.of(2026, 9, 29), info.date)
+        assertEquals(listOf(CoverHeadline("a a1", "a"), CoverHeadline("c c1", "c"), CoverHeadline("b b1", "b")), info.headlines)
+        assertEquals(3, info.articleCount)
+        assertEquals(edition.minutes, info.minutes, 0.001)
+        ZipFile(editions.fileOf(edition)!!).use { zip ->
+            assertTrue(zip.getInputStream(zip.getEntry("OEBPS/images/cover.jpg")).readBytes().contentEquals(coverBytes))
+            val opf = String(zip.getInputStream(zip.getEntry("OEBPS/content.opf")).readBytes())
+            assertTrue(opf.contains("properties=\"cover-image\""))
+        }
+    }
+
+    @Test
+    fun aCoverThatFailsToDrawLeavesATextCoverInsteadOfFailingTheEdition() = runTest {
+        source("a", null, "a1")
+        val built = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) { error("no fonts") }
+            .build(EditionSettings()) as BuildResult.Built
+
+        val edition = db.editions().byId(built.editionId)!!
+        assertEquals(EditionStatus.READY, edition.status)
+        ZipFile(editions.fileOf(edition)!!).use { zip ->
+            assertTrue(zip.entries().toList().none { it.name == "OEBPS/images/cover.jpg" })
+            assertTrue(String(zip.getInputStream(zip.getEntry("OEBPS/cover.xhtml")).readBytes()).contains(edition.title))
+        }
+    }
+
+    @Test
+    fun theCoverCountsAgainstTheEditionsImageBudget() = runTest {
+        source("a", null, "a1")
+        val href = "images/a1-1.jpg"
+        val withImage = ArticleContentProvider { a, _, _ ->
+            ArticleContent(a.title, null, "<p><img src=\"$href\"/></p>", wordCount = 238, images = listOf(EpubImage(href, "image/jpeg", ByteArray(60))))
+        }
+        val built = EditionBuilder(db, withImage, tmp.root, clock, ZoneOffset.UTC, imageBudgetBytes = 100) {
+            EpubImage("images/cover.jpg", "image/jpeg", ByteArray(50))
+        }.build(EditionSettings()) as BuildResult.Built
+
+        ZipFile(editions.fileOf(db.editions().byId(built.editionId)!!)!!).use { zip ->
+            val images = zip.entries().toList().map { it.name }.filter { it.startsWith("OEBPS/images/") }
+            assertEquals("60 + 50 bytes is over the 100 byte budget", listOf("OEBPS/images/cover.jpg"), images)
+        }
+    }
+
+    @Test
     fun removingASourceKeepsPastEditionsContents() = runTest {
         val id = source("a", null, "a1")
         val built = builder.build(EditionSettings()) as BuildResult.Built

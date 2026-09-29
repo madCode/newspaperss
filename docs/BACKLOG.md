@@ -17,7 +17,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] Write encoded images to a cache dir and stream them into the zip (lower peak memory)
 - [ ] Auto-tune source ContentMode from ExtractedArticle feed/page word counts (`ArticleExtractor.suggestMode`)
 - [ ] Edition detail screen: contents, bring back articles, share again
-- [ ] Generated cover image (Canvas) so Kindle's library thumbnail shows date + headlines
 
 ### M5 leftovers
 - [ ] Keep onboarding state across process death (SavedStateHandle); the folder picker or Play Store can kill the app mid-flow
@@ -44,5 +43,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)
 - [x] M5 Onboarding: device, starter packs, paste a site, size and schedule, first edition (#3)
 - [x] Images in editions: 1200px JPEG, per-edition allowance so over-budget images aren't downloaded (#3)
+- [x] Generated cover image (Canvas, 1264x1680 JPEG) so library thumbnails show date + headlines
 - [x] M4 Settings, scheduled editions (timer chain that never skips an overdue edition), folder delivery, notifications (#2)
 - [x] M3 The edition: planner, extraction, EPUB writer, EditionBuilder, Today screen, share/open (#1)
