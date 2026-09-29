@@ -130,7 +130,7 @@ class EditionDetailScreenTest {
 
         compose.onNodeWithText("I've sent it").performClick()
 
-        waitFor("Sent on")
+        waitFor("Sent")
         assertEquals(EditionStatus.DELIVERED, runBlocking { db.editions().byId(id) }?.status)
         assertEquals(ArticleState.DELIVERED, runBlocking { db.articles().byId(articles[0]) }?.state)
     }

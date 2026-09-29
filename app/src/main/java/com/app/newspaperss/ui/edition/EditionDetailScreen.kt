@@ -203,7 +203,7 @@ private fun dateOf(instant: Instant): String =
 
 private fun statusOf(edition: EditionEntity): String = when (edition.status) {
     EditionStatus.READY -> "Ready to send"
-    EditionStatus.DELIVERED -> edition.deliveredAt?.let { "Sent on ${dateOf(it)}" } ?: "Sent"
+    EditionStatus.DELIVERED -> edition.deliveredAt?.takeIf { dateOf(it) != dateOf(edition.createdAt) }?.let { "Sent on ${dateOf(it)}" } ?: "Sent"
     EditionStatus.FAILED -> "Not sent"
     EditionStatus.BUILDING -> "Being made"
 }
