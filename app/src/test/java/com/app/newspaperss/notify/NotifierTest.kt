@@ -8,6 +8,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.testutil.TestApp
+import com.app.newspaperss.testutil.clearFileProviderCache
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -29,6 +31,27 @@ class NotifierTest {
     private fun shownText(): String {
         val shown = shadowOf(app.getSystemService(NotificationManager::class.java)).allNotifications.single()
         return shown.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+    }
+
+    @After fun freshFileProvider() = clearFileProviderCache()
+
+    private fun importanceOfShown(): Int {
+        val system = app.getSystemService(NotificationManager::class.java)
+        return system.getNotificationChannel(shadowOf(system).allNotifications.single().channelId).importance
+    }
+
+    @Test
+    fun readyMakesASound() {
+        clearFileProviderCache()
+        val file = java.io.File(app.filesDir, "editions/e.epub").apply { parentFile!!.mkdirs(); writeText("epub") }
+        notifier.editionReady(EditionEntity(id = 1, title = "Tuesday Morning Edition", articleCount = 7, minutes = 30.0), file)
+        assertEquals(NotificationManager.IMPORTANCE_DEFAULT, importanceOfShown())
+    }
+
+    @Test
+    fun deliveredStaysQuiet() {
+        notifier.editionDelivered(EditionEntity(title = "Tuesday Morning Edition", articleCount = 7, minutes = 30.0), "Books")
+        assertEquals(NotificationManager.IMPORTANCE_LOW, importanceOfShown())
     }
 
     @Test
