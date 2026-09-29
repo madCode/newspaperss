@@ -1,0 +1,86 @@
+package com.app.newspaperss.core.edition
+
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import java.time.Instant
+import kotlin.random.Random
+
+class EditionPlannerTest {
+    private fun c(id: String, source: String, day: Int, back: Boolean = false) =
+        Candidate(id, source, Instant.parse("2026-09-%02dT00:00:00Z".format(day)), back)
+
+    private val pool = listOf(
+        c("a1", "a", 1), c("a2", "a", 2), c("a3", "a", 3),
+        c("b1", "b", 1),
+        c("c1", "c", 1), c("c2", "c", 2),
+    )
+
+    private fun ids(list: List<Candidate>) = list.map { it.id }
+
+    private val abc = listOf("a", "b", "c")
+
+    @Test
+    fun takesTurnsNewestFirstWithinEachSource() {
+        assertEquals(listOf("a3", "b1", "c2", "a2", "c1", "a1"), ids(EditionPlanner.order(pool, abc, Ordering.TAKE_TURNS)))
+    }
+
+    @Test
+    fun broughtBackArticlesGoFirstInTheirSource() {
+        val withBack = pool + c("a0", "a", 1, back = true)
+        assertEquals("a0", EditionPlanner.order(withBack, abc, Ordering.TAKE_TURNS).first().id)
+    }
+
+    @Test
+    fun rotationChangesWhoGoesFirstAndUnknownSourcesGoLast() {
+        val withStray = listOf(c("a1", "a", 1), c("b1", "b", 1), c("c1", "c", 1), c("z1", "z", 1))
+        assertEquals(listOf("b1", "c1", "z1", "a1"), ids(EditionPlanner.order(withStray, abc, Ordering.TAKE_TURNS, rotation = 1)))
+        assertEquals(listOf("a1", "b1", "c1", "z1"), ids(EditionPlanner.order(withStray, abc, Ordering.TAKE_TURNS, rotation = 4)))
+    }
+
+    @Test
+    fun inOrderAndShuffle() {
+        assertEquals(listOf("a3", "a2", "a1", "b1", "c2", "c1"), ids(EditionPlanner.order(pool, abc, Ordering.IN_ORDER)))
+        val shuffled = ids(EditionPlanner.order(pool, abc, Ordering.SHUFFLE, random = Random(1)))
+        assertEquals(ids(pool).toSet(), shuffled.toSet())
+    }
+
+    @Test
+    fun emptyPool() {
+        assertEquals(emptyList<Candidate>(), EditionPlanner.order(emptyList(), listOf("a"), Ordering.TAKE_TURNS, rotation = 5))
+    }
+
+    @Test
+    fun capsPerSourceAndAFailedFetchLetsTheSourcesNextArticleIn() = runTest {
+        val ordered = EditionPlanner.order(pool, abc, Ordering.TAKE_TURNS)
+        val result = EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(10), maxPerSource = 1), { 1.0 }) { cand ->
+            cand.id.takeUnless { it == "c2" }
+        }
+        assertEquals(listOf("a3", "b1", "c1"), result)
+    }
+
+    private data class Fetched(val id: String, val minutes: Double)
+
+    @Test
+    fun minutesBudgetStopsAfterAtMostOneArticleOver() = runTest {
+        val minutes = linkedMapOf("a3" to 10.0, "b1" to 0.4, "c2" to 25.0, "a2" to 5.0)
+        val fetched = mutableListOf<String>()
+        val result = EditionPlanner.fill<Fetched>(
+            minutes.keys.map { Candidate(it, it.take(1), null) },
+            PlanRules(Budget.Minutes(30.0), maxPerSource = null),
+            { it.minutes },
+        ) { cand -> fetched += cand.id; Fetched(cand.id, minutes.getValue(cand.id)) }
+        assertEquals(listOf("a3", "b1", "c2"), result.map { it.id })
+        assertEquals("stops fetching once the budget is met", listOf("a3", "b1", "c2"), fetched)
+    }
+
+    @Test
+    fun articleBudgetSkipsFailedFetches() = runTest {
+        val result = EditionPlanner.fill<Fetched>(
+            listOf(Candidate("x", "s", null), Candidate("gone", "s", null), Candidate("y", "s", null), Candidate("z", "s", null)),
+            PlanRules(Budget.Articles(2), maxPerSource = null),
+            { it.minutes },
+        ) { cand -> if (cand.id == "gone") null else Fetched(cand.id, 1.0) }
+        assertEquals(listOf("x", "y"), result.map { it.id })
+    }
+}
