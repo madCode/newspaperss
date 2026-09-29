@@ -21,6 +21,9 @@ class HttpCacheTest {
             requests += exchange.requestHeaders.getFirst("If-None-Match")
             exchange.responseHeaders.add("ETag", etag)
             exchange.responseHeaders.add("Content-Type", "application/rss+xml")
+            // Fresh for an hour, and last changed long ago: OkHttp would serve it without asking.
+            exchange.responseHeaders.add("Cache-Control", "max-age=3600")
+            exchange.responseHeaders.add("Last-Modified", "Mon, 01 Jan 2024 00:00:00 GMT")
             if (exchange.requestHeaders.getFirst("If-None-Match") == etag) {
                 exchange.sendResponseHeaders(304, -1)
             } else {
@@ -43,7 +46,7 @@ class HttpCacheTest {
         val first = http.get(url)
         val second = http.get(url)
 
-        assertEquals(listOf(null, "\"v1\""), requests)
+        assertEquals("asked both times, the second only whether it changed", listOf(null, "\"v1\""), requests)
         assertEquals("the cached copy stands in for the 304", feed, second.body)
         assertEquals(200, second.code)
         assertEquals(first.body, second.body)

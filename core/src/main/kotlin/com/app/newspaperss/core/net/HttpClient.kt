@@ -3,6 +3,7 @@ package com.app.newspaperss.core.net
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
+import okhttp3.CacheControl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -59,7 +60,10 @@ class OkHttpHttpClient(
     // host and even from https to http, so redirects are handed back to the caller instead.
     private val postClient = client.newBuilder().followRedirects(false).followSslRedirects(false).build()
 
-    override suspend fun get(url: String): HttpResponse = text(request(url, emptyMap()))
+    // max-age=0: always ask the server, if only "not modified?". Otherwise OkHttp serves anything it
+    // judges fresh (max-age, or a guess from Last-Modified) without a request, and a sync misses new
+    // posts. Not no-cache, which in OkHttp skips the cache and its validators altogether.
+    override suspend fun get(url: String): HttpResponse = text(request(url, emptyMap()) { cacheControl(REVALIDATE) })
 
     override suspend fun postJson(url: String, body: String): HttpResponse =
         text(request(url, emptyMap()) { post(body.toRequestBody(JSON)) }, postClient)
@@ -150,5 +154,6 @@ class OkHttpHttpClient(
             .build()
 
         private const val CACHE_BYTES = 10L * 1024 * 1024
+        private val REVALIDATE = CacheControl.Builder().maxAge(0, TimeUnit.SECONDS).build()
     }
 }

@@ -20,7 +20,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     }
 
     companion object {
-        private const val PERIODIC = "sync-periodic"
+        internal const val PERIODIC = "sync-periodic-12h"
+        private const val OLD_PERIODIC = "sync-periodic"
         private const val NOW = "sync-now"
         private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
@@ -31,8 +32,11 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         fun schedulePeriodic(context: Context) {
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
             val request = PeriodicWorkRequestBuilder<SyncWorker>(12, TimeUnit.HOURS).setConstraints(constraints).build()
-            // UPDATE, not KEEP, so installs that already have the old 4-hour work pick up the change.
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, request)
+            val work = WorkManager.getInstance(context)
+            // A new name rather than UPDATE, which would re-schedule the work on every app start
+            // (an extra wakeup each time); the old 4-hour work is cancelled once.
+            work.cancelUniqueWork(OLD_PERIODIC)
+            work.enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
         }
 
         fun syncNow(context: Context) {

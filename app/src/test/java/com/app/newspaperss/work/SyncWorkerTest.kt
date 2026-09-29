@@ -32,7 +32,7 @@ class SyncWorkerTest {
     fun thePeriodicSyncRunsTwiceADayOnlyWithBatteryToSpare() {
         SyncWorker.schedulePeriodic(context)
 
-        val work = WorkManager.getInstance(context).getWorkInfosForUniqueWork("sync-periodic").get().single()
+        val work = WorkManager.getInstance(context).getWorkInfosForUniqueWork(SyncWorker.PERIODIC).get().single()
         assertEquals(TimeUnit.HOURS.toMillis(12), work.periodicityInfo!!.repeatIntervalMillis)
         assertTrue(work.constraints.requiresBatteryNotLow())
     }
