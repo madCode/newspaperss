@@ -8,13 +8,19 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** reading-list titles, reading time and tap-to-open.
-- **Next:** a resource-usage audit; the first tap on an article; language tagging.
+- **In flight:** housekeeping from the resource audit.
+- **Next:** the audit's network and battery fixes (feed cache, sync interval, tt-rss sinceId); the first tap on an article; language tagging.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 17: the reading list (15:17–)
+### Cycle 18: resource audit, and housekeeping (15:30–)
+- **Audit:** typical peak memory while building is about 80 MB, worst case about 220 MB (a 10 MB page parsed twice). Bitmaps live outside the Java heap on Android 8+, and the EPUB is written straight to disk. So **streaming images to disk isn't worth it** (at most 15 MB) and is dropped. The real costs were elsewhere.
+- **Shipped:** only the newest 14 editions keep their EPUB (5–12 MB each, gigabytes a year otherwise); articles a month past delivery drop their feed text but keep their row (the database would have outgrown Auto Backup's 25 MB in months, silently stopping backup); the image budget counts as spent once nothing more fits (before, every later article downloaded and discarded its images).
+- **Review caught:** an empty image budget no longer counted as spent (a test caught it too), and the month was counted from discovery, so a long-saved link sent today lost its text at once.
+- **Next from the audit** (in the backlog): a feed cache (about 180 MB a month of repeat downloads), a 12-hour background sync, tt-rss `sinceId`, and trimming the page DOM before Readability's clone.
+
+### Cycle 17: the reading list (15:17–15:30, [#34](https://github.com/madCode/newspaperss/pull/34))
 - **From device testing:** saved links showed only their site, with no reading time, and tapping one did nothing.
 - **Shipped:** every saved link's page is looked up once: its title if it has none, and its length for "site · N min read". Rows open in the browser. Until a title is found, a row shows one made from the address instead of the bare domain.
 - **The first migration:** the length is a new column, so the database goes to version 2 with a migration and a test that validates it against the exported schema. Your installed debug build upgrades in place.

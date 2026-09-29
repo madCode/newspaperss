@@ -41,6 +41,9 @@ class FeedSync(
         val results = feeds.map { source -> async { limit.withPermit { sync(source) } } }.awaitAll()
         db.articles().expireOlderThan(clock.instant().minus(keepFor))
         db.articles().forgetDeliveredBefore(clock.instant().minus(REMEMBER_DELIVERED))
+        val trimmed = db.articles().dropOldFeedHtml(clock.instant().minus(KEEP_FEED_TEXT))
+        // Freed pages stay in the file until a VACUUM, and Auto Backup copies the file (25 MB quota).
+        if (trimmed >= VACUUM_AFTER) runCatching { db.openHelper.writableDatabase.execSQL("VACUUM") }
         SyncResult(results.sumOf { it ?: 0 }, results.count { it == null })
     }
 
@@ -181,6 +184,9 @@ class FeedSync(
         const val LIST_UNSUPPORTED = "This version of newspapeRSS can't read this list any more. Remove it or update the app."
 
         val REMEMBER_DELIVERED: Duration = Duration.ofDays(365)
+        // A month: long enough to bring an article back from a recent edition with its text.
+        private val KEEP_FEED_TEXT: Duration = Duration.ofDays(30)
+        private const val VACUUM_AFTER = 500
 
         /** tt-rss articles are stored with this guid prefix followed by their tt-rss id. */
         const val TTRSS_GUID_PREFIX = "ttrss:"

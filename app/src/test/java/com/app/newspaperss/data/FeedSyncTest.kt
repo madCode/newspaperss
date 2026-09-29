@@ -184,4 +184,25 @@ class FeedSyncTest {
 
         assertEquals(listOf("One"), db.articles().candidates().map { it.title })
     }
+
+    @Test
+    fun oldArticlesLoseTheirFeedTextButKeepTheirRow() = runTest {
+        val id = repo.addFeed(url, title = "Example")
+        db.articles().insertNew(listOf(
+            ArticleEntity(sourceId = id, guid = "old", url = "https://example.com/old", title = "Old", feedHtml = "<p>old</p>", discoveredAt = now.minus(Duration.ofDays(40)), state = ArticleState.DELIVERED),
+            ArticleEntity(sourceId = id, guid = "recent", url = "https://example.com/recent", title = "Recent", feedHtml = "<p>recent</p>", discoveredAt = now.minus(Duration.ofDays(5)), state = ArticleState.DELIVERED),
+            ArticleEntity(sourceId = id, guid = "sent-today", url = "https://example.com/sent-today", title = "Found long ago", feedHtml = "<p>kept</p>", discoveredAt = now.minus(Duration.ofDays(60)), state = ArticleState.DELIVERED),
+        ))
+        val sentToday = db.articles().allForSource(id).single { it.guid == "sent-today" }.id
+        db.articles().rememberDelivered(listOf(sentToday), now)
+        repo.setPaused(id, true)
+
+        sync.syncAll()
+
+        val byGuid = db.articles().allForSource(id).associateBy { it.guid }
+        assertEquals("the row stays, so the feed can't offer it again", setOf("old", "recent", "sent-today"), byGuid.keys)
+        assertEquals("a month counts from delivery", "<p>kept</p>", byGuid.getValue("sent-today").feedHtml)
+        assertEquals(null, byGuid.getValue("old").feedHtml)
+        assertEquals("<p>recent</p>", byGuid.getValue("recent").feedHtml)
+    }
 }

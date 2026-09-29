@@ -85,7 +85,20 @@ class EditionRepository(
         return true
     }
 
+    /**
+     * Deletes the EPUBs of all but the newest [keep] editions: a daily paper with images is
+     * 5-12 MB, gigabytes a year. Editions still to be sent keep theirs whatever their age.
+     */
+    suspend fun pruneFiles(keep: Int = KEEP_FILES) {
+        for (edition in db.editions().withFiles().drop(keep)) {
+            if (edition.status == EditionStatus.READY || edition.status == EditionStatus.BUILDING) continue
+            edition.fileName?.let { File(editionsDir, it).delete() }
+            db.editions().clearFile(edition.id)
+        }
+    }
+
     private companion object {
+        const val KEEP_FILES = 14
         const val TAG = "EditionRepository"
     }
 }

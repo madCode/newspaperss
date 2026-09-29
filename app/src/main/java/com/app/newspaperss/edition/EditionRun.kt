@@ -39,6 +39,7 @@ class EditionRun(
             is BuildResult.Failed -> if (scheduled) notifier.problem("Today's edition couldn't be made", result.reason)
             BuildResult.NothingNew -> {}
         }
+        editions.pruneFiles()
         return result
     }
 

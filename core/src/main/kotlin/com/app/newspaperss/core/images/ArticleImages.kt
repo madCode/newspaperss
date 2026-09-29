@@ -89,15 +89,34 @@ object ImageBudget {
  */
 class ImageAllowance(maxBytes: Long = ImageRules.MAX_EDITION_BYTES) {
     private val remaining = java.util.concurrent.atomic.AtomicLong(maxBytes)
+    private val refusedInARow = java.util.concurrent.atomic.AtomicInteger(0)
+    private val useful = minOf(USEFUL_BYTES, maxBytes / 10)
 
-    val exhausted get() = remaining.get() <= 0
+    /**
+     * True once no further image is likely to fit: too little is left for a typical one, or the
+     * last few were all refused. Waiting for exactly zero would never happen, since [take]
+     * refuses what doesn't fit, and every later article would download images only to drop them.
+     */
+    val exhausted get() = remaining.get().let { it <= 0 || it < useful } || refusedInARow.get() >= MAX_REFUSALS
 
     /** Takes [bytes] if they fit; false leaves the allowance unchanged. */
     fun take(bytes: Long): Boolean {
         while (true) {
             val left = remaining.get()
-            if (bytes > left) return false
-            if (remaining.compareAndSet(left, left - bytes)) return true
+            if (bytes > left) {
+                refusedInARow.incrementAndGet()
+                return false
+            }
+            if (remaining.compareAndSet(left, left - bytes)) {
+                refusedInARow.set(0)
+                return true
+            }
         }
+    }
+
+    private companion object {
+        // A modest e-ink JPEG; less than this left fits almost nothing.
+        const val USEFUL_BYTES = 50_000L
+        const val MAX_REFUSALS = 3
     }
 }
