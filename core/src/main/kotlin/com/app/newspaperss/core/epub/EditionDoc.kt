@@ -14,6 +14,9 @@ import java.time.LocalDate
  * @property sections the edition's articles in reading order, grouped into sections.
  * @property masthead the paper's name, shown on the cover and written as the book's creator.
  * @property modified written as `dcterms:modified` and used as the zip entries' timestamps.
+ * @property cover the cover image e-readers show as the library thumbnail, also shown on the cover
+ *   page. Its href follows the same rules as article images and must not be one of theirs. Without
+ *   it the cover page is text only.
  */
 data class EditionDoc(
     val title: String,
@@ -23,6 +26,7 @@ data class EditionDoc(
     val language: String = "en",
     val masthead: String = "newspaperss",
     val modified: Instant = Instant.now(),
+    val cover: EpubImage? = null,
 ) {
     val articles: List<EditionArticle> get() = sections.flatMap { it.articles }
 }

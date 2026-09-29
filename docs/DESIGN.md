@@ -94,6 +94,9 @@ Ported from the library, with the lessons its code and comments record:
   - strict XHTML (serialized through jsoup in XML mode);
   - EPUB 3 nav *and* NCX, in the same order;
   - the cover in the spine as a linear item;
+  - a generated 1264x1680 cover image (masthead, date, first headlines),
+    marked as the cover for both EPUB 3 and EPUB 2/Kindle, so library
+    thumbnails show the edition instead of a placeholder;
   - images re-encoded to JPEG at up to 1200px, with no SVG, WebP or AVIF;
   - a total size budget of about 15MB so email delivery works too;
   - a unique title per day ("… (2)"), because Send to Kindle silently

@@ -533,6 +533,65 @@ class EpubWriterTest {
     }
 
     @Test
+    fun aCoverImageIsTheBooksCoverForEpub3AndEpub2ReadersAndFillsTheCoverPage() {
+        val coverBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 4, 2)
+        val photo = EpubImage("images/a1-0.jpg", "image/jpeg", byteArrayOf(9))
+        val epub = write(
+            unsectioned(article(body = "<p><img src=\"images/a1-0.jpg\"></p>", images = listOf(photo)))
+                .copy(cover = EpubImage("images/cover.jpg", "image/jpeg", coverBytes)),
+        )
+
+        val manifest = epub.manifest().values
+        val coverItems = manifest.filter { it.getAttribute("properties").split(" ").contains("cover-image") }
+        assertEquals("exactly one manifest item is the cover image", 1, coverItems.size)
+        val coverItem = coverItems.single()
+        assertEquals("images/cover.jpg", coverItem.getAttribute("href"))
+        assertEquals("image/jpeg", coverItem.getAttribute("media-type"))
+        assertTrue(epub.files.getValue("OEBPS/images/cover.jpg").contentEquals(coverBytes))
+        assertEquals(1, epub.entries.count { it.first.name == "OEBPS/images/cover.jpg" })
+        assertEquals("article images aren't marked as the cover", "", manifest.single { it.getAttribute("href") == "images/a1-0.jpg" }.getAttribute("properties"))
+
+        val metaCover = epub.opf().elements("meta").single { it.getAttribute("name") == "cover" }
+        assertEquals("Kindle looks the cover up by manifest id", coverItem.getAttribute("id"), metaCover.getAttribute("content"))
+
+        val coverPage = epub.xml("OEBPS/cover.xhtml")
+        assertEquals("http://www.w3.org/1999/xhtml", coverPage.documentElement.namespaceURI)
+        val img = coverPage.elements("img").single()
+        assertEquals("images/cover.jpg", img.getAttribute("src"))
+        assertTrue(img.getAttribute("alt").contains("Tuesday Morning Edition"))
+        assertEquals("the cover page stays first in the spine", "cover.xhtml", epub.spineHrefs().first())
+        val manifestFiles = manifest.map { "OEBPS/" + it.getAttribute("href") }.toSet()
+        assertEquals(epub.files.keys - setOf("mimetype", "META-INF/container.xml", "OEBPS/content.opf"), manifestFiles)
+    }
+
+    @Test
+    fun withoutACoverImageTheCoverPageIsTextAndNothingClaimsToBeTheCoverImage() {
+        val epub = write(unsectioned(article(source = "Alpha")))
+        assertTrue(epub.manifest().values.none { it.getAttribute("properties").contains("cover-image") })
+        assertTrue(epub.opf().elements("meta").none { it.getAttribute("name") == "cover" })
+        val coverPage = epub.xml("OEBPS/cover.xhtml")
+        assertTrue(coverPage.elements("img").isEmpty())
+        assertTrue(coverPage.documentElement.textContent.contains("Tuesday Morning Edition"))
+    }
+
+    @Test
+    fun aCoverImageWithABadHrefOrTypeOrAnArticleImagesHrefIsRejected() {
+        val articleImage = EpubImage("images/a1-0.jpg", "image/jpeg", byteArrayOf(1))
+        val cases = listOf(
+            EpubImage("cover.jpg", "image/jpeg", byteArrayOf(1)),
+            EpubImage("images/cover.webp", "image/webp", byteArrayOf(1)),
+            EpubImage("images/a1-0.jpg", "image/jpeg", byteArrayOf(2)),
+        )
+        for (cover in cases) {
+            val out = ByteArrayOutputStream()
+            assertThrows(cover.href, IllegalArgumentException::class.java) {
+                EpubWriter.write(unsectioned(article(images = listOf(articleImage))).copy(cover = cover), out)
+            }
+            assertEquals(0, out.size())
+        }
+    }
+
+    @Test
     fun invalidImagesAreRejectedBeforeAnythingIsWritten() {
         val cases = listOf(
             EpubImage("images/a.webp", "image/webp", byteArrayOf(1)),
