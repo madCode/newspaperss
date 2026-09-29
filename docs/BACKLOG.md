@@ -9,9 +9,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### From device testing (Day 2)
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap; the app's user agent is redirected to m.webtoons.com, whose series page doesn't link the feed. Support strips properly
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
-- [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
 - [ ] Reading list: fetch each link's title and reading time; tap to open in the browser
-- [ ] Label the "Article text" option with what it sets
 - [ ] The first tap on an article in the app may not open it
 - [ ] Decide what tapping an article in a source's list does: open the original in the browser, render it, or offer "add to the next edition"
 
@@ -124,6 +122,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Source page: a real "Recent articles" heading, a status mark per article (● ✓ ○), stronger titles, lighter inset dividers; "Article text: Automatic" says what it sets
 - [x] Webcomics: feeds linked only from the page are found (God Slave's `/comic/rss`), and a page's own comic (`#cc-comic`, `#comic`) beats the feed's thumbnail
 - [x] An app icon: a cream newspaper page on navy, after the Termux shortcut's icon; themed icons get the newspaper glyph
 - [x] EPUB design, round 1: source kicker, byline and rule, justified hyphenated text, links and rules in the text's colour (KOReader night mode), "Read the original at site.com" (no long URL widening the page), a cleaner contents page
