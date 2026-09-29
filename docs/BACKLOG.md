@@ -13,7 +13,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ### M3 leftovers
 - [ ] Write encoded images to a cache dir and stream them into the zip (lower peak memory)
-- [ ] Auto-tune source ContentMode from ExtractedArticle feed/page word counts (`ArticleExtractor.suggestMode`)
+- [ ] Re-check a source settled on the feed's text now and then: a 429/503 block can be temporary, and today only choosing Automatic again re-runs the check
 
 ### M5 leftovers
 
@@ -30,7 +30,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ### UX (from the persona audit)
 - [ ] Import Pocket/Instapaper exports (CSV/HTML) into the reading list
-- [ ] Per-source "full text" health (needs the ContentMode auto-tune stats)
 
 ### Tech debt
 - [ ] Parser tests run on kxml2, the app ships Android's KXmlParser: add a Robolectric smoke test through the platform parser
@@ -39,6 +38,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Done
 
 - [x] App shell: splash until settings load, onboarding survives process death, timer re-armed on time-zone change, launch test
+- [x] Auto-tune each source's ContentMode from its articles (three in a row), a manual choice that's never overridden, and per-source full-text health on the Sources screen
 - [x] tt-rss source (one account, all unread, marked read after delivery); in-app article preview (#9)
 - [x] M1 Skeleton: Gradle (AGP 9.1, Kotlin 2.3, Compose), `:core` + `:app`, CI, design doc (#1)
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)

@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextEvidence
 import java.time.Instant
 
 enum class SourceKind {
@@ -24,6 +25,11 @@ data class SourceEntity(
     val section: String? = null,
     val position: Int = 0,
     val contentMode: ContentMode = ContentMode.AUTO,
+    /** The reader picked [contentMode] themselves, so the automatic full-text check leaves it alone. */
+    val contentModeChosen: Boolean = false,
+    /** The latest article's [FullTextEvidence] and the run behind it; see [com.app.newspaperss.core.extract.FullTextCheck]. */
+    val fullTextEvidence: FullTextEvidence? = null,
+    val fullTextStreak: Int = 0,
     val paused: Boolean = false,
     val addedAt: Instant = Instant.now(),
     val lastFetchedAt: Instant? = null,

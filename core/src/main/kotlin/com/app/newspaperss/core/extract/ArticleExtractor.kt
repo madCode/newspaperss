@@ -45,6 +45,8 @@ data class ExtractedArticle(
     val feedWordCount: Int,
     /** Words extracted from the page, or null if the page wasn't fetched or failed. */
     val pageWordCount: Int?,
+    /** The site turned the page request away or answered with a bot check. */
+    val pageBlocked: Boolean = false,
 )
 
 /**
@@ -64,8 +66,8 @@ class ArticleExtractor(private val http: HttpClient) {
         val feedWords = feed?.wordCount ?: 0
         val feedAuthor = PageExtractor.cleanAuthor(input.feedAuthor)
 
-        fun fromFeed(clean: CleanResult, note: String?, pageWords: Int?) =
-            article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords)
+        fun fromFeed(clean: CleanResult, note: String?, pageWords: Int?, blocked: Boolean = false) =
+            article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked)
 
         // A FEED source's item with no content still gets its page fetched: better than an empty article.
         if (feed != null && (input.mode == ContentMode.FEED || (input.mode == ContentMode.AUTO && feedWords >= FULL_TEXT_WORDS))) {
@@ -74,8 +76,8 @@ class ArticleExtractor(private val http: HttpClient) {
 
         return when (val page = fetchPage(input)) {
             is PageResult.Failed ->
-                if (feed != null) fromFeed(feed, "Couldn't fetch the full article (${page.reason}); showing the feed's version.", null)
-                else failed(input, page.reason)
+                if (feed != null) fromFeed(feed, "Couldn't fetch the full article (${page.reason}); showing the feed's version.", null, page.blocked)
+                else failed(input, page.reason, page.blocked)
             is PageResult.Fetched -> {
                 val words = page.clean.wordCount
                 when {
@@ -98,7 +100,7 @@ class ArticleExtractor(private val http: HttpClient) {
 
     private sealed interface PageResult {
         class Fetched(val content: PageContent, val clean: CleanResult) : PageResult
-        class Failed(val reason: String) : PageResult
+        class Failed(val reason: String, val blocked: Boolean = false) : PageResult
     }
 
     private suspend fun fetchPage(input: ExtractInput): PageResult {
@@ -107,26 +109,26 @@ class ArticleExtractor(private val http: HttpClient) {
         } catch (e: IOException) {
             return PageResult.Failed("couldn't connect")
         }
-        blockedReason(response)?.let { return PageResult.Failed(it) }
+        unusable(response)?.let { return it }
         val content = PageExtractor.extract(response.body, response.finalUrl)
         val title = input.feedTitle.ifBlank { content.title.orEmpty() }
         return PageResult.Fetched(content, HtmlCleaner.clean(content.html, response.finalUrl, title))
     }
 
-    private fun blockedReason(response: HttpResponse): String? {
-        if (response.code in BLOCKED_STATUS_CODES) return "the site turned the app away (error ${response.code})"
-        if (!response.isSuccessful) return "error ${response.code}"
+    private fun unusable(response: HttpResponse): PageResult.Failed? {
+        if (response.code in BLOCKED_STATUS_CODES) return PageResult.Failed("the site turned the app away (error ${response.code})", blocked = true)
+        if (!response.isSuccessful) return PageResult.Failed("error ${response.code}")
         val type = response.contentType?.lowercase()
-        if (type != null && "html" !in type && "xml" !in type) return "not a web page"
+        if (type != null && "html" !in type && "xml" !in type) return PageResult.Failed("not a web page")
         // Bot checks are small pages served with a 200 status.
         if (response.body.length < CHALLENGE_PAGE_MAX_CHARS) {
             val head = response.body.take(30_000)
-            if (CHALLENGE_MARKERS.any { it in head }) return "the site asked for a bot check"
+            if (CHALLENGE_MARKERS.any { it in head }) return PageResult.Failed("the site asked for a bot check", blocked = true)
         }
         return null
     }
 
-    private fun failed(input: ExtractInput, reason: String): ExtractedArticle {
+    private fun failed(input: ExtractInput, reason: String, blocked: Boolean = false): ExtractedArticle {
         val link = HtmlCleaner.absoluteUrl(input.url, "")
         val html = if (link != null) {
             "<p>Couldn't fetch this article ($reason). <a href=\"${Entities.escape(link)}\">Read it on the web</a>.</p>"
@@ -144,11 +146,13 @@ class ArticleExtractor(private val http: HttpClient) {
             imageUrls = emptyList(),
             feedWordCount = 0,
             pageWordCount = null,
+            pageBlocked = blocked,
         )
     }
 
     private fun article(
         title: String, author: String?, clean: CleanResult, usedFeed: Boolean, note: String?, feedWords: Int, pageWords: Int?,
+        blocked: Boolean = false,
     ) = ExtractedArticle(
         title = title.replace(WHITESPACE, " ").trim(),
         author = author,
@@ -160,6 +164,7 @@ class ArticleExtractor(private val http: HttpClient) {
         imageUrls = clean.imageUrls,
         feedWordCount = feedWords,
         pageWordCount = pageWords,
+        pageBlocked = blocked,
     )
 
     companion object {

@@ -2,6 +2,7 @@ package com.app.newspaperss.ui.sources
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.core.feed.FindResult
 import com.app.newspaperss.core.feed.FoundFeed
@@ -134,6 +135,10 @@ class SourcesViewModel(
 
     fun togglePaused(source: SourceEntity) {
         viewModelScope.launch { repository.setPaused(source.id, !source.paused) }
+    }
+
+    fun chooseContentMode(source: SourceEntity, mode: ContentMode) {
+        viewModelScope.launch { repository.chooseContentMode(source.id, mode) }
     }
 
     fun refresh() = onSourcesChanged()

@@ -2,6 +2,9 @@ package com.app.newspaperss.edition
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
+import com.app.newspaperss.core.extract.ArticleExtractor
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionEntity
@@ -374,5 +377,32 @@ class EditionBuilderTest {
         delivering.markDelivered(built.editionId)
         assertEquals(EditionStatus.DELIVERED, db.editions().byId(built.editionId)!!.status)
         assertEquals(ArticleState.DELIVERED, stateOf("n1"))
+    }
+
+    @Test
+    fun aSiteThatBlocksPagesSettlesOnItsOwnTextAndIsNoLongerAskedForThem() = runTest {
+        val http = FakeHttp()
+        val requested = mutableListOf<String>()
+        http.beforeResponse = { requested += it }
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), sources::recordFullText)
+        val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
+        val id = sources.addFeed("https://blocked.example/feed", "Blocked")
+        suspend fun teasers(vararg guids: String) = db.articles().insertNew(
+            guids.map { g ->
+                http.page("https://blocked.example/$g", "<html>Forbidden</html>", code = 403)
+                ArticleEntity(sourceId = id, guid = g, url = "https://blocked.example/$g", title = "Story $g", feedHtml = "<p>The first lines of story $g.</p>")
+            },
+        )
+        val settings = EditionSettings(minutes = 600, maxPerSource = 10)
+
+        teasers("1", "2", "3")
+        tuned.build(settings) as BuildResult.Built
+        assertEquals(3, requested.size)
+        assertEquals(ContentMode.FEED, db.sources().byId(id)!!.contentMode)
+
+        teasers("4")
+        requested.clear()
+        tuned.build(settings) as BuildResult.Built
+        assertTrue(requested.isEmpty())
     }
 }

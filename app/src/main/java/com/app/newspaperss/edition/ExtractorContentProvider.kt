@@ -2,6 +2,8 @@ package com.app.newspaperss.edition
 
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ExtractInput
+import com.app.newspaperss.core.extract.FullTextCheck
+import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.images.ArticleImages
 import com.app.newspaperss.core.images.EncodedImage
 import com.app.newspaperss.core.images.ImageAllowance
@@ -22,11 +24,15 @@ import java.io.IOException
 /**
  * Extracts each article and embeds its images. The edition-wide image size budget is applied
  * later by [EditionBuilder], in reading order.
+ *
+ * @param onEvidence receives what each article showed about where its source's full text is,
+ *   for [com.app.newspaperss.data.SourceRepository.recordFullText].
  */
 class ExtractorContentProvider(
     private val extractor: ArticleExtractor,
     private val http: HttpClient,
     private val encoder: ImageEncoder,
+    private val onEvidence: suspend (sourceId: Long, FullTextEvidence) -> Unit,
 ) : ArticleContentProvider {
     // Downloads overlap but decoding doesn't: a decoded photo can take tens of MB of heap.
     private val encoding = Mutex()
@@ -41,6 +47,7 @@ class ExtractorContentProvider(
                 mode = source.contentMode,
             ),
         )
+        FullTextCheck.evidence(extracted)?.let { onEvidence(source.id, it) }
         // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
         // reader saved on purpose waits for the next edition instead of being used up as a stub.
         if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
