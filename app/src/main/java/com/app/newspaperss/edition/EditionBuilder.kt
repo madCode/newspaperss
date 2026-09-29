@@ -1,5 +1,6 @@
 package com.app.newspaperss.edition
 
+import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.edition.Candidate
 import com.app.newspaperss.core.edition.EditionPlanner
 import com.app.newspaperss.core.edition.EditionTitles
@@ -56,7 +57,8 @@ class EditionBuilder(
             rotation = rotation,
         )
         var fetched = 0
-        val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, settings.rules, { it.second.minutes }) { c ->
+        fun minutesOf(c: ArticleContent) = ReadingTime.minutes(c.wordCount, settings.wordsPerMinute)
+        val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, settings.rules, { minutesOf(it.second) }) { c ->
             val article = byId.getValue(c.id.toLong())
             val result = content.contentFor(article, sourcesById.getValue(article.sourceId))?.let { article to it }
             onProgress(++fetched)
@@ -83,7 +85,7 @@ class EditionBuilder(
                 date = now.toLocalDate(),
                 identifier = "urn:uuid:${UUID.randomUUID()}",
                 sections = arranged.groupBy { (a, _) -> sourcesById.getValue(a.sourceId).section }.map { (section, items) ->
-                    EditionSection(section, items.map { (a, c) -> toEpub(a, c, sourcesById.getValue(a.sourceId)) })
+                    EditionSection(section, items.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })
                 },
                 modified = clock.instant(),
             )
@@ -95,14 +97,14 @@ class EditionBuilder(
         db.withTransaction {
             db.editions().insertArticles(
                 arranged.mapIndexed { i, (a, c) ->
-                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = sourcesById.getValue(a.sourceId).title, minutes = c.minutes)
+                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = sourcesById.getValue(a.sourceId).title, minutes = minutesOf(c))
                 },
             )
             db.articles().setState(arranged.map { it.first.id }, ArticleState.IN_EDITION)
             db.editions().update(
                 db.editions().byId(editionId)!!.copy(
                     status = EditionStatus.READY, fileName = fileName,
-                    articleCount = arranged.size, minutes = arranged.sumOf { it.second.minutes },
+                    articleCount = arranged.size, minutes = arranged.sumOf { minutesOf(it.second) },
                 ),
             )
         }
@@ -128,12 +130,12 @@ class EditionBuilder(
         return BuildResult.Failed(editionId, reason)
     }
 
-    private fun toEpub(a: ArticleEntity, c: ArticleContent, source: SourceEntity) = EditionArticle(
+    private fun toEpub(a: ArticleEntity, c: ArticleContent, minutes: Double, source: SourceEntity) = EditionArticle(
         title = c.title,
         sourceTitle = source.title,
         url = a.url,
         bodyHtml = c.bodyHtml,
-        minutes = c.minutes,
+        minutes = minutes,
         author = c.author,
         published = a.published?.atZone(zone)?.toLocalDate(),
         note = c.note,

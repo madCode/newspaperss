@@ -19,10 +19,10 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun doWork(): Result {
         val container = (applicationContext as NewspaperssApp).container
         setProgress(workDataOf(STAGE to STAGE_SYNCING))
-        container.feedSync.syncAll()
-        val result = container.editionBuilder.build(container.editionSettings()) { done ->
-            setProgressAsync(workDataOf(STAGE to STAGE_FETCHING, FETCHED to done))
-        }
+        val result = container.editionRun.run(
+            scheduled = inputData.getBoolean(SCHEDULED, false),
+            onProgress = { done -> setProgressAsync(workDataOf(STAGE to STAGE_FETCHING, FETCHED to done)) },
+        )
         return when (result) {
             is BuildResult.Built -> Result.success(workDataOf(EDITION_ID to result.editionId))
             BuildResult.NothingNew -> Result.success(workDataOf(NOTHING_NEW to true))
@@ -33,6 +33,7 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     companion object {
         // One build at a time: a scheduled build and "Make one now" share this name.
         const val UNIQUE = "edition-build"
+        const val SCHEDULED = "scheduled"
         const val STAGE = "stage"
         const val STAGE_SYNCING = "syncing"
         const val STAGE_FETCHING = "fetching"
@@ -41,9 +42,10 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         const val NOTHING_NEW = "nothingNew"
         const val ERROR = "error"
 
-        fun buildNow(context: Context) {
+        fun buildNow(context: Context, scheduled: Boolean = false) {
             val request = OneTimeWorkRequestBuilder<EditionWorker>()
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setInputData(workDataOf(SCHEDULED to scheduled))
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.KEEP, request)
         }

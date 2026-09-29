@@ -1,0 +1,34 @@
+package com.app.newspaperss.delivery
+
+import android.content.ContentResolver
+import android.net.Uri
+import android.provider.DocumentsContract
+import java.io.File
+
+fun interface FolderWriter {
+    /** Returns null on success, else a reason fit to show the reader. */
+    fun deliver(file: File, treeUri: String, title: String): String?
+}
+
+/** Saves editions into a folder the reader picked through the system file picker. */
+class FolderDelivery(private val resolver: ContentResolver) : FolderWriter {
+    override fun deliver(file: File, treeUri: String, title: String): String? = try {
+        val tree = Uri.parse(treeUri)
+        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        val doc = DocumentsContract.createDocument(resolver, parent, EditionIntents.EPUB_MIME, fileName(title))
+            ?: throw IllegalStateException("the folder refused a new file")
+        resolver.openOutputStream(doc, "w")?.use { out -> file.inputStream().use { it.copyTo(out) } }
+            ?: throw IllegalStateException("couldn't write the file")
+        null
+    } catch (e: SecurityException) {
+        "newspaperss no longer has access to that folder. Pick it again in Settings."
+    } catch (e: Exception) {
+        "Couldn't save to the folder (${e.message})."
+    }
+
+    companion object {
+        /** A file name that's valid on every provider (Drive, Dropbox, SD cards). */
+        fun fileName(title: String): String =
+            title.replace(Regex("[\\\\/:*?\"<>|]"), "-").trim().take(120) + ".epub"
+    }
+}

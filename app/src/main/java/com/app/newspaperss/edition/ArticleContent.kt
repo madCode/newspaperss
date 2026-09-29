@@ -9,7 +9,7 @@ data class ArticleContent(
     val title: String,
     val author: String?,
     val bodyHtml: String,
-    val minutes: Double,
+    val wordCount: Int,
     val note: String? = null,
     val images: List<EpubImage> = emptyList(),
 )
