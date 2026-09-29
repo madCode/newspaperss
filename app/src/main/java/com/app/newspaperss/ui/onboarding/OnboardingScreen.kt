@@ -44,7 +44,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -213,7 +215,14 @@ private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sourc
     val message by sources.message.collectAsState()
     val ttrssForm by sources.ttrssForm.collectAsState()
     val rows by sources.rows.collectAsState()
-    LaunchedEffect(rows) { rows?.let { onboarding.sourcesAdded(it.size) } }
+    val count = rows?.size
+    LaunchedEffect(count) {
+        if (count != null && count != added) {
+            onboarding.sourcesAdded(count)
+            // An earlier import's result ("Couldn't read that file") would otherwise hide the new count.
+            sources.dismissMessage()
+        }
+    }
     val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) sources.importOpml(context.contentResolver, uri)
     }
@@ -222,8 +231,10 @@ private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sourc
         OutlinedButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Import an OPML file") }
         if (sources.canAddTtrss) OutlinedButton(onClick = sources::openTtrss) { Text("Connect tt-rss") }
     }
-    val status = message ?: if (added > 0) "${plural(added, "source")} added. Pick more below, or go on." else null
-    status?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
+    val status = message ?: if (added > 0) "${plural(added, "source")} added. Pick more below, or go on; you can remove any later in Sources." else null
+    status?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp).semantics { liveRegion = LiveRegionMode.Polite })
+    }
     ttrssForm?.let { TtrssDialog(it, sources) }
 }
 

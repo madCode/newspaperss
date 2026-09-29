@@ -106,12 +106,12 @@ class OnboardingViewModel(
 
     fun finish() {
         val s = state.value
-        // A permission result delivered after process death lands on a fresh, empty state;
-        // saving that would finish onboarding with nothing chosen.
-        if (s.finishing) return
+        // A permission result delivered after process death can land on a fresh, empty state;
+        // saving that would finish onboarding with no device and nothing chosen.
+        if (s.finishing || s.device == null) return
         _state.update { it.copy(finishing = true) }
         viewModelScope.launch {
-            // Read from the database, not state.added: after process death it may not be collected yet.
+            // The database, not state.added, which the screen may not have reported yet.
             if (s.chosen.isEmpty() && sources.observe().first().none { it.kind != SourceKind.READING_LIST }) {
                 _state.update { it.copy(finishing = false) }
                 return@launch

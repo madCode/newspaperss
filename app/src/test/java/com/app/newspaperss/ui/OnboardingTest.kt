@@ -114,6 +114,31 @@ class OnboardingTest {
     }
 
     @Test
+    fun anOpmlImportCountsAsSourcesAndAnEarlierResultDoesntHideTheCount() {
+        val sources = SourceRepository(db)
+        val sourcesVm = SourcesViewModel(sources, FeedFinder(http)) {}
+        compose.setContent { OnboardingScreen(vm, sourcesVm) }
+        click("Get started")
+        scrollAndClick("Kindle")
+        click("Next")
+        compose.onNodeWithText("Connect tt-rss").assertDoesNotExist()
+
+        val resolver = ApplicationProvider.getApplicationContext<android.content.Context>().contentResolver
+        sourcesVm.importOpml(resolver, android.net.Uri.fromFile(tmp.newFile("empty.opml").apply { writeText("<opml version=\"2.0\"><body/></opml>") }))
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("No new sites in that file", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        val opml = tmp.newFile("feeds.opml").apply {
+            writeText("""<opml version="2.0"><body><outline type="rss" text="A" xmlUrl="https://a.example/feed"/><outline type="rss" text="B" xmlUrl="https://b.example/feed"/></body></opml>""")
+        }
+        sourcesVm.importOpml(resolver, android.net.Uri.fromFile(opml))
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("2 sources added", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+
+        click("Next")
+        click("Make my first edition")
+        idleUntil { finished != null }
+        assertEquals(setOf("https://a.example/feed", "https://b.example/feed"), runBlocking { db.sources().all() }.map { it.url }.toSet())
+    }
+
+    @Test
     fun youCantGoOnWithoutADeviceOrASource() {
         vm.next()
         vm.next()
