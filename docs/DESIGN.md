@@ -90,7 +90,7 @@ Ported from the library, with the lessons its code and comments record:
   fetch pages; if extraction keeps under 0.7× the feed, trust the feed. It
   runs automatically on every article instead of asking the user: a feed
   item of 300+ words taken as is counts for the feed, and so does a site
-  that turns page requests away (403, bot check). Three articles in a row
+  that turns page requests away (403, bot check). Three days in a row
   pointing the same way switch the source to always fetching pages or never
   fetching them; a mixed source stays automatic. A mode the reader picks
   from the source's menu is never changed, and picking Automatic starts the
@@ -110,7 +110,9 @@ Ported from the library, with the lessons its code and comments record:
 - **Commit after delivery.** Articles become `DELIVERED` and list items are
   ticked off only when delivery reports success. For share-sheet delivery,
   where the app can't know whether it worked, "success" is the user
-  confirming "Sent it" (§6).
+  confirming "Sent it" (§6). Delivered links are also remembered on their
+  own for a year, so a source removed and added again, or the same story
+  in a second source, doesn't deliver them twice.
 - **One run at a time.** Builds are unique WorkManager work (`KEEP`), so a
   scheduled build and a manual "Make one now" can't race.
 

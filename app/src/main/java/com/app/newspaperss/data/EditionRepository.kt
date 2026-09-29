@@ -33,7 +33,9 @@ class EditionRepository(
     suspend fun markDelivered(id: Long) {
         val delivered = db.withTransaction {
             val edition = db.editions().byId(id) ?: return@withTransaction false
-            db.articles().setState(db.editions().articleIds(id), ArticleState.DELIVERED)
+            val articleIds = db.editions().articleIds(id)
+            db.articles().setState(articleIds, ArticleState.DELIVERED)
+            db.articles().rememberDelivered(articleIds, clock.instant())
             db.editions().update(edition.copy(status = EditionStatus.DELIVERED, deliveredAt = clock.instant(), error = null))
             true
         }

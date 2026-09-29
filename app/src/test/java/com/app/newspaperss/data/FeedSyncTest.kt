@@ -124,4 +124,46 @@ class FeedSyncTest {
         assertEquals(1, result.newArticles)
         assertEquals(listOf("Two"), db.articles().candidates().map { it.title })
     }
+
+    private suspend fun deliver(vararg articles: ArticleEntity) {
+        val editionId = db.editions().insert(EditionEntity(title = "Edition", status = EditionStatus.READY))
+        db.editions().insertArticles(
+            articles.mapIndexed { i, a -> EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = a.title, sourceTitle = "Blog", minutes = 1.0) },
+        )
+        EditionRepository(db, java.io.File("unused"), clock).markDelivered(editionId)
+    }
+
+    /** Removing a source and adding it back, or meeting a story in a second source, mustn't deliver it again. */
+    @Test
+    fun aDeliveredLinkIsntOfferedAgainFromAnySource() = runTest {
+        repo.addFeed(url, "Blog")
+        http.page(url, rss("Blog", "1" to "One", "2" to "Two"))
+        sync.syncAll()
+        deliver(db.articles().candidates().first { it.guid == "1" })
+
+        repo.remove(db.sources().byUrl(url)!!)
+        repo.addFeed(url, "Blog")
+        // A second feed carrying the same link under its own guid.
+        repo.addFeed("https://other.example/feed", "Other")
+        http.page("https://other.example/feed", rss("Other", "1" to "One again"))
+
+        assertEquals(1, sync.syncAll().newArticles)
+        assertEquals(listOf("Two"), db.articles().candidates().map { it.title })
+    }
+
+    @Test
+    fun deliveredLinksAreForgottenAfterAYear() = runTest {
+        repo.addFeed(url, "Blog")
+        http.page(url, rss("Blog", "1" to "One"))
+        sync.syncAll()
+        deliver(db.articles().candidates().single())
+        repo.remove(db.sources().byUrl(url)!!)
+
+        now = now.plus(FeedSync.REMEMBER_DELIVERED).plusSeconds(60)
+        sync.syncAll()
+        repo.addFeed(url, "Blog")
+        sync.syncAll()
+
+        assertEquals(listOf("One"), db.articles().candidates().map { it.title })
+    }
 }

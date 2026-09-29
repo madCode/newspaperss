@@ -19,7 +19,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M6 leftovers
 
 ### M7 Polish
-- [ ] Source health view; remove-and-re-add shouldn't re-deliver (soft delete sources)
+- [ ] Source health view
 
 ### M8 Advanced
 - [ ] tt-rss: pick a category instead of all unread; a setting to leave articles unread on the server (DESIGN §5 calls it an option)
@@ -29,6 +29,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ## Done
 
+- [x] Delivered links are remembered for a year, so removing and re-adding a source, or the same story in two sources, doesn't deliver it twice
 - [x] Real-world check: a live edition from the starter feeds passes epubcheck (stray figcaptions fixed; `./gradlew :core:liveEdition`); a source settled on the feed's text keeps probing short items, so a lifted block is noticed
 - [x] Tech debt: feed parser smoke-tested on Android's own XmlPullParser; HTML meta-charset and byte-order-mark sniffing
 - [x] Curated list sources: a scraper per site (Arts & Letters Daily first), each list its own source, keeping its newest 12 unread links; added from the Add a source dialog

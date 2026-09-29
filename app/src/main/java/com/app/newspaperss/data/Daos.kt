@@ -75,9 +75,29 @@ data class SourceActivity(val sourceId: Long, val lastNew: Instant?)
 
 @Dao
 interface ArticleDao {
-    /** Inserts articles not already known for their source; returns how many were new. */
+    /**
+     * Inserts articles not already known for their source; returns how many were new. One whose
+     * link was already delivered (see [DeliveredUrlEntity]) goes in as delivered and isn't counted.
+     */
     @Transaction
-    suspend fun insertNew(articles: List<ArticleEntity>): Int = articles.count { insertIgnoring(it) != -1L }
+    suspend fun insertNew(articles: List<ArticleEntity>): Int {
+        // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
+        val delivered = articles.map { it.url }.filter { it.isNotBlank() }.distinct().chunked(500).flatMap { deliveredAmong(it) }.toSet()
+        return articles.count { article ->
+            val seen = article.url in delivered
+            insertIgnoring(if (seen) article.copy(state = ArticleState.DELIVERED) else article) != -1L && !seen
+        }
+    }
+
+    @Query("SELECT url FROM delivered_urls WHERE url IN (:urls)")
+    suspend fun deliveredAmong(urls: List<String>): List<String>
+
+    @Query("INSERT OR REPLACE INTO delivered_urls (url, deliveredAt) SELECT url, :at FROM articles WHERE id IN (:ids) AND url != ''")
+    suspend fun rememberDelivered(ids: List<Long>, at: Instant)
+
+    /** Feeds drop items long before this, so a link this old won't be offered again. */
+    @Query("DELETE FROM delivered_urls WHERE deliveredAt < :before")
+    suspend fun forgetDeliveredBefore(before: Instant)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIgnoring(article: ArticleEntity): Long

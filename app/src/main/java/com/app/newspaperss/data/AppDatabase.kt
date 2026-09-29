@@ -14,7 +14,7 @@ class Converters {
 }
 
 @Database(
-    entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class],
+    entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class],
     version = 1,
     exportSchema = true,
 )

@@ -38,6 +38,7 @@ class FeedSync(
         val limit = Semaphore(4)
         val results = feeds.map { source -> async { limit.withPermit { sync(source) } } }.awaitAll()
         db.articles().expireOlderThan(clock.instant().minus(keepFor))
+        db.articles().forgetDeliveredBefore(clock.instant().minus(REMEMBER_DELIVERED))
         SyncResult(results.sumOf { it ?: 0 }, results.count { it == null })
     }
 
@@ -162,6 +163,8 @@ class FeedSync(
         const val LIST_LAYOUT_CHANGED =
             "This page has changed its layout, so newspaperss can't tell which links are new and took none. An app update should fix it."
         const val LIST_UNSUPPORTED = "This version of newspaperss can't read this list any more. Remove it or update the app."
+
+        val REMEMBER_DELIVERED: Duration = Duration.ofDays(365)
 
         /** tt-rss articles are stored with this guid prefix followed by their tt-rss id. */
         const val TTRSS_GUID_PREFIX = "ttrss:"

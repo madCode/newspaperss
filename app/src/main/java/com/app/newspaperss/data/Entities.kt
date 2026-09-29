@@ -89,6 +89,17 @@ data class ArticleEntity(
     val originTitle: String? = null,
 )
 
+/**
+ * A link that went out in a delivered edition. Kept apart from articles, which go when their
+ * source is removed, so a source removed and added again, or a story that turns up in two
+ * sources, doesn't deliver it a second time.
+ */
+@Entity(tableName = "delivered_urls")
+data class DeliveredUrlEntity(
+    @PrimaryKey val url: String,
+    val deliveredAt: Instant,
+)
+
 enum class EditionStatus { BUILDING, READY, DELIVERED, FAILED }
 
 @Entity(tableName = "editions")
