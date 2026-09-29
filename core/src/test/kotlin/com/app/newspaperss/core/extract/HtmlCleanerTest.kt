@@ -131,6 +131,11 @@ class HtmlCleanerTest {
             "<figure><div>One</div><img src=\"https://example.com/a.jpg\" alt=\"\" /><figcaption>Two</figcaption></figure>",
             clean("<figure><figcaption>One</figcaption><img src=\"/a.jpg\"><figcaption>Two</figcaption></figure>"),
         )
+        // A credit span is unwrapped to bare text, which leaves the caption short of the figure's end.
+        assertEquals(
+            "<figure><img src=\"https://example.com/a.jpg\" alt=\"\" /><div>Cap</div>Photo: Getty</figure>",
+            clean("<figure><img src=\"/a.jpg\"><figcaption>Cap</figcaption><span>Photo: Getty</span></figure>"),
+        )
     }
 
     @Test

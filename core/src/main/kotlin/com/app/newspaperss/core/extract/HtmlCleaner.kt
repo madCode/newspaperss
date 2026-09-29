@@ -345,8 +345,10 @@ object HtmlCleaner {
     private fun demoteStrayCaptions(body: Element) {
         for (caption in body.select("figcaption")) {
             val figure = caption.parent()
+            // Nodes, not elements: a credit span unwrapped to bare text beside the caption counts too.
+            val content = figure?.childNodes()?.filterNot { it is TextNode && it.isBlank }.orEmpty()
             val valid = figure != null && figure.tagName() == "figure" &&
-                (caption === figure.firstElementChild() || caption === figure.lastElementChild()) &&
+                (caption === content.first() || caption === content.last()) &&
                 figure.children().count { it.tagName() == "figcaption" } == 1
             if (!valid) caption.tagName("div")
         }
