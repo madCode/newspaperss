@@ -176,6 +176,37 @@ class TtrssSyncTest {
     }
 
     @Test
+    fun aSourceSetToACategoryTakesOnlyItsArticles() = runTest {
+        val source = connect()
+        server.categories[5] = "Tech"
+        server.add(10, "Gadget", feedId = 1, feedTitle = "Tech News", categoryId = 5)
+        server.add(11, "Recipe", feedId = 2, feedTitle = "Food", categoryId = 0)
+
+        val tech = (ttrss.categories() as TtrssRepository.Categories.Loaded).categories.single { it.title == "Tech" }
+        ttrss.chooseCategory(source.id, tech)
+        sync.syncAll()
+
+        assertEquals(listOf("Gadget"), db.articles().allForSource(source.id).map { it.title })
+        assertEquals("Tech", db.sources().byId(source.id)!!.ttrssCategoryTitle)
+    }
+
+    @Test
+    fun anAccountSetToLeaveArticlesUnreadIsntToldWhatWasDelivered() = runTest {
+        val source = connect()
+        ttrss.setMarkRead(source.id, false)
+        server.add(10, "One", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        val editionId = editionWith(source.id, "ttrss:10")
+        var enqueued = false
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)) { enqueued = true }.markDelivered(editionId)
+
+        assertFalse(enqueued)
+        assertTrue(ttrss.markRead(editionId))
+        assertTrue(server.markedRead.isEmpty())
+        assertEquals("already known, so not offered again", 0, sync.syncAll().newArticles)
+    }
+
+    @Test
     fun aFailedMarkReadIsNotedOnTheSourceAndRetried() = runTest {
         val source = connect()
         server.add(10, "One", feedId = 1, feedTitle = "Example News")

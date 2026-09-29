@@ -72,6 +72,12 @@ interface SourceDao {
     @Query("UPDATE sources SET maxArticles = MAX(1, MIN(:limit, COALESCE(maxArticles, :default) + :delta)) WHERE id = :id")
     suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int)
 
+    @Query("UPDATE sources SET ttrssCategoryId = :categoryId, ttrssCategoryTitle = :title WHERE id = :id")
+    suspend fun setTtrssCategory(id: Long, categoryId: Int?, title: String?)
+
+    @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")
+    suspend fun setMarkReadOnServer(id: Long, markRead: Boolean)
+
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 
@@ -174,11 +180,12 @@ interface ArticleDao {
     )
     suspend fun keepNewest(sourceId: Long, keep: Int): Int
 
+    /** The edition's tt-rss articles to mark read on the server: none from an account set to leave them unread. */
     @Query(
         """SELECT articles.* FROM articles
            JOIN edition_articles ON edition_articles.articleId = articles.id
            JOIN sources ON sources.id = articles.sourceId
-           WHERE edition_articles.editionId = :editionId AND sources.kind = 'TTRSS'""",
+           WHERE edition_articles.editionId = :editionId AND sources.kind = 'TTRSS' AND sources.markReadOnServer = 1""",
     )
     suspend fun ttrssInEdition(editionId: Long): List<ArticleEntity>
 }

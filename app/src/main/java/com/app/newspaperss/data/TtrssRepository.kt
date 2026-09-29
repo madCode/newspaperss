@@ -1,6 +1,7 @@
 package com.app.newspaperss.data
 
 import com.app.newspaperss.core.net.HttpClient
+import com.app.newspaperss.core.ttrss.TtrssCategory
 import com.app.newspaperss.core.ttrss.TtrssClient
 import com.app.newspaperss.core.ttrss.TtrssException
 import kotlinx.coroutines.CancellationException
@@ -39,6 +40,32 @@ class TtrssRepository(
         sources.addTtrss(account.apiUrl)
         return null
     }
+
+    sealed interface Categories {
+        data class Loaded(val categories: List<TtrssCategory>) : Categories
+        data class Failed(val message: String) : Categories
+    }
+
+    /** The account's categories, for choosing which one its source takes articles from. */
+    suspend fun categories(): Categories {
+        val account = (accounts.load() as? StoredAccount.Ready)?.account ?: return Categories.Failed(FeedSync.SIGN_IN_AGAIN)
+        val client = account.client(http)
+        return try {
+            Categories.Loaded(client.categories())
+        } catch (e: TtrssException) {
+            Categories.Failed(e.message ?: "tt-rss reported an error.")
+        } catch (e: IOException) {
+            Categories.Failed("Couldn't reach tt-rss.")
+        } finally {
+            logOut(client)
+        }
+    }
+
+    /** Takes unread articles from [category] only, or from all feeds when it's null. */
+    suspend fun chooseCategory(sourceId: Long, category: TtrssCategory?) =
+        db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
+
+    suspend fun setMarkRead(sourceId: Long, markRead: Boolean) = db.sources().setMarkReadOnServer(sourceId, markRead)
 
     /** Removes the account's source and its saved login. */
     suspend fun forget(source: SourceEntity) {

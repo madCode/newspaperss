@@ -9,7 +9,11 @@ import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssRepository
 import com.app.newspaperss.ui.settings.SettingsViewModel
+import com.app.newspaperss.core.ttrss.TtrssCategory
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -22,11 +26,22 @@ import kotlinx.coroutines.launch
  */
 data class SourceDetail(val source: SourceEntity?, val articles: List<ArticleEntity>, val defaultMax: Int)
 
+/** The tt-rss category chooser: loading, the choices, or why they couldn't be loaded. */
+sealed interface CategoryPicker {
+    data object Loading : CategoryPicker
+    data class Choosing(val categories: List<TtrssCategory>) : CategoryPicker
+    data class Failed(val message: String) : CategoryPicker
+}
+
+/**
+ * @param onSourceChanged asks for a sync, after a change to what the source fetches.
+ */
 class SourceDetailViewModel(
     private val repository: SourceRepository,
     private val id: Long,
     defaultMax: Flow<Int>,
     private val ttrss: TtrssRepository? = null,
+    private val onSourceChanged: () -> Unit = {},
 ) : ViewModel() {
     /** Null until loaded. */
     val detail: StateFlow<SourceDetail?> =
@@ -51,6 +66,42 @@ class SourceDetailViewModel(
 
     fun chooseContentMode(mode: ContentMode) {
         viewModelScope.launch { repository.chooseContentMode(id, mode) }
+    }
+
+    private val _categories = MutableStateFlow<CategoryPicker?>(null)
+    /** The open tt-rss category chooser, or null when it's closed. */
+    val categories: StateFlow<CategoryPicker?> = _categories.asStateFlow()
+    private var loadingCategories: Job? = null
+
+    fun openCategories() {
+        val repo = ttrss ?: return
+        _categories.value = CategoryPicker.Loading
+        loadingCategories = viewModelScope.launch {
+            _categories.value = when (val result = repo.categories()) {
+                is TtrssRepository.Categories.Loaded -> CategoryPicker.Choosing(result.categories)
+                is TtrssRepository.Categories.Failed -> CategoryPicker.Failed(result.message)
+            }
+        }
+    }
+
+    fun closeCategories() {
+        loadingCategories?.cancel()
+        _categories.value = null
+    }
+
+    /** Null takes unread articles from every feed. */
+    fun chooseCategory(category: TtrssCategory?) {
+        val repo = ttrss ?: return
+        _categories.value = null
+        viewModelScope.launch {
+            repo.chooseCategory(id, category)
+            onSourceChanged()
+        }
+    }
+
+    fun setMarkReadOnServer(markRead: Boolean) {
+        val repo = ttrss ?: return
+        viewModelScope.launch { repo.setMarkRead(id, markRead) }
     }
 
     /** The screen leaves by itself once [detail] shows the source gone. */

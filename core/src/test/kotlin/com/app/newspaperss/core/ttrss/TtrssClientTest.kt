@@ -120,6 +120,14 @@ class TtrssClientTest {
     }
 
     @Test
+    fun categoriesLeaveOutTtrssOwnGroups() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""[{"id":"2","title":"News","unread":4},{"id":-1,"title":"Special"},{"id":-2,"title":"Labels"},{"id":0,"title":"Uncategorized"}]"""))
+        assertEquals(listOf(TtrssCategory(2, "News"), TtrssCategory(0, "Uncategorized")), client().categories())
+        assertEquals("\"getCategories\"", server.sent[1].str("op"))
+    }
+
+    @Test
     fun headlinesWithoutALinkOrIdAreSkipped() = runTest {
         server.reply(loggedIn)
         server.reply(ok("""[{"id":1,"title":"No link","feed_id":1},{"title":"No id","link":"https://a.example/","feed_id":1}]"""))

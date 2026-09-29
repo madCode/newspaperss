@@ -90,7 +90,10 @@ class FeedSync(
             val client = account.client(http)
             try {
                 val added = db.articles().insertNew(
-                    client.unreadHeadlines().map {
+                    client.unreadHeadlines(
+                        feedId = source.ttrssCategoryId ?: TtrssClient.ALL_ARTICLES,
+                        isCategory = source.ttrssCategoryId != null,
+                    ).map {
                         ArticleEntity(
                             sourceId = source.id, guid = "$TTRSS_GUID_PREFIX${it.id}", url = it.link, title = it.title,
                             author = it.author, published = it.updated?.let(Instant::ofEpochSecond), feedHtml = it.content,
