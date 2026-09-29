@@ -37,6 +37,12 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] Change the device in Settings after onboarding
 - [ ] A short Kindle how-to (same Amazon account, Library › Docs)
 
+### Accessibility audit (asked for, Day 2)
+A full pass over the app and the book, not just spot fixes:
+- [ ] App: TalkBack walk-through of every screen (labels, headings, focus order, live regions), font scale at 200%, display size, touch targets ≥ 48dp, contrast in light and dark, e-ink (Boox) readability, and no meaning carried by colour or animation alone (respect "remove animations")
+- [ ] Book: EPUB Accessibility 1.1 metadata (`schema:accessMode`, `accessibilityFeature`, `accessibilitySummary`), image alt text carried through, a page-list or landmarks where they help, and reading order checked with a screen reader (VoiceOver Books, TalkBack with an EPUB reader)
+- [ ] Tooling: Compose accessibility checks in the Robolectric tests (`enableAccessibilityChecks`), Accessibility Scanner on a device, Ace by DAISY on a live edition
+
 ### From live editions (Day 2)
 - [ ] Le Monde serves a script wall ("A required part of this site couldn't load", `id="loading-error"`) with a 200; count it as a bot check so the feed's text is used and the source learns it's blocked
 
