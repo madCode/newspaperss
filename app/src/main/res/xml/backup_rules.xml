@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older; data_extraction_rules.xml says why these are left out. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="edition-schedule.xml" />
+    <exclude domain="file" path="editions/" />
+</full-backup-content>

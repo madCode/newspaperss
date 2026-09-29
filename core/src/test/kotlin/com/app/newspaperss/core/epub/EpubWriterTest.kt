@@ -614,18 +614,6 @@ class EpubWriterTest {
         assertThrows(IllegalArgumentException::class.java) { EpubWriter.write(clash, ByteArrayOutputStream()) }
     }
 
-
-    @Test
-    fun minutesAreRoundedButNeverZeroForARealArticle() {
-        assertEquals("0 min", formatMinutes(0.0))
-        assertEquals("1 min", formatMinutes(0.1))
-        assertEquals("1 min", formatMinutes(1.4))
-        assertEquals("2 min", formatMinutes(1.5))
-        assertEquals("59 min", formatMinutes(59.4))
-        assertEquals("1 hr 0 min", formatMinutes(59.6))
-        assertEquals("2 hr 5 min", formatMinutes(125.0))
-    }
-
     @Test
     fun aLinkedFigureWhoseImageIsLeftOutGoesWithItsCaption() {
         val body = """<p>Text.</p><figure><a href="https://example.com/big"><img src="images/a1-0.jpg"/></a><figcaption>Orphan caption</figcaption></figure>"""

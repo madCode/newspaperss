@@ -80,9 +80,6 @@ interface ArticleDao {
     @Query("DELETE FROM articles WHERE id = :id")
     suspend fun delete(id: Long)
 
-    @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY COALESCE(published, discoveredAt) DESC LIMIT :limit")
-    fun observeForSource(sourceId: Long, limit: Int = 50): Flow<List<ArticleEntity>>
-
     @Query("SELECT sourceId, COUNT(*) AS count FROM articles WHERE state = 'NEW' GROUP BY sourceId")
     fun observeWaitingCounts(): Flow<List<SourceCount>>
 

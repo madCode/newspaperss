@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -172,10 +171,7 @@ private fun AddSourceDialog(state: AddState, viewModel: SourcesViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                is AddState.Searching -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.padding(end = 16.dp))
-                    Text("Checking ${state.input}…")
-                }
+                is AddState.Searching -> Text("Checking ${state.input}…")
                 is AddState.Choosing -> Column {
                     Text("This site offers more than one set of articles.", modifier = Modifier.padding(bottom = 8.dp))
                     state.feeds.forEach { feed ->
