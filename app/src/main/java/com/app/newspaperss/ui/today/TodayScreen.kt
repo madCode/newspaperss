@@ -29,7 +29,6 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.delivery.EditionIntents
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
@@ -214,16 +213,15 @@ private fun EditionRow(edition: EditionEntity, onClick: () -> Unit) {
     }
 }
 
+/** No date: the title has it, for when the edition is due rather than when it was made. */
 internal fun summary(edition: EditionEntity): String {
-    val date = edition.createdAt.atZone(ZoneId.systemDefault()).toLocalDate()
-        .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
     val status = when (edition.status) {
         EditionStatus.READY -> "ready to send"
         EditionStatus.DELIVERED -> "sent"
         EditionStatus.FAILED -> "not sent"
         EditionStatus.BUILDING -> "being made"
     }
-    if (edition.articleCount == 0) return "$date · $status"
+    if (edition.articleCount == 0) return status.replaceFirstChar { it.uppercase() }
     val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"
-    return "$date · $articles · about ${edition.minutes.roundToInt().coerceAtLeast(1)} min · $status"
+    return "$articles · about ${edition.minutes.roundToInt().coerceAtLeast(1)} min · $status"
 }

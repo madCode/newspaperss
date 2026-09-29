@@ -22,6 +22,17 @@ class EditionTitlesTest {
     }
 
     @Test
+    fun theTitleIsEnglishLikeTheRestOfTheBookWhateverThePhonesLanguage() {
+        val saved = Locale.getDefault()
+        Locale.setDefault(Locale.GERMANY)
+        try {
+            assertEquals("Tuesday Morning Edition, Sep 29", EditionTitles.title(tuesdayMorning, emptyList()))
+        } finally {
+            Locale.setDefault(saved)
+        }
+    }
+
+    @Test
     fun repeatsGetANumber() {
         val existing = listOf("Tuesday Morning Edition, Sep 29", "Tuesday Morning Edition, Sep 29 (2)")
         assertEquals("Tuesday Morning Edition, Sep 29 (3)", EditionTitles.title(tuesdayMorning, existing, Locale.US))

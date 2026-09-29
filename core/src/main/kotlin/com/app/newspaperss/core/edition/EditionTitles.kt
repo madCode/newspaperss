@@ -12,7 +12,9 @@ object EditionTitles {
      * received. The date keeps next week's Tuesday from repeating this one, in
      * e-reader libraries and synced folders too.
      */
-    fun title(at: LocalDateTime, existing: Collection<String>, locale: Locale = Locale.getDefault()): String {
+    // English like the rest of the book's own text: a translated weekday or month in
+    // "Morning Edition" would read as a mix.
+    fun title(at: LocalDateTime, existing: Collection<String>, locale: Locale = Locale.ENGLISH): String {
         val part = when (at.hour) {
             in 4..11 -> "Morning"
             in 12..16 -> "Afternoon"
