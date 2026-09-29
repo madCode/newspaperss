@@ -8,16 +8,22 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** timed editions start 30 minutes early.
-- **Next:** stream images to disk; then an audit (security, resources) and a design pass.
+- **In flight:** onboarding offers tt-rss and OPML import (from your device testing).
+- **Next:** a resource-usage audit (it decides whether streaming images to disk is worth doing); a design pass.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 4: timed editions start early (12:34–)
+### Cycle 5: bring your reader into onboarding (12:53–)
+- **From device testing:** onboarding had no way in for someone who already uses a reader. The sources step insisted on a starter feed; tt-rss and OPML were only in the Sources menu after setup.
+- **Shipped:** "Already use a feed reader?" on the sources step, with Import an OPML file and Connect tt-rss. Either one is enough to go on.
+
+### Cycle 4: timed editions start early (12:34–12:53, [#21](https://github.com/madCode/newspaperss/pull/21))
 - **Shipped:**
   - A timed edition's timer fires 30 minutes before it's due. When Doze holds delayed work, the hold eats into that lead instead of making the paper late.
+  - Editions are titled and dated for when they're due, not when they were started.
   - Two traps that would have built the paper twice: the early timer asking for "the next 6:30" gets today's again, and opening the app during the lead would re-arm the edition already building. The timer now carries its due time, and the scheduler remembers the last one it started.
+- **Review caught:** a clock set ahead and then corrected would hold back editions; moving the time during the lead made a second paper; an edition due at 00:10 was titled for the day before, and then its title could be reused, which Send to Kindle drops. All fixed. Moving the time more than 30 minutes later during the lead can still make a "(2)" edition; left, as the PR explains.
 - **Also:** the competitor research is in [docs/research/competitors.md](research/competitors.md). The headline: nobody else sizes the paper to a reading time; most rivals are paid, Kindle-only email digests. Its best ideas are in the backlog.
 
 ### Cycle 3: expedited builds, closed (12:28–12:33, [#20](https://github.com/madCode/newspaperss/pull/20))

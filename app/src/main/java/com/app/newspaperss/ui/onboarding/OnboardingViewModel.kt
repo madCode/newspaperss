@@ -8,6 +8,7 @@ import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.core.feed.FindResult
 import com.app.newspaperss.core.feed.StarterFeed
 import com.app.newspaperss.core.feed.StarterPacks
+import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
@@ -16,6 +17,7 @@ import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalTime
@@ -37,13 +39,15 @@ data class OnboardingState(
     val scheduleEnabled: Boolean = true,
     val time: LocalTime = LocalTime.of(6, 30),
     val finishing: Boolean = false,
+    /** Sources already saved, from a tt-rss account or an OPML import made during onboarding. */
+    val added: Int = 0,
 ) {
     /** KOReader reads from a synced folder, so it's offered folder delivery. */
     val needsFolder get() = device == Device.KOREADER
     val canContinue get() = when (step) {
         Step.WELCOME -> true
         Step.DEVICE -> device != null
-        Step.SOURCES -> chosen.isNotEmpty()
+        Step.SOURCES -> chosen.isNotEmpty() || added > 0
         Step.SIZE -> !finishing
     }
 }
@@ -66,6 +70,8 @@ class OnboardingViewModel(
 
     fun next() = _state.update { s -> if (!s.canContinue) s else s.copy(step = Step.entries.getOrElse(s.step.ordinal + 1) { s.step }) }
     fun back() = _state.update { s -> s.copy(step = Step.entries.getOrElse(s.step.ordinal - 1) { s.step }) }
+
+    fun sourcesAdded(count: Int) = _state.update { it.copy(added = count) }
 
     fun chooseDevice(device: Device) = _state.update { it.copy(device = device) }
     fun chooseFolder(uri: String, name: String) = _state.update { it.copy(folderUri = uri, folderName = name) }
@@ -100,11 +106,16 @@ class OnboardingViewModel(
 
     fun finish() {
         val s = state.value
-        // A permission result delivered after process death lands on a fresh, empty state;
-        // saving that would finish onboarding with nothing chosen.
-        if (s.finishing || s.chosen.isEmpty()) return
+        // A permission result delivered after process death can land on a fresh, empty state;
+        // saving that would finish onboarding with no device and nothing chosen.
+        if (s.finishing || s.device == null) return
         _state.update { it.copy(finishing = true) }
         viewModelScope.launch {
+            // The database, not state.added, which the screen may not have reported yet.
+            if (s.chosen.isEmpty() && sources.observe().first().none { it.kind != SourceKind.READING_LIST }) {
+                _state.update { it.copy(finishing = false) }
+                return@launch
+            }
             val titles = (StarterPacks.all.flatMap { it.feeds } + s.found).associate { it.url to it.title }
             s.chosen.forEach { url -> sources.addFeed(url, titles[url]) }
             settings.update {

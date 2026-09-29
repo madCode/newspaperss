@@ -89,7 +89,8 @@ class MainActivity : ComponentActivity() {
                                 EditionWorker.buildNow(context)
                             }
                         }
-                        OnboardingScreen(vm)
+                        val sources = viewModel { SourcesViewModel(container.sources, container.feedFinder, container.ttrss) { SyncWorker.syncNow(context) } }
+                        OnboardingScreen(vm, sources)
                     }
                     true -> App(container)
                 }

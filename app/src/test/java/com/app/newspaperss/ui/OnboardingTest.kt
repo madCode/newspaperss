@@ -1,6 +1,11 @@
 package com.app.newspaperss.ui
 
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -13,7 +18,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.core.feed.StarterPacks
 import com.app.newspaperss.data.AppDatabase
+import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.data.TtrssAccountStore
+import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.testutil.FakeTtrss
+import com.app.newspaperss.testutil.testCipher
+import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
@@ -74,6 +85,57 @@ class OnboardingTest {
         val urls = runBlocking { db.sources().all() }.map { it.url }.toSet()
         assertEquals(science.feeds.map { it.url }.toSet(), urls)
         assertEquals("starter feeds keep their names", "Quanta Magazine", runBlocking { db.sources().byUrl(science.feeds.first().url)!!.title })
+    }
+
+    @Test
+    fun aTtrssReaderConnectsTheirAccountAndNeedsNoStarterFeeds() {
+        val server = FakeTtrss(http)
+        val sources = SourceRepository(db)
+        val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
+        val sourcesVm = SourcesViewModel(sources, FeedFinder(http), TtrssRepository(db, http, accounts, sources)) {}
+        compose.setContent { OnboardingScreen(vm, sourcesVm) }
+        click("Get started")
+        scrollAndClick("Kindle")
+        click("Next")
+        compose.onNodeWithText("Next").assertIsNotEnabled()
+
+        scrollAndClick("Connect tt-rss")
+        val fields = compose.onAllNodes(hasSetTextAction() and hasAnyAncestor(isDialog()))
+        fields[0].performTextInput("rss.example.com/tt-rss")
+        fields[1].performTextInput(server.user)
+        fields[2].performTextInput(server.password)
+        click("Test and add")
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("1 source added", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+
+        click("Next")
+        click("Make my first edition")
+        idleUntil { finished != null }
+        assertEquals(listOf(SourceKind.TTRSS), runBlocking { db.sources().all() }.map { it.kind })
+    }
+
+    @Test
+    fun anOpmlImportCountsAsSourcesAndAnEarlierResultDoesntHideTheCount() {
+        val sources = SourceRepository(db)
+        val sourcesVm = SourcesViewModel(sources, FeedFinder(http)) {}
+        compose.setContent { OnboardingScreen(vm, sourcesVm) }
+        click("Get started")
+        scrollAndClick("Kindle")
+        click("Next")
+        compose.onNodeWithText("Connect tt-rss").assertDoesNotExist()
+
+        val resolver = ApplicationProvider.getApplicationContext<android.content.Context>().contentResolver
+        sourcesVm.importOpml(resolver, android.net.Uri.fromFile(tmp.newFile("empty.opml").apply { writeText("<opml version=\"2.0\"><body/></opml>") }))
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("No new sites in that file", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        val opml = tmp.newFile("feeds.opml").apply {
+            writeText("""<opml version="2.0"><body><outline type="rss" text="A" xmlUrl="https://a.example/feed"/><outline type="rss" text="B" xmlUrl="https://b.example/feed"/></body></opml>""")
+        }
+        sourcesVm.importOpml(resolver, android.net.Uri.fromFile(opml))
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("2 sources added", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+
+        click("Next")
+        click("Make my first edition")
+        idleUntil { finished != null }
+        assertEquals(setOf("https://a.example/feed", "https://b.example/feed"), runBlocking { db.sources().all() }.map { it.url }.toSet())
     }
 
     @Test
