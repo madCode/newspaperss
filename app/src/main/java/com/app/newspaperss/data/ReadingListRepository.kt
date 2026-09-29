@@ -23,6 +23,7 @@ class ReadingListRepository(private val db: AppDatabase, private val clock: Cloc
                 contentMode = ContentMode.PAGE,
                 // First in line, so a saved link doesn't wait behind every feed.
                 position = -1,
+                section = SECTION,
             ),
         )
         return if (id == -1L) db.sources().byUrl(URL)!!.id else id
@@ -35,24 +36,34 @@ class ReadingListRepository(private val db: AppDatabase, private val clock: Cloc
     suspend fun save(url: String, title: String? = null): Boolean {
         val id = sourceId()
         return db.articles().insertIgnoring(
-            ArticleEntity(sourceId = id, guid = url, url = url, title = title?.takeIf { it.isNotBlank() } ?: url, discoveredAt = clock.instant()),
+            // A blank title lets the page's own title win when the edition is made.
+            ArticleEntity(sourceId = id, guid = url, url = url, title = title?.trim().orEmpty(), discoveredAt = clock.instant()),
         ) != -1L
     }
 
     suspend fun remove(article: ArticleEntity) = db.articles().delete(article.id)
 
-    /** Adds the checklist's links; ticked ones arrive as already read. Returns how many were new. */
+    /**
+     * Adds the checklist's links; ticked ones arrive as already read, and a link
+     * still waiting here that the checklist has ticked (read elsewhere) is marked
+     * read too. Returns how many were new.
+     */
     suspend fun importMarkdown(text: String): Int {
         val id = sourceId()
         val now = clock.instant()
-        return db.articles().insertNew(
-            MarkdownChecklist.parse(text).map {
+        val items = MarkdownChecklist.parse(text)
+        val added = db.articles().insertNew(
+            items.map {
                 ArticleEntity(
-                    sourceId = id, guid = it.url, url = it.url, title = it.title ?: it.url, discoveredAt = now,
+                    sourceId = id, guid = it.url, url = it.url, title = it.title.orEmpty(), discoveredAt = now,
                     state = if (it.done) ArticleState.DELIVERED else ArticleState.NEW,
                 )
             },
         )
+        val ticked = items.filter { it.done }.map { it.url }.toSet()
+        val readElsewhere = db.articles().allForSource(id).filter { it.state == ArticleState.NEW && it.url in ticked }
+        if (readElsewhere.isNotEmpty()) db.articles().setState(readElsewhere.map { it.id }, ArticleState.DELIVERED)
+        return added
     }
 
     /** The list as an rss-to-e-reader checklist: anything no longer waiting is ticked. */
@@ -63,5 +74,6 @@ class ReadingListRepository(private val db: AppDatabase, private val clock: Cloc
     companion object {
         /** Not a web address, so it can never collide with a real feed's. */
         const val URL = "newspaperss:reading-list"
+        const val SECTION = "Saved for later"
     }
 }

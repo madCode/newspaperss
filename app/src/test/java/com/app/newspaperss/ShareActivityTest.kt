@@ -38,6 +38,13 @@ class ShareActivityTest {
     }
 
     @Test
+    fun aSubjectThatIsJustTheUrlIsntUsedAsTheTitle() {
+        share("https://a.example/post", subject = "https://a.example/post")
+        idleUntil { saved().isNotEmpty() }
+        assertEquals("", saved().single().title)
+    }
+
+    @Test
     fun textWithoutALinkSavesNothing() {
         share("just words")
         assertEquals("There's no link to save in that.", ShadowToast.getTextOfLatestToast())

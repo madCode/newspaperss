@@ -5,6 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.feed.MarkdownChecklist
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ReadingListRepository
+import android.content.ContentResolver
+import android.net.Uri
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,12 +38,34 @@ class ReadingListViewModel(private val list: ReadingListRepository) : ViewModel(
         viewModelScope.launch { list.remove(article) }
     }
 
-    fun import(text: String) {
+    // Files come from the system picker, often a cloud provider: reads and writes can be slow or fail.
+    fun import(resolver: ContentResolver, uri: Uri) {
         viewModelScope.launch {
-            val added = list.importMarkdown(text)
-            _message.value = if (added == 1) "Added 1 link." else "Added $added links."
+            _message.value = try {
+                val text = withContext(Dispatchers.IO) {
+                    resolver.openInputStream(uri)?.use { it.bufferedReader().readText() } ?: throw IOException("empty")
+                }
+                val added = list.importMarkdown(text)
+                if (added == 1) "Added 1 link." else "Added $added links."
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                "Couldn't read that file."
+            }
         }
     }
 
-    suspend fun exportText(): String = list.exportMarkdown()
+    fun export(resolver: ContentResolver, uri: Uri) {
+        viewModelScope.launch {
+            _message.value = try {
+                val text = list.exportMarkdown()
+                withContext(Dispatchers.IO) {
+                    resolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray()) } ?: throw IOException("no stream")
+                }
+                "Reading list saved."
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                "Couldn't save the file."
+            }
+        }
+    }
 }

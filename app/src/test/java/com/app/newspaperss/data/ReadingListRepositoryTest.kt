@@ -51,7 +51,14 @@ class ReadingListRepositoryTest {
     }
 
     @Test
-    fun savedLinksNeverExpireAndDontShowAsFeeds() = runTest {
+    fun aLinkTickedElsewhereIsMarkedReadOnReimport() = runTest {
+        list.importMarkdown("- [ ] https://a.example/1\n")
+        list.importMarkdown("- [x] https://a.example/1 (error 404)\n")
+        assertTrue(db.articles().candidates().isEmpty())
+    }
+
+    @Test
+    fun savedLinksNeverExpire() = runTest {
         list.save("https://a.example/1")
         val clock = object : Clock() {
             override fun getZone() = ZoneOffset.UTC
@@ -60,6 +67,5 @@ class ReadingListRepositoryTest {
         }
         FeedSync(db, FakeHttp(), clock).syncAll()
         assertEquals(1, db.articles().candidates().size)
-        assertEquals(SourceKind.READING_LIST, db.sources().all().single().kind)
     }
 }

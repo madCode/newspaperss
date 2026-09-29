@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 class ShareActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val text = intent?.takeIf { it.action == Intent.ACTION_SEND }?.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+        val text = intent?.takeIf { it.action == Intent.ACTION_SEND }?.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
         val url = MarkdownChecklist.firstUrl(text)
         if (url == null) {
             Toast.makeText(this, "There's no link to save in that.", Toast.LENGTH_LONG).show()

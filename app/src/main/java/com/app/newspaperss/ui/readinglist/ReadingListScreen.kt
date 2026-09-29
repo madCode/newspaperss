@@ -38,7 +38,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.SourceRepository
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,21 +57,13 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
     val message by viewModel.message.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var menu by remember { mutableStateOf(false) }
 
     val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            context.contentResolver.openInputStream(uri)?.use { viewModel.import(it.bufferedReader().readText()) }
-        }
+        if (uri != null) viewModel.import(context.contentResolver, uri)
     }
     val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/markdown")) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val text = viewModel.exportText()
-                context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray()) }
-            }
-        }
+        if (uri != null) viewModel.export(context.contentResolver, uri)
     }
     LaunchedEffect(message) {
         message?.let {
@@ -158,10 +148,10 @@ private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
         ArticleState.SKIPPED, ArticleState.EXPIRED -> "Skipped"
     }
     ListItem(
-        headlineContent = { Text(if (article.title == article.url) SourceRepository.hostOf(article.url) else article.title, maxLines = 2) },
+        headlineContent = { Text(article.title.ifBlank { SourceRepository.hostOf(article.url) }, maxLines = 2) },
         supportingContent = {
             Column {
-                if (article.title != article.url) Text(SourceRepository.hostOf(article.url), style = MaterialTheme.typography.bodySmall)
+                if (article.title.isNotBlank()) Text(SourceRepository.hostOf(article.url), style = MaterialTheme.typography.bodySmall)
                 Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
