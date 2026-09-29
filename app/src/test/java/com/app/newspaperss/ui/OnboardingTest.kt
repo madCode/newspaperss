@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -156,6 +158,24 @@ class OnboardingTest {
         http.page("https://blog.example/feed", rss("Blog"))
         vm.editPasted("blog.example")
         vm.findPasted()
+        idleUntil { vm.state.value.found.isNotEmpty() }
+        assertEquals(setOf("https://blog.example/feed"), vm.state.value.chosen)
+    }
+
+    @Test
+    fun talkBackHearsWhichStepThisIsAndTheAddButtonIsReachable() {
+        http.page("https://blog.example", "<html><head><link rel=alternate type=application/rss+xml href=/feed title=Blog></head></html>")
+        http.page("https://blog.example/feed", rss("Blog"))
+        compose.setContent { OnboardingScreen(vm) }
+        vm.next()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Step 1 of 3")).assertExists()
+        vm.chooseDevice(Device.KINDLE)
+        vm.next()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Step 2 of 3")).assertExists()
+
+        compose.onNode(hasSetTextAction()).performTextInput("blog.example")
+        scrollAndClick("Add")
+
         idleUntil { vm.state.value.found.isNotEmpty() }
         assertEquals(setOf("https://blog.example/feed"), vm.state.value.chosen)
     }

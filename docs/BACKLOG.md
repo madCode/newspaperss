@@ -33,7 +33,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] Boox: offer folder delivery into the Books folder, so editions stay in the library
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs
 - [ ] "No feed found": offer to save the page to the reading list instead
-- [ ] TalkBack: live-region build status, step "2 of 4" on the onboarding progress, a click label on the edition card; move Add out of the text field for large fonts
 - [ ] Change the device in Settings after onboarding
 - [ ] A short Kindle how-to (same Amazon account, Library › Docs)
 
@@ -138,6 +137,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] TalkBack: the build's stage is announced (not every count), onboarding's progress says "Step 2 of 3", earlier editions say "See what's inside"; Add and Save sit below their fields so large fonts leave room to type
 - [x] Each article is tagged with its language (`xml:lang`, `dir="rtl"`), detected from its text (writing system, common words) with the page's declared language as a tiebreaker
 - [x] The article preview shows at once and reads the book in the background, with one open zip per screen (the "first tap doesn't open it" report). The side-scroll came from the old EPUB's long URL line, already gone
 - [x] An HTTP cache: feeds are revalidated (If-None-Match), and unchanged ones answer 304 instead of the whole feed; the background sync runs every 12 hours with the battery not low

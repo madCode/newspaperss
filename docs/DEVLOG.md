@@ -8,13 +8,17 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** each article tagged with its language.
-- **Next:** the audit's memory items (page DOM trimming); reading time for Chinese and Japanese; what tapping a source's article does.
+- **In flight:** each article tagged with its language ([#38](https://github.com/madCode/newspaperss/pull/38)); TalkBack and large-font fixes.
+- **Next:** the rest of the accessibility audit (you asked for it); the audit's memory items (page DOM trimming); reading time for Chinese and Japanese.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 21: articles know their language (16:15–)
+### Cycle 22: TalkBack and large fonts (16:30–)
+- **Why:** the persona audit's TalkBack items, and you asked for an accessibility audit. These are the known gaps; the full audit is in the backlog.
+- **Shipped:** Today announces what the build is doing ("Checking your sources", "Making your edition", and the result) through a live region. The running count isn't announced, or TalkBack would read every number. Onboarding's progress bar says "Step 2 of 3" instead of "66 percent". Earlier editions say what tapping does. Onboarding's Add and the reading list's Save moved below their text fields, where a 200% font can't squeeze out the space to type.
+
+### Cycle 21: articles know their language (16:15–16:30, [#38](https://github.com/madCode/newspaperss/pull/38))
 - **Why:** your note on languages. E-readers choose hyphenation, fonts and text direction from `xml:lang`, and every article was tagged English, so a French article was hyphenated with English rules and an Arabic one laid out left to right.
 - **Shipped:** each article's headline and body are tagged with its language, and right-to-left languages get `dir="rtl"`. The text decides: the writing system for non-Latin scripts, and common words for English, French, German, Spanish, Italian, Portuguese and Dutch. The page's declared language breaks ties, and is kept when it agrees because it's more precise (pt-BR, Persian in Arabic script). Many sites declare the same language on every page, and a feed's text declares nothing. No database change.
 - **Checks:** a live edition from Le Monde, Spiegel, El País, NHK, Al Jazeera Arabic, the Guardian and g1 tagged every article correctly and passes epubcheck. The Arabic page lays out right to left, with the English kicker and byline left to right.

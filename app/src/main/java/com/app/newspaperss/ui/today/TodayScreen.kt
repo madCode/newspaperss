@@ -16,6 +16,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -118,14 +121,18 @@ private fun BuildPanel(build: BuildState, primary: Boolean, onMake: () -> Unit) 
         when (build) {
             BuildState.Syncing, is BuildState.Fetching -> {
                 // Stepped text rather than a spinner: an endless animation smears on e-ink screens.
+                // Only the stage is a live region: TalkBack would read out every new count.
                 Text(
-                    when {
-                        build is BuildState.Fetching && build.done == 1 -> "Making your edition: 1 article read so far"
-                        build is BuildState.Fetching -> "Making your edition: ${build.done} articles read so far"
-                        else -> "Checking your sources for new articles…"
-                    },
+                    if (build is BuildState.Fetching) "Making your edition" else "Checking your sources for new articles…",
                     style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
+                if (build is BuildState.Fetching) {
+                    Text(
+                        if (build.done == 1) "1 article read so far" else "${build.done} articles read so far",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
             else -> {
                 if (primary) Button(onClick = onMake) { Text("Make an edition now") }
@@ -136,7 +143,12 @@ private fun BuildPanel(build: BuildState, primary: Boolean, onMake: () -> Unit) 
                     else -> null
                 }
                 message?.let {
-                    Text(it, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                    Text(
+                        it,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                    )
                 }
             }
         }
@@ -212,7 +224,7 @@ private fun LatestEdition(
 
 @Composable
 private fun EditionRow(edition: EditionEntity, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp)) {
+    Column(Modifier.fillMaxWidth().clickable(onClickLabel = "See what's inside", onClick = onClick).padding(vertical = 12.dp)) {
         Text(edition.title, style = MaterialTheme.typography.titleMedium)
         Text(summary(edition), style = MaterialTheme.typography.bodySmall)
     }

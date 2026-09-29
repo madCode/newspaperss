@@ -10,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -130,7 +129,8 @@ private fun AddLink(viewModel: ReadingListViewModel) {
     fun submit() {
         if (viewModel.add(text)) text = "" else error = true
     }
-    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    // The button goes below the field, not beside it: at large font sizes it squeezes the field.
+    Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.End) {
         OutlinedTextField(
             value = text,
             onValueChange = { text = it; error = false },
@@ -140,7 +140,7 @@ private fun AddLink(viewModel: ReadingListViewModel) {
             supportingText = if (error) { { Text("That doesn't contain a web address.") } } else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
         )
         TextButton(onClick = ::submit, enabled = text.isNotBlank()) { Text("Save") }
     }

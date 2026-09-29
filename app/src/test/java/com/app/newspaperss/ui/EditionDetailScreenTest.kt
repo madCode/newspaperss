@@ -2,6 +2,8 @@ package com.app.newspaperss.ui
 
 import android.app.Application
 import android.content.Intent
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -34,6 +36,11 @@ import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
+import com.app.newspaperss.ui.today.BuildState
+import com.app.newspaperss.work.EditionWorker
+import androidx.work.WorkInfo
+import androidx.work.workDataOf
+import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -250,6 +257,22 @@ class EditionDetailScreenTest {
         compose.onNodeWithText("Monday Morning Edition").performClick()
 
         assertEquals(older, opened)
+    }
+
+    @Test
+    fun talkBackIsToldWhatTheBuildIsDoingButNotEveryCount() {
+        val running = WorkInfo(
+            UUID.randomUUID(), WorkInfo.State.RUNNING, emptySet(),
+            progress = workDataOf(EditionWorker.STAGE to EditionWorker.STAGE_FETCHING, EditionWorker.FETCHED to 3),
+        )
+        val vm = TodayViewModel(repo, flowOf(running)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.build is BuildState.Fetching }
+
+        val live = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)
+        compose.onNode(hasText("Making your edition") and live).assertExists()
+        compose.onNode(hasText("3 articles read so far") and live).assertDoesNotExist()
+        compose.onNodeWithText("3 articles read so far").assertExists()
     }
 
     @Test
