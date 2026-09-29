@@ -1,13 +1,9 @@
 package com.app.newspaperss.work
 
 import android.content.Context
-import android.content.pm.ServiceInfo
-import android.os.Build
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
-import androidx.work.ForegroundInfo
-import androidx.work.OutOfQuotaPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
@@ -16,21 +12,11 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.app.newspaperss.NewspaperssApp
 import com.app.newspaperss.edition.BuildResult
-import com.app.newspaperss.notify.Notifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun getForegroundInfo(): ForegroundInfo {
-        val notification = Notifier(applicationContext).building()
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ForegroundInfo(Notifier.BUILDING_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            ForegroundInfo(Notifier.BUILDING_ID, notification)
-        }
-    }
-
     override suspend fun doWork(): Result {
         val container = (applicationContext as NewspaperssApp).container
         setProgress(workDataOf(STAGE to STAGE_SYNCING))
@@ -68,9 +54,6 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 
         fun buildNow(context: Context, scheduled: Boolean = false) {
             val request = OneTimeWorkRequestBuilder<EditionWorker>()
-                // Expedited, so a 6:30 edition is made at 6:30 rather than whenever the phone next
-                // batches background work. Out of quota, it still runs, just not straight away.
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setInputData(workDataOf(SCHEDULED to scheduled))
                 .build()

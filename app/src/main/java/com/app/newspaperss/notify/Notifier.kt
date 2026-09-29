@@ -1,7 +1,6 @@
 package com.app.newspaperss.notify
 
 import android.Manifest
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -58,17 +57,6 @@ class Notifier(private val context: Context) : EditionNotifier {
         )
     }
 
-    /**
-     * Shown while an edition is being made in the foreground, which is what lets Android run a
-     * scheduled build straight away instead of whenever it next has a spare moment.
-     */
-    fun building(): Notification = NotificationCompat.Builder(context, EDITIONS)
-        .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle("Making your edition\u2026")
-        .setOngoing(true)
-        .setSilent(true)
-        .build()
-
     override fun editionDelivered(edition: EditionEntity, where: String) = notify(
         NotificationCompat.Builder(context, EDITIONS)
             .setContentTitle("${edition.title} delivered")
@@ -105,6 +93,5 @@ class Notifier(private val context: Context) : EditionNotifier {
         const val PROBLEMS = "problems"
         private const val EDITION_ID = 1
         private const val PROBLEM_ID = 2
-        const val BUILDING_ID = 3
     }
 }
