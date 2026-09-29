@@ -37,6 +37,17 @@ class ReadingListTitlesTest {
     }
 
     @Test
+    fun everySavedLinkIsMeasuredForItsReadingTime() = runTest {
+        val words = "word ".repeat(476)
+        http.page("https://a.example/long", "<html><head><title>A long read</title></head><body><article><p>$words</p></article></body></html>")
+        list.save("https://a.example/long", "Given a title already")
+        assertTrue(titles.fetch(untitled))
+        val saved = db.articles().allForSource(list.sourceId()).single()
+        assertEquals("Given a title already", saved.title)
+        assertTrue("about two minutes' worth", (saved.pageWords ?: 0) in 400..500)
+    }
+
+    @Test
     fun aTitleTheReaderGaveIsKept() = runTest {
         http.page("https://a.example/tides", page("How tides work"))
         list.save("https://a.example/tides", "Tides, for Sam")

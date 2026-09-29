@@ -12,3 +12,8 @@ object PageTitle {
         return PageExtractor.cleanTitle(raw, siteName = meta("og:site_name").orEmpty(), url = url).ifBlank { null }
     }
 }
+
+/** How long a page's article is, for a reading-time estimate before the article is fetched for an edition. */
+object PageWords {
+    fun of(html: String, url: String): Int = PageExtractor.extract(html, url).wordCount
+}

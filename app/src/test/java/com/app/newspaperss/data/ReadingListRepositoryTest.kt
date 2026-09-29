@@ -37,12 +37,12 @@ class ReadingListRepositoryTest {
     }
 
     @Test
-    fun onlyLinksSavedWithoutATitleAreLookedUp() = runTest {
+    fun everyLinkSavedIsLookedUpOnce() = runTest {
+        // Titled ones too: the lookup also measures the page for its reading time.
         list.save("https://a.example/titled", "The reader's title")
         list.save("https://a.example/bare")
-        list.save("https://a.example/blank", "  ")
         list.save("https://a.example/bare")
-        assertEquals(listOf(byUrl("https://a.example/bare").id, byUrl("https://a.example/blank").id), untitled)
+        assertEquals(listOf(byUrl("https://a.example/titled").id, byUrl("https://a.example/bare").id), untitled)
     }
 
     @Test
