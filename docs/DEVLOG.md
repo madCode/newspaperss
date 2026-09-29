@@ -8,15 +8,20 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** sends from the notification count as delivered (the persona audit's top finding).
-- **Next:** the rest of the persona audit's list (dated titles, a louder "ready" notification, saved links in onboarding); a resource-usage audit.
+- **In flight:** dated edition titles.
+- **Next:** more from the persona audit (a louder "ready" notification, saved links in onboarding, saying why there's no edition); a resource-usage audit.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 6: persona audit, and sends that count (13:06–)
+### Cycle 7: dated titles (13:31–)
+- **Shipped:** "Tuesday Morning Edition, Sep 29". Without the date, every Tuesday's paper had the same name, so they collided in the Kindle and Kobo libraries and overwrote each other in a synced folder.
+
+### Cycle 6: persona audit, and sends that count (13:06–13:31, [#23](https://github.com/madCode/newspaperss/pull/23))
 - **Audit:** walked the app as a Pocket refugee with a Kobo, a tt-rss + KOReader self-hoster, a casual Kindle owner, a Boox owner and a TalkBack user. Ten findings; the rest are in the backlog.
 - **Shipped:** the worst one. Sending the daily paper from its notification was never recorded, so the next build marked it "Not sent" and its articles came back, every day. Now choosing an app in the share sheet marks the edition delivered, from the notification or the app, and opening it counts on a Boox. The "Did it reach your Kindle?" question, asked before Send to Kindle could have delivered anything, is gone.
+- **Review caught:** a send and the morning build at the same moment could overwrite each other (a sent paper back to "Not sent", its articles repeated after tt-rss had marked them read); Open on the edition screen didn't count on a Boox; the opened book was missing from Recents. All fixed.
+- **Friction:** FileProvider caches its paths in a static map, so one Robolectric test's files folder leaked into the next and broke an unrelated test. A test helper now clears it.
 
 ### Cycle 5: bring your reader into onboarding (12:53–13:06, [#22](https://github.com/madCode/newspaperss/pull/22))
 - **From device testing:** onboarding had no way in for someone who already uses a reader. The sources step insisted on a starter feed; tt-rss and OPML were only in the Sources menu after setup.

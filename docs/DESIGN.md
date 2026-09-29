@@ -105,8 +105,9 @@ Ported from the library, with the lessons its code and comments record:
     thumbnails show the edition instead of a placeholder;
   - images re-encoded to JPEG at up to 1200px, with no SVG, WebP or AVIF;
   - a total size budget of about 15MB so email delivery works too;
-  - a unique title per day ("… (2)"), because Send to Kindle silently
-    drops a document whose title it has already seen.
+  - a unique, dated title ("Tuesday Morning Edition, Sep 29", then "… (2)"),
+    because Send to Kindle silently drops a document whose title it has
+    already seen.
 - **Commit after delivery.** Articles become `DELIVERED` and list items are
   ticked off only when delivery reports success. For share-sheet delivery,
   where the app can't know whether it worked, "success" is the user
