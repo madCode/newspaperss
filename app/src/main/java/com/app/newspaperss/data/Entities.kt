@@ -42,6 +42,8 @@ data class SourceEntity(
     val lastFetchedAt: Instant? = null,
     /** The last sync error, cleared by the next successful sync. */
     val lastError: String? = null,
+    /** When the current run of failed syncs began; null while syncs succeed. */
+    val failingSince: Instant? = null,
     /**
      * A problem reporting back to the service (tt-rss not marking delivered articles read).
      * Kept apart from [lastError] so a successful sync doesn't hide it; cleared when reporting

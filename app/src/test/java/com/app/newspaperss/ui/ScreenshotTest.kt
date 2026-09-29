@@ -40,6 +40,10 @@ import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import com.app.newspaperss.ui.sources.SourceDetailScreen
+import com.app.newspaperss.ui.sources.SourceDetailViewModel
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextEvidence
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -153,6 +157,24 @@ class ScreenshotTest {
         }
         val vm = SourcesViewModel(repo, FeedFinder(FakeHttp())) {}
         shoot("06-sources", ready = { vm.rows.value?.isNotEmpty() == true }) { SourcesScreen(vm) }
+    }
+
+    @Test
+    fun sourceDetail() {
+        val repo = SourceRepository(db)
+        val id = runBlocking {
+            val id = repo.addFeed("https://www.theguardian.com/world/rss", "The Guardian: World")
+            val titles = listOf("Talks resume after a week of storms", "The town that voted to keep its library open", "What the census says about who moves where", "A short history of the night train")
+            db.articles().insertNew(titles.mapIndexed { i, t -> ArticleEntity(sourceId = id, guid = "$i", url = "https://www.theguardian.com/$i", title = t, discoveredAt = Instant.now().minusSeconds(86_400L * i)) })
+            val ids = db.articles().candidates().sortedBy { it.guid }.map { it.id }
+            db.articles().setState(ids.drop(1).take(2), ArticleState.DELIVERED)
+            db.articles().setState(ids.drop(3), ArticleState.EXPIRED)
+            db.sources().recordSuccess(id, Instant.now(), null, "https://www.theguardian.com", "")
+            db.sources().setFullText(id, ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3, null)
+            id
+        }
+        val vm = SourceDetailViewModel(repo, id)
+        shoot("06b-source-detail", ready = { vm.detail.value?.articles?.isNotEmpty() == true }) { SourceDetailScreen(vm, onBack = {}) }
     }
 
     @Test

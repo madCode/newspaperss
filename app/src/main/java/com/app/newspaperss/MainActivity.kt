@@ -37,6 +37,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.app.newspaperss.ui.sources.SourceDetailScreen
+import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.theme.NewspaperssTheme
@@ -62,6 +64,7 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 private const val READING_LIST = "reading-list"
 private const val EDITION = "edition/{id}"
 private const val ARTICLE = "edition/{id}/article/{position}"
+private const val SOURCE = "source/{id}"
 
 class MainActivity : ComponentActivity() {
     @Volatile private var settingsLoaded = false
@@ -103,7 +106,7 @@ private fun App(container: AppContainer) {
             NavigationBar {
                 Tab.entries.forEach { tab ->
                     val route = current?.destination?.route
-                    val inTab = route == tab.route || (tab == Tab.SOURCES && route == READING_LIST) || (tab == Tab.TODAY && (route == EDITION || route == ARTICLE))
+                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE)) || (tab == Tab.TODAY && (route == EDITION || route == ARTICLE))
                     NavigationBarItem(
                         selected = inTab,
                         onClick = {
@@ -165,7 +168,16 @@ private fun App(container: AppContainer) {
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { SourcesViewModel(container.sources, container.feedFinder, container.ttrss) { SyncWorker.syncNow(context) } }
-                SourcesScreen(vm, onOpenReadingList = { nav.navigate(READING_LIST) })
+                SourcesScreen(
+                    vm,
+                    onOpenReadingList = { nav.navigate(READING_LIST) },
+                    onOpenSource = { nav.navigate("source/$it") { launchSingleTop = true } },
+                )
+            }
+            composable(SOURCE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.ttrss) }
+                SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) })
             }
             composable(READING_LIST) {
                 val vm = viewModel { ReadingListViewModel(container.readingList) }

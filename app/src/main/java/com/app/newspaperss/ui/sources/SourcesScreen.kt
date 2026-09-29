@@ -68,7 +68,7 @@ import androidx.compose.ui.semantics.Role
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {}) {
+fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {}, onOpenSource: (Long) -> Unit = {}) {
     val rows by viewModel.rows.collectAsState()
     val add by viewModel.add.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -133,6 +133,7 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
                 items(list, key = { it.source.id }) { row ->
                     SourceItem(
                         row,
+                        onOpen = { onOpenSource(row.source.id) },
                         onRemove = { viewModel.remove(row.source) },
                         onTogglePause = { viewModel.togglePaused(row.source) },
                         onChooseMode = { viewModel.chooseContentMode(row.source, it) },
@@ -238,19 +239,15 @@ private fun EmptySources(modifier: Modifier) {
 }
 
 @Composable
-private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -> Unit, onChooseMode: (ContentMode) -> Unit) {
+private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit, onTogglePause: () -> Unit, onChooseMode: (ContentMode) -> Unit) {
     var menu by remember { mutableStateOf(false) }
     var choosingMode by remember { mutableStateOf(false) }
+    var removing by remember { mutableStateOf(false) }
     val s = row.source
     val fullText = fullTextLine(s)
-    val status = when {
-        s.paused -> "Paused"
-        s.lastError != null -> s.lastError
-        s.serverNote != null -> s.serverNote
-        s.lastFetchedAt == null -> "Checking…"
-        else -> freshness(row.lastNew)
-    }
+    val status = statusLine(s, row.lastNew)
     ListItem(
+        modifier = Modifier.clickable(onClickLabel = "Open ${s.title}", onClick = onOpen),
         headlineContent = { Text(s.title) },
         supportingContent = {
             Column {
@@ -258,7 +255,7 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
                 Text(
                     status,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if ((s.lastError != null || s.serverNote != null) && !s.paused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (hasProblem(s)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (fullText != null) {
                     Text(fullText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -273,7 +270,7 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
                     if (s.kind == SourceKind.FEED) {
                         DropdownMenuItem(text = { Text("Article text") }, onClick = { menu = false; choosingMode = true })
                     }
-                    DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; onRemove() })
+                    DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; removing = true })
                 }
             }
         },
@@ -281,10 +278,31 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
     if (choosingMode) {
         ContentModeDialog(s, onChoose = { choosingMode = false; onChooseMode(it) }, onDismiss = { choosingMode = false })
     }
+    if (removing) {
+        RemoveSourceDialog(s, onConfirm = { removing = false; onRemove() }, onDismiss = { removing = false })
+    }
 }
 
 @Composable
-private fun ContentModeDialog(source: SourceEntity, onChoose: (ContentMode) -> Unit, onDismiss: () -> Unit) {
+internal fun RemoveSourceDialog(source: SourceEntity, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Remove ${source.title}?") },
+        text = {
+            Text(
+                when (source.kind) {
+                    SourceKind.TTRSS -> "This also signs newspaperss out of your tt-rss account. Your articles stay on the server."
+                    else -> "Its waiting articles go with it. If you add it again, articles you already got won't be sent again."
+                },
+            )
+        },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Remove") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+internal fun ContentModeDialog(source: SourceEntity, onChoose: (ContentMode) -> Unit, onDismiss: () -> Unit) {
     val current = if (source.contentModeChosen) source.contentMode else ContentMode.AUTO
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -314,6 +332,17 @@ private val CONTENT_MODE_CHOICES = listOf(
     ContentMode.FEED to "Always use the text the site sends",
     ContentMode.PAGE to "Always fetch the full page",
 )
+
+/** The one line that says how a source is doing: paused, its problem, or how recently it published. */
+internal fun statusLine(source: SourceEntity, lastNew: Instant?): String = when {
+    source.paused -> "Paused"
+    source.lastError != null -> source.lastError
+    source.serverNote != null -> source.serverNote
+    source.lastFetchedAt == null -> "Checking…"
+    else -> freshness(lastNew)
+}
+
+internal fun hasProblem(source: SourceEntity) = (source.lastError != null || source.serverNote != null) && !source.paused
 
 /** Where a site's article text comes from, once the app knows or the reader has chosen; null while it's still checking. */
 internal fun fullTextLine(source: SourceEntity): String? {

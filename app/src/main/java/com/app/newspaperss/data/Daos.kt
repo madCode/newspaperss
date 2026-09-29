@@ -24,6 +24,9 @@ interface SourceDao {
     @Query("SELECT * FROM sources WHERE id = :id")
     suspend fun byId(id: Long): SourceEntity?
 
+    @Query("SELECT * FROM sources WHERE id = :id")
+    fun observe(id: Long): Flow<SourceEntity?>
+
     @Query("SELECT * FROM sources WHERE url = :url")
     suspend fun byUrl(url: String): SourceEntity?
 
@@ -38,22 +41,20 @@ interface SourceDao {
 
     // Targeted updates: a sync holds a source row for up to a minute, and
     // writing the whole row back would undo a pause or rename made meanwhile.
-    @Query("UPDATE sources SET paused = :paused WHERE id = :id")
+    // A pause ends a run of failures: time spent paused isn't time spent failing.
+    @Query("UPDATE sources SET paused = :paused, failingSince = NULL WHERE id = :id")
     suspend fun setPaused(id: Long, paused: Boolean)
 
     @Query(
-        """UPDATE sources SET lastFetchedAt = :at, lastError = NULL,
+        """UPDATE sources SET lastFetchedAt = :at, lastError = NULL, failingSince = NULL,
            siteUrl = COALESCE(siteUrl, :siteUrl),
            title = CASE WHEN title = :placeholderTitle AND :feedTitle IS NOT NULL THEN :feedTitle ELSE title END
            WHERE id = :id""",
     )
     suspend fun recordSuccess(id: Long, at: Instant, feedTitle: String?, siteUrl: String?, placeholderTitle: String)
 
-    @Query("UPDATE sources SET lastFetchedAt = :at, lastError = :error WHERE id = :id")
+    @Query("UPDATE sources SET lastFetchedAt = :at, lastError = :error, failingSince = COALESCE(failingSince, :at) WHERE id = :id")
     suspend fun recordFailure(id: Long, at: Instant, error: String)
-
-    @Query("UPDATE sources SET lastError = :error WHERE id = :id")
-    suspend fun setError(id: Long, error: String)
 
     @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
     suspend fun setServerNote(id: Long, note: String?)
@@ -121,6 +122,9 @@ interface ArticleDao {
 
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt DESC, id DESC")
     fun observeAllForSource(sourceId: Long): Flow<List<ArticleEntity>>
+
+    @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt DESC, id DESC LIMIT :limit")
+    fun observeRecentForSource(sourceId: Long, limit: Int): Flow<List<ArticleEntity>>
 
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt, id")
     suspend fun allForSource(sourceId: Long): List<ArticleEntity>

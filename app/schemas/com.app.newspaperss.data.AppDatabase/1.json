@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "89644ff3c121b382505407d3fa6f05cd",
+    "identityHash": "7facb10f27ce097575ebcfa0c861b4c0",
     "entities": [
       {
         "tableName": "sources",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `contentModeChosen` INTEGER NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `paused` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `serverNote` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `contentModeChosen` INTEGER NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `paused` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `failingSince` INTEGER, `serverNote` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -97,6 +97,11 @@
             "fieldPath": "lastError",
             "columnName": "lastError",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "failingSince",
+            "columnName": "failingSince",
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "serverNote",
@@ -437,7 +442,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '89644ff3c121b382505407d3fa6f05cd')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7facb10f27ce097575ebcfa0c861b4c0')"
     ]
   }
 }

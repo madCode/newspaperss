@@ -61,9 +61,12 @@ class FeedSyncTest {
         http.page(url, "oops", code = 500)
         assertEquals(1, sync.syncAll().failedSources)
         assertEquals("The site answered with error 500.", db.sources().byId(id)!!.lastError)
+        val firstFailure = now
 
+        now = now.plus(Duration.ofDays(1))
         http.page(url, "<html>not a feed</html>")
         sync.syncAll()
+        assertEquals("a run of failures keeps the day it started", firstFailure, db.sources().byId(id)!!.failingSince)
         assertEquals("We can't get new articles from this site any more. It may have moved; try adding it again.", db.sources().byId(id)!!.lastError)
 
         http.unreachable += url
@@ -74,6 +77,7 @@ class FeedSyncTest {
         http.page(url, rss("Blog", "1" to "One"))
         sync.syncAll()
         assertNull(db.sources().byId(id)!!.lastError)
+        assertNull(db.sources().byId(id)!!.failingSince)
     }
 
     @Test
