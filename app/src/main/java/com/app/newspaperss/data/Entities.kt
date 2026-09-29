@@ -4,12 +4,10 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.app.newspaperss.core.extract.ContentMode
 import java.time.Instant
 
 enum class SourceKind { FEED, READING_LIST }
-
-/** Whether to use the feed's own text or fetch the article page; AUTO decides per article. */
-enum class ContentMode { AUTO, FEED, PAGE }
 
 @Entity(tableName = "sources", indices = [Index(value = ["url"], unique = true)])
 data class SourceEntity(

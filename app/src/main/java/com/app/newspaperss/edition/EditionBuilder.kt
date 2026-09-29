@@ -46,13 +46,14 @@ class EditionBuilder(
         val now = LocalDateTime.now(clock.withZone(zone))
         val startOfDay = now.toLocalDate().atStartOfDay(zone).toInstant()
         val title = EditionTitles.title(now, db.editions().titlesSince(startOfDay))
+        val rotation = db.editions().count()
         val editionId = db.editions().insert(EditionEntity(title = title, createdAt = clock.instant()))
 
         val ordered = EditionPlanner.order(
             candidates = articles.map { Candidate(it.id.toString(), it.sourceId.toString(), it.published ?: it.discoveredAt, it.broughtBack) },
             sourceOrder = sources.map { it.id.toString() },
             rules = settings.rules,
-            rotation = db.editions().count(),
+            rotation = rotation,
         )
         var fetched = 0
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, settings.rules.budget, { it.second.minutes }) { c ->
@@ -63,9 +64,16 @@ class EditionBuilder(
         }
         if (picked.isEmpty()) return fail(editionId, "None of the articles could be read.")
 
-        // Reading order groups articles by section, in the order sections first appear.
+        // Which articles made it is the planner's call; reading order is the reader's
+        // own: sections in the order they first appear, sources in list order within them.
         val sectionOrder = sources.map { it.section }.distinct()
-        val arranged = picked.sortedBy { (a, _) -> sectionOrder.indexOf(sourcesById.getValue(a.sourceId).section) }
+        val sourceIndex = sources.withIndex().associate { (i, s) -> s.id to i }
+        val arranged = picked.sortedWith(
+            compareBy<Pair<ArticleEntity, ArticleContent>>(
+                { (a, _) -> sectionOrder.indexOf(sourcesById.getValue(a.sourceId).section) },
+                { (a, _) -> sourceIndex.getValue(a.sourceId) },
+            ),
+        )
 
         val fileName = "edition-$editionId.epub"
         try {
