@@ -1,6 +1,7 @@
 package com.app.newspaperss.edition
 
 import com.app.newspaperss.core.epub.EpubImage
+import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.SourceEntity
 
@@ -16,5 +17,5 @@ data class ArticleContent(
 
 fun interface ArticleContentProvider {
     /** The article's readable content, or null if there's nothing worth including. */
-    suspend fun contentFor(article: ArticleEntity, source: SourceEntity): ArticleContent?
+    suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance): ArticleContent?
 }

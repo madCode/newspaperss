@@ -28,7 +28,19 @@ enum class DeliveryMethod {
     FOLDER,
 }
 
+/** The reader's e-reader, chosen during onboarding; it decides the default delivery and the tips shown. */
+enum class Device(val label: String) {
+    KINDLE("Kindle"),
+    KOBO("Kobo"),
+    BOOX("Boox or another Android e-reader"),
+    POCKETBOOK("PocketBook"),
+    KOREADER("KOReader"),
+    OTHER("Something else / just the file"),
+}
+
 data class Settings(
+    val onboarded: Boolean = false,
+    val device: Device? = null,
     val edition: EditionSettings = EditionSettings(),
     val scheduleEnabled: Boolean = false,
     val schedule: Schedule = Schedule(),
@@ -48,6 +60,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
 
     private object Keys {
+        val onboarded = booleanPreferencesKey("onboarded")
+        val device = stringPreferencesKey("device")
         val minutes = intPreferencesKey("edition_minutes")
         val maxPerSource = intPreferencesKey("edition_max_per_source")
         val ordering = stringPreferencesKey("edition_ordering")
@@ -67,6 +81,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
     suspend fun update(transform: (Settings) -> Settings) {
         store.edit { prefs ->
             val s = transform(read(prefs))
+            prefs[Keys.onboarded] = s.onboarded
+            if (s.device != null) prefs[Keys.device] = s.device.name else prefs.remove(Keys.device)
             prefs[Keys.minutes] = s.edition.minutes
             prefs[Keys.maxPerSource] = s.edition.maxPerSource
             prefs[Keys.ordering] = s.edition.ordering.name
@@ -83,6 +99,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
     private fun read(p: Preferences): Settings {
         val d = Settings()
         return Settings(
+            onboarded = p[Keys.onboarded] ?: false,
+            device = p[Keys.device]?.let { runCatching { Device.valueOf(it) }.getOrNull() },
             edition = EditionSettings(
                 minutes = p[Keys.minutes] ?: d.edition.minutes,
                 maxPerSource = p[Keys.maxPerSource] ?: d.edition.maxPerSource,

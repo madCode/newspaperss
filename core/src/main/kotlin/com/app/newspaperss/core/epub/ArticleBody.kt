@@ -106,9 +106,11 @@ internal object ArticleBody {
         for (img in root.select("img")) {
             val src = img.attr("src")
             if (src !in imageHrefs) {
-                val parent = img.parent()
+                val figure = img.closest("figure")
+                val link = img.parent()?.takeIf { it.tagName() == "a" }
                 img.remove()
-                if (parent != null && parent.tagName() == "figure" && parent.select("img").isEmpty()) parent.remove()
+                if (link != null && link.childrenSize() == 0 && link.text().isBlank()) link.remove()
+                if (figure != null && figure.select("img").isEmpty()) figure.remove()
                 continue
             }
             val alt = img.attr("alt")

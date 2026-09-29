@@ -3,6 +3,7 @@ package com.app.newspaperss.edition
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
@@ -35,7 +36,7 @@ class EditionBuilderTest {
     private val clock = Clock.fixed(Instant.parse("2026-09-29T06:30:00Z"), ZoneOffset.UTC)
     private val sources = SourceRepository(db)
     private val unreadable = mutableSetOf<String>()
-    private val content = ArticleContentProvider { a, _ ->
+    private val content = ArticleContentProvider { a, _, _ ->
         if (a.guid in unreadable) null else ArticleContent(a.title, null, "<p>${a.title} body</p>", wordCount = 2000)
     }
     private val builder by lazy { EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) }
@@ -143,6 +144,30 @@ class EditionBuilderTest {
 
         val second = builder.build(EditionSettings()) as BuildResult.Built
         assertEquals(delivered, db.editions().articleIds(second.editionId))
+    }
+
+    @Test
+    fun imagesPastTheEditionBudgetAreLeftOutInReadingOrder() = runTest {
+        source("a", null, "a1", "a2")
+        val withImage = ArticleContentProvider { a, _, _ ->
+            val href = "images/a${a.id}-1.jpg"
+            ArticleContent(
+                a.title, null, "<p>${a.title}</p><figure><img src=\"$href\"/><figcaption>${a.guid} caption</figcaption></figure>",
+                wordCount = 238, images = listOf(EpubImage(href, "image/jpeg", ByteArray(60))),
+            )
+        }
+        val built = EditionBuilder(db, withImage, tmp.root, clock, ZoneOffset.UTC, imageBudgetBytes = 100)
+            .build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+
+        val edition = db.editions().byId(built.editionId)!!
+        ZipFile(editions.fileOf(edition)!!).use { zip ->
+            val names = zip.entries().toList().map { it.name }
+            assertEquals(1, names.count { it.startsWith("OEBPS/images/") })
+            val chapters = zip.entries().toList().filter { it.name.endsWith(".xhtml") }
+                .map { String(zip.getInputStream(it).readBytes()) }
+            assertEquals("only the first article in reading order keeps its image", 1, chapters.count { "<img" in it })
+            assertEquals(1, chapters.count { "caption</figcaption>" in it })
+        }
     }
 
     @Test
