@@ -21,9 +21,21 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M7 Polish
 
 ### M8 Advanced
-- [ ] SMTP delivery
+- [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
 
 ### Tech debt
+
+## Feature proposals
+
+Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
+
+### Article-to-voice
+Listen to an edition, e.g. on a walk, from the same finite paper.
+- **Engine:** Android's own `TextToSpeech`. It's offline and free, and voices already on the phone keep the no-account promise. Cloud voices sound better but need an account and send the text away, so they'd only ever be an option.
+- **Shape:** a "Listen" button on the edition screen that reads the articles in order. It runs as a media session with a notification (pause, skip article) and stops at the end of the edition, keeping the paper finite.
+- **Text:** the article bodies as already cleaned for the EPUB. Headings are read as pauses; image captions and link lists are skipped.
+- **Later:** export an audio file (M4B with a chapter per article) for podcast apps or a Kindle with audio. The EPUB could carry media overlays, but few e-readers play them.
+- **Open questions:** remember the position between sessions? Count listened articles as read for "bring back"?
 
 ## Done
 

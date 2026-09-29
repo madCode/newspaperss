@@ -103,7 +103,7 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
             if (items != null && list.isEmpty()) {
                 item {
                     Text(
-                        "Nothing saved yet. In any app, tap Share on a page and choose “Read in newspaperss”: " +
+                        "Nothing saved yet. In any app, tap Share on a page and choose “Read in newspapeRSS”: " +
                             "it goes into your next edition.\n\nComing from Pocket or Instapaper? " +
                             "Choose “Import a reading list” in the menu and pick its export file.",
                         modifier = Modifier.padding(24.dp),

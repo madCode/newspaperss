@@ -158,7 +158,7 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel) {
     Title("What do you like to read?")
     Text("Pick a few to start. You can change them any time.", style = MaterialTheme.typography.bodyMedium)
     Text(
-        "Saw something to read later? In any app, tap Share and choose \u201cRead in newspaperss\u201d.",
+        "Saw something to read later? In any app, tap Share and choose \u201cRead in newspapeRSS\u201d.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 4.dp),

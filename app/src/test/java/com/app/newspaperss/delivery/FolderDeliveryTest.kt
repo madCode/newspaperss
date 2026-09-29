@@ -55,7 +55,7 @@ class FolderDeliveryTest {
 
         val error = FolderDelivery(app.contentResolver).deliver(book, Folder.TREE, "Tuesday Morning Edition.epub", EditionIntents.EPUB_MIME)
 
-        assertEquals("newspaperss no longer has access to that folder. Pick it again in Settings.", error)
+        assertEquals("newspapeRSS no longer has access to that folder. Pick it again in Settings.", error)
     }
 
     /** A one-folder documents provider backed by a directory, standing in for the picked folder. */

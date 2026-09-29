@@ -18,6 +18,14 @@ android {
     }
 
     signingConfigs {
+        // One debug key for every machine, so a newer debug build from CI installs over an
+        // older one instead of failing on a signature mismatch. Not a secret: debug-only.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             // Only configured when CI provides a keystore, so ordinary builds don't
             // fail validateSigningRelease.

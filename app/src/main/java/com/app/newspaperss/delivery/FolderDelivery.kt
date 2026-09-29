@@ -37,7 +37,7 @@ class FolderDelivery(private val resolver: ContentResolver) : FolderWriter {
             // A half-written book would sync to the e-reader and fail to open there.
             doc?.let { runCatching { DocumentsContract.deleteDocument(resolver, it) } }
             if (e is SecurityException) {
-                "newspaperss no longer has access to that folder. Pick it again in Settings."
+                "newspapeRSS no longer has access to that folder. Pick it again in Settings."
             } else {
                 "Couldn't save to the folder (${e.message})."
             }
