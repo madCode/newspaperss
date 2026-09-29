@@ -1,0 +1,87 @@
+# newspapeRSS: competitors and neighbours
+
+Research date: 2026-09-29. Every claim has a link. Play Store numbers were scraped from the US listing on 2026-09-29. GitHub star counts come from the repo pages on the same day. Neither Reddit (it blocks the crawler) nor the GitHub API could be reached, so there are no Reddit mention counts here.
+
+## Summary
+
+People who want RSS on an e-reader have plenty of options, but most of them are **paid cloud services that email Kindle a digest of everything that is new**: Kindle4RSS, KTool, RSS to Kindle, SendtoReader, Readivio. Read-later apps add a Kindle digest on top (Instapaper, now paid only; Readwise Reader). None of these limits the digest to a reading time, and almost none reach Kobo or Boox without extra setup. The free and private options (Calibre news recipes, KOReader's News Downloader, GitHub Actions scripts) are powerful but take real setup. Two shutdowns have left users looking for a home. Pocket closed on 2025-07-08 and Kobo replaced it with Instapaper. Omnivore's hosted service closed in Nov 2024. There is also a risk on newspapeRSS's own side: tt-rss.org shut down on 2025-11-01 and the project now lives on as a fork. The gap newspapeRSS can own: **a free, account-free, on-phone Android app that plans one finite, reading-time-sized edition from feeds plus saved links and puts it on any e-reader.** The main threats are Kindle's delivery rules, AI-summary digests like Readivio that are also "finite", and Instapaper-on-Kobo being good enough for many people.
+
+## Comparison table
+
+| Name | What it is | Platform | Price | Popularity signal | E-reader delivery | Finite / edition-style? |
+|---|---|---|---|---|---|---|
+| Kindle4RSS | RSS to daily Kindle "magazine" | Web | Premium $2.9/mo for daily or >25 feeds ([benkuhn](https://www.benkuhn.net/krss/), 2019, may be outdated) | Running since 2010, footer reads "2010-2026" ([site](https://kindle4rss.com/)) | Kindle email | Daily issue, not sized to a reading time |
+| KTool | Articles, newsletters and RSS to Kindle | Web, iOS, extensions | $4.99-$10/mo, cheaper yearly ([pricing](https://ktool.io/pricing)) | iOS 2.8 stars from 9 ratings, last update Sep 2023 ([App Store](https://apps.apple.com/us/app/send-to-kindle-by-ktool/id1620426799)) | Kindle | Daily or weekly "magazine" ([blog](https://ktool.io/blog/read-rss-on-kindle)) |
+| RSS to Kindle | RSS and Substack to Kindle | Web | Free up to 5 articles/day; $60/yr ([site](https://www.rsstokindle.com/)) | No data | Kindle email | Daily digest |
+| SendtoReader | Newsletters and RSS to Kindle | Web | Not shown ([site](https://sendtoreader.com/)) | Running "since 2011" | Kindle | Daily Digest or instant |
+| Readivio | RSS, newsletters and PDFs with AI summaries | Web | Free (5 feeds, 30 digests/mo); $6/mo ([site](https://readivio.com/)) | Claims "500+ active readers" (self-reported) | Kindle, Kobo, PocketBook, reMarkable | Daily digest, AI-shortened |
+| Reabble | E-ink web RSS reader and send-to-Kindle, built on Inoreader | Web | Not shown on site ([site](https://reabble.com/)) | Footer reads "2013-2025" | Kindle browser, email | Scheduled ebook of unread items ([Inoreader forum](https://forum.inoreader.com/topic/10629-inoreader-client-for-amazon-kindle-optimized-for-e-ink-display/)) |
+| Push to Kindle (FiveFilters) | Send one article at a time | Web, extensions | Free 10/mo; $2.99/mo ([site](https://www.pushtokindle.com/)) | No data | Kindle, PocketBook, Dropbox | No |
+| Kindle NewsReader | Free category newspaper | Web | Free ([site](https://kindle-newsreader.com/)) | No data | Kindle | Daily paper, but you pick categories, not your own feeds |
+| Instapaper | Read-later app | iOS, Android, web, Kobo | Premium $5.99/mo or $59.99/yr, Kindle send is Premium-only since Feb 2025 ([Android Authority](https://www.androidauthority.com/instapaper-send-to-kindle-paywall-imminent-3635014/)) | Android 500K+ installs, 4.6 stars (Play, 2026-09-29) | Kindle digest (paid); built into Kobo (free) | Scheduled digest; Kobo shows a list |
+| Readwise Reader | Read-later app plus RSS | iOS, Android, web | $9.99/mo yearly, $12.99 monthly ([pricing](https://readwise.io/pricing/reader)) | "Readwise" Android app 100K+, 4.6 stars (Play); not confirmed this listing is Reader | Kindle daily or weekly digest; KOReader via community plugin | Digest of new items; **feed items left out** ([docs](https://docs.readwise.io/reader/docs/faqs/exporting)) |
+| Matter | Read-later app | iOS, web only, "We don't support Android" ([Chrome store](https://chromewebstore.google.com/detail/matter/knjbgabkeojmfdhindppcmhhfiembkeb?hl=en-US)) | $79.99/yr premium ([TechCrunch](https://techcrunch.com/2026/08/14/read-it-later-app-pocket-is-shutting-down-here-are-the-best-alternatives/)) | No data | Kindle send, one article or in bulk | No |
+| Folio | Pocket successor made by ex-Pocket staff | iOS, Android, web ([TechCrunch](https://techcrunch.com/2026/08/14/read-it-later-app-pocket-is-shutting-down-here-are-the-best-alternatives/)) | No data | Android 1K+ installs, 4.0 stars, 58 reviews (Play) | None found | No |
+| Wallabag | Self-hosted read-later app | Web, Android, KOReader plugin | Free; €11/yr hosted | 13.0k GitHub stars; Android 50K+ installs | KOReader downloads EPUBs ([wiki](https://github.com/koreader/koreader/wiki/Wallabag)) | No |
+| Calibre news | Desktop recipes build news ebooks on a schedule | Win, Mac, Linux | Free | 26.0k GitHub stars ([repo](https://github.com/kovidgoyal/calibre)) | Email to Kindle or USB ([HTG](https://www.howtogeek.com/115178/how-to-convert-news-feeds-to-ebooks-with-calibre/)) | One issue per recipe; the PC must be on |
+| KOReader News Downloader | Built-in plugin that saves feed items as HTML | Rooted/jailbroken Kindle, Kobo, Android | Free | KOReader 30k stars ([repo](https://github.com/koreader/koreader)) | On the device | No, you edit a Lua config per feed ([wiki](https://github.com/koreader/koreader/wiki/News-downloader)) |
+| Feeder | Open-source Android RSS reader | Android | Free | 100K+ installs, 3.8 stars (Play); 3.1k stars ([repo](https://github.com/spacecowboy/Feeder)) | None | No |
+| Read You | Material You RSS reader | Android (GitHub, F-Droid) | Free | 7.6k GitHub stars ([repo](https://github.com/Ashinch/ReadYou)); not on Play (404) | None | No |
+| Feedly | Cloud RSS reader | All | Freemium | 5M+ installs, 4.4 stars (Play) | Only via IFTTT or third parties ([IFTTT](https://ifttt.com/applets/PD2ptabA-push-rss-feed-to-kindle-via-feedly)) | No |
+| Inoreader | Cloud RSS reader | All | Freemium | 500K+ installs, 2.8 stars (Play) | Via Reabble | No |
+| Finite news apps (Steady News, Cup of News, InfoDrizzle) | AI-summarised daily briefings | Web, iOS | Varies | HN "Show HN" ([HN](https://news.ycombinator.com/item?id=46124024)) | None | Yes, but editorial or AI-picked, not your own sources |
+
+## Per-product notes
+
+**Kindle4RSS, KTool, RSS to Kindle, SendtoReader.** These are the classic "email a digest to Kindle" services. Ben Kuhn's post sums up why people like them: one issue a day, delivered at a predictable time, with nothing like an unread badge nagging you ([benkuhn](https://www.benkuhn.net/krss/), Jan 2019). *Where they fall short:* all are Kindle-first and cloud-hosted, and some need an account and a subscription. The digest holds whatever is new, however long that turns out to be. They don't mix in your saved links, and they don't bring back articles you didn't finish. KTool's iOS reviews complain about login bugs and surprise paywalls ([App Store](https://apps.apple.com/us/app/send-to-kindle-by-ktool/id1620426799)). Keendly, an earlier service of this kind, shut down in 2018 ([keendly.github.io](https://keendly.github.io/)), which shows these services can disappear. *Borrow:* a fixed delivery time, a TOC-first "magazine" layout, and turning partial feeds into full text.
+
+**Readivio.** This is the newest and closest in spirit: many devices (Kobo, PocketBook, reMarkable) and a daily digest. It keeps the digest short with AI summaries ([site](https://readivio.com/)). *Falls short:* it is a cloud service with an account, its free tier stops at 5 feeds, and it summarises rather than giving you the whole article. *Borrow:* broad device support as a selling point, and a free tier that is limited but useful.
+
+**Instapaper.** Since Feb 2025 its Kindle digests (scheduled and single sends) need Premium, and the price doubled to $5.99/mo ([Android Authority](https://www.androidauthority.com/instapaper-send-to-kindle-paywall-imminent-3635014/); [Medium](https://medium.com/@kevinko_60193/instapaper-hikes-premium-prices-f82c71d73445)). Instapaper said it had been running Kindle digests at a loss. On Kobo it replaced Pocket in firmware 4.38.23429 / 4.43.23418 and works **free with no limits**, but without folders, tags or highlights ([Engadget](https://www.engadget.com/mobile/tablets/kobo-ereaders-are-swapping-out-pocket-for-instapaper-190615508.html); [Instapaper docs](https://www.instapaper.com/help/kobo)). *Falls short:* no RSS, no sizing, and on Kobo it is a list rather than an edition. *Borrow:* Kobo's zero-setup QR-code pairing flow, and a bulk "archive after reading" step.
+
+**Readwise Reader.** This is the power-user choice: RSS, read-later, TTS and an AI copilot ([App Store](https://apps.apple.com/us/app/readwise-reader/id1567599761)). Its Kindle digest runs daily or weekly at midnight ET. The digest includes only Library items: **feed documents are left out** unless you move them into the Library by hand ([docs](https://docs.readwise.io/reader/docs/faqs/exporting)). Kobo users rely on a community KOReader plugin ([GitHub](https://github.com/Endle/readwisereader)). *Falls short:* $120+/yr, digests are not sized, and Kobo is DIY. *Borrow:* the plugin's rule "finished on device means archived at next sync", syncing highlights back, and TTS as the model for Listen.
+
+**Matter and Folio.** Matter is iOS-only and has a Kindle send ([Chrome store](https://chromewebstore.google.com/detail/matter/knjbgabkeojmfdhindppcmhhfiembkeb?hl=en-US)). Folio is the Pocket look-alike, made by the Less is Better team with a former Pocket staffer ([MacStories](https://www.macstories.net/reviews/folio-a-promising-read-later-app-with-a-strong-foundation/)). It imports Pocket, Instapaper, Matter, Raindrop and Readwise CSVs, but has little Android traction yet (1K+ installs). *Borrow:* Folio's wide set of importers. Matter and Readwise CSV import would be cheap wins.
+
+**Wallabag, KOReader, Calibre.** These are the free, private, DIY stack. KOReader's News Downloader needs a Lua config edited per feed and saves plain HTML ([wiki](https://github.com/koreader/koreader/wiki/News-downloader)). Community plugins (QuickRSS, rssreader.koplugin) make feeds browsable on the device ([MobileRead](https://www.mobileread.com/forums/showthread.php?t=372354)). Calibre recipes can build an issue and email it on a schedule, but only while the PC is on. Calibre-News-Delivery moves that onto GitHub Actions (54 stars) ([repo](https://github.com/bookfere/Calibre-News-Delivery)). A How-To Geek writer (Jul 2026) built RSS, a local LLM, Pandoc, KOReader and a jailbroken Kindle to get a **roughly 10-minute daily** paper ([HTG](https://www.howtogeek.com/daily-newsletter-for-kindle-with-rss-and-llm/)). That is exactly newspapeRSS's pitch, built by hand. *Borrow:* the idea of recipes (site-specific extraction rules), and OPDS as a delivery channel.
+
+**Device-native options.** Boox has a built-in RSS reader and "Send to BOOX"/PushRead ([Onyx](https://onyxboox.medium.com/read-it-later-on-boox-a456bf739c30)). **Kobo natively syncs a Dropbox folder and a Google Drive "Rakuten Kobo" folder** ([Kobo Dropbox](https://help.kobo.com/hc/en-us/articles/360033830114-Add-books-to-your-eReader-using-Dropbox); [Kobo Drive](https://help.kobo.com/hc/en-us/articles/15335985512983-Add-books-to-your-eReader-using-Google-Drive)). readinbox already uses this route for newsletters ([readinbox](https://readinbox.io/kobo)).
+
+**RSS readers (Feeder, Read You, Feedly, Inoreader).** These are well used but built around endless scrolling, and none has a native e-reader export. Feeder's README doesn't mention an e-ink mode. FeedMe does ship an "E-ink" theme ([Play](https://play.google.com/store/apps/details?id=com.seazon.feedme&hl=en_US)). *Borrow:* Feeder's local-first, no-account positioning and F-Droid distribution. Feeder and Read You users are the natural audience.
+
+## Recent shutdowns (users looking for a home)
+
+- **Pocket**: shut down 2025-07-08. Exports were available until 2025-10-08, and Kobo switched to Instapaper ([9to5Mac](https://9to5mac.com/2025/05/22/mozilla-announces-shutdown-of-pocket/); [Engadget](https://www.engadget.com/mobile/tablets/kobo-ereaders-are-swapping-out-pocket-for-instapaper-190615508.html)).
+- **Omnivore**: the team was acquired by ElevenLabs and the hosted service closed in Nov 2024. The code is now self-host only (16.3k stars) ([HN](https://news.ycombinator.com/item?id=41993167); [repo](https://github.com/omnivore-app/omnivore)). The team's work went into ElevenReader, a TTS reader ([Play](https://play.google.com/store/apps/details?id=io.elevenlabs.readerapp&hl=en_US)).
+- **Instapaper free Kindle delivery**: paywalled Feb 2025 (see above).
+- **tt-rss.org**: infrastructure taken down 2025-11-01. Development continues in a community fork ([linuxiac](https://linuxiac.com/tt-rss-shuts-down-but-the-project-lives-on-under-a-new-fork/)).
+
+## Gaps newspapeRSS fills
+
+1. **A finite edition sized to a reading time.** Every digest service above sends "everything new". Only hand-built pipelines like HTG's aim for "10 minutes". The finite news apps do limit length, but they pick the sources for you.
+2. **Free, no account, on-device.** The cloud services charge $3-10/mo and hold your feed list. Instapaper and Readwise charge for Kindle delivery.
+3. **Any e-reader.** Most services only reach Kindle. Kobo and Boox users are left with DIY setups or Instapaper's plain list.
+4. **Feeds and saved links in one paper**, plus bring-back of unfinished articles. Readwise even leaves feed items out of its digest.
+5. **A new home for Pocket and Omnivore users** who own a Kobo or Boox and don't want another subscription (Pocket import already exists).
+6. **Android-first.** Matter doesn't ship on Android, and Folio's Android app is small.
+
+## Ideas worth borrowing (ranked)
+
+1. **Deliver to Kobo through Google Drive or Dropbox.** Kobo syncs both natively, so no KOReader or Syncthing is needed ([Kobo help](https://help.kobo.com/hc/en-us/articles/15335985512983-Add-books-to-your-eReader-using-Google-Drive)). Writing the EPUB into the "Rakuten Kobo" Drive folder removes the hardest setup step for Kobo owners.
+2. **A fixed, predictable delivery time** ("your paper at 6:30"), plus a missed-edition catch-up. This is what fans of Kindle4RSS and RSS to Kindle say they value ([benkuhn](https://www.benkuhn.net/krss/); [rsstokindle](https://www.rsstokindle.com/)).
+3. **Close the loop from the device.** Finished on the device means archived, and not finished means brought back (Readwise KOReader plugin). Add highlights and notes import from KOReader's sidecar files or Kobo's annotations, to feed the notes export.
+4. **More importers.** Matter, Readwise, Raindrop and Omnivore CSV/JSON, as Folio has done. This is cheap and catches people leaving shut-down apps.
+5. **Optional short summaries per article**, done on-device or left off by default. That meets Readivio and the finite news apps where they compete, without the cloud.
+6. **An OPDS catalog served from the phone**, for KOReader and jailbroken Kindles (the HTG setup uses OPDS).
+7. **Listen mode that reuses the edition.** Readwise and ElevenReader have set the bar for TTS quality. The edition plan (ordered and sized to a time) maps naturally onto a "20-minute listen".
+8. **Kobo-style QR-code pairing** for any web or email step, as Instapaper does ([Kobo help](https://help.kobo.com/hc/en-us/articles/33359968957463-Use-Instapaper-with-your-Kobo-eReader)).
+
+## Threats and risks
+
+- **Kindle delivery rules.** Since 2025-04-02 Send to Kindle accepts only fully listed approved sender addresses ([the-ebook-reader](https://blog.the-ebook-reader.com/2025/03/18/amazon-making-a-change-to-send-to-kindle-emails/)). Any further tightening of the share-to-Kindle-app path would break the main Kindle route. Keep more than one path.
+- **Instapaper-on-Kobo is free and built in.** For casual Kobo readers it is "good enough", so newspapeRSS's advantage there has to be RSS plus a finite edition.
+- **AI-summary digests** (Readivio, Steady News, Cup of News) market "finite" too, and ask for zero configuration. Their onboarding is shorter than picking feeds.
+- **Readwise Reader could add sized, feed-inclusive digests.** It already has RSS, TTS and Kindle delivery.
+- **Upstream fragility.** tt-rss depends on a fork. Pocket and Omnivore exports are frozen formats. Full-text extraction breaks as sites change.
+- **Getting noticed.** Existing open-source Android RSS apps have 3-8k stars and about 100K installs (Feeder), so an e-reader niche app has to find users through e-reader communities (MobileRead, Kobo and KOReader forums).
+- **Data gaps in this report.** No Reddit counts. Readwise Reader's own Android install count is not confirmed. Kindle4RSS pricing comes from 2019. Readivio's user count is self-reported.

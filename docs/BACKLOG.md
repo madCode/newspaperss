@@ -7,7 +7,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### M4 leftovers
-- [ ] Expedite scheduled builds (needs getForegroundInfo for API < 31)
+- [ ] If lead time isn't enough on a real device, wake for timed editions with an exact alarm (Doze defers WorkManager; expedited work was rejected: its API 31+ quota can silently restart a long build)
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
 - [ ] Verify folder delivery + chooser-from-notification on a real device
 
@@ -37,14 +37,17 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 - **Later:** export the edition as an audiobook file (M4B with a chapter per article) for podcast and audiobook apps. The EPUB could carry media overlays, but few e-readers play them.
 - **Open questions:** remember the position between sessions? Count listened articles as read for "bring back"?
 
-### Research: what else is out there
-A deep-research pass on competing and neighbouring apps: RSS-to-e-reader tools (e.g. services that send
-feeds to a Kindle, Calibre's news recipes, KOReader's news downloader), read-later apps and newsletter
-digests. For each: what it does, what it costs, how popular it is, and what newspapeRSS does differently
-or should borrow. The result goes in `docs/research/`.
+### From the competitor research ([docs/research/competitors.md](research/competitors.md))
+- **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
+  has no folder trees, so this needs the Drive API (an OAuth client, like Dropbox's app key).
+- **Close the loop from the device:** finished on the e-reader means archived; KOReader highlights feed the notes export.
+- **More importers:** Matter, Readwise, Raindrop and Omnivore exports, for people leaving shut-down apps.
+- **An OPDS catalog served from the phone,** for KOReader and jailbroken Kindles.
 
 ## Done
 
+- [x] Research: competing and neighbouring apps, in [docs/research/competitors.md](research/competitors.md)
+- [x] Timed editions start 30 minutes before they're due, so Doze's hold on delayed work becomes lead time instead of a late paper
 - [x] Extraction: screen-reader-only text ("list 1 of 4") and "Recommended stories" link lists no longer reach the edition (found in a live edition's Al Jazeera article)
 - [x] tt-rss: take articles from one category, and a setting to leave delivered articles unread on the server, both on the source's screen
 - [x] Per-source article cap on the source screen, replacing the edition's "up to N from each site" for that site (not for tt-rss, which is capped per publication)
