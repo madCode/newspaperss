@@ -44,7 +44,13 @@ class SourceRepository(private val db: AppDatabase) {
     )
 
     companion object {
-        fun hostOf(url: String): String =
-            url.substringAfter("://").substringBefore('/').removePrefix("www.").ifBlank { url }
+        /**
+         * The name a source gets when it's added without a title, and the placeholder
+         * [FeedSync] passes to [SourceDao.recordSuccess]: a source whose title still equals
+         * `hostOf(source.url)` takes the feed's own title on its next sync (so does one the
+         * reader renamed to exactly that). Changing what this returns for a URL leaves sources
+         * already named by the old result stuck with it.
+         */
+        fun hostOf(url: String): String = com.app.newspaperss.core.net.hostOf(url)
     }
 }

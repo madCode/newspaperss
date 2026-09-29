@@ -12,10 +12,11 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.app.newspaperss.MainActivity
 import com.app.newspaperss.R
+import com.app.newspaperss.core.ReadingTime
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.delivery.EditionIntents
 import java.io.File
-import kotlin.math.roundToInt
 
 interface EditionNotifier {
     fun editionReady(edition: EditionEntity, file: File)
@@ -40,8 +41,6 @@ class Notifier(private val context: Context) : EditionNotifier {
             },
         )
     }
-
-    fun enabled(): Boolean = manager.areNotificationsEnabled()
 
     override fun editionReady(edition: EditionEntity, file: File) {
         val send = PendingIntent.getActivity(
@@ -84,10 +83,8 @@ class Notifier(private val context: Context) : EditionNotifier {
         manager.notify(id, builder.setSmallIcon(R.drawable.ic_notification).setContentIntent(open).setAutoCancel(true).build())
     }
 
-    private fun summary(edition: EditionEntity): String {
-        val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"
-        return "$articles · about ${edition.minutes.roundToInt().coerceAtLeast(1)} min"
-    }
+    private fun summary(edition: EditionEntity) =
+        "${plural(edition.articleCount, "article")} · about ${ReadingTime.format(edition.minutes)}"
 
     companion object {
         const val EDITIONS = "editions"

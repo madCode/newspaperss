@@ -88,4 +88,11 @@ class CoverRendererTest {
 
         assertTrue("the footer is still drawn", bitmap.darkPixels(bitmap.height - 200, bitmap.height) > 2_000)
     }
+
+    @Test
+    fun theFooterReadsLikeTheBooksOwnTotals() {
+        val one = info(realistic.take(1)).copy(minutes = 0.2)
+        assertEquals("1 article · about 1 min", CoverRenderer.totals(one))
+        assertEquals("7 articles · about 1 hr 15 min", CoverRenderer.totals(info(realistic).copy(minutes = 75.0)))
+    }
 }
