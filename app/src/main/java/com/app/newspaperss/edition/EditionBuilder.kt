@@ -65,8 +65,10 @@ class EditionBuilder(
 
         // A timed edition is built ahead of its time; it's titled and dated for when it's due.
         val now = LocalDateTime.ofInstant(dueAt ?: clock.instant(), zone)
-        val startOfDay = now.toLocalDate().atStartOfDay(zone).toInstant()
-        val title = EditionTitles.title(now, db.editions().titlesSince(startOfDay))
+        // From the day before: an edition due just after midnight was made just before it.
+        // Titles name their weekday, so yesterday's can't clash.
+        val since = now.toLocalDate().minusDays(1).atStartOfDay(zone).toInstant()
+        val title = EditionTitles.title(now, db.editions().titlesSince(since))
         val rotation = db.editions().count()
         val editionId = db.editions().insert(EditionEntity(title = title, createdAt = clock.instant()))
 

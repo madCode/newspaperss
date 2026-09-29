@@ -77,6 +77,12 @@ class EditionBuilderTest {
         val result = lateMonday.build(EditionSettings(), dueAt = Instant.parse("2026-09-29T00:10:00Z")) as BuildResult.Built
 
         assertEquals("Tuesday Evening Edition", db.editions().byId(result.editionId)!!.title)
+
+        // Send to Kindle drops a document whose title it has already seen.
+        source("b", "World", "b1")
+        val tuesdayEvening = EditionBuilder(db, content, tmp.root, Clock.fixed(Instant.parse("2026-09-29T20:00:00Z"), ZoneOffset.UTC), ZoneOffset.UTC)
+        val second = tuesdayEvening.build(EditionSettings()) as BuildResult.Built
+        assertEquals("Tuesday Evening Edition (2)", db.editions().byId(second.editionId)!!.title)
     }
 
     @Test
