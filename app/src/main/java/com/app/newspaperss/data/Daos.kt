@@ -72,6 +72,12 @@ interface SourceDao {
     @Query("UPDATE sources SET maxArticles = MAX(1, MIN(:limit, COALESCE(maxArticles, :default) + :delta)) WHERE id = :id")
     suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int)
 
+    @Query("UPDATE sources SET ttrssCategoryId = :categoryId, ttrssCategoryTitle = :title WHERE id = :id")
+    suspend fun setTtrssCategory(id: Long, categoryId: Int?, title: String?)
+
+    @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")
+    suspend fun setMarkReadOnServer(id: Long, markRead: Boolean)
+
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 
@@ -84,15 +90,14 @@ data class SourceActivity(val sourceId: Long, val lastNew: Instant?)
 @Dao
 interface ArticleDao {
     /**
-     * Inserts articles not already known for their source; returns how many were new. Unless
-     * [skipDelivered] is false, one whose link was already delivered (see [DeliveredUrlEntity])
-     * is left out: stored, it would count as new activity on the Sources screen.
+     * Inserts articles not already known for their source; returns how many were new. One whose
+     * link was already delivered (see [DeliveredUrlEntity]) is left out: stored, it would count as
+     * new activity on the Sources screen.
      */
     @Transaction
-    suspend fun insertNew(articles: List<ArticleEntity>, skipDelivered: Boolean = true): Int {
+    suspend fun insertNew(articles: List<ArticleEntity>): Int {
         // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
-        val delivered = if (!skipDelivered) emptySet() else
-            articles.map { it.url }.filter { it.isNotBlank() }.distinct().chunked(500).flatMap { deliveredAmong(it) }.toSet()
+        val delivered = articles.map { it.url }.filter { it.isNotBlank() }.distinct().chunked(500).flatMap { deliveredAmong(it) }.toSet()
         return articles.filter { it.url !in delivered }.count { insertIgnoring(it) != -1L }
     }
 
@@ -156,6 +161,10 @@ interface ArticleDao {
     @Query("UPDATE articles SET state = 'NEW', broughtBack = 1 WHERE id IN (:ids) AND state = 'DELIVERED'")
     suspend fun bringBackDelivered(ids: List<Long>): Int
 
+    /** Expires a source's unpicked articles; brought-back ones are the reader's and stay. */
+    @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0")
+    suspend fun expireWaiting(sourceId: Long)
+
     /** Expires unpicked articles discovered before [before], except reading-list items. */
     @Query(
         """UPDATE articles SET state = 'EXPIRED' WHERE state = 'NEW' AND broughtBack = 0 AND discoveredAt < :before
@@ -174,11 +183,12 @@ interface ArticleDao {
     )
     suspend fun keepNewest(sourceId: Long, keep: Int): Int
 
+    /** The edition's tt-rss articles to mark read on the server: none from an account set to leave them unread. */
     @Query(
         """SELECT articles.* FROM articles
            JOIN edition_articles ON edition_articles.articleId = articles.id
            JOIN sources ON sources.id = articles.sourceId
-           WHERE edition_articles.editionId = :editionId AND sources.kind = 'TTRSS'""",
+           WHERE edition_articles.editionId = :editionId AND sources.kind = 'TTRSS' AND sources.markReadOnServer = 1""",
     )
     suspend fun ttrssInEdition(editionId: Long): List<ArticleEntity>
 }

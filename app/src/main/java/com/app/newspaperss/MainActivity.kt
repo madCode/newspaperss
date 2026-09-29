@@ -177,7 +177,8 @@ private fun App(container: AppContainer) {
             }
             composable(SOURCE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, container.ttrss) }
+                val context = LocalContext.current.applicationContext
+                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, container.ttrss) { SyncWorker.syncNow(context) } }
                 SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) })
             }
             composable(READING_LIST) {

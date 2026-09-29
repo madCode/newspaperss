@@ -27,6 +27,9 @@ data class TtrssHeadline(
     val feedId: String,
 )
 
+/** A category of the reader's own feeds, as getCategories reports it. */
+data class TtrssCategory(val id: Int, val title: String)
+
 /** A tt-rss API error, with a message fit to show the reader. */
 sealed class TtrssException(message: String) : Exception(message) {
     class LoginFailed : TtrssException("tt-rss didn't accept that username and password.")
@@ -89,6 +92,27 @@ class TtrssClient(
         }
         val items = content as? JsonArray ?: throw TtrssException.NotTtrss()
         return items.mapNotNull { (it as? JsonObject)?.let(::headline) }
+    }
+
+    /**
+     * The reader's categories, "Uncategorized" included. tt-rss's own Special and Labels
+     * groups have negative ids and aren't categories of feeds, so they're left out.
+     */
+    suspend fun categories(): List<TtrssCategory> {
+        val content = withSession { sid ->
+            post(buildJsonObject {
+                put("sid", sid)
+                put("op", "getCategories")
+            })
+        }
+        val items = content as? JsonArray ?: throw TtrssException.NotTtrss()
+        return items.mapNotNull { item ->
+            val o = item as? JsonObject ?: return@mapNotNull null
+            // The id is an int or, in older versions, a string.
+            val id = (o["id"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()?.takeIf { it >= 0 } ?: return@mapNotNull null
+            val title = (o["title"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            TtrssCategory(id, title)
+        }
     }
 
     /** Marks [ids] as read. */

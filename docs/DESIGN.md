@@ -135,8 +135,9 @@ non-coder won't know to do it. newspaperss defaults to:
   links and the source says so, rather than guessing which ones are new.
 
 tt-rss sources keep the library's behaviour: articles are marked read on the
-server when an edition is delivered (always, for now; a setting is in the
-backlog).
+server when an edition is delivered. The source's screen can turn that off
+(articles stay unread in tt-rss, and newspaperss knows which it delivered)
+and can take articles from one category instead of all unread.
 
 ## 6. Delivery
 

@@ -26,6 +26,14 @@ import com.app.newspaperss.ui.sources.lastCheckedLine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.app.newspaperss.data.SourceKind
+import com.app.newspaperss.data.TtrssAccountStore
+import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.testutil.FakeHttp
+import com.app.newspaperss.testutil.FakeTtrss
+import com.app.newspaperss.testutil.testCipher
+import org.junit.rules.TemporaryFolder
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -42,6 +50,7 @@ import java.util.Locale
 @Config(application = TestApp::class)
 class SourceDetailScreenTest {
     @get:Rule val compose = createComposeRule()
+    @get:Rule val tmp = TemporaryFolder()
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
@@ -113,6 +122,35 @@ class SourceDetailScreenTest {
         compose.onNodeWithText("Use your edition setting").performClick()
         idleUntil { compose.waitForIdle(); visible("Up to 1 article in each edition") }
         assertNull(runBlocking { db.sources().byId(id)!!.maxArticles })
+    }
+
+    @Test
+    fun aTtrssAccountCanTakeOneCategoryAndLeaveArticlesUnread() {
+        val http = FakeHttp()
+        val server = FakeTtrss(http)
+        server.categories[5] = "Tech"
+        val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
+        val ttrss = TtrssRepository(db, http, accounts, repo)
+        val id = runBlocking {
+            assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
+            db.sources().ofKind(SourceKind.TTRSS).single().id
+        }
+        var syncs = 0
+        val vm = SourceDetailViewModel(repo, id, flowOf(1), ttrss) { syncs++ }
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { visible("All your unread articles") }
+        compose.onNodeWithText("Up to 1 article", substring = true).assertDoesNotExist()
+
+        compose.onNodeWithText("Change").performClick()
+        idleUntil { compose.waitForIdle(); visible("Tech") }
+        compose.onNodeWithText("Special").assertDoesNotExist()
+        compose.onNodeWithText("Tech").performClick()
+        idleUntil { compose.waitForIdle(); syncs == 1 && visible("Tech") }
+        assertEquals(5, runBlocking { db.sources().byId(id)!!.ttrssCategoryId })
+
+        compose.onNodeWithText("Mark as read in tt-rss").performClick()
+        idleUntil { compose.waitForIdle(); visible("left unread in tt-rss") }
+        assertEquals(false, runBlocking { db.sources().byId(id)!!.markReadOnServer })
     }
 
     @Test

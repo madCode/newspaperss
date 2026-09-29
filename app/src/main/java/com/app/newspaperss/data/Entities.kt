@@ -40,6 +40,11 @@ data class SourceEntity(
     val paused: Boolean = false,
     /** At most this many articles per edition from this source; null follows the edition setting. Not used for tt-rss. */
     val maxArticles: Int? = null,
+    /** tt-rss only: the category to take unread articles from, null for all of them. */
+    val ttrssCategoryId: Int? = null,
+    val ttrssCategoryTitle: String? = null,
+    /** tt-rss only: mark delivered articles read on the server. */
+    val markReadOnServer: Boolean = true,
     val addedAt: Instant = Instant.now(),
     val lastFetchedAt: Instant? = null,
     /** The last sync error, cleared by the next successful sync. */

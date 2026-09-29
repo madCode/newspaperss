@@ -17,6 +17,8 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import android.database.sqlite.SQLiteConstraintException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.time.Clock
 import java.time.Duration
@@ -89,19 +91,31 @@ class FeedSync(
         } else {
             val client = account.client(http)
             try {
+                val category = source.ttrssCategoryId
+                val headlines = client.unreadHeadlines(feedId = category ?: TtrssClient.ALL_ARTICLES, isCategory = category != null)
+                // A link already delivered (from a feed, or before the account was reconnected) is
+                // skipped like any other, and tt-rss is told it's read unless the reader said not to:
+                // otherwise it would sit unread there for good.
+                if (source.markReadOnServer) {
+                    val delivered = db.articles().deliveredAmong(headlines.map { it.link }.distinct()).toSet()
+                    client.markRead(headlines.filter { it.link in delivered }.map { it.id })
+                }
                 val added = db.articles().insertNew(
-                    client.unreadHeadlines().map {
+                    headlines.map {
                         ArticleEntity(
                             sourceId = source.id, guid = "$TTRSS_GUID_PREFIX${it.id}", url = it.link, title = it.title,
                             author = it.author, published = it.updated?.let(Instant::ofEpochSecond), feedHtml = it.content,
                             discoveredAt = now, originId = it.feedId, originTitle = it.feedTitle,
                         )
                     },
-                    // Unread on the server means not yet delivered from it; skipped, it would stay unread there.
-                    skipDelivered = false,
                 )
-                db.sources().recordSuccess(source.id, now, null, null, source.title)
-                return added
+                // tt-rss answers a deleted (or another user's) category with no articles and no error.
+                if (headlines.isEmpty() && category != null && client.categories().none { it.id == category }) {
+                    CATEGORY_GONE
+                } else {
+                    db.sources().recordSuccess(source.id, now, null, null, source.title)
+                    return added
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TtrssException) {
@@ -170,16 +184,18 @@ class FeedSync(
 
         /** tt-rss articles are stored with this guid prefix followed by their tt-rss id. */
         const val TTRSS_GUID_PREFIX = "ttrss:"
+        const val CATEGORY_GONE = "Your chosen tt-rss category isn't there any more. Choose another on this source's page."
         const val SIGN_IN_AGAIN = "Sign in to tt-rss again: tap the menu at the top of Sources."
     }
 }
 
-/** Ends a tt-rss session; the server expires it anyway if this fails. */
-internal suspend fun logOut(client: TtrssClient) {
+/**
+ * Ends a tt-rss session; the server expires it anyway if this fails. NonCancellable: it runs
+ * in `finally` blocks, where a cancelled caller would otherwise skip it.
+ */
+internal suspend fun logOut(client: TtrssClient) = withContext(NonCancellable) {
     try {
         client.logout()
-    } catch (e: CancellationException) {
-        throw e
     } catch (e: Exception) {
     }
 }

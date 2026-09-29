@@ -1,6 +1,8 @@
 package com.app.newspaperss.data
 
+import androidx.room.withTransaction
 import com.app.newspaperss.core.net.HttpClient
+import com.app.newspaperss.core.ttrss.TtrssCategory
 import com.app.newspaperss.core.ttrss.TtrssClient
 import com.app.newspaperss.core.ttrss.TtrssException
 import kotlinx.coroutines.CancellationException
@@ -36,9 +38,53 @@ class TtrssRepository(
             // Some devices' Keystore throws runtime exceptions of its own.
             return "Couldn't store the password securely on this phone."
         }
-        sources.addTtrss(account.apiUrl)
+        val sourceId = sources.addTtrss(account.apiUrl)
+        // Category ids belong to each tt-rss user, and this may be another user on the same server.
+        db.sources().setTtrssCategory(sourceId, null, null)
         return null
     }
+
+    sealed interface Categories {
+        data class Loaded(val categories: List<TtrssCategory>) : Categories
+        data class Failed(val message: String) : Categories
+    }
+
+    /** The account's categories, for choosing which one its source takes articles from. */
+    suspend fun categories(): Categories {
+        // Some devices' Keystore throws runtime exceptions of its own.
+        val account = try {
+            (accounts.load() as? StoredAccount.Ready)?.account
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } ?: return Categories.Failed(FeedSync.SIGN_IN_AGAIN)
+        val client = account.client(http)
+        return try {
+            Categories.Loaded(client.categories())
+        } catch (e: TtrssException) {
+            Categories.Failed(e.message ?: "tt-rss reported an error.")
+        } catch (e: IOException) {
+            Categories.Failed("Couldn't reach tt-rss.")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Categories.Failed("Couldn't load your tt-rss categories.")
+        } finally {
+            logOut(client)
+        }
+    }
+
+    /**
+     * Takes unread articles from [category] only, or from all feeds when it's null. Articles
+     * waiting from before go when a category is chosen: which category each came from isn't kept.
+     */
+    suspend fun chooseCategory(sourceId: Long, category: TtrssCategory?) = db.withTransaction {
+        db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
+        if (category != null) db.articles().expireWaiting(sourceId)
+    }
+
+    suspend fun setMarkRead(sourceId: Long, markRead: Boolean) = db.sources().setMarkReadOnServer(sourceId, markRead)
 
     /** Removes the account's source and its saved login. */
     suspend fun forget(source: SourceEntity) {

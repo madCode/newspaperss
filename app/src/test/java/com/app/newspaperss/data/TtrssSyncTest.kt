@@ -14,6 +14,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import com.app.newspaperss.core.ttrss.TtrssCategory
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -163,16 +164,86 @@ class TtrssSyncTest {
         assertEquals(server.ops.count { it == "login" }, server.ops.count { it == "logout" })
     }
 
-    /** Still unread on the server means tt-rss hasn't been told it was delivered: skipped, it would stay unread there. */
+    /** A story already delivered from a feed isn't delivered again, and tt-rss hears it's been read rather than keeping it unread for good. */
     @Test
-    fun aLinkDeliveredFromAnotherSourceStillArrivesFromTtrss() = runTest {
+    fun aLinkDeliveredFromAFeedIsMarkedReadInTtrssInsteadOfArrivingAgain() = runTest {
         connect()
         val feed = sources.addFeed("https://news.example/feed", "News")
         db.articles().insertNew(listOf(ArticleEntity(sourceId = feed, guid = "n10", url = "https://news.example/10", title = "One")))
         EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionWith(feed, "n10"))
         server.add(10, "One", feedId = 1, feedTitle = "Example News")
+        server.add(11, "Two", feedId = 1, feedTitle = "Example News")
 
         assertEquals(1, sync.syncAll().newArticles)
+        assertEquals(listOf(10L), server.markedRead)
+    }
+
+    @Test
+    fun aSourceSetToACategoryTakesOnlyItsArticles() = runTest {
+        val source = connect()
+        server.categories[5] = "Tech"
+        server.add(10, "Gadget", feedId = 1, feedTitle = "Tech News", categoryId = 5)
+        server.add(11, "Recipe", feedId = 2, feedTitle = "Food", categoryId = 0)
+
+        val tech = (ttrss.categories() as TtrssRepository.Categories.Loaded).categories.single { it.title == "Tech" }
+        ttrss.chooseCategory(source.id, tech)
+        sync.syncAll()
+
+        assertEquals(listOf("Gadget"), db.articles().allForSource(source.id).map { it.title })
+        assertEquals("Tech", db.sources().byId(source.id)!!.ttrssCategoryTitle)
+    }
+
+    @Test
+    fun choosingACategoryDropsArticlesWaitingFromBefore() = runTest {
+        val source = connect()
+        server.add(11, "Recipe", feedId = 2, feedTitle = "Food")
+        sync.syncAll()
+        val broughtBack = db.articles().allForSource(source.id).single()
+        server.add(12, "Soup", feedId = 2, feedTitle = "Food")
+        sync.syncAll()
+        db.articles().bringBack(listOf(broughtBack.id))
+
+        ttrss.chooseCategory(source.id, TtrssCategory(5, "Tech"))
+
+        assertEquals("the reader's own bring-back stays", listOf("Recipe"), db.articles().candidates().map { it.title })
+    }
+
+    /** tt-rss answers a missing category with an empty list, which must not look like a quiet day. */
+    @Test
+    fun aCategoryThatsGoneIsReportedOnTheSource() = runTest {
+        val source = connect()
+        ttrss.chooseCategory(source.id, TtrssCategory(9, "Deleted"))
+
+        assertEquals(1, sync.syncAll().failedSources)
+        assertEquals(FeedSync.CATEGORY_GONE, db.sources().byId(source.id)!!.lastError)
+    }
+
+    @Test
+    fun connectingAgainStartsFromAllUnread() = runTest {
+        val source = connect()
+        ttrss.chooseCategory(source.id, TtrssCategory(0, "Uncategorized"))
+        connect()
+        assertNull(db.sources().byId(source.id)!!.ttrssCategoryId)
+    }
+
+    @Test
+    fun anAccountSetToLeaveArticlesUnreadIsntToldWhatWasDelivered() = runTest {
+        val source = connect()
+        ttrss.setMarkRead(source.id, false)
+        server.add(10, "One", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        val editionId = editionWith(source.id, "ttrss:10")
+        var enqueued = false
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)) { enqueued = true }.markDelivered(editionId)
+
+        assertFalse(enqueued)
+        assertTrue(ttrss.markRead(editionId))
+        assertTrue(server.markedRead.isEmpty())
+        assertEquals("already known, so not offered again", 0, sync.syncAll().newArticles)
+
+        ttrss.forget(db.sources().byId(source.id)!!)
+        connect()
+        assertEquals("nor after connecting again", 0, sync.syncAll().newArticles)
     }
 
     @Test

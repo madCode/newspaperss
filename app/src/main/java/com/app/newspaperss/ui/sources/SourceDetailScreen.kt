@@ -8,6 +8,17 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
+import androidx.compose.ui.semantics.Role
+import com.app.newspaperss.core.ttrss.TtrssCategory
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -89,7 +100,9 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text") }
                     TextButton(onClick = { removing = true }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
                 }
-                if (source.kind != SourceKind.TTRSS) {
+                if (source.kind == SourceKind.TTRSS) {
+                    TtrssOptions(source, viewModel::openCategories, viewModel::setMarkReadOnServer)
+                } else {
                     ArticleCap(source.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
                 }
                 HorizontalDivider(Modifier.padding(top = 16.dp))
@@ -105,6 +118,8 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     if (choosingMode && source != null) {
         ContentModeDialog(source, onChoose = { choosingMode = false; viewModel.chooseContentMode(it) }, onDismiss = { choosingMode = false })
     }
+    val categories by viewModel.categories.collectAsState()
+    categories?.let { CategoryDialog(it, source?.ttrssCategoryId, viewModel::chooseCategory, viewModel::closeCategories) }
     if (removing && source != null) {
         RemoveSourceDialog(source, onConfirm = { removing = false; viewModel.remove() }, onDismiss = { removing = false })
     }
@@ -119,6 +134,65 @@ private fun Health(source: SourceEntity, lastNew: Instant?, locale: Locale, is24
         if (!source.paused) failingLine(source.failingSince, locale)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         lastCheckedLine(source.lastFetchedAt, locale, is24Hour)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
         textLine(source)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
+    }
+}
+
+@Composable
+private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onMarkRead: (Boolean) -> Unit) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Articles from")
+            Text(source.ttrssCategoryTitle ?: "All your unread articles", style = MaterialTheme.typography.bodySmall, color = muted)
+        }
+        TextButton(onClick = onChangeCategory) { Text("Change") }
+    }
+    Row(
+        Modifier.fillMaxWidth()
+            .toggleable(value = source.markReadOnServer, role = Role.Switch, onValueChange = onMarkRead)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Mark as read in tt-rss")
+            Text(
+                if (source.markReadOnServer) "Articles are marked read once they're delivered" else "Delivered articles are left unread in tt-rss",
+                style = MaterialTheme.typography.bodySmall,
+                color = muted,
+            )
+        }
+        Switch(checked = source.markReadOnServer, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun CategoryDialog(picker: CategoryPicker, current: Int?, onChoose: (TtrssCategory?) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Articles from") },
+        text = {
+            when (picker) {
+                CategoryPicker.Loading -> Text("Asking tt-rss for your categories…")
+                is CategoryPicker.Failed -> Text(picker.message, color = MaterialTheme.colorScheme.error)
+                is CategoryPicker.Choosing -> Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
+                    CategoryChoice("All your unread articles", current == null) { onChoose(null) }
+                    picker.categories.forEach { category -> CategoryChoice(category.title, current == category.id) { onChoose(category) } }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun CategoryChoice(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Text(label, modifier = Modifier.padding(start = 12.dp))
     }
 }
 

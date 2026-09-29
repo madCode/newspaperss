@@ -21,13 +21,13 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M7 Polish
 
 ### M8 Advanced
-- [ ] tt-rss: pick a category instead of all unread; a setting to leave articles unread on the server (DESIGN §5 calls it an option)
 - [ ] SMTP delivery
 
 ### Tech debt
 
 ## Done
 
+- [x] tt-rss: take articles from one category, and a setting to leave delivered articles unread on the server, both on the source's screen
 - [x] Per-source article cap on the source screen, replacing the edition's "up to N from each site" for that site (not for tt-rss, which is capped per publication)
 - [x] Source detail: tap a source for its health (status, failing for N days, last checked, where its text comes from), its recent articles and what happened to each, pause, article text and remove with a confirmation
 - [x] Delivered links are remembered for a year, so removing and re-adding a source, or the same story in two sources, doesn't deliver it twice
