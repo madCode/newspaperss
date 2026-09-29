@@ -22,6 +22,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.app.newspaperss.ui.edition.EditionDetailScreen
+import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -48,6 +52,7 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 }
 
 private const val READING_LIST = "reading-list"
+private const val EDITION = "edition/{id}"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,10 +89,14 @@ private fun App(container: AppContainer) {
         bottomBar = {
             NavigationBar {
                 Tab.entries.forEach { tab ->
+                    val route = current?.destination?.route
+                    val inTab = route == tab.route || (tab == Tab.SOURCES && route == READING_LIST) || (tab == Tab.TODAY && route == EDITION)
                     NavigationBarItem(
-                        selected = current?.destination?.route.let { it == tab.route || (tab == Tab.SOURCES && it == READING_LIST) },
+                        selected = inTab,
                         onClick = {
-                            nav.navigate(tab.route) {
+                            // Tapping the tab you're in goes back to its top screen; restoring
+                            // saved state would otherwise reopen the detail screen you're on.
+                            if (inTab) nav.popBackStack(tab.route, inclusive = false) else nav.navigate(tab.route) {
                                 popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -104,7 +113,12 @@ private fun App(container: AppContainer) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context)) { EditionWorker.buildNow(context) } }
-                TodayScreen(vm)
+                TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
+            }
+            composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                val vm = viewModel { EditionDetailViewModel(container.editions, id) }
+                EditionDetailScreen(vm, onBack = { nav.navigateUp() })
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
@@ -113,7 +127,7 @@ private fun App(container: AppContainer) {
             }
             composable(READING_LIST) {
                 val vm = viewModel { ReadingListViewModel(container.readingList) }
-                ReadingListScreen(vm, onBack = { nav.popBackStack() })
+                ReadingListScreen(vm, onBack = { nav.navigateUp() })
             }
             composable(Tab.SETTINGS.route) {
                 val context = LocalContext.current.applicationContext

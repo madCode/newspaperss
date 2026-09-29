@@ -8,6 +8,7 @@ import com.app.newspaperss.core.edition.EditionTitles
 import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
+import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.core.epub.EpubWriter
 import com.app.newspaperss.core.images.ImageBudget
 import com.app.newspaperss.core.images.ImageRules
@@ -32,6 +33,11 @@ sealed interface BuildResult {
     data class Failed(val editionId: Long, val reason: String) : BuildResult
 }
 
+/**
+ * Picks, fetches and writes the next edition.
+ *
+ * @param cover draws the edition's cover image, or returns null for a text-only cover page.
+ */
 class EditionBuilder(
     private val db: AppDatabase,
     private val content: ArticleContentProvider,
@@ -39,6 +45,7 @@ class EditionBuilder(
     private val clock: Clock = Clock.systemDefaultZone(),
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val imageBudgetBytes: Long = ImageRules.MAX_EDITION_BYTES,
+    private val cover: (CoverInfo) -> EpubImage? = { null },
 ) {
     suspend fun build(settings: EditionSettings, onProgress: (done: Int) -> Unit = {}): BuildResult {
         releaseUndelivered()
@@ -82,9 +89,21 @@ class EditionBuilder(
             ),
         )
 
+        val totalMinutes = arranged.sumOf { minutesOf(it.second) }
+        val coverImage = coverFor(
+            CoverInfo(
+                title = title,
+                date = now.toLocalDate(),
+                headlines = arranged.map { (a, c) -> CoverHeadline(c.title, sourcesById.getValue(a.sourceId).title) },
+                articleCount = arranged.size,
+                minutes = totalMinutes,
+            ),
+        )
+
         // Budgeted again in reading order (fetch order differs), so the first articles keep their
         // pictures. EpubWriter drops an img whose image isn't in the book, and an emptied figure.
-        val fitted = ImageBudget.fit(arranged.map { it.second.images }, imageBudgetBytes)
+        val articleImageBudget = (imageBudgetBytes - (coverImage?.bytes?.size ?: 0)).coerceAtLeast(0)
+        val fitted = ImageBudget.fit(arranged.map { it.second.images }, articleImageBudget)
         val withImages = arranged.zip(fitted) { (a, c), images -> a to c.copy(images = images) }
 
         val fileName = "edition-$editionId.epub"
@@ -98,6 +117,7 @@ class EditionBuilder(
                     EditionSection(section, items.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })
                 },
                 modified = clock.instant(),
+                cover = coverImage,
             )
             File(editionsDir, fileName).outputStream().use { EpubWriter.write(doc, it) }
         } catch (e: Exception) {
@@ -114,7 +134,7 @@ class EditionBuilder(
             db.editions().update(
                 db.editions().byId(editionId)!!.copy(
                     status = EditionStatus.READY, fileName = fileName,
-                    articleCount = arranged.size, minutes = arranged.sumOf { minutesOf(it.second) },
+                    articleCount = arranged.size, minutes = totalMinutes,
                 ),
             )
         }
@@ -133,6 +153,15 @@ class EditionBuilder(
                 editions.update(edition.copy(status = EditionStatus.FAILED, error = "Not sent; its articles went into the next edition."))
             }
         }
+    }
+
+    // The cover is decoration: an edition without one is still worth delivering.
+    private fun coverFor(info: CoverInfo): EpubImage? = try {
+        cover(info)
+    } catch (e: Exception) {
+        null
+    } catch (e: OutOfMemoryError) {
+        null
     }
 
     private suspend fun fail(editionId: Long, reason: String): BuildResult {

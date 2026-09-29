@@ -12,6 +12,7 @@ import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.edition.AndroidImageEncoder
 import com.app.newspaperss.edition.ArticleContentProvider
+import com.app.newspaperss.edition.CoverRenderer
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.edition.EditionRun
 import com.app.newspaperss.delivery.FolderDelivery
@@ -38,7 +39,7 @@ class AppContainer(
     val editions = EditionRepository(db, editionsDir)
     val feedFinder = FeedFinder(http)
     val feedSync = FeedSync(db, http)
-    val editionBuilder = EditionBuilder(db, content, editionsDir)
+    val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render)
     val settings = SettingsStore(context)
     val notifier = Notifier(context)
     val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, FolderDelivery(context.contentResolver), notifier)

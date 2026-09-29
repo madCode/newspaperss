@@ -2,6 +2,7 @@ package com.app.newspaperss.ui.today
 
 import android.content.ActivityNotFoundException
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,7 +36,7 @@ import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
 @Composable
-fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now()) {
+fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), onOpenEdition: (Long) -> Unit = {}) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     fun launch(intent: android.content.Intent) {
@@ -54,6 +55,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now()) {
             item {
                 LatestEdition(
                     latest,
+                    onDetails = { onOpenEdition(latest.id) },
                     onSend = { viewModel.fileOf(latest)?.let { launch(EditionIntents.share(context, it, latest.title)) } },
                     onOpen = { viewModel.fileOf(latest)?.let { launch(EditionIntents.open(context, it)) } },
                     onSent = { viewModel.markSent(latest) },
@@ -69,7 +71,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now()) {
                 )
             }
             items(editions.drop(1), key = { it.id }) { edition ->
-                EditionRow(edition)
+                EditionRow(edition, onClick = { onOpenEdition(edition.id) })
                 HorizontalDivider()
             }
         }
@@ -113,11 +115,13 @@ private fun BuildPanel(build: BuildState, onMake: () -> Unit) {
 }
 
 @Composable
-private fun LatestEdition(edition: EditionEntity, onSend: () -> Unit, onOpen: () -> Unit, onSent: () -> Unit) {
+private fun LatestEdition(edition: EditionEntity, onDetails: () -> Unit, onSend: () -> Unit, onOpen: () -> Unit, onSent: () -> Unit) {
     Card(Modifier.fillMaxWidth().padding(top = 16.dp)) {
         Column(Modifier.padding(16.dp)) {
-            Text(edition.title, style = MaterialTheme.typography.headlineSmall)
-            Text(summary(edition), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            Column(Modifier.fillMaxWidth().clickable(onClick = onDetails)) {
+                Text(edition.title, style = MaterialTheme.typography.headlineSmall)
+                Text(summary(edition), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            }
             when (edition.status) {
                 EditionStatus.READY -> {
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -147,8 +151,8 @@ private fun LatestEdition(edition: EditionEntity, onSend: () -> Unit, onOpen: ()
 }
 
 @Composable
-private fun EditionRow(edition: EditionEntity) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+private fun EditionRow(edition: EditionEntity, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp)) {
         Text(edition.title, style = MaterialTheme.typography.titleMedium)
         Text(summary(edition), style = MaterialTheme.typography.bodySmall)
     }

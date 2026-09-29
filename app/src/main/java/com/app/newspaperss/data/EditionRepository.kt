@@ -16,6 +16,8 @@ class EditionRepository(
 
     fun observeArticles(id: Long): Flow<List<EditionArticleEntity>> = db.editions().observeArticles(id)
 
+    fun observeContents(id: Long): Flow<List<EditionContent>> = db.editions().observeContents(id)
+
     suspend fun byId(id: Long): EditionEntity? = db.editions().byId(id)
 
     fun fileOf(edition: EditionEntity): File? = edition.fileName?.let { File(editionsDir, it) }?.takeIf { it.exists() }
@@ -28,5 +30,6 @@ class EditionRepository(
     }
 
     /** Puts articles the reader didn't get to back in the pool, ahead of newer ones. */
-    suspend fun bringBack(articleIds: List<Long>) = db.articles().bringBack(articleIds)
+    /** Returns how many actually went back. */
+    suspend fun bringBack(articleIds: List<Long>): Int = db.articles().bringBackDelivered(articleIds)
 }

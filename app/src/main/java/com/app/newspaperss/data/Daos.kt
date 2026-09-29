@@ -2,6 +2,7 @@ package com.app.newspaperss.data
 
 import androidx.room.Dao
 import androidx.room.Delete
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -91,6 +92,10 @@ interface ArticleDao {
     @Query("UPDATE articles SET state = 'NEW', broughtBack = 1 WHERE id IN (:ids)")
     suspend fun bringBack(ids: List<Long>)
 
+    /** Only articles still marked delivered: one already back in the pool or in a newer edition stays put. */
+    @Query("UPDATE articles SET state = 'NEW', broughtBack = 1 WHERE id IN (:ids) AND state = 'DELIVERED'")
+    suspend fun bringBackDelivered(ids: List<Long>): Int
+
     /** Expires unpicked articles discovered before [before], except reading-list items. */
     @Query(
         """UPDATE articles SET state = 'EXPIRED' WHERE state = 'NEW' AND broughtBack = 0 AND discoveredAt < :before
@@ -98,6 +103,12 @@ interface ArticleDao {
     )
     suspend fun expireOlderThan(before: Instant): Int
 }
+
+data class EditionContent(
+    @Embedded val entry: EditionArticleEntity,
+    /** The article's current state; null once its source has been removed. */
+    val state: ArticleState?,
+)
 
 @Dao
 interface EditionDao {
@@ -130,6 +141,13 @@ interface EditionDao {
 
     @Query("SELECT * FROM edition_articles WHERE editionId = :editionId ORDER BY position")
     fun observeArticles(editionId: Long): Flow<List<EditionArticleEntity>>
+
+    @Query(
+        """SELECT edition_articles.*, articles.state AS state FROM edition_articles
+           LEFT JOIN articles ON articles.id = edition_articles.articleId
+           WHERE editionId = :editionId ORDER BY position""",
+    )
+    fun observeContents(editionId: Long): Flow<List<EditionContent>>
 
     @Query("SELECT articleId FROM edition_articles WHERE editionId = :editionId AND articleId IS NOT NULL ORDER BY position")
     suspend fun articleIds(editionId: Long): List<Long>

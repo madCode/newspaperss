@@ -13,15 +13,21 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.core.feed.StarterPacks
 import com.app.newspaperss.data.AppDatabase
+import com.app.newspaperss.data.ArticleEntity
+import com.app.newspaperss.data.ArticleState
+import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
+import com.app.newspaperss.ui.edition.EditionDetailScreen
+import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
 import com.app.newspaperss.ui.settings.SettingsScreen
@@ -104,6 +110,36 @@ class ScreenshotTest {
         }
         val vm = TodayViewModel(EditionRepository(db, tmp.newFolder()), flowOf(null)) {}
         shoot("05-today", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
+    }
+
+    @Test
+    fun editionDetail() {
+        val (id, lastArticle) = runBlocking {
+            val source = db.sources().insert(SourceEntity(url = "https://example.com/feed", title = "The Example Review"))
+            val titles = listOf(
+                "The quiet return of the night train",
+                "What a century of weather records says about spring",
+                "A short history of the paperback",
+                "Why city trees are planted in pairs",
+            )
+            val articles = titles.mapIndexed { i, title ->
+                db.articles().insertIgnoring(
+                    ArticleEntity(sourceId = source, guid = "$i", url = "https://example.com/$i", title = title, state = if (i == 2) ArticleState.NEW else ArticleState.DELIVERED),
+                )
+            }
+            val now = Instant.parse("2026-09-29T06:30:00Z")
+            val edition = db.editions().insert(
+                EditionEntity(title = "Tuesday Morning Edition", createdAt = now, status = EditionStatus.DELIVERED, fileName = "e.epub", articleCount = 4, minutes = 27.5, deliveredAt = now),
+            )
+            db.editions().insertArticles(
+                titles.mapIndexed { i, title ->
+                    EditionArticleEntity(editionId = edition, articleId = articles[i], position = i, title = title, sourceTitle = "The Example Review", minutes = 4.0 + 3 * i)
+                },
+            )
+            edition to articles.last()
+        }
+        val vm = EditionDetailViewModel(EditionRepository(db, tmp.newFolder().apply { resolve("e.epub").writeText("epub") }), id).apply { toggle(lastArticle) }
+        shoot("05b-edition-detail", ready = { vm.detail.value?.contents?.isNotEmpty() == true }) { EditionDetailScreen(vm, onBack = {}) }
     }
 
     @Test

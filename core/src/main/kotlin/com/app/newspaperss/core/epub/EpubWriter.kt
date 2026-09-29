@@ -20,6 +20,7 @@ object EpubWriter {
     private const val COVER = "cover.xhtml"
     private const val CONTENTS = "contents.xhtml"
     private const val END = "end.xhtml"
+    private const val COVER_IMAGE_ID = "cover-image"
     private const val MAX_COVER_SOURCES = 4
     private val IMAGE_TYPES = setOf("image/jpeg", "image/png", "image/gif")
     private val IMAGE_HREF = Regex("images/[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*")
@@ -33,7 +34,8 @@ object EpubWriter {
      * first byte is written, so an [IllegalArgumentException] leaves [out] untouched.
      *
      * @throws IllegalArgumentException if an image's href is not a plain path under `images/`,
-     *   its media type is not JPEG, PNG or GIF, or two different images share an href.
+     *   its media type is not JPEG, PNG or GIF, two different images share an href, or the cover
+     *   shares an href with an article image.
      */
     fun write(doc: EditionDoc, out: OutputStream) {
         val book = Book(doc)
@@ -88,20 +90,31 @@ object EpubWriter {
             ).map { (name, text) -> name to text.toByteArray(Charsets.UTF_8) }.toMutableList()
             pages.forEach { files += "OEBPS/${it.href}" to it.xhtml.toByteArray(Charsets.UTF_8) }
             images.forEach { files += "OEBPS/${it.href}" to it.bytes }
+            doc.cover?.let { files += "OEBPS/${it.href}" to it.bytes }
             return files
         }
 
         private fun collectImages(): List<EpubImage> {
             val byHref = LinkedHashMap<String, EpubImage>()
             for (image in articles.flatMap { it.images }) {
-                require(IMAGE_HREF.matches(image.href)) { "Image href must be a plain path under images/: ${image.href}" }
-                require(image.mediaType in IMAGE_TYPES) { "Unsupported image type ${image.mediaType} for ${image.href}" }
+                checkImage(image)
                 val existing = byHref.putIfAbsent(image.href, image)
                 require(existing == null || existing.bytes.contentEquals(image.bytes)) {
                     "Two different images share the href ${image.href}"
                 }
             }
+            doc.cover?.let { cover ->
+                checkImage(cover)
+                // The cover's manifest item carries properties="cover-image"; a second item for the
+                // same file would be invalid, and an article image doubling as cover is a caller bug.
+                require(cover.href !in byHref) { "The cover shares the href ${cover.href} with an article image" }
+            }
             return byHref.values.toList()
+        }
+
+        private fun checkImage(image: EpubImage) {
+            require(IMAGE_HREF.matches(image.href)) { "Image href must be a plain path under images/: ${image.href}" }
+            require(image.mediaType in IMAGE_TYPES) { "Unsupported image type ${image.mediaType} for ${image.href}" }
         }
 
         private fun toc(): List<TocEntry> {
@@ -127,14 +140,23 @@ object EpubWriter {
             val sources = articles.map { it.sourceTitle.trim() }.filter { it.isNotEmpty() }.distinct()
             val sourceLine = sources.take(MAX_COVER_SOURCES).joinToString(", ") +
                 if (sources.size > MAX_COVER_SOURCES) " and more" else ""
-            val body = buildString {
-                append("<div class=\"cover\">\n")
-                append("<p class=\"masthead\">${esc(doc.masthead)}</p>\n")
-                append("<h1 class=\"edition-title\">${esc(doc.title)}</h1>\n")
-                append("<p class=\"date\">${esc(COVER_DATE.format(doc.date))}</p>\n")
-                append("<p class=\"totals\">${esc(totalsLine())}</p>\n")
-                if (sources.isNotEmpty()) append("<p class=\"sources\">${esc(sourceLine)}</p>\n")
-                append("</div>")
+            val date = COVER_DATE.format(doc.date)
+            val cover = doc.cover
+            val body = if (cover != null) {
+                // The image already shows the masthead, title and date, so repeating them as text
+                // would push the cover onto a second screen. The alt carries them for screen readers.
+                val alt = "${doc.masthead}: ${doc.title}, $date"
+                "<div class=\"cover-image\"><img src=\"${esc(cover.href)}\" alt=\"${esc(alt)}\"/></div>"
+            } else {
+                buildString {
+                    append("<div class=\"cover\">\n")
+                    append("<p class=\"masthead\">${esc(doc.masthead)}</p>\n")
+                    append("<h1 class=\"edition-title\">${esc(doc.title)}</h1>\n")
+                    append("<p class=\"date\">${esc(date)}</p>\n")
+                    append("<p class=\"totals\">${esc(totalsLine())}</p>\n")
+                    if (sources.isNotEmpty()) append("<p class=\"sources\">${esc(sourceLine)}</p>\n")
+                    append("</div>")
+                }
             }
             return Page("cover", COVER, doc.title, xhtmlPage(doc.title, lang, body))
         }
@@ -212,6 +234,8 @@ object EpubWriter {
                 append("<dc:creator>${esc(doc.masthead)}</dc:creator>\n")
                 append("<dc:date>${doc.date}</dc:date>\n")
                 append("<meta property=\"dcterms:modified\">${DateTimeFormatter.ISO_INSTANT.format(modified)}</meta>\n")
+                // EPUB 2 readers and Kindle find the cover image through this meta, not the manifest property.
+                if (doc.cover != null) append("<meta name=\"cover\" content=\"$COVER_IMAGE_ID\"/>\n")
                 append("</metadata>\n<manifest>\n")
                 append("<item id=\"nav\" href=\"nav.xhtml\" media-type=\"$XHTML\" properties=\"nav\"/>\n")
                 append("<item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\"/>\n")
@@ -219,6 +243,9 @@ object EpubWriter {
                 for (page in pages) append("<item id=\"${page.id}\" href=\"${page.href}\" media-type=\"$XHTML\"/>\n")
                 images.forEachIndexed { i, image ->
                     append("<item id=\"image-${i + 1}\" href=\"${esc(image.href)}\" media-type=\"${image.mediaType}\"/>\n")
+                }
+                doc.cover?.let {
+                    append("<item id=\"$COVER_IMAGE_ID\" href=\"${esc(it.href)}\" media-type=\"${it.mediaType}\" properties=\"cover-image\"/>\n")
                 }
                 append("</manifest>\n<spine toc=\"ncx\">\n")
                 // Every page is linear: Send to Kindle rejects a non-linear cover that nothing links to.

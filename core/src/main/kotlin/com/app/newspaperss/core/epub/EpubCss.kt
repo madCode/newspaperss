@@ -17,6 +17,7 @@ pre { white-space: pre-wrap; font-size: 0.85em; }
 table { border-collapse: collapse; margin: 1em 0; }
 th, td { border: 1px solid #888; padding: 0.2em 0.4em; vertical-align: top; }
 .cover { text-align: center; }
+.cover-image { text-align: center; margin: 0; }
 .masthead { font-size: 2.2em; font-weight: bold; margin: 2em 0 0.3em 0; }
 .edition-title { font-size: 1.4em; margin: 0 0 1.5em 0; }
 .totals { font-style: italic; }
