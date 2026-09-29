@@ -108,5 +108,7 @@ class ArticleImagesTest {
         assertTrue(refusing.take(14_000_000))
         repeat(3) { assertFalse(refusing.take(2_000_000)) }
         assertTrue("three refusals in a row", refusing.exhausted)
+
+        assertTrue("an empty budget is spent before anything is downloaded", ImageAllowance(maxBytes = 0).exhausted)
     }
 }

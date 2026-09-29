@@ -177,11 +177,14 @@ interface ArticleDao {
 
     /**
      * Old articles keep their row, whose guid stops a feed offering them again, but not the
-     * feed's copy of their text, which would otherwise grow the database without end.
+     * feed's copy of their text, which would otherwise grow the database without end. Counted
+     * from delivery where there was one: a link saved long ago and sent today can still be
+     * brought back with its text.
      */
     @Query(
         """UPDATE articles SET feedHtml = NULL WHERE feedHtml IS NOT NULL
-           AND state IN ('DELIVERED', 'EXPIRED', 'SKIPPED') AND discoveredAt < :before""",
+           AND state IN ('DELIVERED', 'EXPIRED', 'SKIPPED') AND discoveredAt < :before
+           AND url NOT IN (SELECT url FROM delivered_urls WHERE deliveredAt >= :before)""",
     )
     suspend fun dropOldFeedHtml(before: Instant): Int
 

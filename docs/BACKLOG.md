@@ -18,7 +18,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] Verify folder delivery + chooser-from-notification on a real device
 
 ### M3 leftovers
-- [ ] Write encoded images to a cache dir and stream them into the zip (lower peak memory)
 
 ### M5 leftovers
 
@@ -38,6 +37,15 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] TalkBack: live-region build status, step "2 of 4" on the onboarding progress, a click label on the edition card; move Add out of the text field for large fonts
 - [ ] Change the device in Settings after onboarding
 - [ ] A short Kindle how-to (same Amazon account, Library › Docs)
+
+### From the resource audit (Day 2)
+- [ ] An OkHttp Cache for feeds, so unchanged ones answer 304 (about 180 MB a month of feed downloads today)
+- [ ] Background sync every 12 hours with battery-not-low, not every 4 (ExistingPeriodicWorkPolicy.UPDATE so installs pick it up)
+- [ ] tt-rss: pass sinceId, so each sync doesn't re-download the same 200 unread items
+- [ ] Strip script/style/svg before the Readability DOM clone, and cap article pages at ~4 MB (the worst-case memory peak)
+- [ ] Load build candidates without feedHtml; fetch it per article
+- [ ] Article preview: open the EPUB off the main thread, one ZipFile per screen
+- [ ] EPUB zip: buffered output, JPEGs stored uncompressed
 
 ### Tech debt
 - [ ] Reading-list links saved before database version 2 with a title never get a reading time (no backfill)
@@ -122,6 +130,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Housekeeping from the resource audit: only the newest 14 editions keep their EPUB; old articles drop their feed text (a month after delivery); the image budget counts as spent when nothing more fits. Streaming images to disk dropped: at most 15 MB, not the real peak
 - [x] Reading list: every saved link's page is measured for a reading time (database version 2, the first migration), rows open in the browser, and an untitled row shows a title made from its address
 - [x] Source page: a real "Recent articles" heading, a status mark per article (● ✓ ○), stronger titles, lighter inset dividers; "Article text: Automatic" says what it sets
 - [x] Webcomics: feeds linked only from the page are found (God Slave's `/comic/rss`), and a page's own comic (`#cc-comic`, `#comic`) beats the feed's thumbnail
