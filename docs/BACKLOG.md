@@ -7,7 +7,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### M4 leftovers
-- [ ] Expedite scheduled builds (needs getForegroundInfo for API < 31)
+- [ ] A timer that fires in Doze: WorkManager's delayed timer can wait for the phone's next maintenance window overnight, so a 6:30 edition may start late. An inexact `AlarmManager.setAndAllowWhileIdle` alarm fires in Doze without the exact-alarm permission
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
 - [ ] Verify folder delivery + chooser-from-notification on a real device
 
@@ -45,6 +45,7 @@ or should borrow. The result goes in `docs/research/`.
 
 ## Done
 
+- [x] Edition builds are expedited work with a "Making your edition…" notification, so they start as soon as they're asked for
 - [x] Extraction: screen-reader-only text ("list 1 of 4") and "Recommended stories" link lists no longer reach the edition (found in a live edition's Al Jazeera article)
 - [x] tt-rss: take articles from one category, and a setting to leave delivered articles unread on the server, both on the source's screen
 - [x] Per-source article cap on the source screen, replacing the edition's "up to N from each site" for that site (not for tt-rss, which is capped per publication)
