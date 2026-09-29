@@ -51,6 +51,13 @@ class OkHttpHttpClientTest {
     }
 
     @Test
+    fun aPageLabelledLatin1IsReadAsWindows1252LikeBrowsersDo() {
+        val page = "<meta charset=\"iso-8859-1\"><p>\u201cQuoted\u201d \u2014 caf\u00e9</p>"
+        val decoded = OkHttpHttpClient.decode(page.toByteArray(charset("windows-1252")), null)
+        assertTrue(decoded.contains("\u201cQuoted\u201d \u2014 caf\u00e9"))
+    }
+
+    @Test
     fun aByteOrderMarkMeansUtf8() {
         val bytes = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + "<meta charset=iso-8859-1>\u00e9".toByteArray(Charsets.UTF_8)
         assertTrue(OkHttpHttpClient.decode(bytes, null).endsWith("\u00e9"))

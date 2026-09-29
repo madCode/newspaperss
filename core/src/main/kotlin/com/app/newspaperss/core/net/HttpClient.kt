@@ -116,8 +116,19 @@ class OkHttpHttpClient(
             // The meta tag is required to be in the first 1024 bytes.
             val head = String(bytes, 0, minOf(bytes.size, 1024), Charsets.ISO_8859_1)
             val declared = xmlEncoding.find(head)?.groupValues?.get(1) ?: htmlCharset.find(head)?.groupValues?.get(1)
-            val charset = declared?.let { runCatching { Charset.forName(it) }.getOrNull() } ?: Charsets.UTF_8
+            val charset = declared?.let { runCatching { Charset.forName(it) }.getOrNull() }?.let(::browserEquivalent) ?: Charsets.UTF_8
             return String(bytes, charset).removePrefix("\uFEFF")
+        }
+
+        /**
+         * What browsers actually use for a declared charset (the WHATWG encoding rules): pages
+         * labelled Latin-1 or ASCII are really windows-1252, whose curly quotes and dashes Latin-1
+         * decodes as control characters; a UTF-16 label on bytes read this way can only be wrong.
+         */
+        private fun browserEquivalent(declared: Charset): Charset = when (declared) {
+            Charsets.ISO_8859_1, Charsets.US_ASCII -> Charset.forName("windows-1252")
+            Charsets.UTF_16, Charsets.UTF_16BE, Charsets.UTF_16LE -> Charsets.UTF_8
+            else -> declared
         }
 
         // A browser-like agent: some sites refuse unknown clients outright.

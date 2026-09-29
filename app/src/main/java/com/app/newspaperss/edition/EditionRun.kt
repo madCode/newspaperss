@@ -10,7 +10,7 @@ import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
-import java.io.IOException
+import kotlinx.coroutines.CancellationException
 
 /** One edition from start to finish: sync, build, deliver, tell the reader. */
 class EditionRun(
@@ -53,8 +53,9 @@ class EditionRun(
                     // Only after the edition is saved: notes that fail mustn't hold back the book.
                     val notesError = try {
                         notes.write(editionId)?.let { folder.deliver(it, folderUri, it.name, EditionNotes.MIME) }
-                    } catch (e: IOException) {
-                        "Couldn't write the notes (${e.message})."
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        "Couldn't write the notes (${e.message ?: e.javaClass.simpleName})."
                     }
                     notesError?.let { notifier.problem("Notes for ${edition.title} weren't saved", it) }
                 }

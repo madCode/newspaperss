@@ -24,17 +24,21 @@ who'd rather not set up Python, a server and a scheduler.
   website (the app finds its feed), import OPML from another reader, or
   connect a Tiny Tiny RSS account.
 - **Save things to read later.** Share a link from any app to "Read in
-  newspaperss"; import your Pocket or Instapaper export.
+  newspaperss"; import your Pocket or Instapaper export. Add curated lists
+  like Arts & Letters Daily, which picks a few links a day.
 - **A paper that ends.** Each edition fills a reading-time budget, taking
-  turns between sites with at most one article from each, so no site drowns
-  out the others. The full article is fetched and cleaned for e-ink when a
+  turns between sites with at most one article from each (you can allow
+  more), so no site drowns out the others. The full article is fetched and cleaned for e-ink when a
   site only sends summaries; the app works out which sites need that.
 - **A proper book.** Cover with the day's headlines, contents with reading
   times, images sized for e-ink, "Next" links, and an end page.
 - **Delivered your way.** A notification with a Send button (Kindle app,
   Dropbox for a Kobo, email), a synced folder (KOReader), or Open on a
-  Boox. Articles are only used up once you confirm the edition arrived.
+  Boox. Articles are only used up once the edition is delivered: saved to
+  your folder, or confirmed by you after sending.
 - **Didn't finish?** Bring articles back into tomorrow's edition.
+- **Take notes.** Export a Markdown notes file per edition, with a citation
+  and reflection prompts for each article, for Obsidian, Logseq or any notes app.
 - **Calm by design.** No unread counts, no infinite timeline, no
   animations to smear on an e-ink screen.
 

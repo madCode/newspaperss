@@ -113,6 +113,12 @@ class NotesWriterTest {
     }
 
     @Test
+    fun anEntityInATitleIsntRenderedAsTheCharacter() {
+        val notes = NotesWriter.write(edition(NotesArticle("Using &copy; in HTML", "Blog", "https://example.com/a")))
+        assertTrue(notes.contains("## Using \\&copy; in HTML"))
+    }
+
+    @Test
     fun aBlankTitleStillMakesAHeading() {
         val notes = NotesWriter.write(edition(NotesArticle(" \n ", "Blog", "https://example.com/a")))
 

@@ -68,7 +68,7 @@ object NotesWriter {
 
     // Backslash-escaping any ASCII punctuation is valid CommonMark, so over-escaping only costs
     // readability of the raw file. `$` is here because Obsidian renders "$5 to $10" as math.
-    private const val SIGNIFICANT = "\\`*_[]#<>|~$"
+    private const val SIGNIFICANT = "\\`*_[]#<>|~$&"
 
     /** One line of plain text: feed titles can hold newlines and Markdown syntax. */
     private fun text(value: String): String = buildString {
