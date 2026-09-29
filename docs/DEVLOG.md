@@ -8,13 +8,17 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** onboarding offers tt-rss and OPML import (from your device testing).
-- **Next:** a resource-usage audit (it decides whether streaming images to disk is worth doing); a design pass.
+- **In flight:** sends from the notification count as delivered (the persona audit's top finding).
+- **Next:** the rest of the persona audit's list (dated titles, a louder "ready" notification, saved links in onboarding); a resource-usage audit.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 5: bring your reader into onboarding (12:53–)
+### Cycle 6: persona audit, and sends that count (13:06–)
+- **Audit:** walked the app as a Pocket refugee with a Kobo, a tt-rss + KOReader self-hoster, a casual Kindle owner, a Boox owner and a TalkBack user. Ten findings; the rest are in the backlog.
+- **Shipped:** the worst one. Sending the daily paper from its notification was never recorded, so the next build marked it "Not sent" and its articles came back, every day. Now choosing an app in the share sheet marks the edition delivered, from the notification or the app, and opening it counts on a Boox. The "Did it reach your Kindle?" question, asked before Send to Kindle could have delivered anything, is gone.
+
+### Cycle 5: bring your reader into onboarding (12:53–13:06, [#22](https://github.com/madCode/newspaperss/pull/22))
 - **From device testing:** onboarding had no way in for someone who already uses a reader. The sources step insisted on a starter feed; tt-rss and OPML were only in the Sources menu after setup.
 - **Shipped:** "Already use a feed reader?" on the sources step, with Import an OPML file and Connect tt-rss. Either one is enough to go on.
 

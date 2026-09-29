@@ -212,8 +212,10 @@ class EditionBuilder(
      */
     private suspend fun releaseUndelivered() {
         val editions = db.editions()
-        for (edition in editions.withStatus(EditionStatus.READY)) {
+        for (listed in editions.withStatus(EditionStatus.READY)) {
             db.withTransaction {
+                // Read again inside the transaction: it may have been sent since it was listed.
+                val edition = editions.byId(listed.id)?.takeIf { it.status == EditionStatus.READY } ?: return@withTransaction
                 db.articles().bringBack(editions.articleIds(edition.id))
                 editions.update(edition.copy(status = EditionStatus.FAILED, error = "Not sent; its articles went into the next edition."))
             }

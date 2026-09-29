@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.app.newspaperss.MainActivity
+import com.app.newspaperss.OpenEditionActivity
 import com.app.newspaperss.R
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.plural
@@ -44,7 +45,13 @@ class Notifier(private val context: Context) : EditionNotifier {
     }
 
     override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean) {
-        val intent = if (openInstead) EditionIntents.open(context, file) else EditionIntents.share(context, file, edition.title)
+        val intent = if (openInstead) {
+            Intent(context, OpenEditionActivity::class.java)
+                .putExtra(OpenEditionActivity.EXTRA_EDITION_ID, edition.id)
+                .putExtra(OpenEditionActivity.EXTRA_FILE, file.path)
+        } else {
+            EditionIntents.share(context, file, edition.title, edition.id)
+        }
         val action = PendingIntent.getActivity(
             context, edition.id.toInt(), intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

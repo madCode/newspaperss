@@ -110,7 +110,7 @@ Ported from the library, with the lessons its code and comments record:
 - **Commit after delivery.** Articles become `DELIVERED` and list items are
   ticked off only when delivery reports success. For share-sheet delivery,
   where the app can't know whether it worked, "success" is the user
-  confirming "Sent it" (§6). Delivered links are also remembered on their
+  choosing an app in the share sheet (§6). Delivered links are also remembered on their
   own for a year, so a source removed and added again, or the same story
   in a second source, doesn't deliver them twice.
 - **One run at a time.** Builds are unique WorkManager work (`KEEP`), so a
@@ -156,9 +156,13 @@ folders and anything that syncs them (Syncthing), but Google Drive's and
 Dropbox's providers don't offer whole folders to other apps, so cloud
 folders need either a share per edition or a direct API connection.
 
-Share-sheet delivery can't tell whether the send worked, so the edition
-stays "Ready" until the user taps **Sent it** (or opens the edition again
-later and is asked). That keeps the commit-after-delivery rule honest.
+Share-sheet delivery can't tell whether the send worked. The closest signal
+is the reader choosing an app in the share sheet, which Android reports back,
+so that marks the edition delivered, from the notification as well as the
+app. On a Boox, opening the edition counts. **I've sent it** covers any other
+route. If a send didn't arrive, **Send again** is on the edition. An edition
+still "Ready" when the next one is built was never sent: its articles go into
+the new one.
 
 ## 7. Onboarding (target: first edition in under two minutes)
 

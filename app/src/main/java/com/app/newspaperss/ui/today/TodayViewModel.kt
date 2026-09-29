@@ -72,7 +72,7 @@ class TodayViewModel(
     fun markSent(edition: EditionEntity) = markSent(edition.id)
 
     fun markSent(editionId: Long) {
-        viewModelScope.launch { editions.markDelivered(editionId) }
+        viewModelScope.launch { editions.markSent(editionId) }
     }
 
     companion object {

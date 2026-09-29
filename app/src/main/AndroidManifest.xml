@@ -38,6 +38,15 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".OpenEditionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <receiver
+            android:name=".delivery.EditionSentReceiver"
+            android:exported="false" />
         <receiver
             android:name=".work.ClockChangeReceiver"
             android:exported="false">

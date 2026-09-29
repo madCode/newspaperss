@@ -77,7 +77,7 @@ class EditionDetailViewModel(
     }
 
     fun markSent() {
-        viewModelScope.launch { editions.markDelivered(id) }
+        viewModelScope.launch { editions.markSent(id) }
     }
 
     fun bringBack() {

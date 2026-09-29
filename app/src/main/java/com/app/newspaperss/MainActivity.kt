@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
                         val sources = viewModel { SourcesViewModel(container.sources, container.feedFinder, container.ttrss) { SyncWorker.syncNow(context) } }
                         OnboardingScreen(vm, sources)
                     }
-                    true -> App(container)
+                    true -> App(container, preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX)
                 }
             }
         }
@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun App(container: AppContainer) {
+private fun App(container: AppContainer, preferOpen: Boolean) {
     val nav = rememberNavController()
     val current by nav.currentBackStackEntryAsState()
     Scaffold(
@@ -145,6 +145,7 @@ private fun App(container: AppContainer) {
                 val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes) }
                 EditionDetailScreen(
                     vm,
+                    preferOpen = preferOpen,
                     onBack = { nav.navigateUp() },
                     onReadArticle = { position -> nav.navigate("edition/$id/article/$position") { launchSingleTop = true } },
                 )
