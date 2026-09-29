@@ -76,6 +76,11 @@ class EditionDetailViewModel(
         _selected.value = _selected.value.let { if (articleId in it) it - articleId else it + articleId }
     }
 
+    /** Deletes this edition, then [onDeleted] (to leave the screen) if it was deleted. */
+    fun delete(onDeleted: () -> Unit) {
+        viewModelScope.launch { if (editions.delete(id)) onDeleted() }
+    }
+
     fun markSent() {
         viewModelScope.launch { editions.markSent(id) }
     }

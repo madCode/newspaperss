@@ -39,7 +39,9 @@ class EditionRepository(
     suspend fun markDelivered(id: Long, onlyIfReady: Boolean = false) {
         val delivered = db.withTransaction {
             val edition = db.editions().byId(id) ?: return@withTransaction false
-            // Checked inside the transaction: a build may be releasing unsent editions at the same time.
+            // Checked inside the transaction: a build may be releasing unsent editions at the same
+            // time, and the reader may have deleted this one while a folder copy was finishing.
+            if (edition.status == EditionStatus.DELETED) return@withTransaction false
             if (onlyIfReady && edition.status != EditionStatus.READY) return@withTransaction false
             val articleIds = db.editions().articleIds(id)
             db.articles().setState(articleIds, ArticleState.DELIVERED)
@@ -62,6 +64,26 @@ class EditionRepository(
      * Returns how many actually went back.
      */
     suspend fun bringBack(articleIds: List<Long>): Int = db.articles().bringBackDelivered(articleIds)
+
+    /**
+     * Deletes an edition's contents and EPUB. One that was never sent gives its articles back to
+     * the next edition first; a delivered one's stay used. An edition still being made is left
+     * alone. The row stays as [EditionStatus.DELETED], keeping its title taken.
+     *
+     * @return false if there was nothing to delete.
+     */
+    suspend fun delete(id: Long): Boolean {
+        val deleted = db.withTransaction {
+            val edition = db.editions().byId(id)
+                ?.takeIf { it.status != EditionStatus.BUILDING && it.status != EditionStatus.DELETED } ?: return@withTransaction null
+            if (edition.status == EditionStatus.READY) db.articles().bringBack(db.editions().articleIds(id))
+            db.editions().deleteArticles(id)
+            db.editions().update(edition.copy(status = EditionStatus.DELETED, fileName = null, articleCount = 0, minutes = 0.0, error = null))
+            edition
+        } ?: return false
+        deleted.fileName?.let { File(editionsDir, it) }?.delete()
+        return true
+    }
 
     private companion object {
         const val TAG = "EditionRepository"

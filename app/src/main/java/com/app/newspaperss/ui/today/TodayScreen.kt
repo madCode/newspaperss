@@ -2,6 +2,7 @@ package com.app.newspaperss.ui.today
 
 import android.content.ActivityNotFoundException
 import android.widget.Toast
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -156,9 +157,13 @@ private fun LatestEdition(
 ) {
     Card(Modifier.fillMaxWidth().padding(top = 16.dp)) {
         Column(Modifier.padding(16.dp)) {
-            Column(Modifier.fillMaxWidth().clickable(onClick = onDetails)) {
+            Column(Modifier.fillMaxWidth().clickable(onClickLabel = "See what's inside", onClick = onDetails)) {
                 Text(edition.title, style = MaterialTheme.typography.headlineSmall)
                 Text(summary(edition), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            }
+            // The title opens the contents too, but nothing about it says so.
+            if (edition.articleCount > 0 && edition.status != EditionStatus.BUILDING) {
+                TextButton(onClick = onDetails, contentPadding = PaddingValues(0.dp)) { Text("See what's inside") }
             }
             when (edition.status) {
                 EditionStatus.READY -> {
@@ -199,7 +204,7 @@ private fun LatestEdition(
                     )
                     OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") }
                 }
-                EditionStatus.BUILDING -> {}
+                EditionStatus.BUILDING, EditionStatus.DELETED -> {}
             }
         }
     }
@@ -220,6 +225,7 @@ internal fun summary(edition: EditionEntity): String {
         EditionStatus.DELIVERED -> "sent"
         EditionStatus.FAILED -> "not sent"
         EditionStatus.BUILDING -> "being made"
+        EditionStatus.DELETED -> "deleted"
     }
     if (edition.articleCount == 0) return status.replaceFirstChar { it.uppercase() }
     val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"

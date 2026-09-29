@@ -7,7 +7,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### From device testing (Day 2)
-- [ ] Make "what's in this edition" obvious before sending, and allow deleting an edition
 - [ ] EPUB design pass (the rss-to-e-reader output is the bar); links inherit the text colour, so KOReader's dark mode stays readable
 - [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
 - [ ] Reading list: fetch each link's title and reading time; tap to open in the browser
@@ -43,6 +42,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] A short Kindle how-to (same Amazon account, Library › Docs)
 
 ### Tech debt
+- [ ] Deleting an edition leaves its "ready" notification up; its Send would share a missing file
 - [ ] Webcomic title text (xkcd's hover text) is dropped with the img title attribute; show it as a caption
 - [ ] `SettingsScreenTest` can fail under full-suite load: DataStore "Unable to rename s.preferences_pb.tmp", likely a write still running when the temp folder is deleted. Give test DataStores a scope that's finished before cleanup
 
@@ -121,6 +121,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] "See what's inside" on Today, and deleting an edition (its title stays taken, so Send to Kindle doesn't drop a remake)
 - [x] Comics and cartoons keep their image: an image-only feed item isn't dropped as empty, and a cartoon page gives its main image instead of its footer
 - [x] The per-site cap gives way when there's room: with one source (the New Yorker) an edition held one article
 - [x] "Edition ready" makes a sound (its own default-importance channel); "delivered" stays quiet
