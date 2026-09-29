@@ -8,13 +8,19 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** the article preview opens at once.
-- **Next:** language tagging; the audit's memory items (page DOM trimming); what tapping a source's article does.
+- **In flight:** each article tagged with its language.
+- **Next:** the audit's memory items (page DOM trimming); reading time for Chinese and Japanese; what tapping a source's article does.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 20: the first tap on an article (16:00–)
+### Cycle 21: articles know their language (16:15–)
+- **Why:** your note on languages. E-readers choose hyphenation, fonts and text direction from `xml:lang`, and every article was tagged English, so a French article was hyphenated with English rules and an Arabic one laid out left to right.
+- **Shipped:** each article's headline and body are tagged with its language, and right-to-left languages get `dir="rtl"`. The text decides: the writing system for non-Latin scripts, and common words for English, French, German, Spanish, Italian, Portuguese and Dutch. The page's declared language breaks ties, and is kept when it agrees because it's more precise (pt-BR, Persian in Arabic script). Many sites declare the same language on every page, and a feed's text declares nothing. No database change.
+- **Checks:** a live edition from Le Monde, Spiegel, El País, NHK, Al Jazeera Arabic, the Guardian and g1 tagged every article correctly and passes epubcheck. The Arabic page lays out right to left, with the English kicker and byline left to right.
+- **Found on the way:** NHK's Japanese articles count as "1 word" (reading time assumes spaces), and Le Monde serves a script wall the bot check doesn't catch. Both are in the backlog.
+
+### Cycle 20: the first tap on an article (16:00–16:15, [#37](https://github.com/madCode/newspaperss/pull/37))
 - **From device testing:** the first tap on an article seemed not to open it, and the article was a little wider than the phone.
 - **Found:** the width came from this morning's EPUB, which printed the full original URL on its own line with no word breaking; the EPUB design round replaced both. A fresh live edition (11 articles, cover and contents) rendered at 360px wide has nothing wider than the screen. The tap wasn't being dropped: the preview read the EPUB during composition, and the first WebView of a session starts slowly, so the screen held still long enough to look ignored.
 - **Shipped:** the preview appears at once with a progress bar, and the book is read in the background. One open zip serves the page and all its images, instead of reopening the zip for each one.

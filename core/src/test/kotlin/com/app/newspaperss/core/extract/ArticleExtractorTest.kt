@@ -261,4 +261,18 @@ class ArticleExtractorTest {
         assertEquals("Story (example.com)", ArticleExtractor.titleFromUrl("https://example.com/story.html"))
         assertEquals("example.com", ArticleExtractor.titleFromUrl("https://example.com/"))
     }
+
+    private val portuguese = "A câmara municipal votou na terça-feira para ampliar as ciclovias ao longo do rio, mas vários membros " +
+        "disseram que o plano foi apressado e que os moradores não foram consultados. "
+
+    @Test
+    fun anArticleKnowsItsLanguageFromItsTextAndKeepsThePagesMorePreciseTag() = runTest {
+        val page = "<html lang=\"pt-BR\"><body><article><h1>Ciclovias</h1>" + "<p>$portuguese</p>".repeat(8) + "</article></body></html>"
+        val fromPage = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(teaser, feedTitle = "Ciclovias"))
+        assertEquals("pt-BR", fromPage.language)
+
+        // A feed's text has no declaration to go on.
+        val fromFeed = ArticleExtractor(FakeHttp(emptyMap())).extract(input("<p>${portuguese.repeat(4)}</p>", mode = ContentMode.FEED, feedTitle = "Ciclovias"))
+        assertEquals("pt", fromFeed.language)
+    }
 }

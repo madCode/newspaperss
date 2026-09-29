@@ -200,11 +200,12 @@ object EpubWriter {
             val imageHrefs = article.images.map { it.href }.toSet()
             val body = buildString {
                 if (source.isNotEmpty()) append("<p class=\"kicker\">${esc(source)}</p>\n")
-                append("<h1 class=\"article-title\">${esc(title)}</h1>\n")
+                val langAttrs = languageAttributes(article.language, lang)
+                append("<h1 class=\"article-title\"$langAttrs>${esc(title)}</h1>\n")
                 append("<p class=\"byline\">${esc(byline)}</p>\n")
                 append("<hr class=\"rule\"/>\n")
                 article.note?.trim()?.takeIf { it.isNotEmpty() }?.let { append("<p class=\"note\">${esc(it)}</p>\n") }
-                append("<div class=\"article-body\">")
+                append("<div class=\"article-body\"$langAttrs>")
                 append(ArticleBody.toXhtml(article.bodyHtml, "a${index + 1}-", imageHrefs))
                 append("</div>\n")
                 val url = article.url.trim()

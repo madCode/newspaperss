@@ -13,6 +13,8 @@ data class ArticleContent(
     val wordCount: Int,
     val note: String? = null,
     val images: List<EpubImage> = emptyList(),
+    /** BCP 47 language tag, if known. */
+    val language: String? = null,
 )
 
 fun interface ArticleContentProvider {

@@ -62,6 +62,7 @@ class ExtractorContentProvider(
             wordCount = extracted.wordCount,
             note = extracted.note,
             images = embedded.images,
+            language = extracted.language,
         )
     }
 

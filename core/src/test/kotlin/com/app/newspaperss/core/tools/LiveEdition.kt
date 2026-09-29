@@ -14,6 +14,7 @@ import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ExtractInput
 import com.app.newspaperss.core.feed.FeedItem
 import com.app.newspaperss.core.feed.FeedParser
+import com.app.newspaperss.core.feed.StarterFeed
 import com.app.newspaperss.core.feed.StarterPacks
 import com.app.newspaperss.core.net.OkHttpHttpClient
 import kotlinx.coroutines.runBlocking
@@ -26,13 +27,16 @@ import java.util.UUID
  * Not a test: a developer tool that builds a real edition from the live starter-pack feeds with
  * the same planner, extractor and EPUB writer the app uses (no images, no cover), so its output
  * can be read and run through epubcheck. `./gradlew :core:liveEdition` writes
- * core/build/live-edition.epub. It needs the network.
+ * core/build/live-edition.epub; `--args="out.epub https://…/feed …"` uses those feeds instead.
+ * It needs the network.
  */
 fun main(args: Array<String>) = runBlocking {
     val out = File(args.firstOrNull() ?: "build/live-edition.epub")
     val http = OkHttpHttpClient()
     val extractor = ArticleExtractor(http)
-    val feeds = StarterPacks.all.flatMap { it.feeds }
+    // Any further arguments are feed URLs to use instead of the starter packs.
+    val feeds = args.drop(1).map { StarterFeed(it.substringAfter("//").substringBefore('/'), it) }
+        .ifEmpty { StarterPacks.all.flatMap { it.feeds } }
     val items = mutableMapOf<String, Pair<String, FeedItem>>()
     for (feed in feeds) {
         val response = runCatching { http.get(feed.url) }.getOrNull()
@@ -50,7 +54,7 @@ fun main(args: Array<String>) = runBlocking {
         EditionArticle(
             title = e.title, sourceTitle = source, url = item.url, bodyHtml = e.html,
             minutes = ReadingTime.minutes(e.wordCount), author = e.author,
-            published = item.published?.atZone(ZoneOffset.UTC)?.toLocalDate(), note = e.note,
+            published = item.published?.atZone(ZoneOffset.UTC)?.toLocalDate(), note = e.note, language = e.language,
         )
     }
     out.parentFile?.mkdirs()

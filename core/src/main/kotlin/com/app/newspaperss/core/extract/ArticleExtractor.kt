@@ -48,6 +48,8 @@ data class ExtractedArticle(
     val pageWordCount: Int?,
     /** The site turned the page request away or answered with a bot check. */
     val pageBlocked: Boolean = false,
+    /** The article's language as a BCP 47 tag, if the text or the page says. */
+    val language: String? = null,
 )
 
 /**
@@ -112,6 +114,7 @@ class ArticleExtractor(private val http: HttpClient) {
                         note = null,
                         feedWords = feedWords,
                         pageWords = words,
+                        declaredLanguage = page.content.language,
                     )
                 }
             }
@@ -203,12 +206,12 @@ class ArticleExtractor(private val http: HttpClient) {
         val title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) }
         val clean = HtmlCleaner.clean(image + caption, page.url, title)
         if (clean.imageUrls.isEmpty()) return null
-        return article(title, feedAuthor ?: page.content.author, clean, false, null, feedWords, page.clean.wordCount)
+        return article(title, feedAuthor ?: page.content.author, clean, false, null, feedWords, page.clean.wordCount, declaredLanguage = page.content.language)
     }
 
     private fun article(
         title: String, author: String?, clean: CleanResult, usedFeed: Boolean, note: String?, feedWords: Int, pageWords: Int?,
-        blocked: Boolean = false,
+        blocked: Boolean = false, declaredLanguage: String? = null,
     ) = ExtractedArticle(
         title = title.replace(WHITESPACE, " ").trim(),
         author = author,
@@ -221,6 +224,7 @@ class ArticleExtractor(private val http: HttpClient) {
         feedWordCount = feedWords,
         pageWordCount = pageWords,
         pageBlocked = blocked,
+        language = LanguageDetector.detect(title + "\n" + Jsoup.parse(clean.html).text(), declaredLanguage),
     )
 
     companion object {

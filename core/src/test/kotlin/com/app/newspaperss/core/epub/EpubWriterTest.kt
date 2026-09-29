@@ -31,9 +31,10 @@ class EpubWriterTest {
         published: LocalDate? = null,
         note: String? = null,
         images: List<EpubImage> = emptyList(),
+        language: String? = null,
     ) = EditionArticle(
         title = title, sourceTitle = source, url = url, bodyHtml = body, minutes = minutes,
-        author = author, published = published, note = note, images = images,
+        author = author, published = published, note = note, images = images, language = language,
     )
 
     private fun doc(vararg sections: EditionSection, title: String = "Tuesday Morning Edition") = EditionDoc(
@@ -629,5 +630,28 @@ class EpubWriterTest {
         val page = epub.text(epub.articleHrefs().single().let { "OEBPS/$it" })
         assertFalse(page.contains("Orphan caption"))
         assertFalse(page.contains("https://example.com/big"))
+    }
+
+    @Test
+    fun anArticleInAnotherLanguageIsTaggedSoTheReaderHyphenatesAndLaysItOutRight() {
+        val epub = write(unsectioned(
+            article(title = "Le vélo en ville", language = "fr"),
+            article(title = "الدراجات في المدينة", language = "ar"),
+            article(title = "Cycling in town", language = "en"),
+        ))
+        val pages = epub.articleHrefs().map { epub.xml("OEBPS/$it") }
+        fun Document.tagged(cls: String) = documentElement.elements("*").single { it.getAttribute("class") == cls }
+
+        for (cls in listOf("article-title", "article-body")) {
+            val fr = pages[0].tagged(cls)
+            assertEquals("fr", fr.getAttributeNS("http://www.w3.org/XML/1998/namespace", "lang"))
+            assertEquals("fr", fr.getAttribute("lang"))
+            assertEquals("", fr.getAttribute("dir"))
+            assertEquals("rtl", pages[1].tagged(cls).getAttribute("dir"))
+            // The book is English already.
+            assertFalse(pages[2].tagged(cls).hasAttribute("lang"))
+        }
+        // The page's own text (source, byline, "Read the original") stays English.
+        assertEquals("en", pages[0].documentElement.getAttribute("lang"))
     }
 }

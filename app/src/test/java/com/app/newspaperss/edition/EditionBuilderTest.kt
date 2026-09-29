@@ -207,6 +207,18 @@ class EditionBuilderTest {
     }
 
     @Test
+    fun eachArticlesLanguageReachesTheBook() = runTest {
+        source("a", null, "a1")
+        val french = ArticleContentProvider { a, _, _ -> ArticleContent(a.title, null, "<p>Bonjour</p>", wordCount = 238, language = "fr") }
+        val built = EditionBuilder(db, french, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings()) as BuildResult.Built
+
+        ZipFile(editions.fileOf(db.editions().byId(built.editionId)!!)!!).use { zip ->
+            val chapter = String(zip.getInputStream(zip.getEntry("OEBPS/article-001.xhtml")).readBytes())
+            assertTrue(chapter, "<div class=\"article-body\" xml:lang=\"fr\" lang=\"fr\">" in chapter)
+        }
+    }
+
+    @Test
     fun imagesPastTheEditionBudgetAreLeftOutInReadingOrder() = runTest {
         source("a", null, "a1", "a2")
         val withImage = ArticleContentProvider { a, _, _ ->
