@@ -22,6 +22,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.app.newspaperss.ui.edition.EditionDetailScreen
+import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -48,6 +52,7 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 }
 
 private const val READING_LIST = "reading-list"
+private const val EDITION = "edition/{id}"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,7 +90,9 @@ private fun App(container: AppContainer) {
             NavigationBar {
                 Tab.entries.forEach { tab ->
                     NavigationBarItem(
-                        selected = current?.destination?.route.let { it == tab.route || (tab == Tab.SOURCES && it == READING_LIST) },
+                        selected = current?.destination?.route.let {
+                            it == tab.route || (tab == Tab.SOURCES && it == READING_LIST) || (tab == Tab.TODAY && it == EDITION)
+                        },
                         onClick = {
                             nav.navigate(tab.route) {
                                 popUpTo(nav.graph.findStartDestination().id) { saveState = true }
@@ -104,7 +111,12 @@ private fun App(container: AppContainer) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context)) { EditionWorker.buildNow(context) } }
-                TodayScreen(vm)
+                TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") })
+            }
+            composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                val vm = viewModel { EditionDetailViewModel(container.editions, id) }
+                EditionDetailScreen(vm, onBack = { nav.popBackStack() })
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext

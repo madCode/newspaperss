@@ -2,6 +2,7 @@ package com.app.newspaperss.data
 
 import androidx.room.Dao
 import androidx.room.Delete
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -99,6 +100,12 @@ interface ArticleDao {
     suspend fun expireOlderThan(before: Instant): Int
 }
 
+data class EditionContent(
+    @Embedded val entry: EditionArticleEntity,
+    /** The article's current state; null once its source has been removed. */
+    val state: ArticleState?,
+)
+
 @Dao
 interface EditionDao {
     @Query("SELECT * FROM editions ORDER BY createdAt DESC")
@@ -130,6 +137,13 @@ interface EditionDao {
 
     @Query("SELECT * FROM edition_articles WHERE editionId = :editionId ORDER BY position")
     fun observeArticles(editionId: Long): Flow<List<EditionArticleEntity>>
+
+    @Query(
+        """SELECT edition_articles.*, articles.state AS state FROM edition_articles
+           LEFT JOIN articles ON articles.id = edition_articles.articleId
+           WHERE editionId = :editionId ORDER BY position""",
+    )
+    fun observeContents(editionId: Long): Flow<List<EditionContent>>
 
     @Query("SELECT articleId FROM edition_articles WHERE editionId = :editionId AND articleId IS NOT NULL ORDER BY position")
     suspend fun articleIds(editionId: Long): List<Long>
