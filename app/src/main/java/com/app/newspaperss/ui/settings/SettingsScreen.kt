@@ -68,6 +68,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             ScheduleSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             DeliverySection(s, viewModel)
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            val context = LocalContext.current
+            val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+            Text(
+                "newspapeRSS $version",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
         }
     }
 }

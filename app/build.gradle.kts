@@ -5,6 +5,9 @@ plugins {
     alias(libs.plugins.kover)
 }
 
+val ciRun = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val ciCommit = System.getenv("GITHUB_SHA")?.take(7)
+
 android {
     namespace = "com.app.newspaperss"
     compileSdk = 37
@@ -13,7 +16,8 @@ android {
         applicationId = "com.app.newspaperss"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
+        // CI's run number, so each build from CI installs over the one before it.
+        versionCode = ciRun ?: 1
         versionName = "0.1.0"
     }
 
@@ -41,7 +45,8 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            // "0.1.0-debug.142+ab12cd3": which CI run and commit a tester has, shown in Settings.
+            versionNameSuffix = "-debug" + (ciRun?.let { ".$it" } ?: "") + (ciCommit?.let { "+$it" } ?: "")
         }
         release {
             isMinifyEnabled = false

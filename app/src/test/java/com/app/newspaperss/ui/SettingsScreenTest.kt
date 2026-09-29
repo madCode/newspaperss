@@ -72,6 +72,11 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun theBuildIsNamedAtTheBottomSoFeedbackCanSayWhichOne() {
+        compose.onNodeWithText("newspapeRSS 0.1.0", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
     fun perSourceCapCanBeRaised() {
         compose.onNodeWithText("+").performClick()
         waitFor("Up to 2 articles from each site")
