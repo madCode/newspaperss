@@ -128,4 +128,22 @@ class ExtractorContentProviderTest {
             evidence,
         )
     }
+
+    /**
+     * A site settled on the feed's text because it was blocking can stop blocking: its short
+     * items keep being checked against the page so the source can switch back. A reader's own
+     * choice of the feed's text is left alone.
+     */
+    @Test
+    fun aSourceSettledOnTheFeedStillHasShortItemsChecked() = runTest {
+        val words = (1..600).joinToString(" ") { "word$it" }
+        http.page("https://example.com/story", "<html><body><article><p>$words</p></article></body></html>")
+
+        val settled = provider.contentFor(article("<p>A short teaser.</p>"), source, ImageAllowance())
+        val chosen = provider.contentFor(article("<p>A short teaser.</p>"), source.copy(contentModeChosen = true), ImageAllowance())
+
+        assertEquals(listOf(1L to FullTextEvidence.PAGE_LONGER), evidence)
+        assertEquals(600, settled?.wordCount)
+        assertEquals(3, chosen?.wordCount)
+    }
 }

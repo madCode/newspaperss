@@ -13,7 +13,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ### M3 leftovers
 - [ ] Write encoded images to a cache dir and stream them into the zip (lower peak memory)
-- [ ] Re-check a source settled on the feed's text now and then: a 429/503 block can be temporary, and today only choosing Automatic again re-runs the check
 
 ### M5 leftovers
 
@@ -30,6 +29,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ## Done
 
+- [x] Real-world check: a live edition from the starter feeds passes epubcheck (stray figcaptions fixed; `./gradlew :core:liveEdition`); a source settled on the feed's text keeps probing short items, so a lifted block is noticed
 - [x] Tech debt: feed parser smoke-tested on Android's own XmlPullParser; HTML meta-charset and byte-order-mark sniffing
 - [x] Curated list sources: a scraper per site (Arts & Letters Daily first), each list its own source, keeping its newest 12 unread links; added from the Add a source dialog
 - [x] Notes export: a Markdown notes file per edition (details, citation, reflection prompts) from Edition detail, and optionally saved beside each edition with folder delivery
