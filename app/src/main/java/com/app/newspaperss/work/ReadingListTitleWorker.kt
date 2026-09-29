@@ -11,7 +11,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.app.newspaperss.NewspaperssApp
 
-/** Looks up the titles of links saved without one (see [com.app.newspaperss.data.ReadingListTitles]). */
+/** Looks up saved links' titles and lengths (see [com.app.newspaperss.data.ReadingListTitles]). */
 class ReadingListTitleWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val ids = inputData.getLongArray(ARTICLE_IDS)?.toList().orEmpty()

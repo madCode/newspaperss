@@ -16,8 +16,9 @@ import java.time.Clock
  * turns with the feeds and gets its own slot in each edition, and its items
  * never expire.
  *
- * [onUntitled] is given the ids of links saved without a title, so their
- * titles can be looked up in the background (see [ReadingListTitles]).
+ * [onUntitled] is given the ids of links to look up in the background (see
+ * [ReadingListTitles]): each link saved, for its length, and imported links
+ * without a title.
  */
 class ReadingListRepository(
     private val db: AppDatabase,
@@ -47,7 +48,7 @@ class ReadingListRepository(
         val article = ArticleEntity(sourceId = sourceId(), guid = url, url = url, title = title?.trim().orEmpty(), discoveredAt = clock.instant())
         val articleId = db.articles().insertIgnoring(article)
         if (articleId == -1L) return false
-        if (article.title.isEmpty()) onUntitled(listOf(articleId))
+        onUntitled(listOf(articleId))
         return true
     }
 

@@ -62,6 +62,10 @@ android {
 
     buildFeatures { compose = true }
 
+    // Room's exported schemas, for MigrationTestHelper. Robolectric reads the variant's assets, not
+    // test-only ones, so they ride in the debug build (a few KB), never in release.
+    sourceSets { getByName("debug").assets.srcDir("$projectDir/schemas") }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

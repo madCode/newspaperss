@@ -1,5 +1,10 @@
 package com.app.newspaperss.ui.readinglist
 
+import com.app.newspaperss.core.extract.ArticleExtractor
+import com.app.newspaperss.core.ReadingTime
+import androidx.compose.foundation.clickable
+import android.net.Uri
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -149,11 +154,20 @@ private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
         ArticleState.DELIVERED -> "Delivered"
         ArticleState.SKIPPED, ArticleState.EXPIRED -> "Skipped"
     }
+    val context = LocalContext.current
+    val site = listOfNotNull(
+        SourceRepository.hostOf(article.url),
+        article.pageWords?.takeIf { it > 0 }?.let { "${ReadingTime.format(ReadingTime.minutes(it))} read" },
+    ).joinToString(" · ")
     ListItem(
-        headlineContent = { Text(article.title.ifBlank { SourceRepository.hostOf(article.url) }, maxLines = 2) },
+        modifier = Modifier.clickable(onClickLabel = "Open in your browser") {
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        },
+        // Before its title is found, a title made from the address reads better than the bare domain.
+        headlineContent = { Text(article.title.ifBlank { ArticleExtractor.titleFromUrl(article.url) }, maxLines = 2) },
         supportingContent = {
             Column {
-                if (article.title.isNotBlank()) Text(SourceRepository.hostOf(article.url), style = MaterialTheme.typography.bodySmall)
+                Text(site, style = MaterialTheme.typography.bodySmall)
                 Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },

@@ -148,6 +148,9 @@ interface ArticleDao {
     @Query("UPDATE articles SET title = :title WHERE id = :id AND title = '' AND state = 'NEW'")
     suspend fun setTitleIfUntitled(id: Long, title: String): Int
 
+    @Query("UPDATE articles SET pageWords = :words WHERE id = :id")
+    suspend fun setPageWords(id: Long, words: Int)
+
     @Query("SELECT sourceId, MAX(discoveredAt) AS lastNew FROM articles GROUP BY sourceId")
     fun observeActivity(): Flow<List<SourceActivity>>
 

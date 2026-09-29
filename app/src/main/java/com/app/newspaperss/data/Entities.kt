@@ -96,6 +96,8 @@ data class ArticleEntity(
      */
     val originId: String? = null,
     val originTitle: String? = null,
+    /** Words in a saved link's article, counted when its page is first looked up: the reading list's time estimate. */
+    val pageWords: Int? = null,
 )
 
 /**
