@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -52,7 +55,7 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit) {
+fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, onReadArticle: (position: Int) -> Unit = {}) {
     val detail by viewModel.detail.collectAsState()
     val selected by viewModel.selected.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -124,6 +127,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit) {
                     broughtBack = current.wasBroughtBack(content),
                     checked = articleId != null && articleId in selected,
                     onToggle = { if (articleId != null) viewModel.toggle(articleId) },
+                    onOpen = if (current.file != null) { { onReadArticle(content.entry.position) } } else null,
                 )
                 HorizontalDivider()
             }
@@ -155,7 +159,7 @@ private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> U
             }
             if (fileMissing) {
                 Text(
-                    "The EPUB file for this edition has been deleted, so it can't be sent or opened.",
+                    "This edition's file has been deleted, so it can't be sent or opened.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = 8.dp),
@@ -174,12 +178,26 @@ private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> U
 }
 
 @Composable
-private fun ContentRow(content: EditionContent, selectable: Boolean, broughtBack: Boolean, checked: Boolean, onToggle: () -> Unit) {
+private fun ContentRow(
+    content: EditionContent,
+    selectable: Boolean,
+    broughtBack: Boolean,
+    checked: Boolean,
+    onToggle: () -> Unit,
+    onOpen: (() -> Unit)?,
+) {
     val entry = content.entry
-    val modifier = if (selectable) Modifier.toggleable(checked, role = Role.Checkbox, onValueChange = { onToggle() }) else Modifier
+    // Tapping the article previews it; the checkbox alone selects it for bringing back.
+    val modifier = when {
+        onOpen != null -> Modifier.clickable(onClickLabel = "Read", onClick = onOpen)
+        selectable -> Modifier.toggleable(checked, role = Role.Checkbox, onValueChange = { onToggle() })
+        else -> Modifier
+    }
     ListItem(
         modifier = modifier,
-        leadingContent = if (selectable) { { Checkbox(checked = checked, onCheckedChange = null) } } else null,
+        leadingContent = if (selectable) {
+            { Checkbox(checked = checked, onCheckedChange = { onToggle() }, modifier = Modifier.semantics { contentDescription = "Bring back ${entry.title}" }) }
+        } else null,
         headlineContent = { Text(entry.title, maxLines = 3) },
         supportingContent = {
             Column {

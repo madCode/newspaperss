@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -101,8 +102,8 @@ class EditionDetailScreenTest {
         val (id, articles) = edition(EditionStatus.DELIVERED, listOf("Read it", "Missed one", "Missed two"))
         show(id)
 
-        compose.onNodeWithText("Missed one").performClick()
-        compose.onNodeWithText("Missed two").performClick()
+        compose.onNodeWithContentDescription("Bring back Missed one").performClick()
+        compose.onNodeWithContentDescription("Bring back Missed two").performClick()
         compose.onNodeWithText("Bring back 2").performClick()
 
         waitFor("2 articles will be in your next edition")

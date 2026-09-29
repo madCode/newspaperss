@@ -19,6 +19,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import com.app.newspaperss.data.EditionEntity
+import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +59,7 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 
 private const val READING_LIST = "reading-list"
 private const val EDITION = "edition/{id}"
+private const val ARTICLE = "edition/{id}/article/{position}"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,7 +97,7 @@ private fun App(container: AppContainer) {
             NavigationBar {
                 Tab.entries.forEach { tab ->
                     val route = current?.destination?.route
-                    val inTab = route == tab.route || (tab == Tab.SOURCES && route == READING_LIST) || (tab == Tab.TODAY && route == EDITION)
+                    val inTab = route == tab.route || (tab == Tab.SOURCES && route == READING_LIST) || (tab == Tab.TODAY && (route == EDITION || route == ARTICLE))
                     NavigationBarItem(
                         selected = inTab,
                         onClick = {
@@ -128,7 +132,29 @@ private fun App(container: AppContainer) {
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
                 val vm = viewModel { EditionDetailViewModel(container.editions, id) }
-                EditionDetailScreen(vm, onBack = { nav.navigateUp() })
+                EditionDetailScreen(
+                    vm,
+                    onBack = { nav.navigateUp() },
+                    onReadArticle = { position -> nav.navigate("edition/$id/article/$position") { launchSingleTop = true } },
+                )
+            }
+            composable(
+                ARTICLE,
+                arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("position") { type = NavType.IntType }),
+            ) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                val position = entry.arguments?.getInt("position") ?: 0
+                val edition by produceState<EditionEntity?>(null, id) { value = container.editions.byId(id) }
+                val contents by container.editions.observeContents(id).collectAsState(initial = emptyList())
+                val loaded = edition
+                if (loaded != null) {
+                    ArticlePreviewScreen(
+                        file = container.editions.fileOf(loaded),
+                        position = position,
+                        title = contents.getOrNull(position)?.entry?.title ?: loaded.title,
+                        onBack = { nav.navigateUp() },
+                    )
+                }
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
