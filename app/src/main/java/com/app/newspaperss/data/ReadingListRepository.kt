@@ -1,8 +1,11 @@
 package com.app.newspaperss.data
 
+import androidx.room.withTransaction
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.feed.ChecklistItem
 import com.app.newspaperss.core.feed.MarkdownChecklist
+import com.app.newspaperss.core.feed.ReadLaterImport
+import com.app.newspaperss.core.feed.ReadingListFile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -12,8 +15,15 @@ import java.time.Clock
  * Links saved to read later. The list is a source of its own, so it takes
  * turns with the feeds and gets its own slot in each edition, and its items
  * never expire.
+ *
+ * [onUntitled] is given the ids of links saved without a title, so their
+ * titles can be looked up in the background (see [ReadingListTitles]).
  */
-class ReadingListRepository(private val db: AppDatabase, private val clock: Clock = Clock.systemUTC()) {
+class ReadingListRepository(
+    private val db: AppDatabase,
+    private val clock: Clock = Clock.systemUTC(),
+    private val onUntitled: (articleIds: List<Long>) -> Unit = {},
+) {
     suspend fun sourceId(): Long {
         db.sources().byUrl(URL)?.let { return it.id }
         val id = db.sources().insert(
@@ -34,36 +44,41 @@ class ReadingListRepository(private val db: AppDatabase, private val clock: Cloc
 
     /** Returns false if the link was already on the list. */
     suspend fun save(url: String, title: String? = null): Boolean {
-        val id = sourceId()
-        return db.articles().insertIgnoring(
-            // A blank title lets the page's own title win when the edition is made.
-            ArticleEntity(sourceId = id, guid = url, url = url, title = title?.trim().orEmpty(), discoveredAt = clock.instant()),
-        ) != -1L
+        val article = ArticleEntity(sourceId = sourceId(), guid = url, url = url, title = title?.trim().orEmpty(), discoveredAt = clock.instant())
+        val articleId = db.articles().insertIgnoring(article)
+        if (articleId == -1L) return false
+        if (article.title.isEmpty()) onUntitled(listOf(articleId))
+        return true
     }
 
     suspend fun remove(article: ArticleEntity) = db.articles().delete(article.id)
 
+    data class Imported(val format: ReadingListFile.Format, val added: Int)
+
     /**
-     * Adds the checklist's links; ticked ones arrive as already read, and a link
-     * still waiting here that the checklist has ticked (read elsewhere) is marked
-     * read too. Returns how many were new.
+     * Adds the links from a markdown checklist or a Pocket or Instapaper export.
+     * Ticked or archived ones arrive as already read, and a link still waiting
+     * here that the file marks read (read elsewhere) is marked read too.
      */
-    suspend fun importMarkdown(text: String): Int {
+    suspend fun import(text: String): Imported {
+        val file = ReadLaterImport.parse(text)
         val id = sourceId()
         val now = clock.instant()
-        val items = MarkdownChecklist.parse(text)
-        val added = db.articles().insertNew(
-            items.map {
-                ArticleEntity(
-                    sourceId = id, guid = it.url, url = it.url, title = it.title.orEmpty(), discoveredAt = now,
-                    state = if (it.done) ArticleState.DELIVERED else ArticleState.NEW,
+        val added = db.withTransaction {
+            file.items.mapNotNull { item ->
+                val article = ArticleEntity(
+                    sourceId = id, guid = item.url, url = item.url, title = item.title.orEmpty(), discoveredAt = now,
+                    state = if (item.done) ArticleState.DELIVERED else ArticleState.NEW,
                 )
-            },
-        )
-        val ticked = items.filter { it.done }.map { it.url }.toSet()
-        val readElsewhere = db.articles().allForSource(id).filter { it.state == ArticleState.NEW && it.url in ticked }
+                db.articles().insertIgnoring(article).takeIf { it != -1L }?.let { article.copy(id = it) }
+            }
+        }
+        val done = file.items.filter { it.done }.map { it.url }.toSet()
+        val readElsewhere = db.articles().allForSource(id).filter { it.state == ArticleState.NEW && it.url in done }
         if (readElsewhere.isNotEmpty()) db.articles().setState(readElsewhere.map { it.id }, ArticleState.DELIVERED)
-        return added
+        val untitled = added.filter { it.title.isEmpty() && it.state == ArticleState.NEW }.map { it.id }
+        if (untitled.isNotEmpty()) onUntitled(untitled)
+        return Imported(file.format, added.size)
     }
 
     /** The list as an rss-to-e-reader checklist: anything no longer waiting is ticked. */

@@ -89,6 +89,10 @@ interface ArticleDao {
     @Query("DELETE FROM articles WHERE id = :id")
     suspend fun delete(id: Long)
 
+    /** Only while the article is untitled and waiting: never over a title the reader gave, or one in an edition. */
+    @Query("UPDATE articles SET title = :title WHERE id = :id AND title = '' AND state = 'NEW'")
+    suspend fun setTitleIfUntitled(id: Long, title: String): Int
+
     @Query("SELECT sourceId, MAX(discoveredAt) AS lastNew FROM articles GROUP BY sourceId")
     fun observeActivity(): Flow<List<SourceActivity>>
 

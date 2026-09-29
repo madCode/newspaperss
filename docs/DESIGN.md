@@ -182,7 +182,9 @@ later and is asked). That keeps the commit-after-delivery rule honest.
   target for URLs), each with a title and domain. They show up in the next
   edition with their own slot, like the library's markdown-checklist
   collector. Export and import as a markdown checklist, which keeps
-  compatibility with the library.
+  compatibility with the library; Pocket and Instapaper exports import
+  too, with their archive arriving as already read. A link saved without
+  a title gets its page's title in the background.
 - **Settings:** edition profiles (schedule, size, ordering, cap), delivery,
   reading speed, advanced (tt-rss account, SMTP, notes export), about.
 

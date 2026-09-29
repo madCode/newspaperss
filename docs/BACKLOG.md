@@ -24,7 +24,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ### M6 leftovers
 - [ ] Curated list sources (a scraper per site, like rss-to-e-reader's Arts & Letters Daily queue) with keep-newest-N
-- [ ] Fetch a saved link's title in the background so the list shows it before the edition does
 
 ### M7 Polish
 - [ ] Source health view; remove-and-re-add shouldn't re-deliver (soft delete sources)
@@ -34,7 +33,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] SMTP delivery; notes export
 
 ### UX (from the persona audit)
-- [ ] Import Pocket/Instapaper exports (CSV/HTML) into the reading list
 - [ ] Per-source "full text" health (needs the ContentMode auto-tune stats)
 
 ### Tech debt
@@ -43,6 +41,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ## Done
 
+- [x] Import Pocket (HTML, CSV) and Instapaper (CSV) exports into the reading list; saved links without a title get the page's title in the background
 - [x] tt-rss source (one account, all unread, marked read after delivery); in-app article preview (#9)
 - [x] M1 Skeleton: Gradle (AGP 9.1, Kotlin 2.3, Compose), `:core` + `:app`, CI, design doc (#1)
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)
