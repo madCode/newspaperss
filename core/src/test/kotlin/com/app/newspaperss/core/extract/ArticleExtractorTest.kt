@@ -50,6 +50,49 @@ class ArticleExtractorTest {
         assertEquals(ContentMode.PAGE, ArticleExtractor.suggestMode(article.feedWordCount, article.pageWordCount))
     }
 
+    private val footer = "<footer><p>© 2026 Example Media. All rights reserved. About us, careers, contact, press, accessibility help, " +
+        "user agreement, privacy policy, your privacy rights, cookie settings, site map, newsletters, subscribe, " +
+        "gift subscriptions, customer care, digital edition, crossword, archive and media kit.</p></footer>"
+
+    @Test
+    fun aComicWhoseFeedItemIsJustTheImageKeepsIt() = runTest {
+        val comic = "<img src=\"https://example.com/comics/moons.png\" alt=\"A joke about moons\">"
+        val http = FakeHttp(mapOf(url to page("<html><body><div id=\"comic\"><p>Comic</p></div>$footer</body></html>")))
+
+        val article = ArticleExtractor(http).extract(input(comic))
+
+        assertTrue(article.usedFeedContent)
+        assertEquals(listOf("https://example.com/comics/moons.png"), article.imageUrls)
+        assertFalse("All rights reserved" in article.html)
+    }
+
+    @Test
+    fun aCartoonPageGivesItsImageNotItsFooter() = runTest {
+        val cartoon = "<html><head><meta property=\"og:description\" content=\"A drawing about the news.\"></head><body>" +
+            "<header><img alt=\"Example\" class=\"logo\" src=\"/logo.png\"></header><article><h1>Daily Cartoon</h1><picture>" +
+            "<img alt=\"Two fans in the stands.\" loading=\"lazy\" srcset=\"https://cdn.example.com/c/w_600/a.jpg 600w, " +
+            "https://cdn.example.com/c/w_1200/a.jpg 1200w\"></picture></article>$footer</body></html>"
+        val http = FakeHttp(mapOf(url to page(cartoon)))
+
+        val article = ArticleExtractor(http).extract(input("<p>A drawing that riffs on the news.</p>"))
+
+        assertEquals(listOf("https://cdn.example.com/c/w_1200/a.jpg"), article.imageUrls)
+        assertTrue("riffs on the news" in article.html || "Two fans" in article.html)
+        assertFalse("footer text isn't the caption", "All rights reserved" in article.html)
+    }
+
+    @Test
+    fun anArticleWithTextAndNoImageIsLeftAlone() = runTest {
+        val paragraph = "<p>The committee met again on Thursday, as it has every week since spring, to argue about the budget, " +
+            "the architects and, above all, the new library wing. Nobody expected a decision, and none came.</p>"
+        val http = FakeHttp(mapOf(url to page("<html><body><article>${paragraph.repeat(6)}</article>$footer</body></html>")))
+
+        val article = ArticleExtractor(http).extract(input(teaser))
+
+        assertEquals(emptyList<String>(), article.imageUrls)
+        assertTrue("library wing" in article.html)
+    }
+
     @Test
     fun autoUsesFullTextFeedContentWithoutFetching() = runTest {
         val http = FakeHttp(emptyMap())

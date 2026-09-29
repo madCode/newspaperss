@@ -8,13 +8,20 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** filling the budget past the per-site cap (the one-article New Yorker edition).
-- **Next:** your device-testing list: missing comic images, edition preview and delete, an EPUB design pass (and the too-wide in-app article), the Sources page.
+- **In flight:** comics and cartoons keep their image.
+- **Next:** your device-testing list: edition preview and delete, an EPUB design pass (and the too-wide in-app article), the Sources page.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 10: a one-source paper fills its time (14:02–)
+### Cycle 11: comics keep their image (14:12–)
+- **From device testing:** the New Yorker's cartoon and a webcomic reached the edition without their images. Two causes:
+  - xkcd-style feed items are just the image, and an item with no words was treated as empty;
+  - on an image-only page the article extractor gave up and took the footer ("58 words" of legal links on the New Yorker's cartoon page).
+- **Shipped:** an image-only feed item is kept, and wins over a page with little text and no image. When only the page has the image, its main image inside `<article>` becomes the post, captioned by the page's own article text or else the feed's description.
+- **Checks:** the real New Yorker cartoon and xkcd now come through; a live edition passes epubcheck.
+
+### Cycle 10: a one-source paper fills its time (14:02–14:12, [#27](https://github.com/madCode/newspaperss/pull/27))
 - **From device testing:** a New Yorker-only edition held one comic. The per-site cap (1 by default) stopped it with the half hour unfilled. The cap is for fairness between sites, so once each has had its turn, what it held back fills the rest. A site's own number stays a hard limit, and its screen now says which it has.
 - **Review caught:** the site screen still said "Up to 1 article", and a noisy site couldn't be held to 1.
 

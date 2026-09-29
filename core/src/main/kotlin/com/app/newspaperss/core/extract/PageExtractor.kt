@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.extract
 
+import com.app.newspaperss.core.images.ImageRules
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -9,6 +10,8 @@ import kotlinx.serialization.json.contentOrNull
 import net.dankito.readability4j.extended.Readability4JExtended
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
+import org.jsoup.select.Elements
 import java.net.URI
 
 /** The article found in a web page, not yet cleaned for e-ink (see [HtmlCleaner]). */
@@ -18,6 +21,12 @@ internal data class PageContent(
     val author: String?,
     val extractor: String,
     val wordCount: Int,
+    /** The page's main image as a `<figure>`, for posts that are an image (a cartoon, a comic). */
+    val mainImage: String? = null,
+    /** The text of the page's `<article>` or `<main>`, to tell article text from footer text. */
+    val articleText: String? = null,
+    /** `og:description`, a stand-in caption for an image post. */
+    val description: String? = null,
 )
 
 /**
@@ -64,13 +73,44 @@ internal object PageExtractor {
             content.html()
         })
         val fromJsonLd = candidate("json-ld", jsonLdBody(jsonLd))
-        if (fromReadability != null && fromReadability.wordCount >= MIN_WORDS) {
-            val jsonLdHasMuchMore = fromJsonLd != null && fromJsonLd.wordCount >= JSON_LD_PREFERENCE_RATIO * fromReadability.wordCount
-            return if (jsonLdHasMuchMore) fromJsonLd!! else fromReadability
+        val chosen = when {
+            fromReadability != null && fromReadability.wordCount >= MIN_WORDS -> {
+                val jsonLdHasMuchMore = fromJsonLd != null && fromJsonLd.wordCount >= JSON_LD_PREFERENCE_RATIO * fromReadability.wordCount
+                if (jsonLdHasMuchMore) fromJsonLd!! else fromReadability
+            }
+            fromJsonLd != null && fromJsonLd.wordCount >= MIN_WORDS -> fromJsonLd
+            else -> listOfNotNull(fromReadability, fromJsonLd).maxByOrNull { it.wordCount }
+                ?: PageContent(doc.body().html(), title, author, "body", HtmlCleaner.countWords(doc.body()))
         }
-        if (fromJsonLd != null && fromJsonLd.wordCount >= MIN_WORDS) return fromJsonLd
-        return listOfNotNull(fromReadability, fromJsonLd).maxByOrNull { it.wordCount }
-            ?: PageContent(doc.body().html(), title, author, "body", HtmlCleaner.countWords(doc.body()))
+        val main = doc.select("article, main")
+        return chosen.copy(
+            mainImage = mainImage(main, doc),
+            articleText = main.text().takeIf { it.isNotBlank() },
+            description = doc.metaContent("og:description"),
+        )
+    }
+
+    /**
+     * The first sizeable image in the page's `<article>` or `<main>`, else `og:image`, as a
+     * `<figure>` with just the attributes [HtmlCleaner] reads. Logos and SVGs don't count.
+     */
+    private fun mainImage(main: Elements, doc: Document): String? {
+        val img = main.select("img").firstOrNull { img ->
+            val marks = "${img.attr("alt")} ${img.className()} ${img.attr("src")}".lowercase()
+            val sources = listOf("src", "srcset", "data-src", "data-srcset").map { img.attr(it) }.filter { it.isNotBlank() && !it.startsWith("data:") }
+            val width = img.attr("width").toIntOrNull()
+            sources.isNotEmpty() && "logo" !in marks && sources.none { it.substringBefore('?').lowercase().endsWith(".svg") } &&
+                (width == null || width >= ImageRules.MIN_DIMENSION * 4)
+        }
+        val figure = Element("figure")
+        if (img != null) {
+            val copy = figure.appendElement("img")
+            for (name in listOf("src", "srcset", "data-src", "data-srcset", "alt")) img.attr(name).takeIf { it.isNotBlank() }?.let { copy.attr(name, it) }
+            return figure.outerHtml()
+        }
+        val og = doc.metaContent("og:image") ?: return null
+        figure.appendElement("img").attr("src", og).attr("alt", doc.metaContent("og:image:alt").orEmpty())
+        return figure.outerHtml()
     }
 
     /**
