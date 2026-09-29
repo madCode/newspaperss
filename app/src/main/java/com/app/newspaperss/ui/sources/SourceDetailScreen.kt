@@ -18,6 +18,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.ui.semantics.Role
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.core.ttrss.TtrssCategory
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -199,16 +200,21 @@ private fun CategoryChoice(label: String, selected: Boolean, onClick: () -> Unit
 @Composable
 private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowDefault: () -> Unit) {
     val max = own ?: default
+    // The edition's number gives way when there's room; a site's own number is a hard limit.
     Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(if (max == 1) "Up to 1 article in each edition" else "Up to $max articles in each edition")
             Text(
-                if (own == null) "Your edition setting" else "Your edition setting: up to $default",
+                if (own == null) "${plural(default, "article")} from this site, then more if there's room"
+                else "At most ${plural(own, "article")} from this site in each edition",
+            )
+            Text(
+                if (own == null) "Your edition setting. Tap − or + to set a limit for this site."
+                else "Your edition setting: ${plural(default, "article")} from each site, then more if there's room",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        OutlinedButton(onClick = { onStep(-1) }, enabled = max > 1, modifier = Modifier.semantics { contentDescription = "Fewer articles from this site" }) {
+        OutlinedButton(onClick = { onStep(-1) }, enabled = own == null || own > 1, modifier = Modifier.semantics { contentDescription = "Fewer articles from this site" }) {
             Text("−")
         }
         OutlinedButton(

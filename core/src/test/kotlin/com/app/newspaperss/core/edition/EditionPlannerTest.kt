@@ -75,6 +75,18 @@ class EditionPlannerTest {
     }
 
     @Test
+    fun anArticleThatFailedIsNotTriedAgainWhenTheCapGivesWay() = runTest {
+        val ordered = EditionPlanner.order(pool, abc, Ordering.TAKE_TURNS)
+        val tried = mutableListOf<String>()
+        val result = EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(10), maxPerSource = 1), { 1.0 }) { cand ->
+            tried += cand.id
+            cand.id.takeUnless { it == "c2" }
+        }
+        assertEquals(listOf("a3", "b1", "c1", "a2", "a1"), result)
+        assertEquals(1, tried.count { it == "c2" })
+    }
+
+    @Test
     fun aSourcesOwnCapReplacesTheEditionsInEitherDirectionAndIsAHardLimit() = runTest {
         val ordered = EditionPlanner.order(pool, abc, Ordering.TAKE_TURNS)
         val rules = PlanRules(Budget.Articles(10), maxPerSource = 2, sourceCaps = mapOf("a" to 3, "c" to 1))

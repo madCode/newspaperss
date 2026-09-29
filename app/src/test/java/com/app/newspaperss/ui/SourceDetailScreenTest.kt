@@ -108,20 +108,34 @@ class SourceDetailScreenTest {
         val defaultMax = MutableStateFlow(2)
         val vm = SourceDetailViewModel(repo, id, defaultMax)
         compose.setContent { SourceDetailScreen(vm, onBack = {}) }
-        idleUntil { visible("Up to 2 articles in each edition") }
+        idleUntil { visible("2 articles from this site, then more if there's room") }
 
         compose.onNodeWithContentDescription("More articles from this site").performClick()
         compose.onNodeWithContentDescription("More articles from this site").performClick()
-        idleUntil { compose.waitForIdle(); visible("Up to 4 articles") }
-        compose.onNodeWithText("Your edition setting: up to 2").assertExists()
+        idleUntil { compose.waitForIdle(); visible("At most 4 articles from this site") }
+        compose.onNodeWithText("Your edition setting: 2 articles", substring = true).assertExists()
 
         defaultMax.value = 1
-        idleUntil { compose.waitForIdle(); visible("Your edition setting: up to 1") }
+        idleUntil { compose.waitForIdle(); visible("Your edition setting: 1 article") }
         assertEquals(4, runBlocking { db.sources().byId(id)!!.maxArticles })
 
         compose.onNodeWithText("Use your edition setting").performClick()
-        idleUntil { compose.waitForIdle(); visible("Up to 1 article in each edition") }
+        idleUntil { compose.waitForIdle(); visible("1 article from this site, then more if there's room") }
         assertNull(runBlocking { db.sources().byId(id)!!.maxArticles })
+    }
+
+    /** At the default of 1, the edition's number is soft; a noisy site can still be held to 1 for good. */
+    @Test
+    fun aSiteCanBeHeldToOneArticleEvenWhenTheEditionAllowsOne() {
+        val id = runBlocking { repo.addFeed("https://example.com/feed", "Example") }
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { visible("1 article from this site, then more if there's room") }
+
+        compose.onNodeWithContentDescription("Fewer articles from this site").performClick()
+
+        idleUntil { compose.waitForIdle(); visible("At most 1 article from this site") }
+        assertEquals(1, runBlocking { db.sources().byId(id)!!.maxArticles })
     }
 
     @Test
@@ -139,7 +153,7 @@ class SourceDetailScreenTest {
         val vm = SourceDetailViewModel(repo, id, flowOf(1), ttrss) { syncs++ }
         compose.setContent { SourceDetailScreen(vm, onBack = {}) }
         idleUntil { visible("All your unread articles") }
-        compose.onNodeWithText("Up to 1 article", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("from this site", substring = true).assertDoesNotExist()
 
         compose.onNodeWithText("Change").performClick()
         idleUntil { compose.waitForIdle(); visible("Tech") }
