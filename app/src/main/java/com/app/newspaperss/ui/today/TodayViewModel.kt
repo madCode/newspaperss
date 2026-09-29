@@ -6,7 +6,15 @@ import androidx.work.WorkInfo
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.work.EditionWorker
+import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.Settings
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -22,15 +30,37 @@ sealed interface BuildState {
     data class Failed(val reason: String) : BuildState
 }
 
-data class TodayState(val editions: List<EditionEntity>?, val build: BuildState)
+data class TodayState(
+    val editions: List<EditionEntity>?,
+    val build: BuildState,
+    /** "Tomorrow at 6:30 AM · about 30 min", or null when there's no schedule. */
+    val next: String? = null,
+    /** Readers who read on this device (a Boox) open editions rather than send them. */
+    val preferOpen: Boolean = false,
+    /** What to call the reader's e-reader in prompts. */
+    val deviceName: String = "e-reader",
+)
 
 class TodayViewModel(
     private val editions: EditionRepository,
     work: Flow<WorkInfo?>,
+    settings: Flow<Settings> = flowOf(Settings()),
+    private val now: () -> ZonedDateTime = { ZonedDateTime.now() },
     private val startBuild: () -> Unit,
 ) : ViewModel() {
-    val state: StateFlow<TodayState> = combine(editions.observeAll(), work) { list, info ->
-        TodayState(list, buildStateOf(info))
+    val state: StateFlow<TodayState> = combine(editions.observeAll(), work, settings) { list, info, s ->
+        TodayState(
+            editions = list,
+            build = buildStateOf(info),
+            next = nextEdition(s, now()),
+            preferOpen = s.device == Device.BOOX,
+            deviceName = when (s.device) {
+                Device.KINDLE -> "Kindle"
+                Device.KOBO -> "Kobo"
+                Device.POCKETBOOK -> "PocketBook"
+                else -> "e-reader"
+            },
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayState(null, BuildState.Idle))
 
     fun makeOneNow() = startBuild()
@@ -42,6 +72,18 @@ class TodayViewModel(
     }
 
     companion object {
+        fun nextEdition(s: Settings, now: ZonedDateTime): String? {
+            if (!s.scheduleEnabled) return null
+            val next = s.schedule.nextAfter(now) ?: return null
+            val time = next.toLocalTime().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
+            val day = when (next.toLocalDate()) {
+                now.toLocalDate() -> "Today"
+                now.toLocalDate().plusDays(1) -> "Tomorrow"
+                else -> next.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            }
+            return "$day at $time \u00b7 about ${s.edition.minutes} min"
+        }
+
         fun buildStateOf(info: WorkInfo?): BuildState = when (info?.state) {
             WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> BuildState.Syncing
             WorkInfo.State.RUNNING ->

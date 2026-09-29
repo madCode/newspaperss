@@ -148,7 +148,7 @@ class ScreenshotTest {
         runBlocking {
             StarterPacks.all[3].feeds.forEach { repo.addFeed(it.url, it.title) }
             val broken = repo.addFeed("https://broken.example/feed", "A blog that moved")
-            db.sources().recordFailure(broken, Instant.now(), "This address no longer gives a feed.")
+            db.sources().recordFailure(broken, Instant.now(), "We can't get new articles from this site any more. It may have moved; try adding it again.")
         }
         val vm = SourcesViewModel(repo, FeedFinder(FakeHttp())) {}
         shoot("06-sources", ready = { vm.rows.value?.isNotEmpty() == true }) { SourcesScreen(vm) }

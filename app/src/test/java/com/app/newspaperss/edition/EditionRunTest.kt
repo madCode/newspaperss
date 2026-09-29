@@ -40,7 +40,7 @@ class EditionRunTest {
     private val editions by lazy { EditionRepository(db, tmp.newFolder("editions")) }
     private val notices = mutableListOf<String>()
     private val notifier = object : EditionNotifier {
-        override fun editionReady(edition: EditionEntity, file: File) { notices += "ready ${edition.title}" }
+        override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean) { notices += if (openInstead) "open ${edition.title}" else "ready ${edition.title}" }
         override fun editionDelivered(edition: EditionEntity, where: String) { notices += "delivered to $where" }
         override fun problem(title: String, reason: String) { notices += "problem: $reason" }
     }
@@ -109,5 +109,13 @@ class EditionRunTest {
         )
         failing.run(scheduled = true)
         assertEquals(listOf("problem: None of the articles could be read."), notices)
+    }
+
+    @Test
+    fun aBooxReaderIsOfferedOpenNotSend() = runTest {
+        oneSource()
+        settings.update { it.copy(device = com.app.newspaperss.settings.Device.BOOX) }
+        run.run(scheduled = true)
+        assertTrue(notices.single().startsWith("open"))
     }
 }

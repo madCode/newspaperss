@@ -22,7 +22,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -47,6 +46,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.delivery.FolderDelivery
+import com.app.newspaperss.ui.components.CheckChip
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Settings as AppSettings
 import java.time.DayOfWeek
@@ -88,7 +88,10 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
         valueRange = SettingsViewModel.MIN_MINUTES.toFloat()..SettingsViewModel.MAX_MINUTES.toFloat(),
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("At most ${s.edition.maxPerSource} from each source", Modifier.weight(1f))
+        Text(
+            if (s.edition.maxPerSource == 1) "Up to 1 article from each site" else "Up to ${s.edition.maxPerSource} articles from each site",
+            Modifier.weight(1f),
+        )
         OutlinedButton(onClick = { vm.setMaxPerSource(s.edition.maxPerSource - 1) }, enabled = s.edition.maxPerSource > 1) { Text("−") }
         OutlinedButton(
             onClick = { vm.setMaxPerSource(s.edition.maxPerSource + 1) },
@@ -139,10 +142,10 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
     val locale = LocalConfiguration.current.locales[0]
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
         DayOfWeek.entries.forEach { day ->
-            FilterChip(
+            CheckChip(
                 selected = day in s.schedule.days,
                 onClick = { vm.toggleDay(day) },
-                label = { Text(day.getDisplayName(TextStyle.SHORT, locale)) },
+                label = day.getDisplayName(TextStyle.SHORT, locale),
             )
         }
     }

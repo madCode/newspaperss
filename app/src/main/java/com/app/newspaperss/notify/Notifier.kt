@@ -18,7 +18,8 @@ import java.io.File
 import kotlin.math.roundToInt
 
 interface EditionNotifier {
-    fun editionReady(edition: EditionEntity, file: File)
+    /** @param openInstead the reader reads on this device, so the action opens the edition rather than sharing it. */
+    fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean = false)
     fun editionDelivered(edition: EditionEntity, where: String)
     fun problem(title: String, reason: String)
 }
@@ -43,16 +44,17 @@ class Notifier(private val context: Context) : EditionNotifier {
 
     fun enabled(): Boolean = manager.areNotificationsEnabled()
 
-    override fun editionReady(edition: EditionEntity, file: File) {
-        val send = PendingIntent.getActivity(
-            context, edition.id.toInt(), EditionIntents.share(context, file, edition.title),
+    override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean) {
+        val intent = if (openInstead) EditionIntents.open(context, file) else EditionIntents.share(context, file, edition.title)
+        val action = PendingIntent.getActivity(
+            context, edition.id.toInt(), intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         notify(
             NotificationCompat.Builder(context, EDITIONS)
                 .setContentTitle("${edition.title} is ready")
                 .setContentText(summary(edition))
-                .addAction(0, "Send", send),
+                .addAction(0, if (openInstead) "Open" else "Send", action),
         )
     }
 

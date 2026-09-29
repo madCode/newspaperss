@@ -109,7 +109,7 @@ private fun EmptySources(modifier: Modifier) {
     ) {
         Text("No sources yet", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Add a website you like to read. Paste its address; newspaperss finds the feed.",
+            "Add a website you like to read. Paste its address and newspaperss does the rest.",
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
         )
@@ -124,8 +124,7 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
         s.paused -> "Paused"
         s.lastError != null -> s.lastError
         s.lastFetchedAt == null -> "Checking…"
-        row.waiting == 1 -> "1 article waiting"
-        else -> "${row.waiting} articles waiting"
+        else -> "Working"
     }
     ListItem(
         headlineContent = { Text(s.title) },
@@ -156,7 +155,7 @@ private fun AddSourceDialog(state: AddState, viewModel: SourcesViewModel) {
     if (state == AddState.Closed) return
     AlertDialog(
         onDismissRequest = viewModel::closeAdd,
-        title = { Text(if (state is AddState.Choosing) "Which feed?" else "Add a source") },
+        title = { Text(if (state is AddState.Choosing) "Which part of this site?" else "Add a source") },
         text = {
             when (state) {
                 is AddState.Editing -> Column {
@@ -175,10 +174,10 @@ private fun AddSourceDialog(state: AddState, viewModel: SourcesViewModel) {
                 }
                 is AddState.Searching -> Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.padding(end = 16.dp))
-                    Text("Looking for a feed at ${state.input}…")
+                    Text("Checking ${state.input}…")
                 }
                 is AddState.Choosing -> Column {
-                    Text("This site has more than one feed.", modifier = Modifier.padding(bottom = 8.dp))
+                    Text("This site offers more than one set of articles.", modifier = Modifier.padding(bottom = 8.dp))
                     state.feeds.forEach { feed ->
                         Text(
                             feed.title ?: feed.url,
@@ -191,7 +190,7 @@ private fun AddSourceDialog(state: AddState, viewModel: SourcesViewModel) {
         },
         confirmButton = {
             if (state is AddState.Editing) {
-                TextButton(onClick = viewModel::find, enabled = state.input.isNotBlank()) { Text("Find feed") }
+                TextButton(onClick = viewModel::find, enabled = state.input.isNotBlank()) { Text("Add") }
             }
         },
         dismissButton = { TextButton(onClick = viewModel::closeAdd) { Text("Cancel") } },

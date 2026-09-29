@@ -67,7 +67,7 @@ class FeedSyncTest {
 
         http.page(url, "<html>not a feed</html>")
         sync.syncAll()
-        assertEquals("This address no longer gives a feed.", db.sources().byId(id)!!.lastError)
+        assertEquals("We can't get new articles from this site any more. It may have moved; try adding it again.", db.sources().byId(id)!!.lastError)
 
         http.unreachable += url
         sync.syncAll()

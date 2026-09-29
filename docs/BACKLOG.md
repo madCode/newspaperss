@@ -33,6 +33,14 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M8 Advanced
 - [ ] tt-rss source (mark read on server after delivery); SMTP delivery; notes export
 
+### UX (from the persona audit)
+- [ ] E-ink: replace indeterminate spinners with stepped text ("Fetching 7 of 12…"); no nav transitions when animations are off
+- [ ] First edition: counted progress and a clear "Your first edition is ready" moment
+- [ ] Import Pocket/Instapaper exports (CSV/HTML) into the reading list
+- [ ] Article preview in the edition detail screen (matters most on Boox)
+- [ ] Source health line ("full text", "last new article 2 days ago") instead of just Working/error
+- [ ] Try again button on failed editions
+
 ### Tech debt
 - [ ] Parser tests run on kxml2, the app ships Android's KXmlParser: add a Robolectric smoke test through the platform parser
 - [ ] Charset sniffing for HTML pages without a header charset
