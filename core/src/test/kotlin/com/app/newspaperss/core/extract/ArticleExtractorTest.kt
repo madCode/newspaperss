@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.extract
 
+import com.app.newspaperss.core.net.HttpBytes
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.net.HttpResponse
 import kotlinx.coroutines.test.runTest
@@ -17,6 +18,7 @@ class ArticleExtractorTest {
             requested += url
             return responses[url] ?: throw IOException("no route to host")
         }
+        override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = throw IOException("not used")
     }
 
     private val url = "https://example.com/culture/slow"

@@ -7,6 +7,8 @@ import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
 import com.app.newspaperss.core.epub.EpubWriter
+import com.app.newspaperss.core.images.ImageBudget
+import com.app.newspaperss.core.images.ImageRules
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
@@ -34,6 +36,7 @@ class EditionBuilder(
     private val editionsDir: File,
     private val clock: Clock = Clock.systemDefaultZone(),
     private val zone: ZoneId = ZoneId.systemDefault(),
+    private val imageBudgetBytes: Long = ImageRules.MAX_EDITION_BYTES,
 ) {
     suspend fun build(settings: EditionSettings, onProgress: (done: Int) -> Unit = {}): BuildResult {
         releaseUndelivered()
@@ -75,6 +78,11 @@ class EditionBuilder(
             ),
         )
 
+        // Budgeted in reading order, so the first articles keep their pictures. EpubWriter drops
+        // an img whose image isn't in the book, taking an emptied figure with it.
+        val fitted = ImageBudget.fit(arranged.map { it.second.images }, imageBudgetBytes)
+        val withImages = arranged.zip(fitted) { (a, c), images -> a to c.copy(images = images) }
+
         val fileName = "edition-$editionId.epub"
         try {
             editionsDir.mkdirs()
@@ -82,7 +90,7 @@ class EditionBuilder(
                 title = title,
                 date = now.toLocalDate(),
                 identifier = "urn:uuid:${UUID.randomUUID()}",
-                sections = arranged.groupBy { (a, _) -> sourcesById.getValue(a.sourceId).section }.map { (section, items) ->
+                sections = withImages.groupBy { (a, _) -> sourcesById.getValue(a.sourceId).section }.map { (section, items) ->
                     EditionSection(section, items.map { (a, c) -> toEpub(a, c, sourcesById.getValue(a.sourceId)) })
                 },
                 modified = clock.instant(),

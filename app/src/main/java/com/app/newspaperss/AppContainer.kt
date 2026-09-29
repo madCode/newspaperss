@@ -9,6 +9,7 @@ import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.edition.AndroidImageEncoder
 import com.app.newspaperss.edition.ArticleContentProvider
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.edition.EditionSettings
@@ -20,7 +21,7 @@ class AppContainer(
     context: Context,
     val http: HttpClient = OkHttpHttpClient(),
     val db: AppDatabase = AppDatabase.open(context),
-    content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http)),
+    content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()),
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     val sources = SourceRepository(db)

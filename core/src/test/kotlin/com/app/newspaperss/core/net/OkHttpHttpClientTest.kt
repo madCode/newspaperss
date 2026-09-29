@@ -53,6 +53,25 @@ class OkHttpHttpClientTest {
         OkHttpHttpClient().get(server.url("/").toString())
     }
 
+    @Test
+    fun getBytesSendsTheGivenHeadersAndReturnsTheRawBody() = runTest {
+        val png = byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 0, -1)
+        server.enqueue(MockResponse.Builder().body(okio.Buffer().write(png)).addHeader("Content-Type", "image/png").build())
+        val r = OkHttpHttpClient().getBytes(server.url("/a.png").toString(), mapOf("Referer" to "https://example.com/story"))
+        assertTrue(r.isSuccessful)
+        assertEquals("image/png", r.contentType)
+        assertTrue(png.contentEquals(r.body))
+        val request = server.takeRequest()
+        assertEquals("https://example.com/story", request.headers["Referer"])
+        assertTrue(request.headers["User-Agent"]!!.contains("newspaperss"))
+    }
+
+    @Test(expected = IOException::class)
+    fun oversizedImagesAreRefused() = runTest {
+        server.enqueue(MockResponse.Builder().body(okio.Buffer().write(ByteArray((OkHttpHttpClient.MAX_IMAGE_BYTES + 1).toInt()))).build())
+        OkHttpHttpClient().getBytes(server.url("/huge.jpg").toString())
+    }
+
     @Test(expected = IOException::class)
     fun malformedUrlIsAnIOException() = runTest {
         OkHttpHttpClient().get("not a url")
