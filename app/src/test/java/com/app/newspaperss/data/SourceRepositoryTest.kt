@@ -3,10 +3,11 @@ package com.app.newspaperss.data
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.TestApp
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -14,11 +15,9 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
 class SourceRepositoryTest {
-    private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
-        .allowMainThreadQueries().build()
+    @get:Rule val dbRule = DbRule()
+    private val db = dbRule.db
     private val repo = SourceRepository(db)
-
-    @After fun close() = db.close()
 
     @Test
     fun addingTheSameFeedTwiceKeepsOne() = runTest {

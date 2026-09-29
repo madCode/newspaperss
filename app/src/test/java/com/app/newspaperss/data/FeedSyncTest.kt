@@ -1,15 +1,14 @@
 package com.app.newspaperss.data
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.rss
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -21,8 +20,8 @@ import java.time.ZoneOffset
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
 class FeedSyncTest {
-    private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
-        .allowMainThreadQueries().build()
+    @get:Rule val dbRule = DbRule()
+    private val db = dbRule.db
     private val http = FakeHttp()
     private var now = Instant.parse("2026-09-29T06:00:00Z")
     private val clock = object : Clock() {
@@ -33,8 +32,6 @@ class FeedSyncTest {
     private val sync = FeedSync(db, http, clock, keepFor = Duration.ofDays(7))
     private val repo = SourceRepository(db)
     private val url = "https://example.com/feed"
-
-    @After fun close() = db.close()
 
     @Test
     fun newArticlesAreAddedOnceAndThePlaceholderTitleIsReplaced() = runTest {

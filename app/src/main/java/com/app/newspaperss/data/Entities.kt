@@ -26,6 +26,7 @@ data class SourceEntity(
     val lastError: String? = null,
 )
 
+/** Stored by name, and the DAO queries spell names out as SQL strings ('NEW'): renaming one breaks them. */
 enum class ArticleState {
     NEW,
     /** In an edition that hasn't been delivered yet; goes back to NEW if it never is. */
