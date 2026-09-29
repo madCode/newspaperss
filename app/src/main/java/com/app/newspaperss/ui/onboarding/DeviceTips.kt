@@ -17,8 +17,8 @@ object DeviceTips {
             "Tap Send, choose your email app and send to your @pbsync.com address (Send-to-PocketBook). " +
                 "Add the address you'll send from as a trusted sender in your PocketBook account first."
         Device.KOREADER ->
-            "Pick a folder that syncs to your e-reader, for example with Syncthing. New editions show up " +
-                "in that folder in KOReader."
+            "Pick a folder that syncs to your e-reader, for example with Syncthing, and new editions are " +
+                "saved there automatically. Without one, tap Send to share each edition."
         Device.OTHER -> "Tap Send to share the EPUB with any app, or Open to read it on this phone."
     }
 }

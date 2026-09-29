@@ -3,6 +3,7 @@ package com.app.newspaperss.edition
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.testutil.FakeHttp
@@ -43,7 +44,7 @@ class ExtractorContentProviderTest {
             <p><img src="https://cdn.example/diagram.svg" alt="diagram"/><img src="https://cdn.example/chart" alt="chart"/></p>
         """.trimIndent()
 
-        val content = provider.contentFor(article(html), source)
+        val content = provider.contentFor(article(html), source, ImageAllowance())
 
         val image = content.images.single()
         assertEquals("images/a42-1.jpg", image.href)
@@ -53,7 +54,7 @@ class ExtractorContentProviderTest {
         assertFalse("a figure whose image failed goes too", content.bodyHtml.contains("Never arrives"))
         assertFalse("no img is left pointing at the web", content.bodyHtml.contains("cdn.example"))
         assertTrue(content.bodyHtml.contains("An icon"))
-        assertEquals("https://example.com/story", http.bytesRequests.getValue("https://cdn.example/photo.png")["Referer"])
+        assertEquals("only the origin is sent", "https://example.com/", http.bytesRequests.getValue("https://cdn.example/photo.png")["Referer"])
         assertFalse("SVG URLs aren't downloaded", "https://cdn.example/diagram.svg" in http.bytesRequests)
     }
 
@@ -70,9 +71,20 @@ class ExtractorContentProviderTest {
         }
         val html = "<p>Words.</p>" + (1..10).joinToString("") { "<p><img src=\"https://cdn.example/$it.jpg\"/></p>" }
 
-        provider.contentFor(article(html), source)
+        provider.contentFor(article(html), source, ImageAllowance())
 
         assertEquals(10, http.bytesRequests.size)
         assertEquals(4, most)
+    }
+
+    @Test
+    fun noImagesAreDownloadedOnceTheEditionIsFull() = runTest {
+        val html = "<p>Words.</p><p><img src=\"https://cdn.example/1.jpg\"/></p>"
+        val full = ImageAllowance(maxBytes = 0)
+
+        val content = provider.contentFor(article(html), source, full)
+
+        assertTrue(http.bytesRequests.isEmpty())
+        assertTrue(content.images.isEmpty())
     }
 }

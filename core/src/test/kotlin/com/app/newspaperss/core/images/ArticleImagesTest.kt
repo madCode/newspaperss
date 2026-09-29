@@ -87,4 +87,13 @@ class ArticleImagesTest {
         )
         assertTrue(ImageBudget.fit(listOf(listOf(img("a", 101))), maxBytes = 100).single().isEmpty())
     }
+
+    @Test
+    fun allowanceHandsOutOnlyWhatFits() {
+        val allowance = ImageAllowance(maxBytes = 100)
+        assertTrue(allowance.take(60))
+        assertFalse("too big for what's left", allowance.take(50))
+        assertTrue(allowance.take(40))
+        assertTrue(allowance.exhausted)
+    }
 }

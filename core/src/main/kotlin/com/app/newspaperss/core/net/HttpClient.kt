@@ -32,7 +32,7 @@ interface HttpClient {
 
     /**
      * Fetches [url] as raw bytes, for images, sending [headers] as well; throws IOException on
-     * network failure or a body over [OkHttpHttpClient.MAX_IMAGE_BYTES], never on an HTTP error status.
+     * network failure or a body over the implementation's image size limit, never on an HTTP error status.
      */
     suspend fun getBytes(url: String, headers: Map<String, String> = emptyMap()): HttpBytes
 }
@@ -40,6 +40,10 @@ interface HttpClient {
 class OkHttpHttpClient(
     private val client: OkHttpClient = defaultClient(),
 ) : HttpClient {
+    // Images get a shorter deadline: an article can have 20, and one slow image host
+    // mustn't push a whole edition past WorkManager's ten-minute limit.
+    private val imageClient = client.newBuilder().callTimeout(20, TimeUnit.SECONDS).build()
+
     override suspend fun get(url: String): HttpResponse = withContext(Dispatchers.IO) {
         client.newCall(request(url, emptyMap())).execute().use { r ->
             val source = r.body.source()
@@ -51,7 +55,7 @@ class OkHttpHttpClient(
     }
 
     override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = withContext(Dispatchers.IO) {
-        client.newCall(request(url, headers)).execute().use { r ->
+        imageClient.newCall(request(url, headers)).execute().use { r ->
             val source = r.body.source()
             if (source.request(MAX_IMAGE_BYTES + 1)) throw IOException("Too large for an image.")
             HttpBytes(r.code, r.header("Content-Type"), source.readByteArray())

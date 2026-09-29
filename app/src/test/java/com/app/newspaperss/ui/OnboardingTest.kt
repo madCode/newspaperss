@@ -2,6 +2,7 @@ package com.app.newspaperss.ui
 
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -60,8 +61,7 @@ class OnboardingTest {
         compose.onNodeWithText("Send to Kindle", substring = true).assertExists()
         click("Next")
         val science = StarterPacks.all.first { it.name == "Science" }
-        vm.togglePack(science.name)
-        compose.waitForIdle()
+        compose.onNodeWithContentDescription("All of Science").performScrollTo().performClick()
         click("Next")
         click("Make my first edition")
 

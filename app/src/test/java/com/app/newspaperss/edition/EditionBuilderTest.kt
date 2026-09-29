@@ -36,7 +36,7 @@ class EditionBuilderTest {
     private val clock = Clock.fixed(Instant.parse("2026-09-29T06:30:00Z"), ZoneOffset.UTC)
     private val sources = SourceRepository(db)
     private val unreadable = mutableSetOf<String>()
-    private val content = ArticleContentProvider { a, _ ->
+    private val content = ArticleContentProvider { a, _, _ ->
         if (a.guid in unreadable) null else ArticleContent(a.title, null, "<p>${a.title} body</p>", wordCount = 2000)
     }
     private val builder by lazy { EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) }
@@ -149,7 +149,7 @@ class EditionBuilderTest {
     @Test
     fun imagesPastTheEditionBudgetAreLeftOutInReadingOrder() = runTest {
         source("a", null, "a1", "a2")
-        val withImage = ArticleContentProvider { a, _ ->
+        val withImage = ArticleContentProvider { a, _, _ ->
             val href = "images/a${a.id}-1.jpg"
             ArticleContent(
                 a.title, null, "<p>${a.title}</p><figure><img src=\"$href\"/><figcaption>${a.guid} caption</figcaption></figure>",

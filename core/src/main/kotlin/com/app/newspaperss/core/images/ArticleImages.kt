@@ -80,3 +80,24 @@ object ImageBudget {
         }
     }
 }
+
+/**
+ * The image bytes an edition still has room for, drawn down as articles are
+ * fetched. Checking it before downloading means images that could never fit
+ * aren't downloaded, decoded or held in memory at all; [ImageBudget.fit]
+ * later settles the final set in reading order.
+ */
+class ImageAllowance(maxBytes: Long = ImageRules.MAX_EDITION_BYTES) {
+    private val remaining = java.util.concurrent.atomic.AtomicLong(maxBytes)
+
+    val exhausted get() = remaining.get() <= 0
+
+    /** Takes [bytes] if they fit; false leaves the allowance unchanged. */
+    fun take(bytes: Long): Boolean {
+        while (true) {
+            val left = remaining.get()
+            if (bytes > left) return false
+            if (remaining.compareAndSet(left, left - bytes)) return true
+        }
+    }
+}

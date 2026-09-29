@@ -2,6 +2,7 @@ package com.app.newspaperss.edition
 
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.edition.Candidate
+import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.core.edition.EditionPlanner
 import com.app.newspaperss.core.edition.EditionTitles
 import com.app.newspaperss.core.epub.EditionArticle
@@ -60,10 +61,11 @@ class EditionBuilder(
             rotation = rotation,
         )
         var fetched = 0
+        val allowance = ImageAllowance(imageBudgetBytes)
         fun minutesOf(c: ArticleContent) = ReadingTime.minutes(c.wordCount, settings.wordsPerMinute)
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, settings.rules, { minutesOf(it.second) }) { c ->
             val article = byId.getValue(c.id.toLong())
-            val result = content.contentFor(article, sourcesById.getValue(article.sourceId))?.let { article to it }
+            val result = content.contentFor(article, sourcesById.getValue(article.sourceId), allowance)?.let { article to it }
             onProgress(++fetched)
             result
         }
@@ -80,8 +82,8 @@ class EditionBuilder(
             ),
         )
 
-        // Budgeted in reading order, so the first articles keep their pictures. EpubWriter drops
-        // an img whose image isn't in the book, taking an emptied figure with it.
+        // Budgeted again in reading order (fetch order differs), so the first articles keep their
+        // pictures. EpubWriter drops an img whose image isn't in the book, and an emptied figure.
         val fitted = ImageBudget.fit(arranged.map { it.second.images }, imageBudgetBytes)
         val withImages = arranged.zip(fitted) { (a, c), images -> a to c.copy(images = images) }
 

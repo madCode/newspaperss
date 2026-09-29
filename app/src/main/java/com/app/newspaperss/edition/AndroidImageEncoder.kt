@@ -27,24 +27,27 @@ class AndroidImageEncoder : ImageEncoder {
             inSampleSize = ImageRules.sampleSize(width, height)
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        // A page can serve a photo far bigger than any the phone takes; one bad image mustn't fail the edition.
-        val decoded = try {
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        var decoded: Bitmap? = null
+        var output: Bitmap? = null
+        // A page can serve a photo far bigger than any the phone takes; running out of memory
+        // on one image mustn't take the whole edition (and the app) down.
+        return try {
+            decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
+            val (targetWidth, targetHeight) = ImageRules.scaledSize(decoded.width, decoded.height)
+            output = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+            // JPEG has no alpha: without the white fill, transparent areas come out black.
+            Canvas(output).apply {
+                drawColor(Color.WHITE)
+                drawBitmap(decoded, null, Rect(0, 0, targetWidth, targetHeight), Paint(Paint.FILTER_BITMAP_FLAG))
+            }
+            val stream = ByteArrayOutputStream()
+            output.compress(Bitmap.CompressFormat.JPEG, ImageRules.JPEG_QUALITY, stream)
+            EncodedImage(stream.toByteArray(), "image/jpeg", targetWidth, targetHeight)
         } catch (e: OutOfMemoryError) {
             null
-        } ?: return null
-
-        val (targetWidth, targetHeight) = ImageRules.scaledSize(decoded.width, decoded.height)
-        val output = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
-        // JPEG has no alpha: without the white fill, transparent areas come out black.
-        Canvas(output).apply {
-            drawColor(Color.WHITE)
-            drawBitmap(decoded, null, Rect(0, 0, targetWidth, targetHeight), Paint(Paint.FILTER_BITMAP_FLAG))
+        } finally {
+            decoded?.recycle()
+            output?.recycle()
         }
-        decoded.recycle()
-        val stream = ByteArrayOutputStream()
-        output.compress(Bitmap.CompressFormat.JPEG, ImageRules.JPEG_QUALITY, stream)
-        output.recycle()
-        return EncodedImage(stream.toByteArray(), "image/jpeg", targetWidth, targetHeight)
     }
 }

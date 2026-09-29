@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
@@ -44,6 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -83,7 +86,8 @@ fun OnboardingScreen(viewModel: OnboardingViewModel) {
                 when (s.step) {
                     Step.WELCOME -> Button(onClick = viewModel::next) { Text("Get started") }
                     Step.SIZE -> Button(onClick = viewModel::finish, enabled = s.canContinue) {
-                        if (s.finishing) CircularProgressIndicator(Modifier.padding(end = 8.dp)) else Text("Make my first edition")
+                        if (s.finishing) CircularProgressIndicator(Modifier.padding(end = 8.dp).size(18.dp), strokeWidth = 2.dp)
+                        Text("Make my first edition")
                     }
                     else -> Button(onClick = viewModel::next, enabled = s.canContinue) { Text("Next") }
                 }
@@ -170,7 +174,12 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel) {
                 Text(pack.name, style = MaterialTheme.typography.titleLarge)
                 Text(pack.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            FilterChip(selected = s.chosen.containsAll(urls), onClick = { vm.togglePack(pack.name) }, label = { Text("All") })
+            FilterChip(
+                selected = s.chosen.containsAll(urls),
+                onClick = { vm.togglePack(pack.name) },
+                label = { Text("All") },
+                modifier = Modifier.semantics { contentDescription = "All of ${pack.name}" },
+            )
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             pack.feeds.forEach { feed ->
@@ -223,7 +232,7 @@ private fun SizeStep(s: OnboardingState, vm: OnboardingViewModel) {
             Text(
                 s.time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)),
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.clickable {
+                modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Change time") {
                     TimePickerDialog(context, { _, h, m -> vm.setTime(LocalTime.of(h, m)) }, s.time.hour, s.time.minute, android.text.format.DateFormat.is24HourFormat(context)).show()
                 }.padding(8.dp),
             )

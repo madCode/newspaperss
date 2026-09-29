@@ -4,6 +4,7 @@ import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ExtractInput
 import com.app.newspaperss.core.images.ArticleImages
 import com.app.newspaperss.core.images.EncodedImage
+import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.core.images.ImageEncoder
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.data.ArticleEntity
@@ -29,7 +30,7 @@ class ExtractorContentProvider(
     // Downloads overlap but decoding doesn't: a decoded photo can take tens of MB of heap.
     private val encoding = Mutex()
 
-    override suspend fun contentFor(article: ArticleEntity, source: SourceEntity): ArticleContent {
+    override suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance): ArticleContent {
         val extracted = extractor.extract(
             ExtractInput(
                 url = article.url,
@@ -39,7 +40,7 @@ class ExtractorContentProvider(
                 mode = source.contentMode,
             ),
         )
-        val encoded = download(ArticleImages.wanted(extracted.imageUrls), referer = article.url)
+        val encoded = download(ArticleImages.wanted(extracted.imageUrls), refererFor(article.url), images)
         val embedded = ArticleImages.embed(extracted.html, "a${article.id}", encoded)
         return ArticleContent(
             title = extracted.title,
@@ -51,13 +52,15 @@ class ExtractorContentProvider(
         )
     }
 
-    private suspend fun download(urls: List<String>, referer: String): Map<String, EncodedImage?> = coroutineScope {
+    private suspend fun download(urls: List<String>, referer: String, allowance: ImageAllowance): Map<String, EncodedImage?> = coroutineScope {
         val slots = Semaphore(PARALLEL_DOWNLOADS)
-        urls.map { url -> async { url to slots.withPermit { fetch(url, referer) } } }.awaitAll().toMap()
+        urls.map { url ->
+            async { url to slots.withPermit { if (allowance.exhausted) null else fetch(url, referer)?.takeIf { allowance.take(it.bytes.size.toLong()) } } }
+        }.awaitAll().toMap()
     }
 
     private suspend fun fetch(url: String, referer: String): EncodedImage? {
-        // Image hosts often refuse hotlinking: without the article as Referer they send a 403 or a placeholder.
+        // Image hosts often refuse hotlinking: without a Referer from the article's site they send a 403 or a placeholder.
         val response = try {
             http.getBytes(url, mapOf("Referer" to referer, "Accept" to ACCEPT))
         } catch (e: IOException) {
@@ -68,6 +71,13 @@ class ExtractorContentProvider(
     }
 
     private companion object {
+        /**
+         * Only the article's origin, as browsers send across sites: the full URL can carry
+         * tokens and tracking parameters, and hotlink checks only look at the host.
+         */
+        fun refererFor(url: String): String =
+            runCatching { java.net.URI(url).let { "${it.scheme}://${it.host}/" } }.getOrDefault("")
+
         const val PARALLEL_DOWNLOADS = 4
         const val ACCEPT = "image/jpeg,image/png,image/gif,image/webp,image/*;q=0.8"
     }

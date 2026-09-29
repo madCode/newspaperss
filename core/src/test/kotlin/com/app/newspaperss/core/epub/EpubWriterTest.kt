@@ -566,4 +566,13 @@ class EpubWriterTest {
         assertEquals("1 hr 0 min", formatMinutes(59.6))
         assertEquals("2 hr 5 min", formatMinutes(125.0))
     }
+
+    @Test
+    fun aLinkedFigureWhoseImageIsLeftOutGoesWithItsCaption() {
+        val body = """<p>Text.</p><figure><a href="https://example.com/big"><img src="images/a1-0.jpg"/></a><figcaption>Orphan caption</figcaption></figure>"""
+        val epub = write(unsectioned(article(body = body)))
+        val page = epub.text(epub.articleHrefs().single().let { "OEBPS/$it" })
+        assertFalse(page.contains("Orphan caption"))
+        assertFalse(page.contains("https://example.com/big"))
+    }
 }
