@@ -11,6 +11,9 @@ import com.app.newspaperss.NewspaperssApp
 import com.app.newspaperss.core.edition.ScheduleTimer
 import com.app.newspaperss.core.edition.TimerAction
 import com.app.newspaperss.settings.Settings
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -22,15 +25,23 @@ import java.util.concurrent.TimeUnit
  * time drifts.
  */
 object EditionScheduler {
-    private const val UNIQUE = "edition-schedule"
-    private const val PREFS = "edition-schedule"
-    private const val PENDING = "pending_epoch_ms"
+    internal const val UNIQUE = "edition-schedule"
+    internal const val PREFS = "edition-schedule"
+    internal const val PENDING = "pending_epoch_ms"
 
-    fun reschedule(context: Context, settings: Settings, now: ZonedDateTime = ZonedDateTime.now()) {
+    // Callers fire and forget (app start, every settings change). Interleaved, an older
+    // change's run could finish last and leave the timer set for settings no longer current.
+    private val lock = Mutex()
+
+    suspend fun reschedule(context: Context, settings: Settings, now: ZonedDateTime = ZonedDateTime.now()) = lock.withLock {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val pending = prefs.getLong(PENDING, 0L).takeIf { it > 0 }?.let(Instant::ofEpochMilli)
-        val target = if (settings.scheduleEnabled) settings.schedule.nextAfter(now)?.toInstant() else null
         val work = WorkManager.getInstance(context)
+        // The stored time can outlive its timer, e.g. restored from a backup onto a device
+        // whose WorkManager database wasn't. ScheduleTimer keeps an overdue pending time, so
+        // a stale one would stop timed editions for good: it only counts while the work exists.
+        val armed = work.getWorkInfosForUniqueWorkFlow(UNIQUE).first().any { !it.state.isFinished }
+        val pending = prefs.getLong(PENDING, 0L).takeIf { armed && it > 0 }?.let(Instant::ofEpochMilli)
+        val target = if (settings.scheduleEnabled) settings.schedule.nextAfter(now)?.toInstant() else null
         when (val action = ScheduleTimer.decide(pending, target, now.toInstant())) {
             TimerAction.Keep -> {}
             TimerAction.Cancel -> {

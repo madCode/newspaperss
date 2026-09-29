@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keep in step with backup_rules.xml, its equivalent before Android 12.
+     The pending timer means nothing without WorkManager's own database, which isn't
+     restored, and past editions' EPUBs would only take up backup quota. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="edition-schedule.xml" />
+        <exclude domain="file" path="editions/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="edition-schedule.xml" />
+        <exclude domain="file" path="editions/" />
+    </device-transfer>
+</data-extraction-rules>
