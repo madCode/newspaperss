@@ -8,13 +8,20 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** an app icon.
-- **Next:** webcomics (built, in review), the Sources page design, reading-list titles, the "Article text" label.
+- **In flight:** webcomics.
+- **Next:** the source page design (built), reading-list titles; then a resource-usage audit.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 14: an app icon (14:55–)
+### Cycle 15: webcomics (15:07–)
+- **From device testing:** God Slave, Namesake and Cursed Princess Club (Webtoons), on top of the New Yorker cartoon and xkcd.
+- **Shipped:** the feed finder follows an ordinary link to a feed (God Slave's `/comic/rss`), shortest path first and never a comments feed; a page's own comic (`img#cc-comic`, `#comic`), every panel, beats the feed's thumbnail, captioned by the feed's text.
+- **Checks:** God Slave and Namesake now give their full comic, xkcd its 2x image, the New Yorker its cartoon; a live edition passes epubcheck.
+- **Left:** Webtoons. The app is redirected to its mobile site, which doesn't link the feed, and an episode is a strip of dozens of images. Parked in the backlog: vertical colour strips suit e-ink poorly.
+- **Review caught:** the caption strip removed a `<figcaption>` (often the joke); only the first panel survived; a tag or comments feed could beat the site's. All fixed.
+
+### Cycle 14: an app icon (14:55–15:06, [#31](https://github.com/madCode/newspaperss/pull/31))
 - **From device testing:** the launcher showed Android's default icon, and you asked for something design-forward like the Termux shortcut's.
 - **Shipped:** an adaptive icon: a cream newspaper page with a navy masthead, a red photo and grey columns, on navy. Themed icons use the notification icon's newspaper as one shape.
 

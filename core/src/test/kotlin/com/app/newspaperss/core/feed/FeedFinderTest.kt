@@ -75,4 +75,32 @@ class FeedFinderTest {
         assertNull(FeedFinder.normalize("hello"))
         assertNull(FeedFinder.normalize(""))
     }
+
+    @Test
+    fun aFeedLinkedOnlyFromThePageIsFound() = runTest {
+        // A webcomic's RSS button, with no <link rel="alternate"> in the head.
+        val page = "<html><body><a href=\"/archive\">Archive</a><a href=\"https://other.example/rss\">Someone else</a>" +
+            "<a href=\"/comic/rss\">RSS</a></body></html>"
+        val http = FakeHttp(mapOf("https://comic.example" to page, "https://comic.example/comic/rss" to feedXml))
+
+        val result = FeedFinder(http).find("comic.example") as FindResult.Found
+
+        assertEquals(listOf("https://comic.example/comic/rss"), result.feeds.map { it.url })
+        assertTrue("another site's feed isn't tried", "https://other.example/rss" !in http.requested)
+    }
+
+    @Test
+    fun linkedFeedsKeepTheirQuery() {
+        val page = "<a href=\"https://www.webtoons.com/en/comedy/princess/rss?title_no=1537\">RSS</a>"
+        assertEquals(
+            listOf("https://www.webtoons.com/en/comedy/princess/rss?title_no=1537"),
+            FeedFinder.linkedFeeds(page, "https://www.webtoons.com/en/comedy/princess/list?title_no=1537"),
+        )
+    }
+
+    @Test
+    fun theSitesOwnLinkedFeedComesBeforeATagsOrTheComments() {
+        val page = "<a href=\"/comments/feed\">Comments</a><a href=\"/tag/cats/feed\">Cats</a><a href=\"/feed\">Posts</a>"
+        assertEquals(listOf("https://blog.example/feed", "https://blog.example/tag/cats/feed"), FeedFinder.linkedFeeds(page, "https://blog.example/"))
+    }
 }

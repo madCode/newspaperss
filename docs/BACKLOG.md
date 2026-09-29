@@ -7,11 +7,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### From device testing (Day 2)
-- [ ] Webcomics (tested: God Slave, Namesake, xkcd, Webtoons):
-  - the feed finder misses feeds linked only by an ordinary link (God Slave's `/comic/rss`, Webtoons' `rss?title_no=`);
-  - ComicControl feeds (God Slave, Namesake) carry a thumbnail; the full comic is the page's `img#cc-comic` and should win;
-  - Namesake gets the comic twice (the full image and its thumbnail).
-- [ ] Webtoons episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap; support strips properly
+- [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap; the app's user agent is redirected to m.webtoons.com, whose series page doesn't link the feed. Support strips properly
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
 - [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
 - [ ] Reading list: fetch each link's title and reading time; tap to open in the browser
@@ -128,6 +124,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Webcomics: feeds linked only from the page are found (God Slave's `/comic/rss`), and a page's own comic (`#cc-comic`, `#comic`) beats the feed's thumbnail
 - [x] An app icon: a cream newspaper page on navy, after the Termux shortcut's icon; themed icons get the newspaper glyph
 - [x] EPUB design, round 1: source kicker, byline and rule, justified hyphenated text, links and rules in the text's colour (KOReader night mode), "Read the original at site.com" (no long URL widening the page), a cleaner contents page
 - [x] "See what's inside" on Today, and deleting an edition (its title stays taken, so Send to Kindle doesn't drop a remake)

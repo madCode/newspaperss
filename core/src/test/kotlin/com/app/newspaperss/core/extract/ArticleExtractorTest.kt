@@ -67,6 +67,29 @@ class ArticleExtractorTest {
     }
 
     @Test
+    fun aWebcomicsOwnComicBeatsTheFeedsThumbnail() = runTest {
+        // ComicControl feeds carry a thumbnail; the page has the comic in img#cc-comic.
+        val feedItem = "<a href=\"$url\"><img src=\"https://example.com/comicsthumbs/1-page.png\" /><br />New comic!</a><p>Edith has ideas.</p>"
+        val page = "<html><body><div id=\"cc-comicbody\"><img title=\"The building\" src=\"https://example.com/comics/1-page.png\" id=\"cc-comic\"/></div>" +
+            "$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(feedItem))
+
+        assertEquals(listOf("https://example.com/comics/1-page.png"), article.imageUrls)
+        assertTrue("the feed's words are the caption", "Edith has ideas" in article.html)
+    }
+
+    @Test
+    fun aComicsCaptionAndEveryPanelSurvive() = runTest {
+        val feedItem = "<figure><img src=\"https://example.com/thumbs/strip.png\"><figcaption>The joke, told in the caption.</figcaption></figure>"
+        val page = "<html><body><div id=\"comic\"><img src=\"https://example.com/strips/panel-1.png\"><img src=\"https://example.com/strips/panel-2.png\"></div>" +
+            "$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(feedItem))
+
+        assertEquals(listOf("https://example.com/strips/panel-1.png", "https://example.com/strips/panel-2.png"), article.imageUrls)
+        assertTrue("told in the caption" in article.html)
+    }
+
+    @Test
     fun aCartoonPageGivesItsImageNotItsFooter() = runTest {
         val cartoon = "<html><head><meta property=\"og:description\" content=\"A drawing about the news.\"></head><body>" +
             "<header><img alt=\"Example\" class=\"logo\" src=\"/logo.png\"></header><article><h1>Daily Cartoon</h1>" +
