@@ -21,7 +21,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
   - The app now shows itself as newspapeRSS.
 - **Friction:** the debug APK was only uploaded for pull requests, so the first link I sent pointed at a run without one.
 
-## Day 1 · Mon 28 – Tue 29 Sep, overnight (summary)
+## Day 1 · Tue 29 Sep, overnight (summary)
 
 Sixteen PRs took the app from an empty repo to a working, tested app:
 - **Sources:** starter packs, any site's feed, OPML, Tiny Tiny RSS, curated lists and a reading list.
