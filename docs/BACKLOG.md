@@ -39,7 +39,6 @@ A full pass over the app and the book, not just spot fixes:
 
 ### From the resource audit (Day 2)
 - [ ] tt-rss: pass sinceId, so each sync doesn't re-download the same 200 unread items. Careful: a since-id cursor changes what "unread" returns (category switches, items marked unread again); rss-to-e-reader's #28 hit a similar trap
-- [ ] Strip script/style/svg before the Readability DOM clone, and cap article pages at ~4 MB (the worst-case memory peak)
 - [ ] Load build candidates without feedHtml; fetch it per article
 - [ ] EPUB zip: buffered output, JPEGs stored uncompressed
 
@@ -127,6 +126,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Extraction drops scripts, styles and SVGs before Readability copies the page (a 2.6 MB script-heavy page: 36 MB allocated before, 16 MB after, twice as fast); pages over 5 MB aren't parsed and use the feed's text
 - [x] Documentation pass: DESIGN.md describes the app as it is (no SMTP, profiles or reading-speed setting; today's changes in), README and CLAUDE.md updated, fresh screenshots; documentation passes are now part of the cycles
 - [x] TalkBack: the build's stage is announced (not every count), onboarding's progress says "Step 2 of 3", earlier editions say "See what's inside"; Add and Save sit below their fields so large fonts leave room to type
 - [x] Each article is tagged with its language (`xml:lang`, `dir="rtl"`), detected from its text (writing system, common words) with the page's declared language as a tiebreaker

@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** TalkBack and large-font fixes ([#39](https://github.com/madCode/newspaperss/pull/39)); a documentation pass.
-- **Next:** the rest of the accessibility audit (you asked for it); the audit's memory items (page DOM trimming); reading time for Chinese and Japanese.
+- **In flight:** lighter extraction of large pages.
+- **Next:** the rest of the accessibility audit; reading time for Chinese and Japanese; the Le Monde script wall.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 23: a documentation pass (16:50–)
+### Cycle 24: lighter extraction (17:00–)
+- **From the resource audit:** the worst memory peak was a large page parsed and then copied whole for Readability.
+- **Shipped:** scripts, styles and SVGs are dropped right after the page's JSON-LD is read, before the copy; on script-heavy sites they're most of the page. On a 2.6 MB test page that's 36 MB allocated before and 16 MB after, in half the time. Pages over 5 MB aren't parsed at all; the feed's text is used with a note.
+- **Checks:** a live edition gives the same articles with the same word counts and passes epubcheck; xkcd, the New Yorker cartoon and Godslave all still get their image. The live-edition tool now prints each article's image count.
+
+### Cycle 23: a documentation pass (16:50–17:00, in [#39](https://github.com/madCode/newspaperss/pull/39))
 - **Why:** you asked for documentation passes in the cycles: readable, current, not onerous. CLAUDE.md now says so: behaviour changes update the docs in the same PR, and every few cycles a pass checks the docs against the code.
 - **Shipped:** DESIGN.md rewritten to describe the app as it is. It had SMTP delivery, edition profiles, user-named sections and a reading-speed setting that don't exist, and nothing on today's changes: timed editions starting early, the feed cache and 12-hour sync, when an edition counts as delivered, housekeeping, comics, language tags, the preview. The finished milestone plan and history are gone (BACKLOG and this log have them), and it's shorter. README: the delivery rule, "ready by", the book's features, a link to the debug APK, and fresh screenshots. CLAUDE.md: database migrations and debug builds.
 - **How:** an agent checked every statement in the three docs against the code and listed what was wrong or missing, with file references; I rewrote from that.

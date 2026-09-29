@@ -143,6 +143,9 @@ class ArticleExtractor(private val http: HttpClient) {
         if (!response.isSuccessful) return PageResult.Failed("error ${response.code}")
         val type = response.contentType?.lowercase()
         if (type != null && "html" !in type && "xml" !in type) return PageResult.Failed("not a web page")
+        // Parsed, a page takes several times its size in memory, and Readability copies it. Real
+        // articles are well under this; the feed's text is the better bet for anything bigger.
+        if (response.body.length > MAX_PAGE_CHARS) return PageResult.Failed("the page is too large")
         // Bot checks are small pages served with a 200 status.
         if (response.body.length < CHALLENGE_PAGE_MAX_CHARS) {
             val head = response.body.take(30_000)
@@ -238,6 +241,7 @@ class ArticleExtractor(private val http: HttpClient) {
         private const val ARTICLE_TEXT_PROBE = 60
         private const val TEASER_RATIO = 2.0
         private const val CHALLENGE_PAGE_MAX_CHARS = 150 * 1024
+        private const val MAX_PAGE_CHARS = 5 * 1024 * 1024
         private val BLOCKED_STATUS_CODES = setOf(401, 403, 429, 503)
         private val CHALLENGE_MARKERS = listOf(
             "<title>Just a moment...</title>", "<title>Verifying Device</title>", "cf-browser-verification",

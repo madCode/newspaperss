@@ -68,8 +68,8 @@ module so it's all unit-tested without Android.
   otherwise fetch the page, remove cookie banners and run Readability4J
   (Firefox's Reader View). schema.org JSON-LD is used instead when it has
   much more text, which usually means Readability only saw a paywall
-  preview. If the page can't be fetched, the feed's text goes in with a
-  note saying so; an article that fails entirely still goes in, so a broken
+  preview. If the page can't be fetched (or is over 5 MB, too big to parse
+  on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
 - **Comics and image posts.** A feed item that's just an image counts as
   content. When a page's text is clearly not the article, the page's main

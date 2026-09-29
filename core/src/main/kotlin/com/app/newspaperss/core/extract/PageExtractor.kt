@@ -55,6 +55,9 @@ internal object PageExtractor {
         val doc = Jsoup.parse(html, url)
         val jsonLd = jsonLdObjects(doc)
         val siteName = doc.metaContent("og:site_name") ?: jsonLd.firstNotNullOfOrNull { (it["publisher"] as? JsonObject)?.string("name") }
+        // Once JSON-LD is read, nothing needs these, and Readability clones the whole document:
+        // on script-heavy sites inline scripts are most of the page, parsed and copied for nothing.
+        doc.select("script, style, svg, template").remove()
         removeOverlays(doc)
         HtmlCleaner.removeScreenReaderOnly(doc.body())
 

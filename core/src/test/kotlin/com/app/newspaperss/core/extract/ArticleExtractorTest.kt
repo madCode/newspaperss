@@ -275,4 +275,13 @@ class ArticleExtractorTest {
         val fromFeed = ArticleExtractor(FakeHttp(emptyMap())).extract(input("<p>${portuguese.repeat(4)}</p>", mode = ContentMode.FEED, feedTitle = "Ciclovias"))
         assertEquals("pt", fromFeed.language)
     }
+
+    @Test
+    fun aHugePageIsntParsedAndTheFeedsTextIsUsed() = runTest {
+        val huge = "<html><body><article>" + "<p>${sentence.repeat(20)}</p>".repeat(3_500) + "</article></body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(huge)))).extract(input(teaser))
+
+        assertTrue(article.usedFeedContent)
+        assertTrue(article.note!!, "too large" in article.note!!)
+    }
 }
