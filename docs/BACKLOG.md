@@ -7,11 +7,17 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### From device testing (Day 2)
-- [ ] EPUB design pass (the rss-to-e-reader output is the bar); links inherit the text colour, so KOReader's dark mode stays readable
+- [ ] Webcomics (tested: God Slave, Namesake, xkcd, Webtoons):
+  - the feed finder misses feeds linked only by an ordinary link (God Slave's `/comic/rss`, Webtoons' `rss?title_no=`);
+  - ComicControl feeds (God Slave, Namesake) carry a thumbnail; the full comic is the page's `img#cc-comic` and should win;
+  - Namesake gets the comic twice (the full image and its thumbnail).
+- [ ] Webtoons episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap; support strips properly
+- [ ] An app icon: there's none, so the launcher shows Android's default. An adaptive icon (a folded-newspaper mark, monochrome layer for themed icons), matching the calm monochrome app
+- [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
 - [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
 - [ ] Reading list: fetch each link's title and reading time; tap to open in the browser
 - [ ] Label the "Article text" option with what it sets
-- [ ] In-app article view is slightly wider than the phone (a long "Original:" URL or a wide table); the first tap on an article may not open it
+- [ ] The first tap on an article in the app may not open it
 - [ ] Decide what tapping an article in a source's list does: open the original in the browser, render it, or offer "add to the next edition"
 
 ### M4 leftovers
@@ -69,7 +75,9 @@ Several timed editions (a weekday morning paper and Sunday long reads), and a on
 
 ### tt-rss categories as sections
 newspapeRSS sits on top of a reader rather than replacing it. tt-rss is one source today, optionally
-one category; its categories could become the paper's sections.
+one category; its categories could become the paper's sections. This is the direction rather than
+making the app a full client, and it pairs with "Add sources to tt-rss": sources found here get
+subscribed on the server, and the server's categories come back as the paper's sections.
 
 Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
 
@@ -121,6 +129,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] EPUB design, round 1: source kicker, byline and rule, justified hyphenated text, links and rules in the text's colour (KOReader night mode), "Read the original at site.com" (no long URL widening the page), a cleaner contents page
 - [x] "See what's inside" on Today, and deleting an edition (its title stays taken, so Send to Kindle doesn't drop a remake)
 - [x] Comics and cartoons keep their image: an image-only feed item isn't dropped as empty, and a cartoon page gives its main image instead of its footer
 - [x] The per-site cap gives way when there's room: with one source (the New Yorker) an edition held one article

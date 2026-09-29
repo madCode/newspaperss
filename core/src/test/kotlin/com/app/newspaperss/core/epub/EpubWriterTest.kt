@@ -185,7 +185,7 @@ class EpubWriterTest {
         val spine = epub.spineHrefs()
         assertEquals(6, spine.size)
         assertTrue(epub.text("OEBPS/" + spine[0]).contains("Tuesday Morning Edition"))
-        assertTrue(epub.text("OEBPS/" + spine[1]).contains("<h1>Contents</h1>"))
+        assertTrue(epub.text("OEBPS/" + spine[1]).contains("<h1>In this edition</h1>"))
         val titles = spine.drop(2).dropLast(1).map { epub.xml("OEBPS/$it").elements("h1").single().textContent }
         assertEquals(listOf("W1", "W2", "S1"), titles)
         assertTrue(epub.text("OEBPS/" + spine.last()).contains("That's all for today."))
@@ -327,12 +327,12 @@ class EpubWriterTest {
         val (first, second) = epub.articleHrefs()
         val page = epub.xml("OEBPS/$first")
         val paragraphs = page.elements("p").associateBy { it.getAttribute("class") }
-        assertEquals("Alpha · Ada Lovelace · Sep 28, 2026 · 5 min", paragraphs.getValue("byline").textContent)
+        assertEquals("Alpha", paragraphs.getValue("kicker").textContent)
+        assertEquals("By Ada Lovelace · Sep 28, 2026 · 5 min read", paragraphs.getValue("byline").textContent)
         assertEquals("Couldn't fetch the full article; showing the feed's version", paragraphs.getValue("note").textContent)
-        assertEquals(
-            "https://example.com/first",
-            paragraphs.getValue("source-link").elements("a").single().getAttribute("href"),
-        )
+        val original = paragraphs.getValue("source-link").elements("a").single()
+        assertEquals("https://example.com/first", original.getAttribute("href"))
+        assertEquals("the site's name, not a long unbreakable address", "example.com", original.textContent)
         val next = paragraphs.getValue("article-nav").elements("a").single()
         assertEquals(second, next.getAttribute("href"))
         assertEquals("Second", next.textContent)
@@ -347,7 +347,15 @@ class EpubWriterTest {
         val epub = write(unsectioned(article(source = "Alpha", minutes = 2.0)))
         val byline = epub.xml("OEBPS/" + epub.articleHrefs().single()).elements("p")
             .single { it.getAttribute("class") == "byline" }
-        assertEquals("Alpha · 2 min", byline.textContent)
+        assertEquals("2 min read", byline.textContent)
+    }
+
+    @Test
+    fun theKickerIsTheSourceAndTheOriginalLinkNamesTheSite() {
+        val epub = write(unsectioned(article(source = "", url = "https://www.example.com/a/very/long/path?with=tracking")))
+        val paragraphs = epub.xml("OEBPS/" + epub.articleHrefs().single()).elements("p")
+        assertTrue("no kicker without a source", paragraphs.none { it.getAttribute("class") == "kicker" })
+        assertEquals("Read the original at example.com", paragraphs.single { it.getAttribute("class") == "source-link" }.textContent)
     }
 
     @Test

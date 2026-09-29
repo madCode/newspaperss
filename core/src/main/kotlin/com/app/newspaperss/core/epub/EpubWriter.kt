@@ -3,6 +3,7 @@ package com.app.newspaperss.core.epub
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.plural
 import java.io.OutputStream
+import java.net.URI
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -167,7 +168,7 @@ object EpubWriter {
 
         private fun contentsPage(): Page {
             val body = buildString {
-                append("<h1>Contents</h1>\n")
+                append("<h1>In this edition</h1>\n")
                 append("<p class=\"totals\">${esc(totalsLine())}</p>\n")
                 var index = 0
                 doc.sections.filter { it.articles.isNotEmpty() }.forEachIndexed { sectionIndex, section ->
@@ -190,16 +191,18 @@ object EpubWriter {
         private fun articlePage(index: Int): Page {
             val article = articles[index]
             val title = articleTitle(index)
+            val source = article.sourceTitle.trim()
             val byline = listOfNotNull(
-                article.sourceTitle.trim().ifEmpty { null },
-                article.author?.trim()?.ifEmpty { null },
+                article.author?.trim()?.ifEmpty { null }?.let { "By $it" },
                 article.published?.let { BYLINE_DATE.format(it) },
-                ReadingTime.format(article.minutes),
+                "${ReadingTime.format(article.minutes)} read",
             ).joinToString(" · ")
             val imageHrefs = article.images.map { it.href }.toSet()
             val body = buildString {
+                if (source.isNotEmpty()) append("<p class=\"kicker\">${esc(source)}</p>\n")
                 append("<h1 class=\"article-title\">${esc(title)}</h1>\n")
                 append("<p class=\"byline\">${esc(byline)}</p>\n")
+                append("<hr class=\"rule\"/>\n")
                 article.note?.trim()?.takeIf { it.isNotEmpty() }?.let { append("<p class=\"note\">${esc(it)}</p>\n") }
                 append("<div class=\"article-body\">")
                 append(ArticleBody.toXhtml(article.bodyHtml, "a${index + 1}-", imageHrefs))
@@ -207,9 +210,14 @@ object EpubWriter {
                 val url = article.url.trim()
                 if (url.isNotEmpty()) {
                     val href = externalHref(url)
-                    append("<p class=\"source-link\">Original: ")
-                    append(if (href == null) esc(url) else "<a href=\"${esc(href)}\">${esc(url)}</a>")
-                    append("</p>\n")
+                    // The site's name, not the whole address: a long URL has nowhere to break and
+                    // pushes the page wider than a phone.
+                    val host = href?.let { runCatching { URI(it).host }.getOrNull() }?.removePrefix("www.")
+                    if (href != null && !host.isNullOrEmpty()) {
+                        append("<p class=\"source-link\">Read the original at <a href=\"${esc(href)}\">${esc(host)}</a></p>\n")
+                    } else {
+                        append("<p class=\"source-link\">Original: ${esc(url)}</p>\n")
+                    }
                 }
                 if (index + 1 < articles.size) {
                     append("<p class=\"article-nav\">Next: <a href=\"${articleHrefs[index + 1]}\">")
