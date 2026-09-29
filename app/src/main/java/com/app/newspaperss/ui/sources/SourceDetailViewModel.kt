@@ -33,14 +33,15 @@ class SourceDetailViewModel(
         combine(repository.observe(id), repository.observeRecentArticles(id), defaultMax) { source, articles, max -> SourceDetail(source, articles, max) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /**
-     * Sets how many articles this source may have in an edition. Landing back on the edition's
-     * own number clears the override, so the source follows that setting again when it changes.
-     */
-    fun setMaxArticles(max: Int) {
+    /** Gives this source its own number of articles per edition, one more or fewer than it has now. */
+    fun stepMaxArticles(delta: Int) {
         val default = detail.value?.defaultMax ?: return
-        val value = max.coerceIn(1, SettingsViewModel.MAX_PER_SOURCE)
-        viewModelScope.launch { repository.setMaxArticles(id, value.takeIf { it != default }) }
+        viewModelScope.launch { repository.stepMaxArticles(id, delta, default, SettingsViewModel.MAX_PER_SOURCE) }
+    }
+
+    /** Back to the edition's own number, following it when it changes. */
+    fun followEditionMax() {
+        viewModelScope.launch { repository.setMaxArticles(id, null) }
     }
 
     fun togglePaused() {

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.room.Room
@@ -91,26 +92,27 @@ class SourceDetailScreenTest {
         assertEquals(emptyList<Any>(), runBlocking { db.sources().all() })
     }
 
-    /** Landing back on the edition's own number clears the override, so the site follows that setting later. */
+    /** A site's own number stays put when the edition setting changes, until the reader hands it back. */
     @Test
-    fun aSiteCanHaveMoreOrFewerArticlesThanTheRest() {
+    fun aSiteCanHaveItsOwnNumberOfArticles() {
         val id = runBlocking { repo.addFeed("https://example.com/feed", "Example") }
         val defaultMax = MutableStateFlow(2)
         val vm = SourceDetailViewModel(repo, id, defaultMax)
         compose.setContent { SourceDetailScreen(vm, onBack = {}) }
         idleUntil { visible("Up to 2 articles in each edition") }
-        compose.onNodeWithText("Same as your other sites").assertExists()
 
-        compose.onNodeWithText("+").performClick()
-        idleUntil { compose.waitForIdle(); visible("Up to 3 articles") }
-        compose.onNodeWithText("Your other sites: up to 2").assertExists()
-        assertEquals(3, runBlocking { db.sources().byId(id)!!.maxArticles })
+        compose.onNodeWithContentDescription("More articles from this site").performClick()
+        compose.onNodeWithContentDescription("More articles from this site").performClick()
+        idleUntil { compose.waitForIdle(); visible("Up to 4 articles") }
+        compose.onNodeWithText("Your edition setting: up to 2").assertExists()
 
-        compose.onNodeWithText("−").performClick()
-        idleUntil { compose.waitForIdle(); visible("Same as your other sites") }
-        assertNull(runBlocking { db.sources().byId(id)!!.maxArticles })
         defaultMax.value = 1
+        idleUntil { compose.waitForIdle(); visible("Your edition setting: up to 1") }
+        assertEquals(4, runBlocking { db.sources().byId(id)!!.maxArticles })
+
+        compose.onNodeWithText("Use your edition setting").performClick()
         idleUntil { compose.waitForIdle(); visible("Up to 1 article in each edition") }
+        assertNull(runBlocking { db.sources().byId(id)!!.maxArticles })
     }
 
     @Test
