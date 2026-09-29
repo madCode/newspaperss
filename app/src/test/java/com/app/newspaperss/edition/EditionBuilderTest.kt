@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -317,5 +318,61 @@ class EditionBuilderTest {
         val edition = db.editions().byId(stuck)!!
         assertEquals(EditionStatus.FAILED, edition.status)
         assertEquals(EditionBuilder.INTERRUPTED, edition.error)
+    }
+
+    /** A tt-rss account's source with articles given as guid to (feed id, feed title). */
+    private suspend fun ttrss(vararg articles: Pair<String, Pair<String, String>>): Long {
+        val id = sources.addTtrss("https://rss.example.com/api/")
+        db.articles().insertNew(
+            articles.mapIndexed { i, (guid, feed) ->
+                ArticleEntity(
+                    sourceId = id, guid = guid, url = "https://news.example/$guid", title = "t $guid",
+                    published = Instant.parse("2026-09-2${i}T00:00:00Z"), originId = feed.first, originTitle = feed.second,
+                )
+            },
+        )
+        return id
+    }
+
+    @Test
+    fun eachTtrssPublicationIsCappedAndBylinedOnItsOwn() = runTest {
+        source("a", null, "a1", "a2")
+        ttrss("n1" to ("1" to "Example News"), "n2" to ("1" to "Example News"), "b1" to ("2" to "A Blog"))
+
+        val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 1, wordsPerMinute = 200)) as BuildResult.Built
+
+        val contents = editions.observeArticles(built.editionId).first()
+        assertEquals(listOf("a", "Example News", "A Blog").sorted(), contents.map { it.sourceTitle }.sorted())
+        assertEquals("one tt-rss publication waits its turn like any capped feed", ArticleState.NEW, stateOf("n1"))
+        ZipFile(editions.fileOf(db.editions().byId(built.editionId)!!)!!).use { zip ->
+            val text = zip.entries().toList().filter { it.name.endsWith(".xhtml") }.joinToString { zip.getInputStream(it).reader().readText() }
+            assertTrue("the EPUB names the publication, not the account", text.contains("A Blog"))
+            assertFalse(text.contains(SourceRepository.TTRSS_TITLE))
+        }
+    }
+
+    @Test
+    fun deliveringAnEditionWithTtrssArticlesAsksForThemToBeMarkedRead() = runTest {
+        val asked = mutableListOf<Long>()
+        val delivering = EditionRepository(db, tmp.root, clock) { asked += it }
+        source("a", null, "a1")
+        val feedOnly = builder.build(EditionSettings()) as BuildResult.Built
+        delivering.markDelivered(feedOnly.editionId)
+        assertTrue(asked.isEmpty())
+
+        ttrss("n1" to ("1" to "Example News"))
+        val withTtrss = builder.build(EditionSettings()) as BuildResult.Built
+        delivering.markDelivered(withTtrss.editionId)
+        assertEquals(listOf(withTtrss.editionId), asked)
+    }
+
+    @Test
+    fun aFailureToScheduleMarkReadDoesntUndoDelivery() = runTest {
+        val delivering = EditionRepository(db, tmp.root, clock) { throw IllegalStateException("WorkManager isn't initialised") }
+        ttrss("n1" to ("1" to "Example News"))
+        val built = builder.build(EditionSettings()) as BuildResult.Built
+        delivering.markDelivered(built.editionId)
+        assertEquals(EditionStatus.DELIVERED, db.editions().byId(built.editionId)!!.status)
+        assertEquals(ArticleState.DELIVERED, stateOf("n1"))
     }
 }

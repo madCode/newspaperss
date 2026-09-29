@@ -105,6 +105,7 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.junit)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.serialization.json)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.work.testing)
     testImplementation(libs.room.testing)

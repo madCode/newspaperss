@@ -2,6 +2,7 @@ package com.app.newspaperss.data
 
 import com.app.newspaperss.core.feed.Opml
 import com.app.newspaperss.core.feed.OpmlFeed
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 
 class SourceRepository(private val db: AppDatabase) {
@@ -18,6 +19,16 @@ class SourceRepository(private val db: AppDatabase) {
             SourceEntity(url = url, title = title?.takeIf { it.isNotBlank() } ?: hostOf(url), section = section, position = sources.nextPosition()),
         )
         return if (id == -1L) sources.byUrl(url)!!.id else id
+    }
+
+    /**
+     * Adds the source for the tt-rss account at [apiUrl] unless it exists; returns its id either
+     * way. Only one account is supported, so another account's source is removed.
+     */
+    suspend fun addTtrss(apiUrl: String): Long = db.withTransaction {
+        sources.ofKind(SourceKind.TTRSS).filter { it.url != apiUrl }.forEach { sources.delete(it) }
+        sources.byUrl(apiUrl)?.id
+            ?: sources.insert(SourceEntity(kind = SourceKind.TTRSS, url = apiUrl, title = TTRSS_TITLE, position = sources.nextPosition()))
     }
 
     suspend fun update(source: SourceEntity) = sources.update(source)
@@ -44,6 +55,9 @@ class SourceRepository(private val db: AppDatabase) {
     )
 
     companion object {
+        // The tt-rss API has no name for an installation; the list shows the host beneath it.
+        const val TTRSS_TITLE = "Tiny Tiny RSS"
+
         /**
          * The name a source gets when it's added without a title, and the placeholder
          * [FeedSync] passes to [SourceDao.recordSuccess]: a source whose title still equals

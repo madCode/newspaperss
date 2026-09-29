@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Keep in step with backup_rules.xml, its equivalent before Android 12.
      The pending timer means nothing without WorkManager's own database, which isn't
-     restored, and past editions' EPUBs would only take up backup quota. -->
+     restored, past editions' EPUBs would only take up backup quota, and the tt-rss
+     password is sealed by a Keystore key that never leaves this phone. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="edition-schedule.xml" />
         <exclude domain="file" path="editions/" />
+        <exclude domain="file" path="datastore/ttrss.preferences_pb" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="edition-schedule.xml" />
         <exclude domain="file" path="editions/" />
+        <exclude domain="file" path="datastore/ttrss.preferences_pb" />
     </device-transfer>
 </data-extraction-rules>

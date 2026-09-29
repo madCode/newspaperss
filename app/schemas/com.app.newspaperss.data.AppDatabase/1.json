@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "058d02d3682f2147207814bdf5d98d00",
+    "identityHash": "7063b694f790505d14c9ebd54daacbfa",
     "entities": [
       {
         "tableName": "sources",
@@ -97,7 +97,7 @@
       },
       {
         "tableName": "articles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, `feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `broughtBack` INTEGER NOT NULL, FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, `feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `broughtBack` INTEGER NOT NULL, `originId` TEXT, `originTitle` TEXT, FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -161,6 +161,16 @@
             "columnName": "broughtBack",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "originId",
+            "columnName": "originId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originTitle",
+            "columnName": "originTitle",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -376,7 +386,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '058d02d3682f2147207814bdf5d98d00')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7063b694f790505d14c9ebd54daacbfa')"
     ]
   }
 }
