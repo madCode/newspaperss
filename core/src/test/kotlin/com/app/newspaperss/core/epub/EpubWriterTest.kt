@@ -351,6 +351,14 @@ class EpubWriterTest {
     }
 
     @Test
+    fun theKickerIsTheSourceAndTheOriginalLinkNamesTheSite() {
+        val epub = write(unsectioned(article(source = "", url = "https://www.example.com/a/very/long/path?with=tracking")))
+        val paragraphs = epub.xml("OEBPS/" + epub.articleHrefs().single()).elements("p")
+        assertTrue("no kicker without a source", paragraphs.none { it.getAttribute("class") == "kicker" })
+        assertEquals("Read the original at example.com", paragraphs.single { it.getAttribute("class") == "source-link" }.textContent)
+    }
+
+    @Test
     fun blankTitlesGetAPlaceholder() {
         val epub = write(unsectioned(article(title = "  ")))
         assertEquals("Article 1", epub.xml("OEBPS/" + epub.articleHrefs().single()).elements("h1").single().textContent)
