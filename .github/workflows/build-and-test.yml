@@ -44,7 +44,9 @@ jobs:
   # Its own job so only these few lines, not the build and its dependencies, get a token that can write.
   publish-debug:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Not on a re-run: an older run's number is a lower version code, which phones that
+    # already have a newer build can't install.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -70,7 +70,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             DeliverySection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             val context = LocalContext.current
-            val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+            val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
             Text(
                 "newspapeRSS $version",
                 style = MaterialTheme.typography.bodySmall,

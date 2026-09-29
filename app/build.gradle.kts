@@ -16,8 +16,7 @@ android {
         applicationId = "com.app.newspaperss"
         minSdk = 26
         targetSdk = 37
-        // CI's run number, so each build from CI installs over the one before it.
-        versionCode = ciRun ?: 1
+        versionCode = 1
         versionName = "0.1.0"
     }
 
@@ -127,4 +126,12 @@ dependencies {
     testImplementation(libs.compose.ui.test.junit4)
     // Compose UI test pulls an older Espresso that crashes on API 37.
     testImplementation(libs.espresso.core)
+}
+
+// Debug builds only: CI's run number, so each build from CI installs over the one before it.
+// Release builds keep their own version code, which stores and F-Droid need to control.
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        ciRun?.let { run -> variant.outputs.forEach { it.versionCode.set(run) } }
+    }
 }
