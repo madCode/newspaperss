@@ -41,7 +41,9 @@ object HtmlCleaner {
         removeComments(body)
         body.select(REMOVE_TAGS.joinToString(",")).remove()
         removeHidden(body)
+        removeScreenReaderOnly(body)
         removeJunk(body)
+        removeRelatedLinks(body)
         removeBoilerplate(body)
         fixPictures(body)
         fixImages(body, baseUrl)
@@ -180,6 +182,58 @@ object HtmlCleaner {
                 // Paywall scripts mark the whole article body aria-hidden, so only small parts go.
                 el.remove()
             }
+        }
+    }
+
+    /**
+     * Removes text meant only for screen readers ("list 1 of 4", "Skip to content"), which
+     * sites hide with CSS the EPUB doesn't carry. Readability drops class names, so page
+     * extraction calls this before running it.
+     */
+    internal fun removeScreenReaderOnly(root: Element) {
+        for (el in root.select("*")) {
+            if (el === root || !el.isAttached()) continue
+            // By length, not share of the page: before Readability the page includes navigation and
+            // comments, and a paywalled article body can sit in one of these classes.
+            if (el.classNames().any { it.lowercase() in SCREEN_READER_ONLY } && countWords(el) <= SCREEN_READER_MAX_WORDS &&
+                el.selectFirst("img") == null
+            ) {
+                el.remove()
+            }
+        }
+    }
+
+    /**
+     * Removes a "Recommended stories" style list of links. Readability often flattens the box
+     * that held it, so this goes by the heading and the list after it rather than a class.
+     * A heading like that over paragraphs of the article's own text stays.
+     */
+    private fun removeRelatedLinks(body: Element) {
+        val total = countWords(body).coerceAtLeast(1)
+        for (heading in body.select("h2, h3, h4, h5, h6")) {
+            if (!heading.isAttached() || !RELATED_HEADING.matches(heading.text().trim())) continue
+            val box = heading.parent()
+            if (box != null && box !== body && heading === box.firstElementChild() && box.children().drop(1).all(::isLinkList) &&
+                box.childrenSize() > 1 && isSmallPart(box, total)
+            ) {
+                box.remove()
+                continue
+            }
+            val list = heading.nextElementSibling()?.takeIf(::isLinkList) ?: continue
+            // An essay's own "Further reading" can be a long list; a site's box of links is short.
+            if (!isSmallPart(list, total)) continue
+            list.remove()
+            heading.remove()
+        }
+    }
+
+    /** A list whose items are all, or nearly all, link text. */
+    private fun isLinkList(el: Element): Boolean {
+        if (el.tagName() !in LIST_TAGS) return false
+        val items = el.children().filter { it.tagName() == "li" }
+        return items.isNotEmpty() && items.all { li ->
+            val text = li.text()
+            text.isNotBlank() && li.select("a").text().length >= LINK_TEXT_SHARE * text.length
         }
     }
 
@@ -411,6 +465,17 @@ object HtmlCleaner {
         "comments", "comment", "sidebar", "popup", "modal", "cookie", "cookies", "banner", "sponsored",
         "outbrain", "taboola", "breadcrumb", "breadcrumbs", "toolbar",
     )
+    private val SCREEN_READER_ONLY = setOf(
+        "screen-reader-text", "screen-reader-only", "sr-only", "sr-text", "visually-hidden", "visuallyhidden", "a11y-hidden",
+    )
+    private val RELATED_HEADING = Regex(
+        "(recommended|related)( (stories|articles|reading|content|coverage|posts))?|more (on|from) .{1,40}|" +
+            "read (more|next)|you (may|might) also like|most (read|popular)|further reading",
+        RegexOption.IGNORE_CASE,
+    )
+    private const val LINK_TEXT_SHARE = 0.8
+    private const val SCREEN_READER_MAX_WORDS = 12
+    private val LIST_TAGS = setOf("ul", "ol")
     private val JUNK_ROLES = setOf("navigation", "complementary", "banner", "contentinfo", "dialog")
 
     private val LAZY_IMAGE_ATTRIBUTES = listOf(

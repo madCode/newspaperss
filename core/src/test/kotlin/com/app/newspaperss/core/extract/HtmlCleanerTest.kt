@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.extract
 
+import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -137,6 +138,28 @@ class HtmlCleanerTest {
             clean("<figure><img src=\"/a.jpg\"><figcaption>Cap</figcaption><span>Photo: Getty</span></figure>"),
         )
     }
+
+    @Test
+    fun aRelatedLinksListGoesButARelatedSectionOfTheArticleStays() {
+        val body = "<p>" + "Words of the article itself. ".repeat(30) + "</p>"
+        assertEquals(
+            body,
+            clean("$body<h2>Read next</h2><ul><li><a href=\"/a\">Story A</a></li><li><a href=\"/b\">Story B</a></li></ul>"),
+        )
+        val ownSection = "<h2>Related research</h2><p>Earlier studies found the same effect in mice.</p>"
+        assertEquals(body + ownSection, clean(body + ownSection))
+        val gallery = "<h2>More from our photographers</h2><ul><li><a href=\"https://example.com/p\"><img src=\"https://example.com/p.jpg\" alt=\"\" /></a></li></ul>"
+        assertEquals("a list of pictures isn't a list of links", body + gallery, clean(body + gallery))
+    }
+
+    /** A long reading list that is the article, as in a newsletter item or an essay's references, stays. */
+    @Test
+    fun aLongListUnderARelatedHeadingIsKept() {
+        val items = (1..12).joinToString("") { "<li><a href=\"https://example.com/$it\">A long and interesting book title number $it</a></li>" }
+        val html = "<p>A short introduction.</p><h2>Further reading</h2><ul>$items</ul>"
+        assertEquals(12, Jsoup.parse(clean(html)).select("li").size)
+    }
+
 
     @Test
     fun pictureElementsPreferJpegSources() {
