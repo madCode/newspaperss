@@ -50,7 +50,7 @@ Kindle, Kobo, Boox, PocketBook or KOReader device.
 
 | Concept | What it is |
 |---|---|
-| **Source** | Somewhere articles come from: an RSS/Atom/JSON feed; a **reading list** (links you shared or saved); a tt-rss account; later, a FreshRSS or Miniflux account or a scraper-fed curated list. |
+| **Source** | Somewhere articles come from: an RSS/Atom/JSON feed; a **reading list** (links you shared or saved); a tt-rss account; a **curated list**, a site that isn't a feed but picks a few links a day (Arts & Letters Daily), read by a scraper; later, a FreshRSS or Miniflux account. |
 | **Section** | A user-named group of sources ("World", "Long reads", "Friends' blogs"). Sections become the edition's contents pages. |
 | **Edition profile** | A recipe: schedule, reading-time budget *or* article count, per-source cap, ordering (take turns / in order / shuffle), which sections to use, delivery method. Starts with one ("Morning paper"); power users add more ("Sunday long reads"). |
 | **Edition** | One built issue: title ("Tuesday Morning Edition"), articles, the EPUB file and its delivery status. The history of editions is the app's main screen. |
@@ -127,6 +127,10 @@ non-coder won't know to do it. newspaperss defaults to:
 - **Everything else expires.** Unplanned articles older than the source's
   keep window (default 7 days for news feeds, never for reading lists)
   quietly disappear. No backlog guilt.
+- **Curated lists keep their newest 12.** A list read less often than it
+  grows stays bounded: when new links arrive, its unread ones beyond the
+  newest 12 expire. If a list's page changes shape, the scraper takes no
+  links and the source says so, rather than guessing which ones are new.
 
 tt-rss sources keep the library's behaviour: articles are marked read on the
 server when an edition is delivered (always, for now; a setting is in the

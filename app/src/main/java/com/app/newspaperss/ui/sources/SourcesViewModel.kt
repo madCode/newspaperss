@@ -6,6 +6,8 @@ import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.core.feed.FindResult
 import com.app.newspaperss.core.feed.FoundFeed
+import com.app.newspaperss.core.lists.CuratedList
+import com.app.newspaperss.core.lists.CuratedLists
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -58,6 +61,12 @@ class SourcesViewModel(
         sources.filter { it.kind != SourceKind.READING_LIST }.map { SourceRow(it, bySource[it.id]) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The curated lists not added yet, offered in the add dialog. */
+    val curatedLists: StateFlow<List<CuratedList>> = repository.observe().map { sources ->
+        val added = sources.map { it.url }.toSet()
+        CuratedLists.all.filter { CuratedLists.sourceUrl(it) !in added }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _add = MutableStateFlow<AddState>(AddState.Closed)
     val add: StateFlow<AddState> = _add.asStateFlow()
 
@@ -91,6 +100,14 @@ class SourcesViewModel(
         viewModelScope.launch {
             subscribe(feed)
             _add.value = AddState.Closed
+        }
+    }
+
+    fun addList(list: CuratedList) {
+        viewModelScope.launch {
+            repository.addList(list)
+            _add.value = AddState.Closed
+            onSourcesChanged()
         }
     }
 
