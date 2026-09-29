@@ -50,6 +50,15 @@ interface SourceDao {
     @Query("UPDATE sources SET lastFetchedAt = :at, lastError = :error WHERE id = :id")
     suspend fun recordFailure(id: Long, at: Instant, error: String)
 
+    @Query("UPDATE sources SET lastError = :error WHERE id = :id")
+    suspend fun setError(id: Long, error: String)
+
+    @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
+    suspend fun setServerNote(id: Long, note: String?)
+
+    @Query("SELECT * FROM sources WHERE kind = :kind")
+    suspend fun ofKind(kind: SourceKind): List<SourceEntity>
+
     @Delete
     suspend fun delete(source: SourceEntity)
 }
@@ -96,9 +105,17 @@ interface ArticleDao {
     /** Expires unpicked articles discovered before [before], except reading-list items. */
     @Query(
         """UPDATE articles SET state = 'EXPIRED' WHERE state = 'NEW' AND broughtBack = 0 AND discoveredAt < :before
-           AND sourceId IN (SELECT id FROM sources WHERE kind = 'FEED')""",
+           AND sourceId IN (SELECT id FROM sources WHERE kind != 'READING_LIST')""",
     )
     suspend fun expireOlderThan(before: Instant): Int
+
+    @Query(
+        """SELECT articles.* FROM articles
+           JOIN edition_articles ON edition_articles.articleId = articles.id
+           JOIN sources ON sources.id = articles.sourceId
+           WHERE edition_articles.editionId = :editionId AND sources.kind = 'TTRSS'""",
+    )
+    suspend fun ttrssInEdition(editionId: Long): List<ArticleEntity>
 }
 
 data class EditionContent(

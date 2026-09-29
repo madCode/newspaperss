@@ -3,6 +3,9 @@ package com.app.newspaperss.data
 import com.app.newspaperss.core.feed.FeedParseException
 import com.app.newspaperss.core.feed.FeedParser
 import com.app.newspaperss.core.net.HttpClient
+import com.app.newspaperss.core.ttrss.TtrssClient
+import com.app.newspaperss.core.ttrss.TtrssException
+import java.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -22,9 +25,10 @@ class FeedSync(
     private val clock: Clock = Clock.systemUTC(),
     /** Unpicked feed articles older than this expire, so there's never a backlog to feel behind on. */
     private val keepFor: Duration = Duration.ofDays(7),
+    private val ttrssAccounts: TtrssAccountStore? = null,
 ) {
     suspend fun syncAll(): SyncResult = coroutineScope {
-        val feeds = db.sources().all().filter { it.kind == SourceKind.FEED && !it.paused }
+        val feeds = db.sources().all().filter { it.kind != SourceKind.READING_LIST && !it.paused }
         val limit = Semaphore(4)
         val results = feeds.map { source -> async { limit.withPermit { sync(source) } } }.awaitAll()
         db.articles().expireOlderThan(clock.instant().minus(keepFor))
@@ -33,6 +37,7 @@ class FeedSync(
 
     /** Returns the number of new articles, or null if the source failed. */
     suspend fun sync(source: SourceEntity): Int? {
+        if (source.kind == SourceKind.TTRSS) return syncTtrss(source)
         val now = clock.instant()
         val error = try {
             val response = http.get(source.url)
@@ -66,5 +71,58 @@ class FeedSync(
         }
         db.sources().recordFailure(source.id, now, error)
         return null
+    }
+
+    private suspend fun syncTtrss(source: SourceEntity): Int? {
+        val now = clock.instant()
+        val account = (ttrssAccounts?.load() as? StoredAccount.Ready)?.account
+        val error = if (account == null || account.apiUrl != source.url) {
+            SIGN_IN_AGAIN
+        } else {
+            val client = account.client(http)
+            try {
+                val added = db.articles().insertNew(
+                    client.unreadHeadlines().map {
+                        ArticleEntity(
+                            sourceId = source.id, guid = "$TTRSS_GUID_PREFIX${it.id}", url = it.link, title = it.title,
+                            author = it.author, published = it.updated?.let(Instant::ofEpochSecond), feedHtml = it.content,
+                            discoveredAt = now, originId = it.feedId, originTitle = it.feedTitle,
+                        )
+                    },
+                )
+                db.sources().recordSuccess(source.id, now, null, null, source.title)
+                return added
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: TtrssException) {
+                e.message ?: "tt-rss reported an error."
+            } catch (e: IOException) {
+                "Couldn't reach tt-rss."
+            } catch (e: SQLiteConstraintException) {
+                return null
+            } catch (e: Exception) {
+                "Something went wrong reading from tt-rss."
+            } finally {
+                logOut(client)
+            }
+        }
+        db.sources().recordFailure(source.id, now, error)
+        return null
+    }
+
+    companion object {
+        /** tt-rss articles are stored with this guid prefix followed by their tt-rss id. */
+        const val TTRSS_GUID_PREFIX = "ttrss:"
+        const val SIGN_IN_AGAIN = "Sign in to tt-rss again: tap the menu at the top of Sources."
+    }
+}
+
+/** Ends a tt-rss session; the server expires it anyway if this fails. */
+internal suspend fun logOut(client: TtrssClient) {
+    try {
+        client.logout()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
     }
 }

@@ -2,8 +2,10 @@ package com.app.newspaperss.core.net
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
@@ -35,6 +37,12 @@ interface HttpClient {
      * network failure or a body over the implementation's image size limit, never on an HTTP error status.
      */
     suspend fun getBytes(url: String, headers: Map<String, String> = emptyMap()): HttpBytes
+
+    /**
+     * POSTs [body] as JSON to [url]; throws IOException on network failure, never on an HTTP error
+     * status. Redirects are not followed: a 3xx comes back as is, with its Location as `finalUrl`.
+     */
+    suspend fun postJson(url: String, body: String): HttpResponse
 }
 
 class OkHttpHttpClient(
@@ -44,8 +52,21 @@ class OkHttpHttpClient(
     // mustn't push a whole edition past WorkManager's ten-minute limit.
     private val imageClient = client.newBuilder().callTimeout(20, TimeUnit.SECONDS).build()
 
-    override suspend fun get(url: String): HttpResponse = withContext(Dispatchers.IO) {
-        client.newCall(request(url, emptyMap())).execute().use { r ->
+    // A POST carries credentials (tt-rss logins). OkHttp re-sends the body on a 307/308, to any
+    // host and even from https to http, so redirects are handed back to the caller instead.
+    private val postClient = client.newBuilder().followRedirects(false).followSslRedirects(false).build()
+
+    override suspend fun get(url: String): HttpResponse = text(request(url, emptyMap()))
+
+    override suspend fun postJson(url: String, body: String): HttpResponse =
+        text(request(url, emptyMap()) { post(body.toRequestBody(JSON)) }, postClient)
+
+    private suspend fun text(request: Request, via: OkHttpClient = client): HttpResponse = withContext(Dispatchers.IO) {
+        via.newCall(request).execute().use { r ->
+            if (r.isRedirect) {
+                val location = r.header("Location")?.let { r.request.url.resolve(it)?.toString() } ?: r.request.url.toString()
+                return@use HttpResponse(r.code, location, r.header("Content-Type"), "")
+            }
             val source = r.body.source()
             // Someone may paste a link to a video or a huge file; don't read it all into memory.
             if (source.request(MAX_BYTES + 1)) throw IOException("Too large to be a feed or an article.")
@@ -62,9 +83,10 @@ class OkHttpHttpClient(
         }
     }
 
-    private fun request(url: String, headers: Map<String, String>) = try {
+    private fun request(url: String, headers: Map<String, String>, configure: Request.Builder.() -> Unit = {}) = try {
         Request.Builder().url(url).header("User-Agent", USER_AGENT)
             .apply { headers.forEach { (name, value) -> header(name, value) } }
+            .apply(configure)
             .build()
     } catch (e: IllegalArgumentException) {
         throw IOException("Not a web address: $url", e)
@@ -73,6 +95,7 @@ class OkHttpHttpClient(
     companion object {
         const val MAX_BYTES = 10L * 1024 * 1024
         const val MAX_IMAGE_BYTES = 8L * 1024 * 1024
+        private val JSON = "application/json; charset=utf-8".toMediaType()
 
         private val xmlEncoding = Regex("""^\s*<\?xml[^>]*encoding=["']([A-Za-z0-9._-]+)["']""")
 

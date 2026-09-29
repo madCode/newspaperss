@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "058d02d3682f2147207814bdf5d98d00",
+    "identityHash": "e86778290a5c6558e0aab71bed1563b7",
     "entities": [
       {
         "tableName": "sources",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `paused` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `paused` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `serverNote` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -75,6 +75,11 @@
             "fieldPath": "lastError",
             "columnName": "lastError",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "serverNote",
+            "columnName": "serverNote",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -97,7 +102,7 @@
       },
       {
         "tableName": "articles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, `feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `broughtBack` INTEGER NOT NULL, FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, `feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `broughtBack` INTEGER NOT NULL, `originId` TEXT, `originTitle` TEXT, FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -161,6 +166,16 @@
             "columnName": "broughtBack",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "originId",
+            "columnName": "originId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originTitle",
+            "columnName": "originTitle",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -376,7 +391,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '058d02d3682f2147207814bdf5d98d00')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e86778290a5c6558e0aab71bed1563b7')"
     ]
   }
 }
