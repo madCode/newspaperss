@@ -178,7 +178,7 @@ object EpubWriter {
                     for (article in section.articles) {
                         val meta = listOf(article.sourceTitle.trim(), ReadingTime.format(article.minutes))
                             .filter { it.isNotEmpty() }.joinToString(" · ")
-                        append("<li><a href=\"${articleHrefs[index]}\">${esc(articleTitle(index))}</a>")
+                        append("<li><a href=\"${articleHrefs[index]}\"${languageAttributes(article.language, lang)}>${esc(articleTitle(index))}</a>")
                         append("<br/><span class=\"meta\">${esc(meta)}</span></li>\n")
                         index++
                     }
@@ -221,7 +221,7 @@ object EpubWriter {
                     }
                 }
                 if (index + 1 < articles.size) {
-                    append("<p class=\"article-nav\">Next: <a href=\"${articleHrefs[index + 1]}\">")
+                    append("<p class=\"article-nav\">Next: <a href=\"${articleHrefs[index + 1]}\"${languageAttributes(articles[index + 1].language, lang)}>")
                     append("${esc(articleTitle(index + 1))}</a></p>\n")
                 }
             }

@@ -80,4 +80,57 @@ class LanguageDetectorTest {
         assertTrue(LanguageDetector.isRightToLeft("he-IL"))
         assertFalse(LanguageDetector.isRightToLeft("en"))
     }
+
+    // News prose leans on "la", which French shares: these tipped to French.
+    private val spanishLa = "La ministra de Sanidad presentó ayer la nueva estrategia de salud mental en la sede del ministerio. " +
+        "La crisis de la vivienda y la falta de profesionales en la atención primaria centraron la rueda de prensa, en la que " +
+        "la ministra defendió la necesidad de reforzar la red pública."
+    private val italianLa = "La sindaca ha firmato la nuova ordinanza sulla movida nella notte tra venerdì e sabato. La misura " +
+        "prevede la chiusura anticipata dei locali e la presenza della polizia locale nelle piazze, e la giunta la considera " +
+        "la risposta alle proteste dei residenti."
+    private val dutch = "De gemeenteraad heeft dinsdag besloten om de fietspaden langs de rivier te verlengen, maar een aantal " +
+        "raadsleden zei dat het plan te snel is gegaan en dat de bewoners niet om hun mening is gevraagd."
+
+    @Test
+    fun spanishAndItalianArentMistakenForFrench() {
+        assertEquals("es", LanguageDetector.detect(spanishLa, null))
+        assertEquals("it", LanguageDetector.detect(italianLa, null))
+        assertEquals("es-ES", LanguageDetector.detect(spanishLa, "es-ES"))
+        assertEquals("it", LanguageDetector.detect(italianLa, "it"))
+        assertEquals("nl", LanguageDetector.detect(dutch, null))
+    }
+
+    @Test
+    fun aLatinLanguageTheWordListsDontKnowKeepsThePagesTag() {
+        val galician = "O goberno galego aprobou onte o novo plan de vivenda para as cidades, pero a oposición dixo que as " +
+            "medidas chegan tarde e que os veciños non foron consultados sobre o proxecto nin sobre os prazos."
+        assertEquals("gl", LanguageDetector.detect(galician, "gl"))
+        // Unless it's plainly English: a site-wide tag on an English article.
+        assertEquals("en", LanguageDetector.detect(english, "sv"))
+    }
+
+    @Test
+    fun latinTextNeverTakesARightToLeftOrOtherScriptTagFromThePage() {
+        assertNull(LanguageDetector.detect("A cartoon about the week.", "ar"))
+        assertNull(LanguageDetector.detect("Bugün hükümet yeni bir ekonomi paketi açıkladı ve muhalefet bunu eleştirdi.", "fa"))
+        assertEquals("en", LanguageDetector.detect(english, "ur"))
+    }
+
+    @Test
+    fun aJapanesePageWrittenMostlyInKanjiStaysJapanese() {
+        val kanji = "東京都知事選挙結果発表、新知事就任式典開催予定、都議会議員各党代表出席、経済政策重点課題説明会同日実施予定。"
+        assertEquals("zh", LanguageDetector.detect(kanji, null))
+        assertEquals("ja", LanguageDetector.detect(kanji, "ja"))
+    }
+
+    @Test
+    fun onlyWellFormedRegionsAndScriptsAreKept() {
+        assertEquals("en", LanguageDetector.normalize("en-UK"))
+        assertEquals("en", LanguageDetector.normalize("en-EN"))
+        assertEquals("fr-FR", LanguageDetector.normalize("fr-FR-FR"))
+        assertEquals("zh-CN", LanguageDetector.normalize("zh-CN-Hans"))
+        assertEquals("sr-Latn-RS", LanguageDetector.normalize("sr-latn-rs"))
+        assertEquals("en-GB", LanguageDetector.detect(english, "en-GB"))
+        assertEquals("en", LanguageDetector.detect(english, "en-UK"))
+    }
 }

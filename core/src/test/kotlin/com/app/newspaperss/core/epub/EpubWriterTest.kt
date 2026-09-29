@@ -653,5 +653,8 @@ class EpubWriterTest {
         }
         // The page's own text (source, byline, "Read the original") stays English.
         assertEquals("en", pages[0].documentElement.getAttribute("lang"))
+        // Headlines are tagged wherever they appear, so an Arabic one lays out right in the contents too.
+        val contents = epub.xml("OEBPS/contents.xhtml").documentElement.elements("a")
+        assertEquals("rtl", contents.single { it.getAttribute("href") == epub.articleHrefs()[1] }.getAttribute("dir"))
     }
 }
