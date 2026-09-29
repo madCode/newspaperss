@@ -45,7 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.font.FontWeight
@@ -115,14 +115,17 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     if (articles.isEmpty()) "Recent articles" else "Recent articles · ${articles.size}",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp).semantics { heading() },
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp).semantics {
+                        heading()
+                        contentDescription = if (articles.isEmpty()) "Recent articles" else "Recent articles, ${articles.size}"
+                    },
                 )
                 if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
             }
             items(articles, key = { it.id }) { article ->
                 RecentArticle(article, locale)
-                // Inset and faint: full-width rules chopped the list into boxes to track across.
-                HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                // Inset: full-width rules chopped the list into boxes to track across.
+                HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
     }
@@ -244,7 +247,7 @@ private fun RecentArticle(article: ArticleEntity, locale: Locale) {
     ListItem(
         // A shape per state, not a colour, so it reads on e-ink; the words are in the line below.
         leadingContent = {
-            Text(statusMark(article.state), style = MaterialTheme.typography.titleMedium, modifier = Modifier.width(24.dp).clearAndSetSemantics {})
+            Text(statusMark(article.state), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(min = 24.dp).clearAndSetSemantics {})
         },
         headlineContent = {
             Text(article.title.ifBlank { SourceRepository.hostOf(article.url) }, maxLines = 2, fontWeight = FontWeight.Medium)
@@ -262,7 +265,7 @@ private fun statusMark(state: ArticleState) = when (state) {
 /** The article-text setting in a word or two, for its button. */
 private fun modeName(source: SourceEntity) = when {
     !source.contentModeChosen -> "Automatic"
-    source.contentMode == ContentMode.FEED -> "Site's text"
+    source.contentMode == ContentMode.FEED -> "Feed's text"
     source.contentMode == ContentMode.PAGE -> "Full page"
     else -> "Automatic"
 }
