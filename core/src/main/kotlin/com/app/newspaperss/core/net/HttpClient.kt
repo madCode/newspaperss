@@ -18,21 +18,30 @@ class HttpResponse(
     val isSuccessful get() = code in 200..299
 }
 
+class HttpBytes(
+    val code: Int,
+    val contentType: String?,
+    val body: ByteArray,
+) {
+    val isSuccessful get() = code in 200..299
+}
+
 interface HttpClient {
     /** Fetches [url]; throws IOException on network failure, never on an HTTP error status. */
     suspend fun get(url: String): HttpResponse
+
+    /**
+     * Fetches [url] as raw bytes, for images, sending [headers] as well; throws IOException on
+     * network failure or a body over [OkHttpHttpClient.MAX_IMAGE_BYTES], never on an HTTP error status.
+     */
+    suspend fun getBytes(url: String, headers: Map<String, String> = emptyMap()): HttpBytes
 }
 
 class OkHttpHttpClient(
     private val client: OkHttpClient = defaultClient(),
 ) : HttpClient {
     override suspend fun get(url: String): HttpResponse = withContext(Dispatchers.IO) {
-        val request = try {
-            Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
-        } catch (e: IllegalArgumentException) {
-            throw IOException("Not a web address: $url", e)
-        }
-        client.newCall(request).execute().use { r ->
+        client.newCall(request(url, emptyMap())).execute().use { r ->
             val source = r.body.source()
             // Someone may paste a link to a video or a huge file; don't read it all into memory.
             if (source.request(MAX_BYTES + 1)) throw IOException("Too large to be a feed or an article.")
@@ -41,8 +50,25 @@ class OkHttpHttpClient(
         }
     }
 
+    override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = withContext(Dispatchers.IO) {
+        client.newCall(request(url, headers)).execute().use { r ->
+            val source = r.body.source()
+            if (source.request(MAX_IMAGE_BYTES + 1)) throw IOException("Too large for an image.")
+            HttpBytes(r.code, r.header("Content-Type"), source.readByteArray())
+        }
+    }
+
+    private fun request(url: String, headers: Map<String, String>) = try {
+        Request.Builder().url(url).header("User-Agent", USER_AGENT)
+            .apply { headers.forEach { (name, value) -> header(name, value) } }
+            .build()
+    } catch (e: IllegalArgumentException) {
+        throw IOException("Not a web address: $url", e)
+    }
+
     companion object {
         const val MAX_BYTES = 10L * 1024 * 1024
+        const val MAX_IMAGE_BYTES = 8L * 1024 * 1024
 
         private val xmlEncoding = Regex("""^\s*<\?xml[^>]*encoding=["']([A-Za-z0-9._-]+)["']""")
 

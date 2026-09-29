@@ -14,7 +14,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] Tests for EditionScheduler with work-testing's TestDriver
 
 ### M3 leftovers
-- [ ] Images: download, downscale to 1200px JPEG via BitmapFactory, per-article and total size budget
 - [ ] Auto-tune source ContentMode from ExtractedArticle feed/page word counts (`ArticleExtractor.suggestMode`)
 - [ ] Edition detail screen: contents, bring back articles, share again
 - [ ] Generated cover image (Canvas) so Kindle's library thumbnail shows date + headlines
@@ -42,3 +41,4 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)
 - [x] M4 Settings, scheduled editions (timer chain that never skips an overdue edition), folder delivery, notifications (#2)
 - [x] M3 The edition: planner, extraction, EPUB writer, EditionBuilder, Today screen, share/open (#1)
+- [x] Images: download with the article as Referer, 1200px JPEG via BitmapFactory, 20 per article, 15MB per edition

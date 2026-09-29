@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.feed
 
+import com.app.newspaperss.core.net.HttpBytes
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.net.HttpResponse
 import kotlinx.coroutines.test.runTest
@@ -18,6 +19,7 @@ class FeedFinderTest {
             val body = pages[url] ?: return HttpResponse(404, url, "text/html", "not found")
             return HttpResponse(200, url, null, body)
         }
+        override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = throw IOException("not used")
     }
 
     private val feedXml = "<rss version=\"2.0\"><channel><title>Site feed</title></channel></rss>"
