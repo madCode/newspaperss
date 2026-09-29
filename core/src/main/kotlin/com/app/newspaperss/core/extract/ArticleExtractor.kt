@@ -3,6 +3,7 @@ package com.app.newspaperss.core.extract
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.net.HttpResponse
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Entities
 import java.io.IOException
 import java.net.URI
@@ -62,7 +63,8 @@ class ArticleExtractor(private val http: HttpClient) {
     suspend fun extract(input: ExtractInput): ExtractedArticle {
         val feed = input.feedHtml?.takeIf { it.isNotBlank() }
             ?.let { HtmlCleaner.clean(it, input.url, input.feedTitle) }
-            ?.takeIf { it.wordCount > 0 }
+            // An image with no text is still content: a webcomic's feed item is often just the comic.
+            ?.takeIf { it.wordCount > 0 || it.imageUrls.isNotEmpty() }
         val feedWords = feed?.wordCount ?: 0
         val feedAuthor = PageExtractor.cleanAuthor(input.feedAuthor)
 
@@ -80,6 +82,17 @@ class ArticleExtractor(private val http: HttpClient) {
                 else failed(input, page.reason, page.blocked)
             is PageResult.Fetched -> {
                 val words = page.clean.wordCount
+                // A cartoon or comic: extraction found little text and no image. Only on strong
+                // signs, so a short brief doesn't get a stray picture: a feed item that's
+                // essentially just the image, or page text that isn't from the article at all
+                // (extraction settled on the footer) with a real image in the article.
+                if (page.clean.imageUrls.isEmpty() && words < IMAGE_POST_MAX_WORDS) {
+                    val missed = missedTheArticle(page)
+                    if (feed != null && feed.imageUrls.isNotEmpty() && feedWords <= IMAGE_CAPTION_WORDS && (missed || words < FEED_IMAGE_PAGE_WORDS)) {
+                        return fromFeed(feed, null, words)
+                    }
+                    if (missed) imagePost(input, page, feed, feedAuthor, feedWords)?.let { return it }
+                }
                 when {
                     // Extraction that keeps well under the feed's text missed the article; the feed is better.
                     feed != null && words < KEEP_FEED_RATIO * feedWords -> fromFeed(feed, null, words)
@@ -99,7 +112,7 @@ class ArticleExtractor(private val http: HttpClient) {
     }
 
     private sealed interface PageResult {
-        class Fetched(val content: PageContent, val clean: CleanResult) : PageResult
+        class Fetched(val content: PageContent, val clean: CleanResult, val url: String) : PageResult
         class Failed(val reason: String, val blocked: Boolean = false) : PageResult
     }
 
@@ -112,7 +125,7 @@ class ArticleExtractor(private val http: HttpClient) {
         unusable(response)?.let { return it }
         val content = PageExtractor.extract(response.body, response.finalUrl)
         val title = input.feedTitle.ifBlank { content.title.orEmpty() }
-        return PageResult.Fetched(content, HtmlCleaner.clean(content.html, response.finalUrl, title))
+        return PageResult.Fetched(content, HtmlCleaner.clean(content.html, response.finalUrl, title), response.finalUrl)
     }
 
     private fun unusable(response: HttpResponse): PageResult.Failed? {
@@ -150,6 +163,31 @@ class ArticleExtractor(private val http: HttpClient) {
         )
     }
 
+    /**
+     * The page has an article, and the text extraction found isn't from it (it settled on the
+     * footer). An empty page isn't counted: it stays a failure, with its link to the page.
+     */
+    private fun missedTheArticle(page: PageResult.Fetched): Boolean {
+        val articleText = page.content.articleText?.let(::normalized) ?: return false
+        val pageText = normalized(Jsoup.parse(page.clean.html).text())
+        if (pageText.isEmpty()) return false
+        // A stretch from the middle: the cleaner may have dropped a label or two at the start.
+        val probe = pageText.substring(pageText.length / 4).take(ARTICLE_TEXT_PROBE)
+        return probe !in articleText
+    }
+
+    private fun normalized(text: String) = text.lowercase().replace(NOT_LETTERS, "")
+
+    /** The page's main image, captioned by the feed's text or the page's description; null without one. */
+    private fun imagePost(input: ExtractInput, page: PageResult.Fetched, feed: CleanResult?, feedAuthor: String?, feedWords: Int): ExtractedArticle? {
+        val image = page.content.mainImage ?: return null
+        val caption = feed?.html ?: page.content.description?.let { "<p>${Entities.escape(it)}</p>" }.orEmpty()
+        val title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) }
+        val clean = HtmlCleaner.clean(image + caption, page.url, title)
+        if (clean.imageUrls.isEmpty()) return null
+        return article(title, feedAuthor ?: page.content.author, clean, false, null, feedWords, page.clean.wordCount)
+    }
+
     private fun article(
         title: String, author: String?, clean: CleanResult, usedFeed: Boolean, note: String?, feedWords: Int, pageWords: Int?,
         blocked: Boolean = false,
@@ -171,6 +209,11 @@ class ArticleExtractor(private val http: HttpClient) {
         /** Feed content with at least this many words is taken as the full text in [ContentMode.AUTO]. */
         const val FULL_TEXT_WORDS = 300
         private const val KEEP_FEED_RATIO = 0.7
+        private const val IMAGE_POST_MAX_WORDS = 150
+        private const val IMAGE_CAPTION_WORDS = 25
+        private const val FEED_IMAGE_PAGE_WORDS = 80
+        private val NOT_LETTERS = Regex("[^\\p{L}\\p{N}]")
+        private const val ARTICLE_TEXT_PROBE = 60
         private const val TEASER_RATIO = 2.0
         private const val CHALLENGE_PAGE_MAX_CHARS = 150 * 1024
         private val BLOCKED_STATUS_CODES = setOf(401, 403, 429, 503)

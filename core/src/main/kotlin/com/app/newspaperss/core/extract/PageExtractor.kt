@@ -9,6 +9,7 @@ import kotlinx.serialization.json.contentOrNull
 import net.dankito.readability4j.extended.Readability4JExtended
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import java.net.URI
 
 /** The article found in a web page, not yet cleaned for e-ink (see [HtmlCleaner]). */
@@ -18,6 +19,12 @@ internal data class PageContent(
     val author: String?,
     val extractor: String,
     val wordCount: Int,
+    /** The page's main image as a `<figure>`, for posts that are an image (a cartoon, a comic). */
+    val mainImage: String? = null,
+    /** The text of the page's `<article>` or `<main>`, to tell article text from footer text. */
+    val articleText: String? = null,
+    /** `og:description`, a stand-in caption for an image post. */
+    val description: String? = null,
 )
 
 /**
@@ -32,6 +39,8 @@ internal data class PageContent(
  */
 internal object PageExtractor {
     const val MIN_WORDS = 150
+    private const val MAIN_IMAGE_MIN_PX = 200
+    private val NOT_MAIN_IMAGE = setOf("logo", "avatar", "headshot", "author", "profile", "icon", "icons")
     private const val JSON_LD_PREFERENCE_RATIO = 1.5
 
     fun extract(html: String, url: String): PageContent {
@@ -64,13 +73,44 @@ internal object PageExtractor {
             content.html()
         })
         val fromJsonLd = candidate("json-ld", jsonLdBody(jsonLd))
-        if (fromReadability != null && fromReadability.wordCount >= MIN_WORDS) {
-            val jsonLdHasMuchMore = fromJsonLd != null && fromJsonLd.wordCount >= JSON_LD_PREFERENCE_RATIO * fromReadability.wordCount
-            return if (jsonLdHasMuchMore) fromJsonLd!! else fromReadability
+        val chosen = when {
+            fromReadability != null && fromReadability.wordCount >= MIN_WORDS -> {
+                val jsonLdHasMuchMore = fromJsonLd != null && fromJsonLd.wordCount >= JSON_LD_PREFERENCE_RATIO * fromReadability.wordCount
+                if (jsonLdHasMuchMore) fromJsonLd!! else fromReadability
+            }
+            fromJsonLd != null && fromJsonLd.wordCount >= MIN_WORDS -> fromJsonLd
+            else -> listOfNotNull(fromReadability, fromJsonLd).maxByOrNull { it.wordCount }
+                ?: PageContent(doc.body().html(), title, author, "body", HtmlCleaner.countWords(doc.body()))
         }
-        if (fromJsonLd != null && fromJsonLd.wordCount >= MIN_WORDS) return fromJsonLd
-        return listOfNotNull(fromReadability, fromJsonLd).maxByOrNull { it.wordCount }
-            ?: PageContent(doc.body().html(), title, author, "body", HtmlCleaner.countWords(doc.body()))
+        // <main>, or a lone <article>: several <article>s are usually related-story cards, whose
+        // thumbnails aren't this page's.
+        val main = doc.selectFirst("main") ?: doc.select("article").singleOrNull()
+        return chosen.copy(
+            mainImage = main?.let(::mainImage),
+            articleText = main?.text()?.takeIf { it.isNotBlank() },
+            description = doc.metaContent("og:description"),
+        )
+    }
+
+    /**
+     * The first sizeable image in the page's `<article>` or `<main>`, as a `<figure>` with just the
+     * attributes [HtmlCleaner] reads. Not `og:image`: many sites use one share card on every page.
+     * Logos, avatars, SVGs and images declared small don't count.
+     */
+    private fun mainImage(main: Element): String? {
+        val img = main.select("img").firstOrNull { img ->
+            // Whole words of the class and address only: a cartoon's alt text can say "an iconic
+            // moment", and "silicon-valley.jpg" isn't an icon.
+            val marks = "${img.className()} ${img.attr("src")}".lowercase().split(NON_ALNUM).toSet()
+            val sources = listOf("src", "srcset", "data-src", "data-srcset").map { img.attr(it) }.filter { it.isNotBlank() && !it.startsWith("data:") }
+            val small = listOf("width", "height").any { dim -> img.attr(dim).toIntOrNull()?.let { it < MAIN_IMAGE_MIN_PX } == true }
+            sources.isNotEmpty() && !small && NOT_MAIN_IMAGE.none { it in marks } &&
+                sources.none { it.substringBefore('?').lowercase().endsWith(".svg") }
+        } ?: return null
+        val figure = Element("figure")
+        val copy = figure.appendElement("img")
+        for (name in listOf("src", "srcset", "data-src", "data-srcset", "alt")) img.attr(name).takeIf { it.isNotBlank() }?.let { copy.attr(name, it) }
+        return figure.outerHtml()
     }
 
     /**
