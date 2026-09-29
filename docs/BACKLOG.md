@@ -29,6 +29,37 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
 
+### Add sources to tt-rss, not just the phone
+For someone with a tt-rss account, a site found in newspapeRSS (a starter pack, a curated list, a
+pasted address) could be subscribed on the server instead, with the API's `subscribeToFeed`. It would
+then show up in their other reader apps too, and read state stays in one place. Open questions:
+- which tt-rss category it goes in;
+- whether the phone-side source is then dropped, so articles don't arrive twice;
+- what to do for an OPML import.
+
+### Local news for your city or country
+Help people find news sources near them: local papers, public broadcasters, city blogs.
+- Options include a curated starter pack per country or region, and location-based Google News feeds.
+- A "near me" search could use the device's locale, without needing a location permission.
+- The hard part is keeping curated lists current and fair. Starter packs must stay public, well-known
+  feeds only.
+
+### Languages
+What to do with non-English sources and readers. Today:
+- the book's language is always `en`;
+- the page text (contents, "min read") is English;
+- reading time assumes English words per minute.
+
+Questions:
+- tag each article with its own language (`xml:lang`), so e-readers hyphenate and pick fonts correctly;
+- reading time for languages that aren't space-separated (Chinese, Japanese), which is roughly
+  characters per minute;
+- right-to-left layout;
+- whether the app UI and the book's own text should be translated;
+- whether an edition should mix languages or keep them in sections.
+
+A small first step: detect each article's language and tag it.
+
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
 - **Engine:** Android's own `TextToSpeech`. It's offline and free, and voices already on the phone keep the no-account promise. Cloud voices sound better but need an account and send the text away, so they'd only ever be an option.
