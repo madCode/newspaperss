@@ -39,7 +39,9 @@ class EditionRepository(
     suspend fun markDelivered(id: Long, onlyIfReady: Boolean = false) {
         val delivered = db.withTransaction {
             val edition = db.editions().byId(id) ?: return@withTransaction false
-            // Checked inside the transaction: a build may be releasing unsent editions at the same time.
+            // Checked inside the transaction: a build may be releasing unsent editions at the same
+            // time, and the reader may have deleted this one while a folder copy was finishing.
+            if (edition.status == EditionStatus.DELETED) return@withTransaction false
             if (onlyIfReady && edition.status != EditionStatus.READY) return@withTransaction false
             val articleIds = db.editions().articleIds(id)
             db.articles().setState(articleIds, ArticleState.DELIVERED)

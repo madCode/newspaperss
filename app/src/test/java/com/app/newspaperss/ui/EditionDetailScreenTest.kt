@@ -302,6 +302,17 @@ class EditionDetailScreenTest {
     }
 
     @Test
+    fun aFolderCopyFinishingAfterADeleteDoesntBringItBack() {
+        val (id, articles) = edition(EditionStatus.READY, listOf("A story"))
+        runBlocking { repo.delete(id) }
+
+        runBlocking { repo.markDelivered(id) }
+
+        assertTrue(isGone(id))
+        assertEquals("its articles stay with the next edition", ArticleState.NEW, runBlocking { db.articles().byId(articles[0]) }?.state)
+    }
+
+    @Test
     fun anEditionBeingMadeCantBeDeleted() {
         val building = runBlocking { db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.BUILDING)) }
 
