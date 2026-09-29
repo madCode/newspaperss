@@ -97,6 +97,8 @@ class FeedSync(
                             discoveredAt = now, originId = it.feedId, originTitle = it.feedTitle,
                         )
                     },
+                    // Unread on the server means not yet delivered from it; skipped, it would stay unread there.
+                    skipDelivered = false,
                 )
                 db.sources().recordSuccess(source.id, now, null, null, source.title)
                 return added

@@ -137,18 +137,32 @@ class FeedSyncTest {
     @Test
     fun aDeliveredLinkIsntOfferedAgainFromAnySource() = runTest {
         repo.addFeed(url, "Blog")
+        repo.addFeed("https://other.example/feed", "Other")
         http.page(url, rss("Blog", "1" to "One", "2" to "Two"))
+        // The same link under the other feed's own guid and title.
+        http.page("https://other.example/feed", rss("Other", "1" to "One, reposted"))
         sync.syncAll()
-        deliver(db.articles().candidates().first { it.guid == "1" })
+        deliver(db.articles().candidates().first { it.title == "One" })
+        assertEquals("a waiting copy is used up too", listOf("Two"), db.articles().candidates().map { it.title })
 
         repo.remove(db.sources().byUrl(url)!!)
         repo.addFeed(url, "Blog")
-        // A second feed carrying the same link under its own guid.
-        repo.addFeed("https://other.example/feed", "Other")
-        http.page("https://other.example/feed", rss("Other", "1" to "One again"))
 
         assertEquals(1, sync.syncAll().newArticles)
-        assertEquals(listOf("Two"), db.articles().candidates().map { it.title })
+        assertEquals(setOf("Two"), db.articles().candidates().map { it.title }.toSet())
+    }
+
+    /** Saving a link on purpose is the reader asking for it, whatever was delivered before. */
+    @Test
+    fun aDeliveredLinkCanStillBeSavedToTheReadingList() = runTest {
+        repo.addFeed(url, "Blog")
+        http.page(url, rss("Blog", "1" to "One"))
+        sync.syncAll()
+        deliver(db.articles().candidates().single())
+
+        ReadingListRepository(db).save("https://example.com/1", "One")
+
+        assertEquals(listOf("https://example.com/1"), db.articles().candidates().map { it.url })
     }
 
     @Test

@@ -36,6 +36,7 @@ class EditionRepository(
             val articleIds = db.editions().articleIds(id)
             db.articles().setState(articleIds, ArticleState.DELIVERED)
             db.articles().rememberDelivered(articleIds, clock.instant())
+            db.articles().deliverCopies(articleIds)
             db.editions().update(edition.copy(status = EditionStatus.DELIVERED, deliveredAt = clock.instant(), error = null))
             true
         }

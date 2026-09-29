@@ -91,8 +91,8 @@ data class ArticleEntity(
 
 /**
  * A link that went out in a delivered edition. Kept apart from articles, which go when their
- * source is removed, so a source removed and added again, or a story that turns up in two
- * sources, doesn't deliver it a second time.
+ * source is removed, so a source removed and added again, or a story that turns up later in
+ * another source, doesn't deliver it a second time.
  */
 @Entity(tableName = "delivered_urls")
 data class DeliveredUrlEntity(

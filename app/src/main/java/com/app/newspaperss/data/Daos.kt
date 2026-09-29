@@ -76,17 +76,16 @@ data class SourceActivity(val sourceId: Long, val lastNew: Instant?)
 @Dao
 interface ArticleDao {
     /**
-     * Inserts articles not already known for their source; returns how many were new. One whose
-     * link was already delivered (see [DeliveredUrlEntity]) goes in as delivered and isn't counted.
+     * Inserts articles not already known for their source; returns how many were new. Unless
+     * [skipDelivered] is false, one whose link was already delivered (see [DeliveredUrlEntity])
+     * is left out: stored, it would count as new activity on the Sources screen.
      */
     @Transaction
-    suspend fun insertNew(articles: List<ArticleEntity>): Int {
+    suspend fun insertNew(articles: List<ArticleEntity>, skipDelivered: Boolean = true): Int {
         // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
-        val delivered = articles.map { it.url }.filter { it.isNotBlank() }.distinct().chunked(500).flatMap { deliveredAmong(it) }.toSet()
-        return articles.count { article ->
-            val seen = article.url in delivered
-            insertIgnoring(if (seen) article.copy(state = ArticleState.DELIVERED) else article) != -1L && !seen
-        }
+        val delivered = if (!skipDelivered) emptySet() else
+            articles.map { it.url }.filter { it.isNotBlank() }.distinct().chunked(500).flatMap { deliveredAmong(it) }.toSet()
+        return articles.filter { it.url !in delivered }.count { insertIgnoring(it) != -1L }
     }
 
     @Query("SELECT url FROM delivered_urls WHERE url IN (:urls)")
@@ -94,6 +93,18 @@ interface ArticleDao {
 
     @Query("INSERT OR REPLACE INTO delivered_urls (url, deliveredAt) SELECT url, :at FROM articles WHERE id IN (:ids) AND url != ''")
     suspend fun rememberDelivered(ids: List<Long>, at: Instant)
+
+    /**
+     * Uses up other waiting copies of the articles' links, from a second feed or the reading
+     * list, so they aren't delivered again. tt-rss copies stay: marking them read on the
+     * server is how they leave tt-rss, and that only happens for articles in an edition.
+     */
+    @Query(
+        """UPDATE articles SET state = 'DELIVERED' WHERE state = 'NEW' AND broughtBack = 0
+           AND url IN (SELECT url FROM articles WHERE id IN (:ids) AND url != '')
+           AND sourceId NOT IN (SELECT id FROM sources WHERE kind = 'TTRSS')""",
+    )
+    suspend fun deliverCopies(ids: List<Long>)
 
     /** Feeds drop items long before this, so a link this old won't be offered again. */
     @Query("DELETE FROM delivered_urls WHERE deliveredAt < :before")
