@@ -13,6 +13,8 @@ class TestApp : NewspaperssApp() {
     val http = FakeHttp()
     /** Editions [com.app.newspaperss.data.EditionRepository] asked to mark read in tt-rss. */
     val markedTtrssRead = mutableListOf<Long>()
+    /** Reading-list articles whose titles the app asked to look up in the background. */
+    val titlesRequested = mutableListOf<Long>()
 
     override fun createContainer() = AppContainer(
         this,
@@ -20,6 +22,7 @@ class TestApp : NewspaperssApp() {
         db = Room.inMemoryDatabaseBuilder(this, AppDatabase::class.java).allowMainThreadQueries().build(),
         cipher = testCipher(),
         markTtrssRead = { markedTtrssRead += it },
+        fetchReadingListTitles = { titlesRequested += it },
     )
 
     override fun scheduleWork() {}

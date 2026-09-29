@@ -10,6 +10,7 @@ import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.data.ReadingListRepository
+import com.app.newspaperss.data.ReadingListTitles
 import com.app.newspaperss.data.SecretCipher
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssAccountStore
@@ -23,6 +24,7 @@ import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
+import com.app.newspaperss.work.ReadingListTitleWorker
 import com.app.newspaperss.work.TtrssMarkReadWorker
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -37,12 +39,14 @@ class AppContainer(
     content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), SourceRepository(db)::recordFullText),
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
+    fetchReadingListTitles: (articleIds: List<Long>) -> Unit = { ReadingListTitleWorker.enqueue(context, it) },
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val sources = SourceRepository(db)
-    val readingList = ReadingListRepository(db)
+    val readingList = ReadingListRepository(db, onUntitled = fetchReadingListTitles)
+    val readingListTitles = ReadingListTitles(db, http)
     val editions = EditionRepository(db, editionsDir, onTtrssDelivered = markTtrssRead)
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)

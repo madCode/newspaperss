@@ -3,6 +3,8 @@ package com.app.newspaperss.ui.readinglist
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.feed.MarkdownChecklist
+import com.app.newspaperss.core.feed.ReadingListFile
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ReadingListRepository
 import android.content.ContentResolver
@@ -45,13 +47,21 @@ class ReadingListViewModel(private val list: ReadingListRepository) : ViewModel(
                 val text = withContext(Dispatchers.IO) {
                     resolver.openInputStream(uri)?.use { it.bufferedReader().readText() } ?: throw IOException("empty")
                 }
-                val added = list.importMarkdown(text)
-                if (added == 1) "Added 1 link." else "Added $added links."
+                importMessage(list.import(text))
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 "Couldn't read that file."
             }
         }
+    }
+
+    private fun importMessage(result: ReadingListRepository.Imported): String {
+        val from = when (result.format) {
+            ReadingListFile.Format.MARKDOWN -> ""
+            ReadingListFile.Format.POCKET_HTML, ReadingListFile.Format.POCKET_CSV -> " from Pocket"
+            ReadingListFile.Format.INSTAPAPER_CSV -> " from Instapaper"
+        }
+        return "Added ${plural(result.added, "link")}$from."
     }
 
     fun export(resolver: ContentResolver, uri: Uri) {

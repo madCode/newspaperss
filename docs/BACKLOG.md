@@ -19,7 +19,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ### M6 leftovers
 - [ ] Curated list sources (a scraper per site, like rss-to-e-reader's Arts & Letters Daily queue) with keep-newest-N
-- [ ] Fetch a saved link's title in the background so the list shows it before the edition does
 
 ### M7 Polish
 - [ ] Source health view; remove-and-re-add shouldn't re-deliver (soft delete sources)
@@ -27,9 +26,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M8 Advanced
 - [ ] tt-rss: pick a category instead of all unread; a setting to leave articles unread on the server (DESIGN §5 calls it an option)
 - [ ] SMTP delivery; notes export
-
-### UX (from the persona audit)
-- [ ] Import Pocket/Instapaper exports (CSV/HTML) into the reading list
 
 ### Tech debt
 - [ ] Parser tests run on kxml2, the app ships Android's KXmlParser: add a Robolectric smoke test through the platform parser
@@ -39,6 +35,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 - [x] App shell: splash until settings load, onboarding survives process death, timer re-armed on time-zone change, launch test
 - [x] Auto-tune each source's ContentMode from its articles (three in a row), a manual choice that's never overridden, and per-source full-text health on the Sources screen
+- [x] Import Pocket (HTML, CSV) and Instapaper (CSV) exports into the reading list; saved links without a title get the page's title in the background
 - [x] tt-rss source (one account, all unread, marked read after delivery); in-app article preview (#9)
 - [x] M1 Skeleton: Gradle (AGP 9.1, Kotlin 2.3, Compose), `:core` + `:app`, CI, design doc (#1)
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)

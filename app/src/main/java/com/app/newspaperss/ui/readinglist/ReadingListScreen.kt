@@ -81,9 +81,10 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Import or export") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Import a checklist") }, onClick = {
+                            DropdownMenuItem(text = { Text("Import a reading list") }, onClick = {
                                 menu = false
-                                importFile.launch(arrayOf("text/markdown", "text/plain", "text/*"))
+                                // Some providers label a .csv as an Excel file.
+                                importFile.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel"))
                             })
                             DropdownMenuItem(text = { Text("Export as a checklist") }, onClick = {
                                 menu = false
@@ -103,7 +104,8 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
                 item {
                     Text(
                         "Nothing saved yet. In any app, tap Share on a page and choose “Read in newspaperss”: " +
-                            "it goes into your next edition.",
+                            "it goes into your next edition.\n\nComing from Pocket or Instapaper? " +
+                            "Choose “Import a reading list” in the menu and pick its export file.",
                         modifier = Modifier.padding(24.dp),
                     )
                 }
