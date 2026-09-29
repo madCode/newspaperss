@@ -7,6 +7,11 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### From device testing (Day 2)
+- [ ] Webcomics (tested: God Slave, Namesake, xkcd, Webtoons):
+  - the feed finder misses feeds linked only by an ordinary link (God Slave's `/comic/rss`, Webtoons' `rss?title_no=`);
+  - ComicControl feeds (God Slave, Namesake) carry a thumbnail; the full comic is the page's `img#cc-comic` and should win;
+  - Namesake gets the comic twice (the full image and its thumbnail).
+- [ ] Webtoons episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap; support strips properly
 - [ ] An app icon: there's none, so the launcher shows Android's default. An adaptive icon (a folded-newspaper mark, monochrome layer for themed icons), matching the calm monochrome app
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
 - [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
