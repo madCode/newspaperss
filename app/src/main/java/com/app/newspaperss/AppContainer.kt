@@ -35,7 +35,7 @@ import kotlinx.coroutines.SupervisorJob
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
 class AppContainer(
     context: Context,
-    val http: HttpClient = OkHttpHttpClient(),
+    val http: HttpClient = OkHttpHttpClient(OkHttpHttpClient.defaultClient(File(context.cacheDir, "http"))),
     val db: AppDatabase = AppDatabase.open(context),
     content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), SourceRepository(db)::recordFullText),
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
