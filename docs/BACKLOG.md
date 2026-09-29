@@ -16,7 +16,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M3 leftovers
 - [ ] Write encoded images to a cache dir and stream them into the zip (lower peak memory)
 - [ ] Auto-tune source ContentMode from ExtractedArticle feed/page word counts (`ArticleExtractor.suggestMode`)
-- [ ] Edition detail screen: contents, bring back articles, share again
 - [ ] Generated cover image (Canvas) so Kindle's library thumbnail shows date + headlines
 
 ### M5 leftovers
@@ -41,6 +40,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ## Done
 
+- [x] Edition detail screen: contents, send/open, "I've sent it", bring back articles
 - [x] M1 Skeleton: Gradle (AGP 9.1, Kotlin 2.3, Compose), `:core` + `:app`, CI, design doc (#1)
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)
 - [x] M6 Reading list: share target, reading list screen, markdown checklist import/export compatible with rss-to-e-reader (#4)
