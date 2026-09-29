@@ -24,6 +24,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +34,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.delivery.EditionIntents
 import java.time.LocalDate
+import java.util.concurrent.atomic.AtomicBoolean
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
@@ -117,40 +119,38 @@ fun Masthead(date: LocalDate, modifier: Modifier = Modifier) {
 
 @Composable
 private fun BuildPanel(build: BuildState, primary: Boolean, onMake: () -> Unit) {
+    val running = build == BuildState.Syncing || build is BuildState.Fetching
+    // Announced only once a build has run while this screen was up: a failure WorkManager still
+    // remembers from earlier would otherwise be read out every time Today opens.
+    // A plain flag, not state: it only has to be right when the status line is next composed.
+    val sawRunning = remember { AtomicBoolean(false) }
+    if (running) sawRunning.set(true)
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        when (build) {
-            BuildState.Syncing, is BuildState.Fetching -> {
-                // Stepped text rather than a spinner: an endless animation smears on e-ink screens.
-                // Only the stage is a live region: TalkBack would read out every new count.
-                Text(
-                    if (build is BuildState.Fetching) "Making your edition" else "Checking your sources for new articles…",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                )
-                if (build is BuildState.Fetching) {
-                    Text(
-                        if (build.done == 1) "1 article read so far" else "${build.done} articles read so far",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-            else -> {
-                if (primary) Button(onClick = onMake) { Text("Make an edition now") }
-                else TextButton(onClick = onMake, modifier = Modifier.padding(top = 8.dp)) { Text("Make another edition") }
-                val message = when (build) {
-                    BuildState.NothingNew -> "Nothing new to read yet. Add sources, or check back later."
-                    is BuildState.Failed -> build.reason
-                    else -> null
-                }
-                message?.let {
-                    Text(
-                        it,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                }
-            }
+        if (!running) {
+            if (primary) Button(onClick = onMake) { Text("Make an edition now") }
+            else TextButton(onClick = onMake, modifier = Modifier.padding(top = 8.dp)) { Text("Make another edition") }
+        }
+        // One status line, always composed, whose text changes: TalkBack announces a change to a
+        // live region, not one appearing. Stepped text rather than a spinner, which smears on e-ink.
+        Text(
+            when (build) {
+                BuildState.Syncing -> "Checking your sources for new articles…"
+                is BuildState.Fetching -> "Making your edition"
+                BuildState.NothingNew -> "Nothing new to read yet. Add sources, or check back later."
+                is BuildState.Failed -> build.reason
+                BuildState.Idle -> ""
+            },
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 8.dp).semantics { if (sawRunning.get()) liveRegion = LiveRegionMode.Polite },
+        )
+        // Outside the live region, or TalkBack would read every count. Kept while syncing too, so
+        // the page doesn't shift by a line (an extra refresh on e-ink) when fetching starts.
+        if (running) {
+            Text(
+                (build as? BuildState.Fetching)?.done?.let { if (it == 1) "1 article read so far" else "$it articles read so far" }.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }

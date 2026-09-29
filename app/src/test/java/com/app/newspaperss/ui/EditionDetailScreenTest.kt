@@ -41,6 +41,7 @@ import com.app.newspaperss.work.EditionWorker
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
 import java.util.UUID
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -259,20 +260,35 @@ class EditionDetailScreenTest {
         assertEquals(older, opened)
     }
 
-    @Test
-    fun talkBackIsToldWhatTheBuildIsDoingButNotEveryCount() {
-        val running = WorkInfo(
-            UUID.randomUUID(), WorkInfo.State.RUNNING, emptySet(),
-            progress = workDataOf(EditionWorker.STAGE to EditionWorker.STAGE_FETCHING, EditionWorker.FETCHED to 3),
-        )
-        val vm = TodayViewModel(repo, flowOf(running)) {}
-        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
-        idleUntil { vm.state.value.build is BuildState.Fetching }
+    private fun work(state: WorkInfo.State, progress: androidx.work.Data = androidx.work.Data.EMPTY, output: androidx.work.Data = androidx.work.Data.EMPTY) =
+        WorkInfo(UUID.randomUUID(), state, emptySet(), outputData = output, progress = progress)
 
+    @Test
+    fun talkBackHearsTheBuildGoFromCheckingToItsResultButNotEveryCount() {
+        val work = MutableStateFlow<WorkInfo?>(null)
+        val vm = TodayViewModel(repo, work) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
         val live = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)
+
+        work.value = work(WorkInfo.State.RUNNING, progress = workDataOf(EditionWorker.STAGE to EditionWorker.STAGE_FETCHING, EditionWorker.FETCHED to 3))
+        idleUntil { vm.state.value.build is BuildState.Fetching }
         compose.onNode(hasText("Making your edition") and live).assertExists()
         compose.onNode(hasText("3 articles read so far") and live).assertDoesNotExist()
-        compose.onNodeWithText("3 articles read so far").assertExists()
+
+        work.value = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Couldn't reach any of your sources."))
+        idleUntil { vm.state.value.build is BuildState.Failed }
+        compose.onNode(hasText("Couldn't reach any of your sources.") and live).assertExists()
+    }
+
+    @Test
+    fun anOldFailureIsShownButNotAnnouncedEachTimeTodayOpens() {
+        val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Couldn't reach any of your sources."))
+        val vm = TodayViewModel(repo, flowOf(failed)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.build is BuildState.Failed }
+
+        compose.onNodeWithText("Couldn't reach any of your sources.").assertExists()
+        compose.onNode(hasText("Couldn't reach any of your sources.") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertDoesNotExist()
     }
 
     @Test

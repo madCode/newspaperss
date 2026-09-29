@@ -186,12 +186,11 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel, sources: So
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
     )
     // Below the field, not inside it: at large font sizes a button inside leaves no room to type.
+    // The status is always composed and only its text changes, so TalkBack announces it; the
+    // button stays put rather than being swapped out from under focus.
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-        if (s.searching) {
-            Text("Checking…", Modifier.padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite })
-        } else {
-            OutlinedButton(onClick = vm::findPasted, enabled = s.pasted.isNotBlank()) { Text("Add") }
-        }
+        Text(if (s.searching) "Checking…" else "", Modifier.padding(horizontal = 12.dp).semantics { liveRegion = LiveRegionMode.Polite })
+        OutlinedButton(onClick = vm::findPasted, enabled = !s.searching && s.pasted.isNotBlank()) { Text("Add") }
     }
     s.found.forEach { feed -> FeedCheck(feed.title, feed.url in s.chosen) { vm.toggleFeed(feed.url) } }
     StarterPacks.all.forEach { pack ->

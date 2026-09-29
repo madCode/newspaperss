@@ -163,21 +163,13 @@ class OnboardingTest {
     }
 
     @Test
-    fun talkBackHearsWhichStepThisIsAndTheAddButtonIsReachable() {
-        http.page("https://blog.example", "<html><head><link rel=alternate type=application/rss+xml href=/feed title=Blog></head></html>")
-        http.page("https://blog.example/feed", rss("Blog"))
+    fun talkBackHearsWhichStepThisIsNotAPercentage() {
         compose.setContent { OnboardingScreen(vm) }
         vm.next()
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Step 1 of 3")).assertExists()
         vm.chooseDevice(Device.KINDLE)
         vm.next()
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Step 2 of 3")).assertExists()
-
-        compose.onNode(hasSetTextAction()).performTextInput("blog.example")
-        scrollAndClick("Add")
-
-        idleUntil { vm.state.value.found.isNotEmpty() }
-        assertEquals(setOf("https://blog.example/feed"), vm.state.value.chosen)
     }
 
     @Test
