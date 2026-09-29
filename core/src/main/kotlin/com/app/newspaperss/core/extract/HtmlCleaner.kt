@@ -191,10 +191,11 @@ object HtmlCleaner {
      * extraction calls this before running it.
      */
     internal fun removeScreenReaderOnly(root: Element) {
-        val total = countWords(root).coerceAtLeast(1)
         for (el in root.select("*")) {
             if (el === root || !el.isAttached()) continue
-            if (el.classNames().any { it.lowercase() in SCREEN_READER_ONLY } && isSmallPart(el, total)) el.remove()
+            // By length, not share of the page: before Readability the page includes navigation and
+            // comments, and a paywalled article body can sit in one of these classes.
+            if (el.classNames().any { it.lowercase() in SCREEN_READER_ONLY } && countWords(el) <= SCREEN_READER_MAX_WORDS) el.remove()
         }
     }
 
@@ -215,6 +216,8 @@ object HtmlCleaner {
                 continue
             }
             val list = heading.nextElementSibling()?.takeIf(::isLinkList) ?: continue
+            // An essay's own "Further reading" can be a long list; a site's box of links is short.
+            if (!isSmallPart(list, total)) continue
             list.remove()
             heading.remove()
         }
@@ -222,9 +225,12 @@ object HtmlCleaner {
 
     /** A list whose items are all, or nearly all, link text. */
     private fun isLinkList(el: Element): Boolean {
-        if (el.tagName() !in setOf("ul", "ol")) return false
+        if (el.tagName() !in LIST_TAGS) return false
         val items = el.children().filter { it.tagName() == "li" }
-        return items.isNotEmpty() && items.all { li -> li.select("a").text().length >= LINK_TEXT_SHARE * li.text().length }
+        return items.isNotEmpty() && items.all { li ->
+            val text = li.text()
+            text.isNotBlank() && li.select("a").text().length >= LINK_TEXT_SHARE * text.length
+        }
     }
 
     private fun removeJunk(body: Element) {
@@ -464,6 +470,8 @@ object HtmlCleaner {
         RegexOption.IGNORE_CASE,
     )
     private const val LINK_TEXT_SHARE = 0.8
+    private const val SCREEN_READER_MAX_WORDS = 12
+    private val LIST_TAGS = setOf("ul", "ol")
     private val JUNK_ROLES = setOf("navigation", "complementary", "banner", "contentinfo", "dialog")
 
     private val LAZY_IMAGE_ATTRIBUTES = listOf(
