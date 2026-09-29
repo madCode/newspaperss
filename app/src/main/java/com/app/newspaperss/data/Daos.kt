@@ -90,15 +90,14 @@ data class SourceActivity(val sourceId: Long, val lastNew: Instant?)
 @Dao
 interface ArticleDao {
     /**
-     * Inserts articles not already known for their source; returns how many were new. Unless
-     * [skipDelivered] is false, one whose link was already delivered (see [DeliveredUrlEntity])
-     * is left out: stored, it would count as new activity on the Sources screen.
+     * Inserts articles not already known for their source; returns how many were new. One whose
+     * link was already delivered (see [DeliveredUrlEntity]) is left out: stored, it would count as
+     * new activity on the Sources screen.
      */
     @Transaction
-    suspend fun insertNew(articles: List<ArticleEntity>, skipDelivered: Boolean = true): Int {
+    suspend fun insertNew(articles: List<ArticleEntity>): Int {
         // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
-        val delivered = if (!skipDelivered) emptySet() else
-            articles.map { it.url }.filter { it.isNotBlank() }.distinct().chunked(500).flatMap { deliveredAmong(it) }.toSet()
+        val delivered = articles.map { it.url }.filter { it.isNotBlank() }.distinct().chunked(500).flatMap { deliveredAmong(it) }.toSet()
         return articles.filter { it.url !in delivered }.count { insertIgnoring(it) != -1L }
     }
 
@@ -161,6 +160,10 @@ interface ArticleDao {
     /** Only articles still marked delivered: one already back in the pool or in a newer edition stays put. */
     @Query("UPDATE articles SET state = 'NEW', broughtBack = 1 WHERE id IN (:ids) AND state = 'DELIVERED'")
     suspend fun bringBackDelivered(ids: List<Long>): Int
+
+    /** Expires a source's unpicked articles; brought-back ones are the reader's and stay. */
+    @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0")
+    suspend fun expireWaiting(sourceId: Long)
 
     /** Expires unpicked articles discovered before [before], except reading-list items. */
     @Query(

@@ -156,7 +156,7 @@ private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onM
         Column(Modifier.weight(1f)) {
             Text("Mark as read in tt-rss")
             Text(
-                if (source.markReadOnServer) "Once an edition with them is delivered" else "They stay unread there; newspaperss remembers what it delivered",
+                if (source.markReadOnServer) "Articles are marked read once they're delivered" else "Delivered articles are left unread in tt-rss",
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
             )

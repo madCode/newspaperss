@@ -149,7 +149,7 @@ class SourceDetailScreenTest {
         assertEquals(5, runBlocking { db.sources().byId(id)!!.ttrssCategoryId })
 
         compose.onNodeWithText("Mark as read in tt-rss").performClick()
-        idleUntil { compose.waitForIdle(); visible("They stay unread there") }
+        idleUntil { compose.waitForIdle(); visible("left unread in tt-rss") }
         assertEquals(false, runBlocking { db.sources().byId(id)!!.markReadOnServer })
     }
 
