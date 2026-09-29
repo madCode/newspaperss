@@ -3,16 +3,23 @@ package com.app.newspaperss.delivery
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 fun interface FolderWriter {
     /** Returns null on success, else a reason fit to show the reader. */
-    fun deliver(file: File, treeUri: String, title: String): String?
+    suspend fun deliver(file: File, treeUri: String, title: String): String?
 }
 
 /** Saves editions into a folder the reader picked through the system file picker. */
 class FolderDelivery(private val resolver: ContentResolver) : FolderWriter {
-    override fun deliver(file: File, treeUri: String, title: String): String? {
+    // IO: a cloud provider's createDocument and write can block on the network.
+    override suspend fun deliver(file: File, treeUri: String, title: String): String? = withContext(Dispatchers.IO) {
+        write(file, treeUri, title)
+    }
+
+    private fun write(file: File, treeUri: String, title: String): String? {
         var doc: Uri? = null
         return try {
             val tree = Uri.parse(treeUri)

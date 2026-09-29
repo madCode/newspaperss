@@ -19,7 +19,12 @@ import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceEntity
+import android.util.Log
 import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Clock
 import java.time.LocalDateTime
@@ -48,12 +53,12 @@ class EditionBuilder(
     private val cover: (CoverInfo) -> EpubImage? = { null },
 ) {
     suspend fun build(settings: EditionSettings, onProgress: (done: Int) -> Unit = {}): BuildResult {
+        failInterrupted()
         releaseUndelivered()
         val sources = db.sources().all().filter { !it.paused }
         val sourcesById = sources.associateBy { it.id }
         val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
         if (articles.isEmpty()) return BuildResult.NothingNew
-        val byId = articles.associateBy { it.id }
 
         val now = LocalDateTime.now(clock.withZone(zone))
         val startOfDay = now.toLocalDate().atStartOfDay(zone).toInstant()
@@ -61,6 +66,31 @@ class EditionBuilder(
         val rotation = db.editions().count()
         val editionId = db.editions().insert(EditionEntity(title = title, createdAt = clock.instant()))
 
+        // Whatever goes wrong from here, the edition must not stay BUILDING: the Today screen
+        // would show it as being made forever. Its articles only change state in the final
+        // transaction, so a failed edition leaves them all for the next one.
+        return try {
+            fill(editionId, title, now, sources, articles, rotation, settings, onProgress)
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) { fail(editionId, STOPPED) }
+            throw e
+        } catch (e: Exception) {
+            fail(editionId, "Something went wrong while making the edition (${e.message ?: e.javaClass.simpleName}).")
+        }
+    }
+
+    private suspend fun fill(
+        editionId: Long,
+        title: String,
+        now: LocalDateTime,
+        sources: List<SourceEntity>,
+        articles: List<ArticleEntity>,
+        rotation: Int,
+        settings: EditionSettings,
+        onProgress: (done: Int) -> Unit,
+    ): BuildResult {
+        val sourcesById = sources.associateBy { it.id }
+        val byId = articles.associateBy { it.id }
         val ordered = EditionPlanner.order(
             candidates = articles.map { Candidate(it.id.toString(), it.sourceId.toString(), it.published ?: it.discoveredAt, it.broughtBack) },
             sourceOrder = sources.map { it.id.toString() },
@@ -72,7 +102,16 @@ class EditionBuilder(
         fun minutesOf(c: ArticleContent) = ReadingTime.minutes(c.wordCount, settings.wordsPerMinute)
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, settings.rules, { minutesOf(it.second) }) { c ->
             val article = byId.getValue(c.id.toLong())
-            val result = content.contentFor(article, sourcesById.getValue(article.sourceId), allowance)?.let { article to it }
+            val result = try {
+                content.contentFor(article, sourcesById.getValue(article.sourceId), allowance)?.let { article to it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // One broken page shouldn't cost the reader the whole edition. Only the exception
+                // type is logged: messages can carry the article's URL.
+                Log.w(TAG, "Skipped an article: ${e.javaClass.name}")
+                null
+            }
             onProgress(++fetched)
             result
         }
@@ -107,22 +146,28 @@ class EditionBuilder(
         val withImages = arranged.zip(fitted) { (a, c), images -> a to c.copy(images = images) }
 
         val fileName = "edition-$editionId.epub"
-        try {
-            editionsDir.mkdirs()
-            val doc = EditionDoc(
-                title = title,
-                date = now.toLocalDate(),
-                identifier = "urn:uuid:${UUID.randomUUID()}",
-                sections = withImages.groupBy { (a, _) -> sourcesById.getValue(a.sourceId).section }.map { (section, items) ->
-                    EditionSection(section, items.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })
-                },
-                modified = clock.instant(),
-                cover = coverImage,
-            )
-            File(editionsDir, fileName).outputStream().use { EpubWriter.write(doc, it) }
-        } catch (e: Exception) {
-            return fail(editionId, "Couldn't write the edition: ${e.message}")
+        val doc = EditionDoc(
+            title = title,
+            date = now.toLocalDate(),
+            identifier = "urn:uuid:${UUID.randomUUID()}",
+            sections = withImages.groupBy { (a, _) -> sourcesById.getValue(a.sourceId).section }.map { (section, items) ->
+                EditionSection(section, items.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })
+            },
+            modified = clock.instant(),
+            cover = coverImage,
+        )
+        // The try is inside withContext so a cancellation surfacing from it isn't reported as
+        // a write error.
+        val writeError = withContext(Dispatchers.IO) {
+            try {
+                editionsDir.mkdirs()
+                File(editionsDir, fileName).outputStream().use { EpubWriter.write(doc, it) }
+                null
+            } catch (e: Exception) {
+                e
+            }
         }
+        if (writeError != null) return fail(editionId, "Couldn't write the edition: ${writeError.message}")
 
         db.withTransaction {
             db.editions().insertArticles(
@@ -155,13 +200,27 @@ class EditionBuilder(
         }
     }
 
-    // The cover is decoration: an edition without one is still worth delivering.
-    private fun coverFor(info: CoverInfo): EpubImage? = try {
-        cover(info)
-    } catch (e: Exception) {
-        null
-    } catch (e: OutOfMemoryError) {
-        null
+    // The cover is decoration: an edition without one is still worth delivering. Drawing and
+    // JPEG-encoding it is CPU work, so it goes to Default, whose threads match the cores, not IO.
+    private suspend fun coverFor(info: CoverInfo): EpubImage? = withContext(Dispatchers.Default) {
+        try {
+            cover(info)
+        } catch (e: Exception) {
+            null
+        } catch (e: OutOfMemoryError) {
+            null
+        }
+    }
+
+    /**
+     * A BUILDING edition at the start of a build was cut off by the process dying (a stopped
+     * worker is marked FAILED on its way out). Builds share one unique work name, so it can't be
+     * one still running.
+     */
+    private suspend fun failInterrupted() {
+        for (edition in db.editions().withStatus(EditionStatus.BUILDING)) {
+            db.editions().update(edition.copy(status = EditionStatus.FAILED, error = INTERRUPTED))
+        }
     }
 
     private suspend fun fail(editionId: Long, reason: String): BuildResult {
@@ -180,4 +239,10 @@ class EditionBuilder(
         note = c.note,
         images = c.images,
     )
+
+    companion object {
+        private const val TAG = "EditionBuilder"
+        const val INTERRUPTED = "Interrupted; its articles will be in the next edition."
+        const val STOPPED = "Stopped before it was finished; its articles will be in the next edition."
+    }
 }
