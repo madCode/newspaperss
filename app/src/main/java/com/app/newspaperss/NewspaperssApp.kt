@@ -20,7 +20,8 @@ open class NewspaperssApp : Application() {
     protected open fun scheduleWork() {
         container.notifier.createChannels()
         SyncWorker.schedulePeriodic(this)
-        // Re-arm after an app update or a restore; WorkManager itself survives reboots.
+        // Arms the timer if none is pending (first run, after an update or a
+        // restore); a pending or overdue one is left alone.
         MainScope().launch { EditionScheduler.reschedule(this@NewspaperssApp, container.settings.current()) }
     }
 }

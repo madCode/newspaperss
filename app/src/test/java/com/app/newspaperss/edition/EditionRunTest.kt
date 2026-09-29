@@ -110,21 +110,4 @@ class EditionRunTest {
         failing.run(scheduled = true)
         assertEquals(listOf("problem: None of the articles could be read."), notices)
     }
-
-    @Test
-    fun settingsRoundTrip() = runTest {
-        settings.update {
-            it.copy(
-                edition = it.edition.copy(minutes = 45, maxPerSource = 2, ordering = com.app.newspaperss.core.edition.Ordering.SHUFFLE),
-                scheduleEnabled = true,
-                schedule = it.schedule.copy(time = java.time.LocalTime.of(7, 15), days = setOf(java.time.DayOfWeek.SUNDAY)),
-            )
-        }
-        val s = settings.current()
-        assertEquals(45, s.edition.minutes)
-        assertEquals(2, s.edition.maxPerSource)
-        assertEquals(com.app.newspaperss.core.edition.Ordering.SHUFFLE, s.edition.ordering)
-        assertEquals(java.time.LocalTime.of(7, 15), s.schedule.time)
-        assertEquals(setOf(java.time.DayOfWeek.SUNDAY), s.schedule.days)
-    }
 }

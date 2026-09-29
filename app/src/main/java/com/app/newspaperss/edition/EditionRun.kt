@@ -17,11 +17,9 @@ class EditionRun(
     private val notifier: EditionNotifier,
 ) {
     /**
-     * Parameters
-     * ----------
-     * scheduled: true for the timed run. Only then does a shared edition get
-     *   a "ready" notification; someone who tapped "Make one now" is already
-     *   looking at it.
+     * @param scheduled true for the timed run. Only then does a shared edition
+     *   get a "ready" notification; someone who tapped "Make one now" is
+     *   already looking at it.
      */
     suspend fun run(scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}): BuildResult {
         val s = settings.current()

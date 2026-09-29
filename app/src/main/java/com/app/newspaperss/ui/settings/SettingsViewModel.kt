@@ -28,7 +28,7 @@ class SettingsViewModel(
     }
 
     fun setMinutes(minutes: Int) = update { it.copy(edition = it.edition.copy(minutes = minutes.coerceIn(MIN_MINUTES, MAX_MINUTES))) }
-    fun setMaxPerSource(max: Int) = update { it.copy(edition = it.edition.copy(maxPerSource = max.coerceIn(1, 10))) }
+    fun setMaxPerSource(max: Int) = update { it.copy(edition = it.edition.copy(maxPerSource = max.coerceIn(1, MAX_PER_SOURCE))) }
     fun setOrdering(ordering: Ordering) = update { it.copy(edition = it.edition.copy(ordering = ordering)) }
     fun setScheduleEnabled(enabled: Boolean) = update { it.copy(scheduleEnabled = enabled) }
     fun setTime(time: LocalTime) = update { it.copy(schedule = it.schedule.copy(time = time)) }
@@ -42,5 +42,6 @@ class SettingsViewModel(
     companion object {
         const val MIN_MINUTES = 5
         const val MAX_MINUTES = 120
+        const val MAX_PER_SOURCE = 10
     }
 }

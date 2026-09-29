@@ -41,4 +41,33 @@ class ScheduleTest {
         assertEquals(LocalTime.of(6, 30), next.toLocalTime())
         assertEquals(java.time.ZoneOffset.ofHours(-5), next.offset)
     }
+
+    @Test
+    fun springForwardGapMovesWithTheClock() {
+        // US clocks skip 2:00-3:00 on 2027-03-14.
+        val next = Schedule(LocalTime.of(2, 30)).nextAfter(at("2027-03-13T12:00"))!!
+        assertEquals(at("2027-03-14T03:30"), next)
+    }
+
+    private val now = java.time.Instant.parse("2026-09-29T12:00:00Z")
+    private val later = now.plusSeconds(3600)
+    private val tomorrow = now.plusSeconds(86_400)
+
+    @Test
+    fun anOverdueTimerIsNeverReplaced() {
+        assertEquals(TimerAction.Keep, ScheduleTimer.decide(pending = now.minusSeconds(60), target = tomorrow, now = now))
+    }
+
+    @Test
+    fun anUnchangedTargetIsKeptAndAChangedOneReplaced() {
+        assertEquals(TimerAction.Keep, ScheduleTimer.decide(later, later, now))
+        assertEquals(TimerAction.Arm(tomorrow), ScheduleTimer.decide(later, tomorrow, now))
+        assertEquals(TimerAction.Arm(later), ScheduleTimer.decide(null, later, now))
+    }
+
+    @Test
+    fun turningTheScheduleOffCancels() {
+        assertEquals(TimerAction.Cancel, ScheduleTimer.decide(later, null, now))
+        assertEquals(TimerAction.Keep, ScheduleTimer.decide(null, null, now))
+    }
 }

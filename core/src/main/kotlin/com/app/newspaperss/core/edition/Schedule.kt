@@ -1,6 +1,7 @@
 package com.app.newspaperss.core.edition
 
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalTime
 import java.time.ZonedDateTime
 
@@ -24,5 +25,28 @@ data class Schedule(
             if (candidate.isAfter(now)) return candidate
         }
         return null
+    }
+}
+
+sealed interface TimerAction {
+    data object Keep : TimerAction
+    data object Cancel : TimerAction
+    data class Arm(val at: Instant) : TimerAction
+}
+
+object ScheduleTimer {
+    /**
+     * What to do with the edition timer, given the one already pending.
+     *
+     * A pending time that has passed is kept: its timer is about to run, or
+     * Doze is holding it, and replacing it with tomorrow's would skip today's
+     * edition. An unchanged target is kept so that unrelated settings edits
+     * don't restart the timer.
+     */
+    fun decide(pending: Instant?, target: Instant?, now: Instant): TimerAction = when {
+        target == null -> if (pending == null) TimerAction.Keep else TimerAction.Cancel
+        pending != null && !pending.isAfter(now) -> TimerAction.Keep
+        pending == target -> TimerAction.Keep
+        else -> TimerAction.Arm(target)
     }
 }

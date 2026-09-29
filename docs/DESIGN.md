@@ -128,15 +128,16 @@ server when an edition is delivered.
 |---|---|---|
 | Kindle | **Share to the Kindle app** (the Send to Kindle share target), one tap from the "Your edition is ready" notification | No, one tap |
 | Kindle (advanced) | Email to your @kindle.com address via SMTP app password | Yes |
-| Kobo | **Save to a folder** through the Android file picker (SAF). Pick a Dropbox or Google Drive folder that the Kobo syncs | Yes |
+| Kobo | **Share to the Dropbox app**, saving into the folder the Kobo syncs (`Apps/Rakuten Kobo`). Later: a direct Dropbox connection (OAuth with PKCE, no server) | One tap; yes later |
 | PocketBook | Email to `@pbsync.com`: share with an email intent, or SMTP | One tap / yes |
 | KOReader | Save to a folder (Syncthing or similar) | Yes |
 | Boox / Android e-readers | Open in the device's reader app (`ACTION_VIEW`) or read in the app | Yes |
 | Anything else | Share sheet | No |
 
-"Save to a folder" through SAF covers every cloud-folder route without the
-app handling any OAuth: Google Drive, Dropbox and Syncthing-Fork all
-provide document providers.
+"Save to a folder" uses the system folder picker (SAF). It works for local
+folders and anything that syncs them (Syncthing), but Google Drive's and
+Dropbox's providers don't offer whole folders to other apps, so cloud
+folders need either a share per edition or a direct API connection.
 
 Share-sheet delivery can't tell whether the send worked, so the edition
 stays "Ready" until the user taps **Sent it** (or opens the edition again

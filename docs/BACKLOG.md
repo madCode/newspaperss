@@ -6,11 +6,12 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ## Next
 
-### M4 Delivery and schedule
-- [ ] Settings screen: edition size (minutes), per-source cap, ordering, schedule (DataStore)
-- [ ] Scheduled builds (daily at a time, chosen days); "edition ready" notification with Send action
-- [ ] SAF folder delivery (Kobo via Dropbox/Drive, KOReader via Syncthing), marks delivered automatically
-- [ ] Failure notification (loud) vs success (quiet)
+### M4 leftovers
+- [ ] Re-arm the edition timer on ACTION_TIMEZONE_CHANGED / ACTION_TIME_CHANGED
+- [ ] Expedite scheduled builds (needs getForegroundInfo for API < 31)
+- [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
+- [ ] Verify folder delivery + chooser-from-notification on a real device
+- [ ] Tests for EditionScheduler with work-testing's TestDriver
 
 ### M3 leftovers
 - [ ] Images: download, downscale to 1200px JPEG via BitmapFactory, per-article and total size budget
@@ -39,4 +40,5 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 - [x] M1 Skeleton: Gradle (AGP 9.1, Kotlin 2.3, Compose), `:core` + `:app`, CI, design doc (#1)
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)
+- [x] M4 Settings, scheduled editions (timer chain that never skips an overdue edition), folder delivery, notifications (#2)
 - [x] M3 The edition: planner, extraction, EPUB writer, EditionBuilder, Today screen, share/open (#1)

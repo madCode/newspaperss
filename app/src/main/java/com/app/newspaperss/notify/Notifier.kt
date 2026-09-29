@@ -41,6 +41,8 @@ class Notifier(private val context: Context) : EditionNotifier {
         )
     }
 
+    fun enabled(): Boolean = manager.areNotificationsEnabled()
+
     override fun editionReady(edition: EditionEntity, file: File) {
         val send = PendingIntent.getActivity(
             context, edition.id.toInt(), EditionIntents.share(context, file, edition.title),
@@ -66,9 +68,10 @@ class Notifier(private val context: Context) : EditionNotifier {
             .setContentText(reason)
             .setStyle(NotificationCompat.BigTextStyle().bigText(reason))
             .setPriority(NotificationCompat.PRIORITY_HIGH),
+        id = PROBLEM_ID,
     )
 
-    private fun notify(builder: NotificationCompat.Builder) {
+    private fun notify(builder: NotificationCompat.Builder, id: Int = EDITION_ID) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
             android.os.Build.VERSION.SDK_INT >= 33
         ) return
@@ -76,8 +79,9 @@ class Notifier(private val context: Context) : EditionNotifier {
             context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        // One notification slot: a newer edition's news replaces the last one's.
-        manager.notify(NOTIFICATION_ID, builder.setSmallIcon(R.drawable.ic_notification).setContentIntent(open).setAutoCancel(true).build())
+        // One slot per kind: a newer edition's news replaces the last one's, but
+        // never an unread problem.
+        manager.notify(id, builder.setSmallIcon(R.drawable.ic_notification).setContentIntent(open).setAutoCancel(true).build())
     }
 
     private fun summary(edition: EditionEntity): String {
@@ -88,6 +92,7 @@ class Notifier(private val context: Context) : EditionNotifier {
     companion object {
         const val EDITIONS = "editions"
         const val PROBLEMS = "problems"
-        private const val NOTIFICATION_ID = 1
+        private const val EDITION_ID = 1
+        private const val PROBLEM_ID = 2
     }
 }
