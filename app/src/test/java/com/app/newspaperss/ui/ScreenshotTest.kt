@@ -21,6 +21,7 @@ import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.FakeHttp
@@ -138,7 +139,7 @@ class ScreenshotTest {
             )
             edition to articles.last()
         }
-        val vm = EditionDetailViewModel(EditionRepository(db, tmp.newFolder().apply { resolve("e.epub").writeText("epub") }), id).apply { toggle(lastArticle) }
+        val vm = EditionDetailViewModel(EditionRepository(db, tmp.newFolder().apply { resolve("e.epub").writeText("epub") }), id, EditionNotes(db, tmp.newFolder())).apply { toggle(lastArticle) }
         shoot("05b-edition-detail", ready = { vm.detail.value?.contents?.isNotEmpty() == true }) { EditionDetailScreen(vm, onBack = {}) }
     }
 

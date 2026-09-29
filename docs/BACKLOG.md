@@ -18,21 +18,21 @@ with tests, and moves it to Done with its PR. Milestones are from
 ### M5 leftovers
 
 ### M6 leftovers
-- [ ] Curated list sources (a scraper per site, like rss-to-e-reader's Arts & Letters Daily queue) with keep-newest-N
 
 ### M7 Polish
 - [ ] Source health view; remove-and-re-add shouldn't re-deliver (soft delete sources)
 
 ### M8 Advanced
 - [ ] tt-rss: pick a category instead of all unread; a setting to leave articles unread on the server (DESIGN §5 calls it an option)
-- [ ] SMTP delivery; notes export
+- [ ] SMTP delivery
 
 ### Tech debt
-- [ ] Parser tests run on kxml2, the app ships Android's KXmlParser: add a Robolectric smoke test through the platform parser
-- [ ] Charset sniffing for HTML pages without a header charset
 
 ## Done
 
+- [x] Tech debt: feed parser smoke-tested on Android's own XmlPullParser; HTML meta-charset and byte-order-mark sniffing
+- [x] Curated list sources: a scraper per site (Arts & Letters Daily first), each list its own source, keeping its newest 12 unread links; added from the Add a source dialog
+- [x] Notes export: a Markdown notes file per edition (details, citation, reflection prompts) from Edition detail, and optionally saved beside each edition with folder delivery
 - [x] App shell: splash until settings load, onboarding survives process death, timer re-armed on time-zone change, launch test
 - [x] Auto-tune each source's ContentMode from its articles (three in a row), a manual choice that's never overridden, and per-source full-text health on the Sources screen
 - [x] Import Pocket (HTML, CSV) and Instapaper (CSV) exports into the reading list; saved links without a title get the page's title in the background

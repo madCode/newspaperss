@@ -8,23 +8,27 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 fun interface FolderWriter {
-    /** Returns null on success, else a reason fit to show the reader. */
-    suspend fun deliver(file: File, treeUri: String, title: String): String?
+    /**
+     * Saves [file] into the folder as [fileName].
+     *
+     * @return null on success, else a reason fit to show the reader.
+     */
+    suspend fun deliver(file: File, treeUri: String, fileName: String, mime: String): String?
 }
 
-/** Saves editions into a folder the reader picked through the system file picker. */
+/** Saves editions (and their notes) into a folder the reader picked through the system file picker. */
 class FolderDelivery(private val resolver: ContentResolver) : FolderWriter {
     // IO: a cloud provider's createDocument and write can block on the network.
-    override suspend fun deliver(file: File, treeUri: String, title: String): String? = withContext(Dispatchers.IO) {
-        write(file, treeUri, title)
+    override suspend fun deliver(file: File, treeUri: String, fileName: String, mime: String): String? = withContext(Dispatchers.IO) {
+        write(file, treeUri, fileName, mime)
     }
 
-    private fun write(file: File, treeUri: String, title: String): String? {
+    private fun write(file: File, treeUri: String, fileName: String, mime: String): String? {
         var doc: Uri? = null
         return try {
             val tree = Uri.parse(treeUri)
             val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-            doc = DocumentsContract.createDocument(resolver, parent, EditionIntents.EPUB_MIME, fileName(title))
+            doc = DocumentsContract.createDocument(resolver, parent, mime, fileName)
                 ?: throw IllegalStateException("the folder refused a new file")
             resolver.openOutputStream(doc, "w")?.use { out -> file.inputStream().use { it.copyTo(out) } }
                 ?: throw IllegalStateException("couldn't write the file")
@@ -52,7 +56,7 @@ class FolderDelivery(private val resolver: ContentResolver) : FolderWriter {
         }
 
         /** A file name that's valid on every provider (Drive, Dropbox, SD cards). */
-        fun fileName(title: String): String =
-            title.replace(Regex("[\\\\/:*?\"<>|]"), "-").trim().take(120) + ".epub"
+        fun fileName(title: String, suffix: String = ".epub"): String =
+            title.replace(Regex("[\\\\/:*?\"<>|]"), "-").trim().take(120) + suffix
     }
 }

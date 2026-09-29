@@ -42,6 +42,28 @@ class OkHttpHttpClientTest {
     }
 
     @Test
+    fun anHtmlPagesMetaCharsetIsUsedWhenTheHeaderHasNone() {
+        val page = "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=windows-1252\"></head><body>caf\u00e9 \u2014 na\u00efve</body></html>"
+        val decoded = OkHttpHttpClient.decode(page.toByteArray(charset("windows-1252")), null)
+        assertTrue(decoded.contains("caf\u00e9 \u2014 na\u00efve"))
+        val html5 = "<!doctype html><meta charset=iso-8859-1><p>\u00e9t\u00e9</p>"
+        assertTrue(OkHttpHttpClient.decode(html5.toByteArray(Charsets.ISO_8859_1), null).contains("\u00e9t\u00e9"))
+    }
+
+    @Test
+    fun aPageLabelledLatin1IsReadAsWindows1252LikeBrowsersDo() {
+        val page = "<meta charset=\"iso-8859-1\"><p>\u201cQuoted\u201d \u2014 caf\u00e9</p>"
+        val decoded = OkHttpHttpClient.decode(page.toByteArray(charset("windows-1252")), null)
+        assertTrue(decoded.contains("\u201cQuoted\u201d \u2014 caf\u00e9"))
+    }
+
+    @Test
+    fun aByteOrderMarkMeansUtf8() {
+        val bytes = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + "<meta charset=iso-8859-1>\u00e9".toByteArray(Charsets.UTF_8)
+        assertTrue(OkHttpHttpClient.decode(bytes, null).endsWith("\u00e9"))
+    }
+
+    @Test
     fun headerCharsetWins() {
         val bytes = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\u00e9".toByteArray(Charsets.UTF_8)
         assertTrue(OkHttpHttpClient.decode(bytes, Charsets.UTF_8).endsWith("\u00e9"))

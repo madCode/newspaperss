@@ -58,6 +58,7 @@ import java.time.temporal.ChronoUnit
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.core.lists.CuratedList
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import androidx.compose.foundation.selection.selectable
@@ -141,7 +142,8 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
             }
         }
     }
-    AddSourceDialog(add, viewModel)
+    val curatedLists by viewModel.curatedLists.collectAsState()
+    AddSourceDialog(add, curatedLists, viewModel)
     val ttrssForm by viewModel.ttrssForm.collectAsState()
     ttrssForm?.let { TtrssDialog(it, viewModel) }
 }
@@ -335,7 +337,7 @@ internal fun fullTextLine(source: SourceEntity): String? {
 }
 
 @Composable
-private fun AddSourceDialog(state: AddState, viewModel: SourcesViewModel) {
+private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, viewModel: SourcesViewModel) {
     if (state == AddState.Closed) return
     AlertDialog(
         onDismissRequest = viewModel::closeAdd,
@@ -355,6 +357,7 @@ private fun AddSourceDialog(state: AddState, viewModel: SourcesViewModel) {
                         keyboardActions = KeyboardActions(onGo = { viewModel.find() }),
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (curatedLists.isNotEmpty()) CuratedListChoices(curatedLists, viewModel::addList)
                 }
                 is AddState.Searching -> Text("Checking ${state.input}…")
                 is AddState.Choosing -> Column {
@@ -376,6 +379,18 @@ private fun AddSourceDialog(state: AddState, viewModel: SourcesViewModel) {
         },
         dismissButton = { TextButton(onClick = viewModel::closeAdd) { Text("Cancel") } },
     )
+}
+
+/** Sites that aren't feeds but pick a few links a day; one tap adds one. */
+@Composable
+private fun CuratedListChoices(lists: List<CuratedList>, onAdd: (CuratedList) -> Unit) {
+    Text("Curated lists", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp))
+    lists.forEach { list ->
+        Column(Modifier.fillMaxWidth().clickable(onClickLabel = "Add ${list.title}") { onAdd(list) }.padding(vertical = 8.dp)) {
+            Text(list.title)
+            Text(list.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 /** How recently a site published, so a quiet or dead one stands out without counting what's unread. */

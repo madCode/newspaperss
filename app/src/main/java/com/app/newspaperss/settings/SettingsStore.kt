@@ -48,6 +48,8 @@ data class Settings(
     /** A persisted SAF tree URI, for [DeliveryMethod.FOLDER]. */
     val folderUri: String? = null,
     val folderName: String? = null,
+    /** With [DeliveryMethod.FOLDER], also save each edition's Markdown reading notes beside it. */
+    val notesWithEdition: Boolean = false,
 )
 
 // A corrupt settings file resets to defaults rather than crashing every launch.
@@ -72,6 +74,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val delivery = stringPreferencesKey("delivery_method")
         val folderUri = stringPreferencesKey("delivery_folder_uri")
         val folderName = stringPreferencesKey("delivery_folder_name")
+        val notesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
 
     val settings: Flow<Settings> = store.data.map(::read)
@@ -93,6 +96,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             prefs[Keys.delivery] = s.delivery.name
             if (s.folderUri != null) prefs[Keys.folderUri] = s.folderUri else prefs.remove(Keys.folderUri)
             if (s.folderName != null) prefs[Keys.folderName] = s.folderName else prefs.remove(Keys.folderName)
+            prefs[Keys.notesWithEdition] = s.notesWithEdition
         }
     }
 
@@ -115,6 +119,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             delivery = p[Keys.delivery]?.let { runCatching { DeliveryMethod.valueOf(it) }.getOrNull() } ?: d.delivery,
             folderUri = p[Keys.folderUri],
             folderName = p[Keys.folderName],
+            notesWithEdition = p[Keys.notesWithEdition] ?: d.notesWithEdition,
         )
     }
 }

@@ -121,6 +121,17 @@ interface ArticleDao {
     )
     suspend fun expireOlderThan(before: Instant): Int
 
+    /**
+     * Expires all but the newest [keep] unpicked articles of a source, so a list that grows
+     * faster than it's read stays bounded. Brought-back articles are the reader's and stay.
+     */
+    @Query(
+        """UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0
+           AND id NOT IN (SELECT id FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0
+                          ORDER BY discoveredAt DESC, id DESC LIMIT :keep)""",
+    )
+    suspend fun keepNewest(sourceId: Long, keep: Int): Int
+
     @Query(
         """SELECT articles.* FROM articles
            JOIN edition_articles ON edition_articles.articleId = articles.id
@@ -134,6 +145,15 @@ data class EditionContent(
     @Embedded val entry: EditionArticleEntity,
     /** The article's current state; null once its source has been removed. */
     val state: ArticleState?,
+)
+
+/** An edition article with what its notes need; the article's own fields are null once its source is removed. */
+data class NotesRow(
+    val title: String,
+    val sourceTitle: String,
+    val url: String?,
+    val author: String?,
+    val published: Instant?,
 )
 
 @Dao
@@ -174,6 +194,13 @@ interface EditionDao {
            WHERE editionId = :editionId ORDER BY position""",
     )
     fun observeContents(editionId: Long): Flow<List<EditionContent>>
+
+    @Query(
+        """SELECT edition_articles.title, edition_articles.sourceTitle, articles.url, articles.author, articles.published
+           FROM edition_articles LEFT JOIN articles ON articles.id = edition_articles.articleId
+           WHERE editionId = :editionId ORDER BY position""",
+    )
+    suspend fun notesRows(editionId: Long): List<NotesRow>
 
     @Query("SELECT articleId FROM edition_articles WHERE editionId = :editionId AND articleId IS NOT NULL ORDER BY position")
     suspend fun articleIds(editionId: Long): List<Long>

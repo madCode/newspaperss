@@ -68,6 +68,12 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
             Toast.makeText(context, "No reading app on this phone can open the edition. Try Send instead.", Toast.LENGTH_LONG).show()
         }
     }
+    val notesFile by viewModel.notesFile.collectAsState()
+    LaunchedEffect(notesFile) {
+        val file = notesFile ?: return@LaunchedEffect
+        context.startActivity(EditionIntents.shareNotes(context, file, detail?.edition?.title ?: file.nameWithoutExtension))
+        viewModel.notesShared()
+    }
     LaunchedEffect(message) {
         message?.let {
             snackbar.showSnackbar(it)
@@ -80,6 +86,11 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
             TopAppBar(
                 title = { Text("Edition") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+                actions = {
+                    if (detail?.contents?.isNotEmpty() == true) {
+                        TextButton(onClick = viewModel::writeNotes) { Text("Notes") }
+                    }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

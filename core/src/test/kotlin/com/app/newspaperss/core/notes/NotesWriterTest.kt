@@ -1,0 +1,127 @@
+package com.app.newspaperss.core.notes
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.LocalDate
+
+class NotesWriterTest {
+    private val prompts = """
+        ### Reflection
+
+        **What's the main claim?**
+
+        **What evidence supports it?**
+
+        **What do I agree or disagree with?**
+
+        **How does this connect to other things I've read?**
+
+        **What do I want to remember in six months?**
+
+        ### Notes and quotes
+    """.trimIndent()
+
+    private fun edition(vararg articles: NotesArticle) =
+        NotesEdition("Tuesday Morning Edition", LocalDate.of(2026, 9, 29), articles.toList())
+
+    @Test
+    fun anEditionGetsAHeaderAndOneSectionPerArticleInOrder() {
+        val notes = NotesWriter.write(
+            edition(
+                NotesArticle("The quiet city", "Example News", "https://example.com/quiet", "Jane Doe", LocalDate.of(2026, 9, 28)),
+                NotesArticle("Why rivers bend?", "Field Notes", "https://example.org/rivers", "A. Writer", LocalDate.of(2026, 9, 27)),
+            ),
+        )
+
+        assertEquals(
+            """
+            |# Tuesday Morning Edition
+            |
+            |Date: 2026-09-29
+            |Articles: 2
+            |
+            |## The quiet city
+            |
+            |- Source: Example News
+            |- Author: Jane Doe
+            |- Published: 2026-09-28
+            |- Link: https://example.com/quiet
+            |- Read in: Tuesday Morning Edition, 2026-09-29
+            |- Citation: Jane Doe. "The quiet city." *Example News*, 2026-09-28. https://example.com/quiet
+            |
+            |$prompts
+            |
+            |## Why rivers bend?
+            |
+            |- Source: Field Notes
+            |- Author: A. Writer
+            |- Published: 2026-09-27
+            |- Link: https://example.org/rivers
+            |- Read in: Tuesday Morning Edition, 2026-09-29
+            |- Citation: A. Writer. "Why rivers bend?" *Field Notes*, 2026-09-27. https://example.org/rivers
+            |
+            |$prompts
+            |
+            """.trimMargin(),
+            notes,
+        )
+    }
+
+    @Test
+    fun missingDetailsAreLeftOutRatherThanLeftBlank() {
+        val notes = NotesWriter.write(edition(NotesArticle("A story", "Blog", url = null, author = " ", published = null)))
+
+        assertEquals(
+            """
+            |# Tuesday Morning Edition
+            |
+            |Date: 2026-09-29
+            |Articles: 1
+            |
+            |## A story
+            |
+            |- Source: Blog
+            |- Read in: Tuesday Morning Edition, 2026-09-29
+            |- Citation: "A story." *Blog*.
+            |
+            |$prompts
+            |
+            """.trimMargin(),
+            notes,
+        )
+    }
+
+    @Test
+    fun markdownInTitlesStaysLiteralAndOnOneLine() {
+        val notes = NotesWriter.write(
+            NotesEdition(
+                "#1 [Weekend] *Edition*",
+                LocalDate.of(2026, 9, 29),
+                listOf(NotesArticle("C# tips:\n  [draft] *new*_ish_ `code` <b> | $5 ~ok~", "The \\ Times", "https://example.com/a", "Ann <ann@example.com>")),
+            ),
+        )
+
+        val lines = notes.lines()
+        assertEquals("# \\#1 \\[Weekend\\] \\*Edition\\*", lines[0])
+        assertTrue(
+            "## C\\# tips: \\[draft\\] \\*new\\*\\_ish\\_ \\`code\\` \\<b\\> \\| \\$5 \\~ok\\~" in lines,
+        )
+        assertTrue("- Source: The \\\\ Times" in lines)
+        assertTrue("- Author: Ann \\<ann@example.com\\>" in lines)
+        assertTrue("- Read in: \\#1 \\[Weekend\\] \\*Edition\\*, 2026-09-29" in lines)
+    }
+
+    @Test
+    fun anEntityInATitleIsntRenderedAsTheCharacter() {
+        val notes = NotesWriter.write(edition(NotesArticle("Using &copy; in HTML", "Blog", "https://example.com/a")))
+        assertTrue(notes.contains("## Using \\&copy; in HTML"))
+    }
+
+    @Test
+    fun aBlankTitleStillMakesAHeading() {
+        val notes = NotesWriter.write(edition(NotesArticle(" \n ", "Blog", "https://example.com/a")))
+
+        assertTrue("## Untitled" in notes.lines())
+    }
+}

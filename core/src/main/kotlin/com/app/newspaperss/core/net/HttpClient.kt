@@ -99,16 +99,36 @@ class OkHttpHttpClient(
 
         private val xmlEncoding = Regex("""^\s*<\?xml[^>]*encoding=["']([A-Za-z0-9._-]+)["']""")
 
+        // <meta charset="…"> or <meta http-equiv="Content-Type" content="…; charset=…">.
+        private val htmlCharset = Regex("""<meta[^>]+charset\s*=\s*["']?([A-Za-z0-9._-]+)""", RegexOption.IGNORE_CASE)
+
         /**
          * The header's charset, else the XML prolog's (feeds served as bare
-         * text/xml often declare ISO-8859-1 or windows-1252 only there), else UTF-8.
+         * text/xml often declare ISO-8859-1 or windows-1252 only there), else
+         * an HTML page's meta charset, else UTF-8. A byte-order mark wins over
+         * everything but the header.
          */
         internal fun decode(bytes: ByteArray, headerCharset: Charset?): String {
             if (headerCharset != null) return String(bytes, headerCharset)
-            val head = String(bytes, 0, minOf(bytes.size, 256), Charsets.ISO_8859_1)
-            val declared = xmlEncoding.find(head)?.groupValues?.get(1)
-            val charset = declared?.let { runCatching { Charset.forName(it) }.getOrNull() } ?: Charsets.UTF_8
+            if (bytes.size >= 3 && bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()) {
+                return String(bytes, Charsets.UTF_8).removePrefix("\uFEFF")
+            }
+            // The meta tag is required to be in the first 1024 bytes.
+            val head = String(bytes, 0, minOf(bytes.size, 1024), Charsets.ISO_8859_1)
+            val declared = xmlEncoding.find(head)?.groupValues?.get(1) ?: htmlCharset.find(head)?.groupValues?.get(1)
+            val charset = declared?.let { runCatching { Charset.forName(it) }.getOrNull() }?.let(::browserEquivalent) ?: Charsets.UTF_8
             return String(bytes, charset).removePrefix("\uFEFF")
+        }
+
+        /**
+         * What browsers actually use for a declared charset (the WHATWG encoding rules): pages
+         * labelled Latin-1 or ASCII are really windows-1252, whose curly quotes and dashes Latin-1
+         * decodes as control characters; a UTF-16 label on bytes read this way can only be wrong.
+         */
+        private fun browserEquivalent(declared: Charset): Charset = when (declared) {
+            Charsets.ISO_8859_1, Charsets.US_ASCII -> Charset.forName("windows-1252")
+            Charsets.UTF_16, Charsets.UTF_16BE, Charsets.UTF_16LE -> Charsets.UTF_8
+            else -> declared
         }
 
         // A browser-like agent: some sites refuse unknown clients outright.

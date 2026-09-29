@@ -137,7 +137,7 @@ private fun App(container: AppContainer) {
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { EditionDetailViewModel(container.editions, id) }
+                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes) }
                 EditionDetailScreen(
                     vm,
                     onBack = { nav.navigateUp() },
