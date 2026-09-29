@@ -8,6 +8,7 @@ import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.delivery.EditionIntents
 import com.app.newspaperss.notify.EditionNotifier
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.SettingsStore
@@ -41,13 +42,14 @@ class EditionRunTest {
         override fun editionDelivered(edition: EditionEntity, where: String) { notices += "delivered to $where" }
         override fun problem(title: String, reason: String) { notices += "problem: $reason" }
     }
-    private var folderError: String? = null
+    private val folderErrors = mutableMapOf<String, String>()
     private val saved = mutableListOf<String>()
+    private val notes by lazy { EditionNotes(db, tmp.newFolder("notes")) }
     private val run by lazy {
         val content = ArticleContentProvider { a, _, _ -> ArticleContent(a.title, null, "<p>body</p>", 500) }
         EditionRun(
             settings, FeedSync(db, http), EditionBuilder(db, content, editions.editionsDir), editions,
-            { file, uri, title -> saved += "$uri/$title:${file.length() > 0}"; folderError }, notifier,
+            { file, uri, name, mime -> saved += "$uri/$name ($mime):${file.length() > 0}"; folderErrors[mime] }, notifier, notes,
         )
     }
 
@@ -66,7 +68,7 @@ class EditionRunTest {
         val result = run.run(scheduled = true)
 
         assertEquals(EditionStatus.DELIVERED, status(result))
-        assertEquals(listOf("content://tree/${db.editions().byId((result as BuildResult.Built).editionId)!!.title}:true"), saved)
+        assertEquals(listOf("content://tree/${db.editions().byId((result as BuildResult.Built).editionId)!!.title}.epub (application/epub+zip):true"), saved)
         assertEquals(listOf("delivered to Kobo"), notices)
         assertTrue(db.articles().candidates().isEmpty())
     }
@@ -75,12 +77,65 @@ class EditionRunTest {
     fun aFailedFolderSaveLeavesTheEditionReadyAndSaysWhy() = runTest {
         oneSource()
         settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree") }
-        folderError = "no access"
+        folderErrors[EditionIntents.EPUB_MIME] = "no access"
 
         val result = run.run(scheduled = false)
 
         assertEquals(EditionStatus.READY, status(result))
         assertEquals(listOf("problem: no access"), notices)
+    }
+
+    @Test
+    fun notesAreSavedBesideTheEditionWhenAskedFor() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Kobo", notesWithEdition = true) }
+
+        val result = run.run(scheduled = true)
+
+        val title = db.editions().byId((result as BuildResult.Built).editionId)!!.title
+        assertEquals(
+            listOf("content://tree/$title.epub (application/epub+zip):true", "content://tree/$title notes.md (text/markdown):true"),
+            saved,
+        )
+        assertTrue(File(notes.notesDir, "$title notes.md").readText().contains("## One"))
+        assertEquals(listOf("delivered to Kobo"), notices)
+    }
+
+    @Test
+    fun notesThatCantBeSavedDontUndoTheDelivery() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Kobo", notesWithEdition = true) }
+        folderErrors[EditionNotes.MIME] = "folder full"
+
+        val result = run.run(scheduled = true)
+
+        assertEquals(EditionStatus.DELIVERED, status(result))
+        assertEquals(listOf("delivered to Kobo", "problem: folder full"), notices)
+    }
+
+    @Test
+    fun notesThatCantBeWrittenLocallyAreReportedNotThrown() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Kobo", notesWithEdition = true) }
+        notes.notesDir.delete()
+        notes.notesDir.writeText("a file where the folder should be")
+
+        val result = run.run(scheduled = true)
+
+        assertEquals(EditionStatus.DELIVERED, status(result))
+        assertEquals("delivered to Kobo", notices[0])
+        assertTrue(notices[1].startsWith("problem: Couldn't write the notes"))
+    }
+
+    @Test
+    fun notesStayOutOfTheFolderUnlessAskedFor() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree") }
+
+        run.run(scheduled = true)
+
+        assertEquals(1, saved.size)
+        assertTrue(saved.single().endsWith(".epub (application/epub+zip):true"))
     }
 
     @Test
@@ -100,7 +155,7 @@ class EditionRunTest {
         SourceRepository(db).addFeed("https://example.com/feed", "Blog")
         http.page("https://example.com/feed", rss("Blog", "1" to "One"))
         val failing = EditionRun(
-            settings, FeedSync(db, http), EditionBuilder(db, { _, _, _ -> null }, editions.editionsDir), editions, { _, _, _ -> null }, notifier,
+            settings, FeedSync(db, http), EditionBuilder(db, { _, _, _ -> null }, editions.editionsDir), editions, { _, _, _, _ -> null }, notifier, notes,
         )
         failing.run(scheduled = true)
         assertEquals(listOf("problem: None of the articles could be read."), notices)

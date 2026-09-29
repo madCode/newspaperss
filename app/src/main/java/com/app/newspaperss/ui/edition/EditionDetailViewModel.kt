@@ -7,6 +7,7 @@ import com.app.newspaperss.data.EditionContent
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.edition.EditionNotes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.IOException
 
 data class EditionDetail(
     /** Null if the edition doesn't exist (any more). */
@@ -35,7 +37,11 @@ data class EditionDetail(
         edition?.status == EditionStatus.DELIVERED && content.state == ArticleState.NEW
 }
 
-class EditionDetailViewModel(private val editions: EditionRepository, private val id: Long) : ViewModel() {
+class EditionDetailViewModel(
+    private val editions: EditionRepository,
+    private val id: Long,
+    private val notes: EditionNotes,
+) : ViewModel() {
     val detail: StateFlow<EditionDetail?> = combine(editions.observe(id), editions.observeContents(id)) { edition, contents ->
         EditionDetail(edition, contents, edition?.let(editions::fileOf))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -48,6 +54,23 @@ class EditionDetailViewModel(private val editions: EditionRepository, private va
     val message: StateFlow<String?> = _message.asStateFlow()
 
     fun dismissMessage() { _message.value = null }
+
+    private val _notesFile = MutableStateFlow<File?>(null)
+    /** A notes file waiting for the share sheet; the screen calls [notesShared] once it opens it. */
+    val notesFile: StateFlow<File?> = _notesFile.asStateFlow()
+
+    fun writeNotes() {
+        viewModelScope.launch {
+            val file = try {
+                notes.write(id)
+            } catch (_: IOException) {
+                null
+            }
+            if (file != null) _notesFile.value = file else _message.value = "Couldn't make notes for this edition"
+        }
+    }
+
+    fun notesShared() { _notesFile.value = null }
 
     fun toggle(articleId: Long) {
         _selected.value = _selected.value.let { if (articleId in it) it - articleId else it + articleId }

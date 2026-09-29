@@ -42,7 +42,7 @@ class FolderDeliveryTest {
     fun theEditionIsCopiedIntoTheFolderOffTheMainThread() = runTest {
         val folder = Folder.install(tmp.newFolder("provider"))
 
-        val error = FolderDelivery(app.contentResolver).deliver(book, Folder.TREE, "Tuesday Morning Edition")
+        val error = FolderDelivery(app.contentResolver).deliver(book, Folder.TREE, "Tuesday Morning Edition.epub", EditionIntents.EPUB_MIME)
 
         assertNull(error)
         assertEquals(listOf(1, 2, 3), File(folder.dir, "Tuesday Morning Edition.epub").readBytes().map { it.toInt() })
@@ -53,7 +53,7 @@ class FolderDeliveryTest {
     fun aFolderWeLostAccessToAsksTheReaderToPickItAgain() = runTest {
         Folder.install(tmp.newFolder("provider")).revoked = true
 
-        val error = FolderDelivery(app.contentResolver).deliver(book, Folder.TREE, "Tuesday Morning Edition")
+        val error = FolderDelivery(app.contentResolver).deliver(book, Folder.TREE, "Tuesday Morning Edition.epub", EditionIntents.EPUB_MIME)
 
         assertEquals("newspaperss no longer has access to that folder. Pick it again in Settings.", error)
     }

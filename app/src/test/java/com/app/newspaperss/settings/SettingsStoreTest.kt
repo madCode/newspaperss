@@ -26,6 +26,7 @@ class SettingsStoreTest {
                 delivery = DeliveryMethod.FOLDER,
                 folderUri = "content://tree/x",
                 folderName = "Books",
+                notesWithEdition = true,
             )
         }
         val s = store.current()
@@ -39,6 +40,7 @@ class SettingsStoreTest {
         assertEquals(DeliveryMethod.FOLDER, s.delivery)
         assertEquals("content://tree/x", s.folderUri)
         assertEquals("Books", s.folderName)
+        assertEquals(true, s.notesWithEdition)
     }
 
     @Test
