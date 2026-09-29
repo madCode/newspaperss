@@ -17,6 +17,7 @@ import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.data.SourceKind
 import kotlinx.coroutines.runBlocking
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.SourceRepository
@@ -146,5 +147,21 @@ class SourcesScreenTest {
         val saved = runBlocking { db.sources().byId(id)!! }
         assertEquals(ContentMode.PAGE, saved.contentMode)
         assertTrue(saved.contentModeChosen)
+    }
+
+    @Test
+    fun aCuratedListIsAddedWithATapAndIsNotOfferedAgain() {
+        compose.onNodeWithText("Add a source", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Three picks a day from essays and reviews").assertIsDisplayed()
+        compose.onNodeWithText("Arts & Letters Daily").performClick()
+
+        waitFor("Paste a website or feed address.", present = false)
+        waitFor("aldaily.com")
+        assertEquals(1, syncRequests)
+        assertEquals(SourceKind.LIST, runBlocking { db.sources().all().single().kind })
+
+        compose.onNodeWithText("Add a source", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Paste a website or feed address.").assertIsDisplayed()
+        waitFor("Three picks a day", present = false)
     }
 }

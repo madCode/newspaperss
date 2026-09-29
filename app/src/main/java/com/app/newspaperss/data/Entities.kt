@@ -13,6 +13,11 @@ enum class SourceKind {
     READING_LIST,
     /** A Tiny Tiny RSS account: its url is the API endpoint and its articles come from many feeds. */
     TTRSS,
+    /**
+     * A curated list read by a scraper ([com.app.newspaperss.core.lists.CuratedList]): its url is
+     * [com.app.newspaperss.core.lists.CuratedLists.sourceUrl] and its siteUrl the page read.
+     */
+    LIST,
 }
 
 @Entity(tableName = "sources", indices = [Index(value = ["url"], unique = true)])

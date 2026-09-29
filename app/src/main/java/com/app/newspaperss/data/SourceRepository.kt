@@ -6,6 +6,8 @@ import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.extract.FullTextState
 import com.app.newspaperss.core.feed.Opml
 import com.app.newspaperss.core.feed.OpmlFeed
+import com.app.newspaperss.core.lists.CuratedList
+import com.app.newspaperss.core.lists.CuratedLists
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
@@ -34,6 +36,20 @@ class SourceRepository(private val db: AppDatabase) {
         sources.ofKind(SourceKind.TTRSS).filter { it.url != apiUrl }.forEach { sources.delete(it) }
         sources.byUrl(apiUrl)?.id
             ?: sources.insert(SourceEntity(kind = SourceKind.TTRSS, url = apiUrl, title = TTRSS_TITLE, position = sources.nextPosition()))
+    }
+
+    /** Adds the source for a curated list unless it exists; returns its id either way. */
+    suspend fun addList(list: CuratedList): Long {
+        val url = CuratedLists.sourceUrl(list)
+        sources.byUrl(url)?.let { return it.id }
+        val id = sources.insert(
+            SourceEntity(
+                kind = SourceKind.LIST, url = url, title = list.title, siteUrl = list.pageUrl, position = sources.nextPosition(),
+                // A list's links are to pages of all kinds; there's no feed text to weigh against them.
+                contentMode = ContentMode.PAGE,
+            ),
+        )
+        return if (id == -1L) sources.byUrl(url)!!.id else id
     }
 
     suspend fun update(source: SourceEntity) = sources.update(source)

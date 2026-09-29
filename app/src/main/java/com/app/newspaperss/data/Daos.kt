@@ -121,6 +121,17 @@ interface ArticleDao {
     )
     suspend fun expireOlderThan(before: Instant): Int
 
+    /**
+     * Expires all but the newest [keep] unpicked articles of a source, so a list that grows
+     * faster than it's read stays bounded. Brought-back articles are the reader's and stay.
+     */
+    @Query(
+        """UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0
+           AND id NOT IN (SELECT id FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0
+                          ORDER BY discoveredAt DESC, id DESC LIMIT :keep)""",
+    )
+    suspend fun keepNewest(sourceId: Long, keep: Int): Int
+
     @Query(
         """SELECT articles.* FROM articles
            JOIN edition_articles ON edition_articles.articleId = articles.id
