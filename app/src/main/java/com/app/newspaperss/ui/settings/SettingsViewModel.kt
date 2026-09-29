@@ -38,6 +38,7 @@ class SettingsViewModel(
     }
     fun useShare() = update { it.copy(delivery = DeliveryMethod.SHARE) }
     fun useFolder(uri: String, name: String) = update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = uri, folderName = name) }
+    fun setNotesWithEdition(enabled: Boolean) = update { it.copy(notesWithEdition = enabled) }
 
     companion object {
         const val MIN_MINUTES = 5

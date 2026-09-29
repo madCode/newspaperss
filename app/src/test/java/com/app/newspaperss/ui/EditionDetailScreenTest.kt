@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui
 
+import android.app.Application
+import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -11,6 +13,9 @@ import androidx.compose.ui.test.performClick
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.newspaperss.core.notes.NotesArticle
+import com.app.newspaperss.core.notes.NotesEdition
+import com.app.newspaperss.core.notes.NotesWriter
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
@@ -19,6 +24,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.EditionDetailScreen
@@ -34,8 +40,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.File
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 @RunWith(AndroidJUnit4::class)
 // Tall enough that every row of these short editions is composed without scrolling.
@@ -48,6 +58,10 @@ class EditionDetailScreenTest {
         .allowMainThreadQueries().build()
     private val editionsDir by lazy { tmp.newFolder("editions") }
     private val repo by lazy { EditionRepository(db, editionsDir) }
+    // In the app's files dir: the share sheet's FileProvider only serves files from there.
+    private val notes by lazy {
+        EditionNotes(db, File(ApplicationProvider.getApplicationContext<Application>().filesDir, "notes")) { ZoneOffset.UTC }
+    }
 
     @After fun close() = db.close()
 
@@ -74,7 +88,7 @@ class EditionDetailScreenTest {
     }
 
     private fun show(editionId: Long): EditionDetailViewModel {
-        val vm = EditionDetailViewModel(repo, editionId)
+        val vm = EditionDetailViewModel(repo, editionId, notes)
         compose.setContent { EditionDetailScreen(vm, onBack = {}) }
         idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
         return vm
@@ -145,6 +159,52 @@ class EditionDetailScreenTest {
         compose.onNodeWithText("Open").assertIsNotEnabled()
         compose.onNodeWithText("has been deleted", substring = true).assertIsDisplayed()
         compose.onNodeWithText("I've sent it").assertIsEnabled()
+    }
+
+    @Test
+    fun notesCarryEachArticlesDetailsAndOpenTheShareSheet() {
+        val editionId = runBlocking {
+            val source = db.sources().insert(SourceEntity(url = "https://example.com/feed", title = "Example News"))
+            val kept = db.articles().insertIgnoring(
+                ArticleEntity(
+                    sourceId = source, guid = "a", url = "https://example.com/a", title = "Kept", author = "Jane Doe",
+                    published = Instant.parse("2026-09-28T23:30:00Z"), state = ArticleState.DELIVERED,
+                ),
+            )
+            val id = db.editions().insert(
+                EditionEntity(title = "Tuesday Morning Edition", createdAt = Instant.parse("2026-09-29T06:30:00Z"), status = EditionStatus.DELIVERED),
+            )
+            db.editions().insertArticles(
+                listOf(
+                    EditionArticleEntity(editionId = id, articleId = kept, position = 0, title = "Kept", sourceTitle = "Example News", minutes = 4.0),
+                    // Its source was removed: the edition still lists it, but its link and byline are gone.
+                    EditionArticleEntity(editionId = id, articleId = null, position = 1, title = "Orphan", sourceTitle = "Old Blog", minutes = 3.0),
+                ),
+            )
+            id
+        }
+        val vm = show(editionId)
+
+        compose.onNodeWithText("Notes").performClick()
+        idleUntil { File(notes.notesDir, "Tuesday Morning Edition notes.md").exists() }
+        idleUntil { compose.waitForIdle(); vm.notesFile.value == null }
+
+        val expected = NotesWriter.write(
+            NotesEdition(
+                "Tuesday Morning Edition",
+                LocalDate.of(2026, 9, 29),
+                listOf(
+                    NotesArticle("Kept", "Example News", "https://example.com/a", "Jane Doe", LocalDate.of(2026, 9, 28)),
+                    NotesArticle("Orphan", "Old Blog", url = null),
+                ),
+            ),
+        )
+        assertEquals(expected, File(notes.notesDir, "Tuesday Morning Edition notes.md").readText())
+        val chooser = shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity
+        val send = chooser.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)!!
+        assertEquals(Intent.ACTION_SEND, send.action)
+        assertEquals("text/markdown", send.type)
+        assertEquals("Tuesday Morning Edition notes.md", send.getStringExtra(Intent.EXTRA_TITLE))
     }
 
     @Test

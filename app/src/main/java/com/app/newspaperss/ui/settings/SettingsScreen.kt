@@ -184,6 +184,21 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
     )
     if (s.delivery == DeliveryMethod.FOLDER) {
         OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = 48.dp)) { Text("Choose another folder") }
+        Row(
+            Modifier.fillMaxWidth().toggleable(s.notesWithEdition, role = Role.Switch, onValueChange = vm::setNotesWithEdition)
+                .padding(start = 48.dp, top = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Also save notes with each edition", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "A Markdown file for Obsidian, Logseq or any notes app, with each article's details and prompts for your thoughts.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = s.notesWithEdition, onCheckedChange = null)
+        }
     }
 }
 

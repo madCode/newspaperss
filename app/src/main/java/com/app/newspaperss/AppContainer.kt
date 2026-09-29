@@ -19,6 +19,7 @@ import com.app.newspaperss.edition.AndroidImageEncoder
 import com.app.newspaperss.edition.ArticleContentProvider
 import com.app.newspaperss.edition.CoverRenderer
 import com.app.newspaperss.edition.EditionBuilder
+import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.edition.EditionRun
 import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.notify.Notifier
@@ -55,5 +56,6 @@ class AppContainer(
     val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render)
     val settings = SettingsStore(context)
     val notifier = Notifier(context)
-    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, FolderDelivery(context.contentResolver), notifier)
+    val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))
+    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, FolderDelivery(context.contentResolver), notifier, editionNotes)
 }

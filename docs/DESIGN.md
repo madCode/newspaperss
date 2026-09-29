@@ -184,7 +184,9 @@ later and is asked). That keeps the commit-after-delivery rule honest.
   the history of past editions.
 - **Edition detail:** the cover and contents. Tap an article to preview it
   as the e-reader will show it. Actions: *bring back unread*, *send again*,
-  *share EPUB*.
+  *share EPUB*, *notes* (a Markdown file for a notes app: per article its
+  source, author, date, link and a citation, reflection prompts and an
+  empty "Notes and quotes" section).
 - **Sources:** sections, each with its sources. Per source: its last
   articles, health ("full text ✓", "failing for 3 days ✗"), cap override,
   pause. An add button (paste URL / search starter packs / OPML).
@@ -195,8 +197,9 @@ later and is asked). That keeps the commit-after-delivery rule honest.
   compatibility with the library; Pocket and Instapaper exports import
   too, with their archive arriving as already read. A link saved without
   a title gets its page's title in the background.
-- **Settings:** edition profiles (schedule, size, ordering, cap), delivery,
-  reading speed, advanced (tt-rss account, SMTP, notes export), about.
+- **Settings:** edition profiles (schedule, size, ordering, cap), delivery
+  (with folder delivery, optionally the notes file beside each edition),
+  reading speed, advanced (tt-rss account, SMTP), about.
 
 The visual language: a newspaper feel inside the app (serif headlines, a
 masthead with the date), but calm, with no badges or counts.

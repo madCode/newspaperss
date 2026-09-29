@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.edition.Ordering
+import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.TestApp
@@ -58,6 +59,16 @@ class SettingsScreenTest {
         compose.onNodeWithText("Shuffle").performScrollTo().performClick()
         idleUntil { runBlocking { store.current().edition.ordering } == Ordering.SHUFFLE }
         compose.onNodeWithText("Shuffle").assertIsSelected()
+    }
+
+    @Test
+    fun notesWithEachEditionCanBeTurnedOnForFolderDelivery() {
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") } }
+        waitFor("Also save notes with each edition")
+
+        compose.onNodeWithText("Also save notes with each edition").performScrollTo().performClick()
+
+        idleUntil { runBlocking { store.current().notesWithEdition } }
     }
 
     @Test
