@@ -24,7 +24,15 @@ class ReadingListTitles(private val db: AppDatabase, private val http: HttpClien
                 continue
             }
             if (!page.isSuccessful || page.contentType?.contains("html", ignoreCase = true) == false) continue
-            db.articles().setPageWords(id, PageWords.of(page.body, page.finalUrl))
+            // One page the extractor can't handle mustn't fail the batch: the worker's failure
+            // would cancel the batches queued behind it.
+            val measured = try {
+                PageWords.of(page.body, page.finalUrl)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                null
+            }
+            measured?.let { db.articles().setPageWords(id, it) }
             val title = PageTitle.of(page.body, page.finalUrl) ?: continue
             // Checked again in the update: an edition may have taken the article while the page loaded.
             db.articles().setTitleIfUntitled(id, title)

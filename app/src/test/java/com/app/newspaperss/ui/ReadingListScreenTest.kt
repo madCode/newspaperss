@@ -37,7 +37,8 @@ class ReadingListScreenTest {
             val long = app.container.db.articles().allForSource(list.sourceId()).single { it.url.endsWith("long-read") }
             app.container.db.articles().setPageWords(long.id, 2380)
         }
-        compose.setContent { ReadingListScreen(ReadingListViewModel(list), onBack = {}) }
+        val vm = ReadingListViewModel(list)
+        compose.setContent { ReadingListScreen(vm, onBack = {}) }
 
         // Before its title is found, a title made from the address, not the bare domain.
         waitFor("Why tides matter")

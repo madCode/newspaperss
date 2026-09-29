@@ -8,13 +8,19 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** the source page design.
-- **Next:** reading-list titles, reading time and tap-to-open; then a resource-usage audit.
+- **In flight:** reading-list titles, reading time and tap-to-open.
+- **Next:** a resource-usage audit; the first tap on an article; language tagging.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 16: the source page (15:14–)
+### Cycle 17: the reading list (15:17–)
+- **From device testing:** saved links showed only their site, with no reading time, and tapping one did nothing.
+- **Shipped:** every saved link's page is looked up once: its title if it has none, and its length for "site · N min read". Rows open in the browser. Until a title is found, a row shows one made from the address instead of the bare domain.
+- **The first migration:** the length is a new column, so the database goes to version 2 with a migration and a test that validates it against the exported schema. Your installed debug build upgrades in place.
+- **Review caught:** the site shown twice on an untitled row; one page the extractor chokes on would cancel the queued lookups behind it. Both fixed.
+
+### Cycle 16: the source page (15:14–15:17, [#33](https://github.com/madCode/newspaperss/pull/33))
 - **From device testing:** the recent-articles list made you squint, and "Recent articles" didn't stand out; "Article text" didn't say what it set.
 - **Shipped:** "Recent articles · N" as a real heading; a status mark per article in its own column (● waiting, ✓ delivered, ○ not used: shapes, not colours, for e-ink); medium-weight titles; inset dividers; "Article text: Automatic / Feed's text / Full page".
 - **Review caught:** "Site's text" read as the web page (now "Feed's text"); TalkBack read the heading's middle dot aloud; faint dividers would vanish on a Boox's greys.

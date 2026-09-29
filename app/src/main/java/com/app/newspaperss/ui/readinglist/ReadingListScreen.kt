@@ -156,7 +156,8 @@ private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
     }
     val context = LocalContext.current
     val site = listOfNotNull(
-        SourceRepository.hostOf(article.url),
+        // An untitled row's stand-in title already names the site.
+        SourceRepository.hostOf(article.url).takeIf { article.title.isNotBlank() },
         article.pageWords?.takeIf { it > 0 }?.let { "${ReadingTime.format(ReadingTime.minutes(it))} read" },
     ).joinToString(" · ")
     ListItem(
@@ -167,7 +168,7 @@ private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
         headlineContent = { Text(article.title.ifBlank { ArticleExtractor.titleFromUrl(article.url) }, maxLines = 2) },
         supportingContent = {
             Column {
-                Text(site, style = MaterialTheme.typography.bodySmall)
+                if (site.isNotEmpty()) Text(site, style = MaterialTheme.typography.bodySmall)
                 Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
