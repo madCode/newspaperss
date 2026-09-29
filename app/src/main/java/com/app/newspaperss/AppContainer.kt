@@ -34,7 +34,7 @@ class AppContainer(
     context: Context,
     val http: HttpClient = OkHttpHttpClient(),
     val db: AppDatabase = AppDatabase.open(context),
-    content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()),
+    content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), SourceRepository(db)::recordFullText),
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
 ) {

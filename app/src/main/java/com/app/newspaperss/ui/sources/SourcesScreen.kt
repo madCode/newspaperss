@@ -56,6 +56,14 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.data.SourceKind
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.RadioButton
+import androidx.compose.ui.semantics.Role
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +130,12 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
             else -> LazyColumn(contentPadding = PaddingValues(bottom = 96.dp), modifier = Modifier.padding(padding)) {
                 item { ReadingListRow(onOpenReadingList) }
                 items(list, key = { it.source.id }) { row ->
-                    SourceItem(row, onRemove = { viewModel.remove(row.source) }, onTogglePause = { viewModel.togglePaused(row.source) })
+                    SourceItem(
+                        row,
+                        onRemove = { viewModel.remove(row.source) },
+                        onTogglePause = { viewModel.togglePaused(row.source) },
+                        onChooseMode = { viewModel.chooseContentMode(row.source, it) },
+                    )
                     HorizontalDivider()
                 }
             }
@@ -223,9 +236,11 @@ private fun EmptySources(modifier: Modifier) {
 }
 
 @Composable
-private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -> Unit) {
+private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -> Unit, onChooseMode: (ContentMode) -> Unit) {
     var menu by remember { mutableStateOf(false) }
+    var choosingMode by remember { mutableStateOf(false) }
     val s = row.source
+    val fullText = fullTextLine(s)
     val status = when {
         s.paused -> "Paused"
         s.lastError != null -> s.lastError
@@ -243,6 +258,9 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
                     style = MaterialTheme.typography.bodySmall,
                     color = if ((s.lastError != null || s.serverNote != null) && !s.paused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (fullText != null) {
+                    Text(fullText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
         trailingContent = {
@@ -250,11 +268,70 @@ private fun SourceItem(row: SourceRow, onRemove: () -> Unit, onTogglePause: () -
                 IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More for ${s.title}") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text(if (s.paused) "Resume" else "Pause") }, onClick = { menu = false; onTogglePause() })
+                    if (s.kind == SourceKind.FEED) {
+                        DropdownMenuItem(text = { Text("Article text") }, onClick = { menu = false; choosingMode = true })
+                    }
                     DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; onRemove() })
                 }
             }
         },
     )
+    if (choosingMode) {
+        ContentModeDialog(s, onChoose = { choosingMode = false; onChooseMode(it) }, onDismiss = { choosingMode = false })
+    }
+}
+
+@Composable
+private fun ContentModeDialog(source: SourceEntity, onChoose: (ContentMode) -> Unit, onDismiss: () -> Unit) {
+    val current = if (source.contentModeChosen) source.contentMode else ContentMode.AUTO
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Article text") },
+        text = {
+            Column(Modifier.selectableGroup()) {
+                CONTENT_MODE_CHOICES.forEach { (mode, label) ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .selectable(selected = mode == current, role = Role.RadioButton, onClick = { onChoose(mode) })
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = mode == current, onClick = null)
+                        Text(label, modifier = Modifier.padding(start = 12.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+private val CONTENT_MODE_CHOICES = listOf(
+    ContentMode.AUTO to "Automatic",
+    ContentMode.FEED to "Always use the text the site sends",
+    ContentMode.PAGE to "Always fetch the full page",
+)
+
+/** Where a site's article text comes from, once the app knows or the reader has chosen; null while it's still checking. */
+internal fun fullTextLine(source: SourceEntity): String? {
+    if (source.kind != SourceKind.FEED) return null
+    if (source.contentModeChosen) {
+        return when (source.contentMode) {
+            ContentMode.FEED -> "Uses the text the site sends (your choice)"
+            ContentMode.PAGE -> "Always fetches the full page (your choice)"
+            ContentMode.AUTO -> null
+        }
+    }
+    return when (source.contentMode) {
+        ContentMode.AUTO -> null
+        ContentMode.PAGE -> "Full articles"
+        ContentMode.FEED -> when (source.fullTextEvidence) {
+            FullTextEvidence.FEED_SHORT -> "Summaries only"
+            FullTextEvidence.BLOCKED -> "Site blocks fetching: using the summaries it sends"
+            else -> "Full articles"
+        }
+    }
 }
 
 @Composable

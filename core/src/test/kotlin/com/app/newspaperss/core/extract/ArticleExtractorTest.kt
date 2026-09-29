@@ -108,6 +108,7 @@ class ArticleExtractorTest {
             assertTrue(name, article.note!!.startsWith("Couldn't fetch the full article"))
             assertTrue(name, "particular pleasure" in article.html)
             assertFalse(name, "Checking your browser" in article.html)
+            assertEquals("only a refusal or bot check counts as blocked: $name", name in setOf("blocked", "challenge"), article.pageBlocked)
         }
     }
 
@@ -120,6 +121,7 @@ class ArticleExtractorTest {
         assertTrue("error 403" in article.html)
         assertTrue("<a href=\"$url\">" in article.html)
         assertEquals(0, article.wordCount)
+        assertTrue(article.pageBlocked)
     }
 
     @Test

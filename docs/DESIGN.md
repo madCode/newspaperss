@@ -88,8 +88,14 @@ Ported from the library, with the lessons its code and comments record:
 - **Automatic full-text detection per source.** The library's source check:
   if the page has at least 2× the feed's words, the feed is a teaser, so
   fetch pages; if extraction keeps under 0.7× the feed, trust the feed. It
-  runs automatically on the first few articles of a new source instead of
-  asking the user.
+  runs automatically on every article instead of asking the user: a feed
+  item of 300+ words taken as is counts for the feed, and so does a site
+  that turns page requests away (403, bot check). Three articles in a row
+  pointing the same way switch the source to always fetching pages or never
+  fetching them; a mixed source stays automatic. A mode the reader picks
+  from the source's menu is never changed, and picking Automatic starts the
+  check over. The Sources screen shows the outcome: "Full articles",
+  "Summaries only" or "Site blocks fetching".
 - **EPUB that Send to Kindle accepts.**
   - strict XHTML (serialized through jsoup in XML mode);
   - EPUB 3 nav *and* NCX, in the same order;

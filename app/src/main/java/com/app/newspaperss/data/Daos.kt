@@ -8,6 +8,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextEvidence
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
@@ -55,6 +57,12 @@ interface SourceDao {
 
     @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
     suspend fun setServerNote(id: Long, note: String?)
+
+    @Query("UPDATE sources SET contentMode = :mode, fullTextEvidence = :evidence, fullTextStreak = :streak WHERE id = :id")
+    suspend fun setFullText(id: Long, mode: ContentMode, evidence: FullTextEvidence, streak: Int)
+
+    @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen, fullTextEvidence = NULL, fullTextStreak = 0 WHERE id = :id")
+    suspend fun setContentMode(id: Long, mode: ContentMode, chosen: Boolean)
 
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
