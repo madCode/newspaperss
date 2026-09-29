@@ -19,6 +19,7 @@ import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.data.SourceKind
 import android.util.Log
 import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
@@ -94,9 +95,15 @@ class EditionBuilder(
     ): BuildResult {
         val sourcesById = sources.associateBy { it.id }
         val byId = articles.associateBy { it.id }
+        // An aggregator's publications take turns and are capped one by one, like feeds of their
+        // own, and together they take the aggregator's place in the reader's source order.
+        val publicationOrder = sources.flatMap { s ->
+            if (s.kind == SourceKind.TTRSS) articles.filter { it.sourceId == s.id }.map(::publicationOf).distinct().sorted()
+            else listOf(s.id.toString())
+        }
         val ordered = EditionPlanner.order(
-            candidates = articles.map { Candidate(it.id.toString(), it.sourceId.toString(), it.published ?: it.discoveredAt, it.broughtBack) },
-            sourceOrder = sources.map { it.id.toString() },
+            candidates = articles.map { Candidate(it.id.toString(), publicationOf(it), it.published ?: it.discoveredAt, it.broughtBack) },
+            sourceOrder = publicationOrder,
             ordering = settings.ordering,
             rotation = rotation,
         )
@@ -124,10 +131,12 @@ class EditionBuilder(
         // own: sections in the order they first appear, sources in list order within them.
         val sectionOrder = sources.map { it.section }.distinct()
         val sourceIndex = sources.withIndex().associate { (i, s) -> s.id to i }
+        val pickedPublications = picked.map { publicationOf(it.first) }.distinct()
         val arranged = picked.sortedWith(
             compareBy<Pair<ArticleEntity, ArticleContent>>(
                 { (a, _) -> sectionOrder.indexOf(sourcesById.getValue(a.sourceId).section) },
                 { (a, _) -> sourceIndex.getValue(a.sourceId) },
+                { (a, _) -> pickedPublications.indexOf(publicationOf(a)) },
             ),
         )
 
@@ -136,7 +145,7 @@ class EditionBuilder(
             CoverInfo(
                 title = title,
                 date = now.toLocalDate(),
-                headlines = arranged.map { (a, c) -> CoverHeadline(c.title, sourcesById.getValue(a.sourceId).title) },
+                headlines = arranged.map { (a, c) -> CoverHeadline(c.title, bylineOf(a, sourcesById.getValue(a.sourceId))) },
                 articleCount = arranged.size,
                 minutes = totalMinutes,
             ),
@@ -175,7 +184,7 @@ class EditionBuilder(
         db.withTransaction {
             db.editions().insertArticles(
                 arranged.mapIndexed { i, (a, c) ->
-                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = sourcesById.getValue(a.sourceId).title, minutes = minutesOf(c))
+                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = bylineOf(a, sourcesById.getValue(a.sourceId)), minutes = minutesOf(c))
                 },
             )
             db.articles().setState(arranged.map { it.first.id }, ArticleState.IN_EDITION)
@@ -235,7 +244,7 @@ class EditionBuilder(
 
     private fun toEpub(a: ArticleEntity, c: ArticleContent, minutes: Double, source: SourceEntity) = EditionArticle(
         title = c.title,
-        sourceTitle = source.title,
+        sourceTitle = bylineOf(a, source),
         url = a.url,
         bodyHtml = c.bodyHtml,
         minutes = minutes,
@@ -244,6 +253,11 @@ class EditionBuilder(
         note = c.note,
         images = c.images,
     )
+
+    /** The planner's source for [a]: the publication it came from within an aggregator, else its source. */
+    private fun publicationOf(a: ArticleEntity) = a.originId?.let { "${a.sourceId}/$it" } ?: a.sourceId.toString()
+
+    private fun bylineOf(a: ArticleEntity, source: SourceEntity) = a.originTitle ?: source.title
 
     companion object {
         private fun fileNameOf(editionId: Long) = "edition-$editionId.epub"

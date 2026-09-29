@@ -50,7 +50,7 @@ Kindle, Kobo, Boox, PocketBook or KOReader device.
 
 | Concept | What it is |
 |---|---|
-| **Source** | Somewhere articles come from: an RSS/Atom/JSON feed; a **reading list** (links you shared or saved); later, a tt-rss/FreshRSS/Miniflux account or a scraper-fed curated list. |
+| **Source** | Somewhere articles come from: an RSS/Atom/JSON feed; a **reading list** (links you shared or saved); a tt-rss account; later, a FreshRSS or Miniflux account or a scraper-fed curated list. |
 | **Section** | A user-named group of sources ("World", "Long reads", "Friends' blogs"). Sections become the edition's contents pages. |
 | **Edition profile** | A recipe: schedule, reading-time budget *or* article count, per-source cap, ordering (take turns / in order / shuffle), which sections to use, delivery method. Starts with one ("Morning paper"); power users add more ("Sunday long reads"). |
 | **Edition** | One built issue: title ("Tuesday Morning Edition"), articles, the EPUB file and its delivery status. The history of editions is the app's main screen. |

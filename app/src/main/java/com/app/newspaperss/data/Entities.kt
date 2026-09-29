@@ -7,7 +7,12 @@ import androidx.room.PrimaryKey
 import com.app.newspaperss.core.extract.ContentMode
 import java.time.Instant
 
-enum class SourceKind { FEED, READING_LIST }
+enum class SourceKind {
+    FEED,
+    READING_LIST,
+    /** A Tiny Tiny RSS account: its url is the API endpoint and its articles come from many feeds. */
+    TTRSS,
+}
 
 @Entity(tableName = "sources", indices = [Index(value = ["url"], unique = true)])
 data class SourceEntity(
@@ -56,6 +61,13 @@ data class ArticleEntity(
     val discoveredAt: Instant = Instant.now(),
     val state: ArticleState = ArticleState.NEW,
     val broughtBack: Boolean = false,
+    /**
+     * The publication an aggregator source (tt-rss) got the article from: its feed id there,
+     * so the per-source cap applies per publication, and its title, for the byline. Null for
+     * articles from a feed of their own.
+     */
+    val originId: String? = null,
+    val originTitle: String? = null,
 )
 
 enum class EditionStatus { BUILDING, READY, DELIVERED, FAILED }

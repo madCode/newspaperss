@@ -3,4 +3,5 @@
 <full-backup-content>
     <exclude domain="sharedpref" path="edition-schedule.xml" />
     <exclude domain="file" path="editions/" />
+    <exclude domain="file" path="datastore/ttrss.preferences_pb" />
 </full-backup-content>

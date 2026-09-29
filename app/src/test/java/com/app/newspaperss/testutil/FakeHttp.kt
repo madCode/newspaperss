@@ -17,7 +17,16 @@ class FakeHttp : HttpClient {
     /** The headers each [getBytes] call sent, by url. */
     val bytesRequests = mutableMapOf<String, Map<String, String>>()
 
+    /** Answers [postJson] with (status, body); by default every POST is a 404. */
+    var onPost: suspend (url: String, body: String) -> Pair<Int, String> = { _, _ -> 404 to "" }
+
     fun page(url: String, body: String, code: Int = 200) { pages[url] = code to body }
+
+    override suspend fun postJson(url: String, body: String): HttpResponse {
+        if (url in unreachable) throw IOException("unreachable")
+        val (code, reply) = onPost(url, body)
+        return HttpResponse(code, url, "application/json", reply)
+    }
 
     override suspend fun get(url: String): HttpResponse {
         if (url in unreachable) throw IOException("unreachable")
