@@ -8,20 +8,27 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import java.io.File
 
@@ -29,12 +36,32 @@ import java.io.File
 // images/…, the "Next" link) resolve against it; nothing is fetched from the network.
 internal const val BOOK_ORIGIN = "https://edition.newspaperss.invalid/"
 
-/** One article as the e-reader will show it, read straight out of the EPUB. */
+private sealed interface Preview {
+    data object Loading : Preview
+    data object Missing : Preview
+    class Ready(val pages: EpubPages, val xhtml: String) : Preview
+}
+
+/**
+ * One article as the e-reader will show it, read straight out of the EPUB.
+ *
+ * @param loadFile the edition's file, or null if it's gone. Called off the main thread.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ArticlePreviewScreen(file: File?, position: Int, title: String, onBack: () -> Unit) {
-    val pages = remember(file) { file?.takeIf { it.exists() }?.let(::EpubPages) }
-    val xhtml = remember(pages, position) { pages?.article(position) }
+fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: String, onBack: () -> Unit) {
+    // Read in the background so the screen shows at once: reading a large edition during
+    // composition holds up the frame, and the tap that opened it seems not to have registered.
+    val preview by produceState<Preview>(Preview.Loading, position) {
+        val pages = withContext(Dispatchers.IO) { loadFile()?.let(::EpubPages) }
+        try {
+            val xhtml = pages?.let { withContext(Dispatchers.IO) { it.article(position) } }
+            value = if (pages != null && xhtml != null) Preview.Ready(pages, xhtml) else Preview.Missing
+            awaitCancellation()
+        } finally {
+            pages?.close()
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -43,12 +70,13 @@ fun ArticlePreviewScreen(file: File?, position: Int, title: String, onBack: () -
             )
         },
     ) { padding ->
-        if (pages == null || xhtml == null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+        when (val p = preview) {
+            Preview.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(padding))
+            Preview.Missing -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("This edition's file is gone, so the article can't be shown.")
             }
-        } else {
-            BookView(pages, xhtml, Modifier.fillMaxSize().padding(padding))
+            // Keyed: the WebView is built once, so a new article needs a new one.
+            is Preview.Ready -> key(p) { BookView(p.pages, p.xhtml, Modifier.fillMaxSize().padding(padding)) }
         }
     }
 }
