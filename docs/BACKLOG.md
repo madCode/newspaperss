@@ -1,8 +1,8 @@
 # Backlog
 
-The running plan. Each work cycle picks the top unblocked item, builds it
-with tests, and moves it to Done with its PR. Milestones are from
-[DESIGN.md §10](DESIGN.md#10-milestones).
+The running plan. Each work cycle picks what matters most for readers right now (device feedback
+first, then research and judgment), builds it with tests, and moves it to Done. Feature proposals are
+ideas, not commitments.
 
 ## Next
 
@@ -11,20 +11,12 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
 - [ ] Decide what tapping an article in a source's list does: open the original in the browser, render it, or offer "add to the next edition"
 
-### M4 leftovers
+### Delivery and schedule
 - [ ] If lead time isn't enough on a real device, wake for timed editions with an exact alarm (Doze defers WorkManager; expedited work was rejected: its API 31+ quota can silently restart a long build)
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
 - [ ] Verify folder delivery + chooser-from-notification on a real device
 
-### M3 leftovers
-
-### M5 leftovers
-
-### M6 leftovers
-
-### M7 Polish
-
-### M8 Advanced
+### Later
 - [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
 
 ### From the persona audit (Day 2)
@@ -33,7 +25,6 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] Boox: offer folder delivery into the Books folder, so editions stay in the library
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs
 - [ ] "No feed found": offer to save the page to the reading list instead
-- [ ] TalkBack: live-region build status, step "2 of 4" on the onboarding progress, a click label on the edition card; move Add out of the text field for large fonts
 - [ ] Change the device in Settings after onboarding
 - [ ] A short Kindle how-to (same Amazon account, Library › Docs)
 
@@ -109,17 +100,15 @@ What to do with non-English sources and readers. Today:
 - reading time assumes English words per minute.
 
 Done: each article is tagged with its own language (`xml:lang`, and `dir="rtl"` for Arabic,
-Hebrew, Persian), detected from its text with the page's declaration as a tiebreaker.
+Hebrew, Persian), so e-readers hyphenate and lay it out correctly.
 
 Questions:
 - reading time for languages that aren't space-separated (Chinese, Japanese), which is roughly
   characters per minute. A live NHK article counted as "1 word";
 - the book's `dc:language` when a whole edition is in one language other than English (Kindle
   picks its dictionary from it);
-- right-to-left layout;
 - whether the app UI and the book's own text should be translated;
 - whether an edition should mix languages or keep them in sections.
-
 
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
@@ -138,6 +127,8 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Documentation pass: DESIGN.md describes the app as it is (no SMTP, profiles or reading-speed setting; today's changes in), README and CLAUDE.md updated, fresh screenshots; documentation passes are now part of the cycles
+- [x] TalkBack: the build's stage is announced (not every count), onboarding's progress says "Step 2 of 3", earlier editions say "See what's inside"; Add and Save sit below their fields so large fonts leave room to type
 - [x] Each article is tagged with its language (`xml:lang`, `dir="rtl"`), detected from its text (writing system, common words) with the page's declared language as a tiebreaker
 - [x] The article preview shows at once and reads the book in the background, with one open zip per screen (the "first tap doesn't open it" report). The side-scroll came from the old EPUB's long URL line, already gone
 - [x] An HTTP cache: feeds are revalidated (If-None-Match), and unchanged ones answer 304 instead of the whole feed; the background sync runs every 12 hours with the battery not low

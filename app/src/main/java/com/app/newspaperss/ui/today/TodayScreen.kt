@@ -16,11 +16,16 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -47,13 +52,17 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
     }
     val editions = state.editions.orEmpty()
     val latest = editions.firstOrNull()
+    // Remembered here, not in the panel, which moves below the card once an edition is ready.
+    val announcer = remember { BuildAnnouncer() }
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        item { Masthead(today, Modifier.padding(top = 24.dp, bottom = 16.dp)) }
+        // Keyed, so an item keeps its state when others come and go above it: the build panel's
+        // status line has to stay the same node for TalkBack to announce its changes.
+        item(key = "masthead") { Masthead(today, Modifier.padding(top = 24.dp, bottom = 16.dp)) }
         state.next?.let { next ->
-            item { Text("Next edition: $next", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp)) }
+            item(key = "next") { Text("Next edition: $next", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp)) }
         }
         if (state.editions != null && latest == null && state.build == BuildState.Idle) {
-            item {
+            item(key = "firstPrompt") {
                 Text(
                     if (state.next != null) "Your first edition arrives on schedule. Or make one now." else "Make your first edition whenever you're ready.",
                     textAlign = TextAlign.Center,
@@ -64,9 +73,10 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         }
         // A ready edition waiting to be sent comes first; making another is secondary.
         val readyWaiting = latest?.status == EditionStatus.READY
-        if (!readyWaiting) item { BuildPanel(state.build, primary = true, onMake = viewModel::makeOneNow) }
+        // The same key in both places: only one exists at a time, and it moves rather than restarts.
+        if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, primary = true, onMake = viewModel::makeOneNow) }
         if (latest != null) {
-            item {
+            item(key = "latest") {
                 LatestEdition(
                     latest,
                     first = editions.size == 1,
@@ -85,9 +95,9 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 )
             }
         }
-        if (readyWaiting) item { BuildPanel(state.build, primary = false, onMake = viewModel::makeOneNow) }
+        if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, primary = false, onMake = viewModel::makeOneNow) }
         if (editions.size > 1) {
-            item {
+            item(key = "earlier") {
                 Text(
                     "Earlier editions",
                     style = MaterialTheme.typography.titleMedium,
@@ -112,33 +122,58 @@ fun Masthead(date: LocalDate, modifier: Modifier = Modifier) {
     }
 }
 
+internal const val BUILD_STATUS = "buildStatus"
+
+/**
+ * What the build status has seen while Today was up. A plain holder, not state: it only has to be
+ * right when the status line is next composed, which a build's every change causes.
+ */
+private class BuildAnnouncer {
+    /** A build ran while the screen was up; until then a result is an old one WorkManager kept. */
+    var sawRunning = false
+    /** That build then finished successfully. */
+    var finished = false
+
+    fun update(build: BuildState) {
+        val running = build == BuildState.Syncing || build is BuildState.Fetching
+        if (running) finished = false
+        else if (sawRunning && build == BuildState.Idle) finished = true
+        if (running) sawRunning = true
+    }
+}
+
 @Composable
-private fun BuildPanel(build: BuildState, primary: Boolean, onMake: () -> Unit) {
+private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, primary: Boolean, onMake: () -> Unit) {
+    val running = build == BuildState.Syncing || build is BuildState.Fetching
+    // Announced only once a build has run while this screen was up: a failure WorkManager still
+    // remembers from earlier would otherwise be read out every time Today opens.
+    announcer.update(build)
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        when (build) {
-            BuildState.Syncing, is BuildState.Fetching -> {
-                // Stepped text rather than a spinner: an endless animation smears on e-ink screens.
-                Text(
-                    when {
-                        build is BuildState.Fetching && build.done == 1 -> "Making your edition: 1 article read so far"
-                        build is BuildState.Fetching -> "Making your edition: ${build.done} articles read so far"
-                        else -> "Checking your sources for new articles…"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            else -> {
-                if (primary) Button(onClick = onMake) { Text("Make an edition now") }
-                else TextButton(onClick = onMake, modifier = Modifier.padding(top = 8.dp)) { Text("Make another edition") }
-                val message = when (build) {
-                    BuildState.NothingNew -> "Nothing new to read yet. Add sources, or check back later."
-                    is BuildState.Failed -> build.reason
-                    else -> null
-                }
-                message?.let {
-                    Text(it, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-                }
-            }
+        if (!running) {
+            if (primary) Button(onClick = onMake) { Text("Make an edition now") }
+            else TextButton(onClick = onMake, modifier = Modifier.padding(top = 8.dp)) { Text("Make another edition") }
+        }
+        // One status line, always composed, whose text changes: TalkBack announces a change to a
+        // live region, not one appearing. Stepped text rather than a spinner, which smears on e-ink.
+        Text(
+            when (build) {
+                BuildState.Syncing -> "Checking your sources for new articles…"
+                is BuildState.Fetching -> "Making your edition"
+                BuildState.NothingNew -> "Nothing new to read yet. Add sources, or check back later."
+                is BuildState.Failed -> build.reason
+                BuildState.Idle -> if (announcer.finished) "Your edition is ready." else ""
+            },
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 8.dp).testTag(BUILD_STATUS).semantics { if (announcer.sawRunning) liveRegion = LiveRegionMode.Polite },
+        )
+        // Outside the live region, or TalkBack would read every count. Kept while syncing too, so
+        // the page doesn't shift by a line (an extra refresh on e-ink) when fetching starts.
+        if (running) {
+            Text(
+                (build as? BuildState.Fetching)?.done?.let { if (it == 1) "1 article read so far" else "$it articles read so far" }.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }
@@ -212,7 +247,7 @@ private fun LatestEdition(
 
 @Composable
 private fun EditionRow(edition: EditionEntity, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp)) {
+    Column(Modifier.fillMaxWidth().clickable(onClickLabel = "See what's inside", onClick = onClick).padding(vertical = 12.dp)) {
         Text(edition.title, style = MaterialTheme.typography.titleMedium)
         Text(summary(edition), style = MaterialTheme.typography.bodySmall)
     }

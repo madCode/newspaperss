@@ -7,272 +7,225 @@ newspaperss is an Android app that brings the ideas behind
 [rss-to-e-reader](https://github.com/madCode/rss-to-e-reader) to people who
 don't write code or run servers. You subscribe to feeds and save links, and
 the app puts together a finite *edition* (for example "about 30 minutes,
-every morning at 6:30"), turns it into a clean EPUB and delivers it to your
-Kindle, Kobo, Boox, PocketBook or KOReader device.
+ready by 6:30 every morning"), turns it into a clean EPUB and delivers it to
+your Kindle, Kobo, Boox, PocketBook or KOReader device.
+
+This document describes how the app works today. What's planned is in
+[BACKLOG.md](BACKLOG.md); what changed and why is in [DEVLOG.md](DEVLOG.md).
 
 ## 1. Principles
 
 1. **An edition that ends.** The unit of the app is the edition, not a feed.
    It has a reading-time budget, a clear last page ("That's all for
-   today") and no unread counts anywhere. You shouldn't feel you owe the
-   app anything.
+   today") and no unread counts anywhere.
 2. **You are the editor.** Only sources you chose, ordered by rules you can
    see (take turns between sources, at most N per source). No
    recommendations, no ranking by engagement.
 3. **Read somewhere calmer.** The app is where you *edit* your paper, not
-   where you read it. An in-app preview exists so you can check an edition,
-   and for Android e-readers like Boox that run the app themselves, but
-   there's no endless in-app timeline.
+   where you read it. You can preview an article, and a Boox can read the
+   edition on the device, but there's no endless in-app timeline.
 4. **Works for non-coders in two minutes.** From install to first edition:
-   pick your device, pick some sources, press "Make my first edition".
-   Advanced knobs (tt-rss, per-source full-text, SMTP) exist, out of the way.
-5. **Nothing is lost on failure.** Articles are only marked as consumed
-   after delivery succeeds (the library's "tick off after send" rule).
-   Failures are loud, successes are quiet.
+   pick your device, pick some sources, make the edition. Advanced knobs
+   (tt-rss, per-source article text) exist, out of the way.
+5. **Nothing is lost on failure.** Articles are only used up once the
+   edition is delivered. Failures are loud, successes are quiet.
 6. **Private by default.** No account, no analytics, no server. Everything
    stays on the phone except the fetches it makes to your sources and the
    delivery you choose.
 
 ## 2. Who it's for
 
-- **The Kindle reader who doomscrolls.** Owns a Kindle, reads news on
-  their phone and wishes they didn't. Wants: pick a few sites, get a
-  morning paper on the Kindle, done.
-- **The ex-Pocket or Omnivore user.** Saved links vanished when those
-  services shut down. Wants: share a link from anywhere and have it turn
-  up in their next edition.
-- **The RSS veteran.** Already runs tt-rss or FreshRSS. Wants: their
-  existing subscriptions turned into a well-made EPUB on a schedule.
-- **The Boox or other Android e-reader owner.** Installs the app on the
-  reader itself and reads the edition there.
+- **The Kindle reader who doomscrolls:** wants a few sites as a morning paper on the Kindle.
+- **The ex-Pocket or Omnivore user:** wants links shared from anywhere to turn up in the next edition.
+- **The RSS veteran:** already runs tt-rss or FreshRSS, wants those subscriptions as a well-made EPUB.
+- **The Boox owner:** installs the app on the reader itself and reads the edition there.
 
 ## 3. Core concepts
 
 | Concept | What it is |
 |---|---|
-| **Source** | Somewhere articles come from: an RSS/Atom/JSON feed; a **reading list** (links you shared or saved); a tt-rss account; a **curated list**, a site that isn't a feed but picks a few links a day (Arts & Letters Daily), read by a scraper; later, a FreshRSS or Miniflux account. |
-| **Section** | A user-named group of sources ("World", "Long reads", "Friends' blogs"). Sections become the edition's contents pages. |
-| **Edition profile** | A recipe: schedule, reading-time budget *or* article count, per-source cap, ordering (take turns / in order / shuffle), which sections to use, delivery method. Starts with one ("Morning paper"); power users add more ("Sunday long reads"). |
-| **Edition** | One built issue: title ("Tuesday Morning Edition"), articles, the EPUB file and its delivery status. The history of editions is the app's main screen. |
-| **Delivery method** | How the EPUB reaches the device (§6). |
-| **Article state** | `NEW`, then `IN_EDITION` (planned), then `DELIVERED`. Or `SKIPPED` (the user dismissed it) or `EXPIRED` (older than the source's keep window). |
+| **Source** | Where articles come from: an RSS, Atom or JSON feed; the **reading list** (links you shared or saved); a tt-rss account; or a **curated list**, a page that picks a few links a day (Arts & Letters Daily). |
+| **Section** | A heading in the edition's contents. Sections come from OPML folders, and the reading list is "Saved for later". |
+| **Edition settings** | One recipe: size (minutes), per-source cap, order (take turns / in order / shuffle), and the time and days it should be ready. |
+| **Edition** | One built issue: a dated title ("Tuesday Morning Edition, Sep 29"), its articles, the EPUB and its status: building, ready, delivered, failed or deleted. |
+| **Article state** | `NEW`, then `IN_EDITION`, then `DELIVERED`; or `SKIPPED`, or `EXPIRED` (older than the source keeps articles). |
 
-## 4. The edition pipeline
-
-The same shape as the Python library, rewritten in Kotlin in the pure-JVM
-`:core` module so all of it can be unit-tested without Android:
+## 4. Making an edition
 
 ```
-Collectors ──► Candidates ──► EditionPlanner ──► Fetcher/Extractor ──► EpubWriter ──► Delivery ──► Commit
- (feeds,        (Article       (take turns,       (readability,          (cover, TOC,     (share,     (mark
-  reading        metadata,      per-source cap,    JSON-LD fallback,      nav + NCX,       folder,     DELIVERED,
-  lists,         dedup by       reading-time       e-reader cleaning,     images ≤1200px,  email)      record the
-  tt-rss)        URL)           budget)            feed fallback)         size budget)                 edition)
+Sync feeds ─► Plan ─► Extract ─► Write the EPUB ─► Deliver ─► Mark delivered
 ```
 
-Ported from the library, with the lessons its code and comments record:
+The pipeline follows the Python library's shape, in the pure-JVM `:core`
+module so it's all unit-tested without Android.
 
-- **Reading-time budget with lazy fetching.** Fetch in plan order and stop
-  once the running total reaches the budget, so it goes over by at most one
-  article. Minutes are *fractional*: the library's integer division counts
-  short pieces as 0 minutes.
-- **Take turns (round-robin) between sources, with a per-source cap.** The
-  default cap is 1 per source for a daily paper, so a busy feed can't take
-  over the edition.
-- **Extraction.** Use the feed's own content when it's full text, otherwise
-  fetch the page and run Readability4J. Before extraction, remove
-  cookie/consent overlays. Fall back to schema.org JSON-LD `articleBody`,
-  then to the feed text with a visible note ("Couldn't fetch the full
-  article; showing the feed's version"). An article that failed still goes
-  in the edition, so you notice a source that always fails.
-- **Automatic full-text detection per source.** The library's source check:
-  if the page has at least 2× the feed's words, the feed is a teaser, so
-  fetch pages; if extraction keeps under 0.7× the feed, trust the feed. It
-  runs automatically on every article instead of asking the user: a feed
-  item of 300+ words taken as is counts for the feed, and so does a site
-  that turns page requests away (403, bot check). Three days in a row
-  pointing the same way switch the source to always fetching pages or never
-  fetching them; a mixed source stays automatic. A mode the reader picks
-  from the source's menu is never changed, and picking Automatic starts the
-  check over. The Sources screen shows the outcome: "Full articles",
-  "Summaries only" or "Site blocks fetching".
-- **EPUB that Send to Kindle accepts.**
-  - strict XHTML (serialized through jsoup in XML mode);
-  - EPUB 3 nav *and* NCX, in the same order;
-  - the cover in the spine as a linear item;
-  - a generated 1264x1680 cover image (masthead, date, first headlines),
-    marked as the cover for both EPUB 3 and EPUB 2/Kindle, so library
-    thumbnails show the edition instead of a placeholder;
-  - images re-encoded to JPEG at up to 1200px, with no SVG, WebP or AVIF;
-  - a total size budget of about 15MB so email delivery works too;
-  - a unique, dated title ("Tuesday Morning Edition, Sep 29", then "… (2)"),
-    because Send to Kindle silently drops a document whose title it has
-    already seen.
-- **Commit after delivery.** Articles become `DELIVERED` and list items are
-  ticked off only when delivery reports success. For share-sheet delivery,
-  where the app can't know whether it worked, "success" is the user
-  choosing an app in the share sheet (§6). Delivered links are also remembered on their
-  own for a year, so a source removed and added again, or the same story
-  in a second source, doesn't deliver them twice.
-- **One run at a time.** Builds are unique WorkManager work (`KEEP`), so a
-  scheduled build and a manual "Make one now" can't race.
+- **Plan.** Take turns between sources, at most one article each by default,
+  until the reading-time budget is reached. Articles are fetched in plan
+  order, so an edition goes over by at most one article. If a turn-taking
+  pass leaves time unfilled, a second pass adds more from sources whose own
+  cap allows it.
+- **Extract.** Use the feed's own text when it's the full article;
+  otherwise fetch the page, remove cookie banners and run Readability4J
+  (Firefox's Reader View). schema.org JSON-LD is used instead when it has
+  much more text, which usually means Readability only saw a paywall
+  preview. If the page can't be fetched, the feed's text goes in with a
+  note saying so; an article that fails entirely still goes in, so a broken
+  source gets noticed.
+- **Comics and image posts.** A feed item that's just an image counts as
+  content. When a page's text is clearly not the article, the page's main
+  image is used, and a webcomic's own comic (all its panels) beats the
+  feed's thumbnail.
+- **Which text to use, per source.** Each article is evidence: a page with
+  twice the feed's words means the feed is a teaser; a feed of 300+ words,
+  or a site that blocks fetching, means the feed is enough. Three days
+  pointing the same way set the source to that; the reader can override it
+  on the source's page ("Article text: Automatic / Feed's text / Full page").
+- **Language.** Each article is tagged with its language (`xml:lang`, and
+  `dir="rtl"` for right-to-left scripts) so e-readers hyphenate and lay it
+  out correctly. The text decides; the page's declared language breaks ties.
+- **The EPUB.** Built to be accepted by Send to Kindle:
+  - strict XHTML, EPUB 3 nav *and* NCX in the same order, the cover in the
+    spine;
+  - a generated cover image (masthead, date, first headlines) so library
+    thumbnails show the edition;
+  - "In this edition" contents with each article's source and reading time;
+  - each article: source, headline, "By … · date · N min read", the body,
+    "Read the original at site", and a "Next" link; then "That's all for
+    today";
+  - images as JPEG up to 1200px, about 15 MB in all including the cover, up
+    to 20 per article. The budget goes to articles in reading order, and an
+    image that can't fit isn't downloaded;
+  - a unique title ("… Sep 29", then "… (2)"), because Send to Kindle
+    silently drops a title it has seen before.
+- **One build at a time.** Builds are unique WorkManager work, so a timed
+  build and "Make an edition now" can't race.
 
-## 5. What happens to articles you didn't read
+## 5. Timing and background work
 
-The library's personal setup re-offers *all unread* articles until you mark
-them read on the tt-rss server. That's a separate manual step, and a
-non-coder won't know to do it. newspaperss defaults to:
-
-- **Delivered means done.** An article appears in one edition.
-- **Bring it back.** In an edition's detail screen, you can tap articles
-  you didn't get to and they go back into the pool, at the front of their
-  source's queue.
-- **Everything else expires.** Unplanned articles older than the source's
-  keep window (default 7 days for news feeds, never for reading lists)
-  quietly disappear. No backlog guilt.
-- **Curated lists keep their newest 12.** A list read less often than it
-  grows stays bounded: when new links arrive, its unread ones beyond the
-  newest 12 expire. If a list's page changes shape, the scraper takes no
-  links and the source says so, rather than guessing which ones are new.
-
-tt-rss sources keep the library's behaviour: articles are marked read on the
-server when an edition is delivered. The source's screen can turn that off
-(articles stay unread in tt-rss, and newspaperss knows which it delivered)
-and can take articles from one category instead of all unread.
+- **Timed editions start early.** The time you set is when the edition
+  should be *ready*. A chain of one-off timers fires 30 minutes early,
+  because Android's Doze can hold background work; the delay then eats lead
+  time, not your morning. A clock or time-zone change re-arms the timer.
+- **Feeds sync right before each build,** and in the background every 12
+  hours when the battery isn't low.
+- **Fetching is polite and cheap.** An HTTP cache revalidates every feed
+  (If-None-Match / If-Modified-Since), so an unchanged feed costs a small
+  "not modified" reply. Requests use a browser-like mobile user agent.
 
 ## 6. Delivery
 
-| Device | Default method | Unattended? |
+| Device | How it gets there | Unattended? |
 |---|---|---|
-| Kindle | **Share to the Kindle app** (the Send to Kindle share target), one tap from the "Your edition is ready" notification | No, one tap |
-| Kindle (advanced) | Email to your @kindle.com address via SMTP app password | Yes |
-| Kobo | **Share to the Dropbox app**, saving into the folder the Kobo syncs (`Apps/Rakuten Kobo`). Later: a direct Dropbox connection (OAuth with PKCE, no server) | One tap; yes later |
-| PocketBook | Email to `@pbsync.com`: share with an email intent, or SMTP | One tap / yes |
-| KOReader | Save to a folder (Syncthing or similar) | Yes |
-| Boox / Android e-readers | Open in the device's reader app (`ACTION_VIEW`) or read in the app | Yes |
-| Anything else | Share sheet | No |
+| Kindle | Share to the Kindle app, one tap from the "ready" notification | One tap |
+| Kobo | Share to Dropbox, into the folder the Kobo syncs (`Apps/Rakuten Kobo`) | One tap |
+| PocketBook | Share to an email app, to your `@pbsync.com` address | One tap |
+| KOReader | Save to a folder that syncs to the device (Syncthing) | Yes |
+| Boox | Open it in the device's reader, from the app or the notification | Yes |
+| Anything else | The share sheet | One tap |
 
-"Save to a folder" uses the system folder picker (SAF). It works for local
-folders and anything that syncs them (Syncthing), but Google Drive's and
-Dropbox's providers don't offer whole folders to other apps, so cloud
-folders need either a share per edition or a direct API connection.
+Folders use Android's folder picker. Google Drive and Dropbox don't offer
+whole folders to other apps that way, so cloud delivery goes through a
+share for now (a direct Dropbox connection is in the backlog).
 
-Share-sheet delivery can't tell whether the send worked. The closest signal
-is the reader choosing an app in the share sheet, which Android reports back,
-so that marks the edition delivered, from the notification as well as the
-app. On a Boox, opening the edition counts. **I've sent it** covers any other
-route. If a send didn't arrive, **Send again** is on the edition. An edition
-still "Ready" when the next one is built was never sent: its articles go into
-the new one.
+**When is an edition delivered?** Saving it to your folder; choosing an app
+in the share sheet (Android reports the choice back, from the notification
+too); or opening it on a Boox. **I've sent it** covers any other route, and
+**Send again** is there if a send didn't arrive. An edition still "ready"
+when the next one is built was never sent: it's marked not sent and its
+articles go into the new one.
 
-## 7. Onboarding (target: first edition in under two minutes)
+## 7. What happens to articles you didn't read
 
-1. **Welcome.** One sentence of pitch, then "Get started".
-2. **Where do you read?** Pictures: Kindle / Kobo / Boox / PocketBook /
-   KOReader / "Just give me the file". This picks the delivery method and
-   shows device-specific setup (for example "Pick your Kobo's Dropbox
-   folder").
-3. **Pick your sources.**
-   - **Starter packs** by topic: a few well-known public feeds each (news,
-     science, tech, essays, culture).
-   - **Paste any website.** Feed autodiscovery from `<link rel="alternate">`,
-     then common paths (`/feed`, `/rss`, `/atom.xml`, `/index.xml`).
-   - **Import OPML**, from other readers or a tt-rss export.
-4. **How big, how often?**
-   - Size slider: "15 min · 30 min · 1 hour" (reading at about 238 wpm).
-   - Time and days: "Every morning at 6:30".
-5. **Make my first edition.** It builds right away, with visible progress
-   ("Fetching 7 of 12 …"), then offers delivery.
+- **Delivered means done.** An article appears in one edition. Delivered
+  links are remembered for a year, so a source removed and added again, or
+  the same story in two sources, isn't delivered twice.
+- **Bring it back.** On a delivered edition, tick the articles you didn't
+  get to and they go into the next one.
+- **Everything else expires.** Unplanned articles older than the source's
+  keep window (7 days for news feeds, never for the reading list) quietly
+  go. Curated lists keep only their newest 12 unread links.
+- **tt-rss:** articles are marked read on the server once delivered. A
+  source can turn that off, or take one category instead of all unread.
+- **Housekeeping.** Only the newest 14 editions keep their EPUB on the
+  phone (ready ones always do). An article's feed text is dropped a month
+  after it's delivered or expires; its row stays, so it's never re-offered.
+- **Deleting an edition** removes its file and contents but keeps its title
+  reserved, since Send to Kindle would drop a repeat. A ready edition's
+  articles go back to the pool; a delivered one's stay used.
 
-## 8. Screens
+## 8. Onboarding (target: first edition in under two minutes)
 
-- **Today** (home): the next edition ("Tomorrow 6:30 · ~30 min · 9 sources"),
-  a big **Make one now** button, and the latest edition's card (cover,
-  article list, delivery status, *Send* / *Sent it* / *Open*). Below it,
-  the history of past editions.
-- **Edition detail:** the cover and contents. Tap an article to preview it
-  as the e-reader will show it. Actions: *bring back unread*, *send again*,
-  *share EPUB*, *notes* (a Markdown file for a notes app: per article its
-  source, author, date, link and a citation, reflection prompts and an
-  empty "Notes and quotes" section).
-- **Sources:** sections, each with its sources. Per source: its last
-  articles, health ("full text ✓", "failing for 3 days ✗"), cap override,
-  pause. An add button (paste URL / search starter packs / OPML).
-- **Reading list:** links you shared into the app (the app is a share
-  target for URLs), each with a title and domain. They show up in the next
-  edition with their own slot, like the library's markdown-checklist
-  collector. Export and import as a markdown checklist, which keeps
-  compatibility with the library; Pocket and Instapaper exports import
-  too, with their archive arriving as already read. A link saved without
-  a title gets its page's title in the background.
-- **Settings:** edition profiles (schedule, size, ordering, cap), delivery
-  (with folder delivery, optionally the notes file beside each edition),
-  reading speed, advanced (tt-rss account, SMTP), about.
+1. **Welcome.**
+2. **Where do you read?** Kindle, Kobo, Boox, PocketBook, KOReader, or
+   "just the file". This picks the delivery method; KOReader asks for its
+   folder.
+3. **Pick your sources:** starter packs of well-known public feeds; paste
+   any website (the app finds its feed); import an OPML file; or connect a
+   tt-rss account.
+4. **How much, and when?** A 10–90 minute slider, "A new edition every
+   day", and a "Ready by" time.
+5. **The first edition** builds right away, with its progress on Today.
 
-The visual language: a newspaper feel inside the app (serif headlines, a
-masthead with the date), but calm, with no badges or counts.
+## 9. Screens
 
-## 9. Architecture
+- **Today** (home): when the next edition is due, **Make an edition now**,
+  and the latest edition with **Send**, **Open** and **I've sent it**
+  (**Send again** once delivered). Earlier editions are listed below.
+- **Edition:** its contents; tap an article to preview it as the e-reader
+  will show it (read straight from the EPUB, with nothing fetched from the
+  network). **Notes** exports a Markdown file for a notes app (per article:
+  source, author, date, link, a citation and reflection prompts).
+  **Delete**, and on delivered editions, **bring back**.
+- **Sources:** each source with its health ("Full articles", "Summaries
+  only", "Site blocks fetching", "Failing for N days"). A source's page
+  shows its recent articles, its cap, pause and the article-text setting.
+  Add a source, import or export OPML, or add a tt-rss account.
+- **Reading list:** links you shared into the app, each with its title,
+  site and reading time (looked up in the background). They go into the
+  next edition under "Saved for later". Import and export as a Markdown
+  checklist (compatible with the library); Pocket and Instapaper exports
+  import too.
+- **Settings:** the edition (size, per-source cap, order), the schedule
+  (time and days), delivery (share or folder, optionally the notes file
+  beside each edition), and the app's version.
+
+The look: a newspaper feel (serif headlines, a masthead with the date), but
+calm, with no badges, counts or endless animations, which smear on e-ink.
+
+## 10. Architecture
 
 ```
-:core   (Kotlin/JVM, no Android)            :app   (Android, Compose)
-├─ model/        Article, Source, …          ├─ data/       Room DB, DAOs, repositories, DataStore
-├─ feed/         RSS/Atom/JSON Feed parser,  ├─ work/       EditionWorker, SyncWorker (WorkManager)
-│                feed autodiscovery, OPML    ├─ delivery/   Share, SAF folder, open-in-reader, SMTP
-├─ edition/      EditionPlanner (turns, cap, ├─ ui/         Compose screens + ViewModels
-│                budget), titles             │   ├─ today/ edition/ sources/ reading list/ settings/ onboarding/
-├─ extract/      Readability4J + cleaning    └─ AppContainer  (manual DI, no Hilt)
-├─ epub/         EpubWriter (hand-rolled zip)
-└─ net/          HttpFetcher interface
+:core  (Kotlin/JVM, no Android)          :app  (Android, Compose)
+├─ feed/     parsing, feed discovery,    ├─ data/      Room database, repositories
+│            OPML, starter packs         ├─ settings/  DataStore settings
+├─ edition/  planner, titles, schedule   ├─ edition/   EditionBuilder, EditionRun, cover, notes
+├─ extract/  page and article            ├─ work/      edition, sync and title workers, the scheduler
+│            extraction, language        ├─ delivery/  share, folder, the sent callback
+├─ images/   image rules and budget      ├─ notify/    the "ready" notification
+├─ epub/     the EPUB writer             ├─ ui/        Compose screens and ViewModels
+│                                        └─ AppContainer (manual dependency injection)
+├─ lists/    curated-list scrapers
+├─ notes/    the Markdown notes file
+├─ ttrss/    the tt-rss API
+└─ net/      HttpClient (OkHttp)
 ```
 
-- **`:core` is pure Kotlin** so the planner, parser, extractor and EPUB
-  writer are fast JVM unit tests. XML parsing uses the XmlPullParser API:
-  the Android platform provides it, and kxml2 provides it in JVM tests.
-- **Single activity, Jetpack Compose, Navigation Compose, ViewModels with
-  StateFlow.** Compose avoids the fragment-recreation class of bugs
-  dailylog ran into.
-- **Room** for sources, articles, editions and the reading list, with
-  exported schemas and explicit migrations from the first release.
-  **DataStore** for settings.
-- **WorkManager**: a periodic feed sync, plus a unique scheduled edition
-  build that re-arms itself for the profile's next time slot. The build
-  is idempotent: rerunning it after a crash doesn't duplicate an edition.
-- **OkHttp** for fetching, with a normal desktop user agent and timeouts.
-  The library's TLS-impersonation fallback (curl_cffi) has no easy Android
-  equivalent. The feed-text fallback with a note covers blocked pages.
-- **Manual dependency injection** (`AppContainer`): the app is small, and
-  Hilt would add kapt/KSP and annotation machinery for little gain.
-- **Dependencies stay permissively licensed** (Apache/MIT): Readability4J,
-  jsoup, OkHttp and AndroidX. The open-source Android readers (Read You,
-  Feeder, Capy) are GPL, so newspaperss learns from them but copies no code.
-- **Tests:** JVM unit tests in `:core`; Robolectric + Compose UI tests in
-  `:app` against a real Room database; MockWebServer for network code.
-  CI runs `./gradlew build` and Kover. The EPUB writer's output is checked
-  structurally in tests (mimetype first and stored, nav/NCX agree, XHTML
-  well-formed).
-
-## 10. Milestones
-
-1. **Skeleton:** Gradle, CI, Compose shell, Room, `:core`.
-2. **Feeds:** parse RSS/Atom/JSON Feed, add a source by URL with
-   autodiscovery, OPML import, sync worker.
-3. **The edition:** planner, extraction, EPUB writer, "Make one now", share
-   the EPUB. **This is the first usable app.**
-4. **Delivery and schedule:** SAF folder, open-in-reader, scheduled builds,
-   the "ready" notification, *Sent it*.
-5. **Onboarding:** device picker, starter packs, first-edition flow.
-6. **Reading list:** share target, markdown import/export.
-7. **Polish:** edition preview, source health, bring-back-unread, cover art.
-8. **Advanced:** tt-rss source, SMTP, notes export (Markdown notes with
-   citations and reflection prompts, from the personal setup).
+- **`:core` is pure Kotlin,** so the planner, parser, extractor and EPUB
+  writer run as fast JVM tests.
+- **One activity, Jetpack Compose, ViewModels with StateFlow.**
+- **Room** holds sources, articles and editions, with exported schemas
+  (`app/schemas`) and tested migrations. **DataStore** holds settings.
+- **WorkManager** runs the sync, the build and the timers.
+- **Manual dependency injection** (`AppContainer`): the app is small enough
+  that Hilt isn't worth its machinery.
+- **Permissive dependencies only** (Apache/MIT): Readability4J, jsoup,
+  OkHttp, AndroidX. The open-source Android readers are GPL, so newspaperss
+  learns from them but copies no code.
+- **Tests:** JVM tests in `:core`; Robolectric and Compose UI tests in
+  `:app` against a real Room database. CI runs `./gradlew build` and Kover.
 
 ## 11. Open questions for the owner
 
-- **Name.** "newspaperss" works well written down but is hard to say
-  aloud or spell. Alternatives: *Morning Paper*, *Broadsheet*, *Slowpaper*,
-  *Inkling*, *The Daily Edition*. It stays newspaperss until decided.
-- **License.** rss-to-e-reader has no LICENSE file. For F-Droid, the app
-  needs one (Apache-2.0 or GPL-3.0 are the usual choices).
-- **Starter packs.** Which feeds to curate by default (public, well-known,
-  full-text where possible).
+- **License.** The app needs one for F-Droid (Apache-2.0 or GPL-3.0 are the
+  usual choices).
+- **Name.** Shown as newspapeRSS; the repository stays newspaperss.

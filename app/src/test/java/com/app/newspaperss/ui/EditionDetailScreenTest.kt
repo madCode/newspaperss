@@ -2,6 +2,9 @@ package com.app.newspaperss.ui
 
 import android.app.Application
 import android.content.Intent
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -10,6 +13,7 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.room.Room
@@ -34,6 +38,13 @@ import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
+import com.app.newspaperss.ui.today.BuildState
+import com.app.newspaperss.ui.today.BUILD_STATUS
+import com.app.newspaperss.work.EditionWorker
+import androidx.work.WorkInfo
+import androidx.work.workDataOf
+import java.util.UUID
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -250,6 +261,66 @@ class EditionDetailScreenTest {
         compose.onNodeWithText("Monday Morning Edition").performClick()
 
         assertEquals(older, opened)
+    }
+
+    private fun work(state: WorkInfo.State, progress: androidx.work.Data = androidx.work.Data.EMPTY, output: androidx.work.Data = androidx.work.Data.EMPTY) =
+        WorkInfo(UUID.randomUUID(), state, emptySet(), outputData = output, progress = progress)
+
+    @Test
+    fun talkBackHearsTheBuildGoFromCheckingToItsResultButNotEveryCount() {
+        // A new reader's first build: the "make your first edition" prompt goes away as it starts.
+        val work = MutableStateFlow<WorkInfo?>(null)
+        val vm = TodayViewModel(repo, work) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.editions != null }
+        // TalkBack announces a live region whose text changes, not one that appears, so the status
+        // must stay the same node from the tap to the result.
+        val status = compose.onNodeWithTag(BUILD_STATUS).fetchSemanticsNode().id
+        fun statusNode() = compose.onNodeWithTag(BUILD_STATUS).fetchSemanticsNode()
+        fun text() = statusNode().config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text }
+
+        work.value = work(WorkInfo.State.ENQUEUED)
+        idleUntil { vm.state.value.build == BuildState.Syncing }
+        compose.waitForIdle()
+        assertEquals(status, statusNode().id)
+        assertEquals("Checking your sources for new articles…", text())
+        assertTrue(SemanticsProperties.LiveRegion in statusNode().config)
+
+        work.value = work(WorkInfo.State.RUNNING, progress = workDataOf(EditionWorker.STAGE to EditionWorker.STAGE_FETCHING, EditionWorker.FETCHED to 3))
+        idleUntil { vm.state.value.build is BuildState.Fetching }
+        compose.waitForIdle()
+        assertEquals(status, statusNode().id)
+        assertEquals("Making your edition", text())
+        compose.onNode(hasText("3 articles read so far") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertDoesNotExist()
+
+        work.value = work(WorkInfo.State.SUCCEEDED)
+        idleUntil { vm.state.value.build == BuildState.Idle }
+        compose.waitForIdle()
+        assertEquals(status, statusNode().id)
+        assertEquals("Your edition is ready.", text())
+    }
+
+    @Test
+    fun aFailedBuildIsAnnounced() {
+        val work = MutableStateFlow<WorkInfo?>(work(WorkInfo.State.ENQUEUED))
+        val vm = TodayViewModel(repo, work) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.build == BuildState.Syncing }
+
+        work.value = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Couldn't reach any of your sources."))
+        idleUntil { vm.state.value.build is BuildState.Failed }
+        compose.onNode(hasText("Couldn't reach any of your sources.") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
+    }
+
+    @Test
+    fun anOldFailureIsShownButNotAnnouncedEachTimeTodayOpens() {
+        val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Couldn't reach any of your sources."))
+        val vm = TodayViewModel(repo, flowOf(failed)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.build is BuildState.Failed }
+
+        compose.onNodeWithText("Couldn't reach any of your sources.").assertExists()
+        compose.onNode(hasText("Couldn't reach any of your sources.") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertDoesNotExist()
     }
 
     @Test

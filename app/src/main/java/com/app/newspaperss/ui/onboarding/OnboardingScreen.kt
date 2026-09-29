@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -83,7 +84,8 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
             if (s.step != Step.WELCOME) {
                 LinearProgressIndicator(
                     progress = { s.step.ordinal / (Step.entries.size - 1f) },
-                    modifier = Modifier.fillMaxWidth(),
+                    // TalkBack would read "33 percent"; the welcome screen isn't a step.
+                    modifier = Modifier.fillMaxWidth().semantics { stateDescription = "Step ${s.step.ordinal} of ${Step.entries.size - 1}" },
                 )
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp)) {
@@ -179,13 +181,17 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel, sources: So
         singleLine = true,
         isError = s.findError != null,
         supportingText = s.findError?.let { { Text(it) } },
-        trailingIcon = {
-            if (s.searching) Text("Checking…", Modifier.padding(end = 12.dp)) else TextButton(onClick = vm::findPasted, enabled = s.pasted.isNotBlank()) { Text("Add") }
-        },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { vm.findPasted() }),
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
     )
+    // Below the field, not inside it: at large font sizes a button inside leaves no room to type.
+    // The status is always composed and only its text changes, so TalkBack announces it; the
+    // button stays put rather than being swapped out from under focus.
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+        Text(if (s.searching) "Checking…" else "", Modifier.padding(horizontal = 12.dp).semantics { liveRegion = LiveRegionMode.Polite })
+        OutlinedButton(onClick = vm::findPasted, enabled = !s.searching && s.pasted.isNotBlank()) { Text("Add") }
+    }
     s.found.forEach { feed -> FeedCheck(feed.title, feed.url in s.chosen) { vm.toggleFeed(feed.url) } }
     StarterPacks.all.forEach { pack ->
         val urls = pack.feeds.map { it.url }

@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -158,6 +160,16 @@ class OnboardingTest {
         vm.findPasted()
         idleUntil { vm.state.value.found.isNotEmpty() }
         assertEquals(setOf("https://blog.example/feed"), vm.state.value.chosen)
+    }
+
+    @Test
+    fun talkBackHearsWhichStepThisIsNotAPercentage() {
+        compose.setContent { OnboardingScreen(vm) }
+        vm.next()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Step 1 of 3")).assertExists()
+        vm.chooseDevice(Device.KINDLE)
+        vm.next()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Step 2 of 3")).assertExists()
     }
 
     @Test
