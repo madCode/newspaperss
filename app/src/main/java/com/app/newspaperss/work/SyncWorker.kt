@@ -20,13 +20,23 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     }
 
     companion object {
-        private const val PERIODIC = "sync-periodic"
+        internal const val PERIODIC = "sync-periodic-12h"
+        private const val OLD_PERIODIC = "sync-periodic"
         private const val NOW = "sync-now"
         private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
+        /**
+         * Keeps the Sources screen current between editions. Twice a day is plenty: every edition
+         * syncs right before it's built anyway, so these runs only refresh what the screen shows.
+         */
         fun schedulePeriodic(context: Context) {
-            val request = PeriodicWorkRequestBuilder<SyncWorker>(4, TimeUnit.HOURS).setConstraints(network).build()
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
+            val request = PeriodicWorkRequestBuilder<SyncWorker>(12, TimeUnit.HOURS).setConstraints(constraints).build()
+            val work = WorkManager.getInstance(context)
+            // A new name rather than UPDATE, which would re-schedule the work on every app start
+            // (an extra wakeup each time); the old 4-hour work is cancelled once.
+            work.cancelUniqueWork(OLD_PERIODIC)
+            work.enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
         }
 
         fun syncNow(context: Context) {

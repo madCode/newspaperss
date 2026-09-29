@@ -2,10 +2,13 @@ package com.app.newspaperss.core.net
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Cache
+import okhttp3.CacheControl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.io.IOException
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
@@ -50,13 +53,17 @@ class OkHttpHttpClient(
 ) : HttpClient {
     // Images get a shorter deadline: an article can have 20, and one slow image host
     // mustn't push a whole edition past WorkManager's ten-minute limit.
-    private val imageClient = client.newBuilder().callTimeout(20, TimeUnit.SECONDS).build()
+    // No cache for images: a few would push every feed out of it, and each is fetched once anyway.
+    private val imageClient = client.newBuilder().callTimeout(20, TimeUnit.SECONDS).cache(null).build()
 
     // A POST carries credentials (tt-rss logins). OkHttp re-sends the body on a 307/308, to any
     // host and even from https to http, so redirects are handed back to the caller instead.
     private val postClient = client.newBuilder().followRedirects(false).followSslRedirects(false).build()
 
-    override suspend fun get(url: String): HttpResponse = text(request(url, emptyMap()))
+    // max-age=0: always ask the server, if only "not modified?". Otherwise OkHttp serves anything it
+    // judges fresh (max-age, or a guess from Last-Modified) without a request, and a sync misses new
+    // posts. Not no-cache, which in OkHttp skips the cache and its validators altogether.
+    override suspend fun get(url: String): HttpResponse = text(request(url, emptyMap()) { cacheControl(REVALIDATE) })
 
     override suspend fun postJson(url: String, body: String): HttpResponse =
         text(request(url, emptyMap()) { post(body.toRequestBody(JSON)) }, postClient)
@@ -135,10 +142,18 @@ class OkHttpHttpClient(
         const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36 newspaperss"
 
-        fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
+        /**
+         * @param cacheDir where to keep an HTTP cache. With one, OkHttp revalidates a feed it has
+         *   seen (If-None-Match / If-Modified-Since), and most answer 304 instead of the whole feed.
+         */
+        fun defaultClient(cacheDir: File? = null): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .callTimeout(60, TimeUnit.SECONDS)
+            .apply { cacheDir?.let { cache(Cache(it, CACHE_BYTES)) } }
             .build()
+
+        private const val CACHE_BYTES = 10L * 1024 * 1024
+        private val REVALIDATE = CacheControl.Builder().maxAge(0, TimeUnit.SECONDS).build()
     }
 }

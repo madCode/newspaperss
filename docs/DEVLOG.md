@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** housekeeping from the resource audit.
-- **Next:** the audit's network and battery fixes (feed cache, sync interval, tt-rss sinceId); the first tap on an article; language tagging.
+- **In flight:** a feed cache and a gentler background sync.
+- **Next:** the first tap on an article; language tagging; the audit's memory items (page DOM trimming).
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 18: resource audit, and housekeeping (15:30–)
+### Cycle 19: fewer downloads, fewer wakeups (15:44–)
+- **Shipped:** a 10 MB HTTP cache, with every feed and page request revalidated (If-None-Match), so an unchanged feed answers 304 instead of downloading again (about 180 MB a month at 20 feeds). The background sync runs every 12 hours with the battery not low, instead of every 4: each edition syncs right before it's built.
+- **Review caught:** OkHttp would serve a feed it judged "fresh" without asking at all (max-age, or a guess from Last-Modified), so a new post could miss an edition. Requests now ask for max-age=0, which forces the conditional request (no-cache would skip the cache altogether, as the test found). Re-applying the schedule with UPDATE on every start cost wakeups; it's a new name with KEEP.
+- **Left:** tt-rss `sinceId`: a since-id cursor changes what "unread" returns, the trap rss-to-e-reader's #28 hit. In the backlog with that note.
+
+### Cycle 18: resource audit, and housekeeping (15:30–15:44, [#35](https://github.com/madCode/newspaperss/pull/35))
 - **Audit:** typical peak memory while building is about 80 MB, worst case about 220 MB (a 10 MB page parsed twice). Bitmaps live outside the Java heap on Android 8+, and the EPUB is written straight to disk. So **streaming images to disk isn't worth it** (at most 15 MB) and is dropped. The real costs were elsewhere.
 - **Shipped:** only the newest 14 editions keep their EPUB (5–12 MB each, gigabytes a year otherwise); articles a month past delivery drop their feed text but keep their row (the database would have outgrown Auto Backup's 25 MB in months, silently stopping backup); the image budget counts as spent once nothing more fits (before, every later article downloaded and discarded its images).
 - **Review caught:** an empty image budget no longer counted as spent (a test caught it too), and the month was counted from discovery, so a long-saved link sent today lost its text at once.
