@@ -45,6 +45,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,7 +102,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 Health(source, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
                 FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
-                    if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text") }
+                    if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(source)}") }
                     TextButton(onClick = { removing = true }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
                 }
                 if (source.kind == SourceKind.TTRSS) {
@@ -107,12 +111,21 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     ArticleCap(source.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
                 }
                 HorizontalDivider(Modifier.padding(top = 16.dp))
-                Text("Recent articles", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(16.dp))
+                Text(
+                    if (articles.isEmpty()) "Recent articles" else "Recent articles · ${articles.size}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp).semantics {
+                        heading()
+                        contentDescription = if (articles.isEmpty()) "Recent articles" else "Recent articles, ${articles.size}"
+                    },
+                )
                 if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
             }
             items(articles, key = { it.id }) { article ->
                 RecentArticle(article, locale)
-                HorizontalDivider()
+                // Inset: full-width rules chopped the list into boxes to track across.
+                HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
     }
@@ -232,9 +245,29 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
 private fun RecentArticle(article: ArticleEntity, locale: Locale) {
     val details = listOfNotNull(article.originTitle, shortDate(article.discoveredAt, locale), articleStatus(article)).joinToString(" · ")
     ListItem(
-        headlineContent = { Text(article.title.ifBlank { SourceRepository.hostOf(article.url) }, maxLines = 2) },
+        // A shape per state, not a colour, so it reads on e-ink; the words are in the line below.
+        leadingContent = {
+            Text(statusMark(article.state), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(min = 24.dp).clearAndSetSemantics {})
+        },
+        headlineContent = {
+            Text(article.title.ifBlank { SourceRepository.hostOf(article.url) }, maxLines = 2, fontWeight = FontWeight.Medium)
+        },
         supportingContent = { Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
     )
+}
+
+private fun statusMark(state: ArticleState) = when (state) {
+    ArticleState.NEW, ArticleState.IN_EDITION -> "●"
+    ArticleState.DELIVERED -> "✓"
+    ArticleState.SKIPPED, ArticleState.EXPIRED -> "○"
+}
+
+/** The article-text setting in a word or two, for its button. */
+private fun modeName(source: SourceEntity) = when {
+    !source.contentModeChosen -> "Automatic"
+    source.contentMode == ContentMode.FEED -> "Feed's text"
+    source.contentMode == ContentMode.PAGE -> "Full page"
+    else -> "Automatic"
 }
 
 /** Where the source's text comes from, including while the automatic check is still deciding. */

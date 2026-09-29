@@ -14,6 +14,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.data.AppDatabase
+import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.SourceRepository
@@ -122,6 +123,19 @@ class SourceDetailScreenTest {
         compose.onNodeWithText("Use your edition setting").performClick()
         idleUntil { compose.waitForIdle(); visible("1 article from this site, then more if there's room") }
         assertNull(runBlocking { db.sources().byId(id)!!.maxArticles })
+    }
+
+    /** The button says what it sets: the reader's choice, or Automatic when the check decides. */
+    @Test
+    fun theArticleTextButtonNamesTheSetting() {
+        val id = runBlocking { repo.addFeed("https://example.com/feed", "Example") }
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { visible("Article text: Automatic") }
+
+        runBlocking { repo.chooseContentMode(id, ContentMode.PAGE) }
+
+        idleUntil { compose.waitForIdle(); visible("Article text: Full page") }
     }
 
     /** At the default of 1, the edition's number is soft; a noisy site can still be held to 1 for good. */

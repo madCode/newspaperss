@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** webcomics.
-- **Next:** the source page design (built), reading-list titles; then a resource-usage audit.
+- **In flight:** the source page design.
+- **Next:** reading-list titles, reading time and tap-to-open; then a resource-usage audit.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 15: webcomics (15:07–)
+### Cycle 16: the source page (15:14–)
+- **From device testing:** the recent-articles list made you squint, and "Recent articles" didn't stand out; "Article text" didn't say what it set.
+- **Shipped:** "Recent articles · N" as a real heading; a status mark per article in its own column (● waiting, ✓ delivered, ○ not used: shapes, not colours, for e-ink); medium-weight titles; inset dividers; "Article text: Automatic / Feed's text / Full page".
+- **Review caught:** "Site's text" read as the web page (now "Feed's text"); TalkBack read the heading's middle dot aloud; faint dividers would vanish on a Boox's greys.
+
+### Cycle 15: webcomics (15:07–15:14, [#32](https://github.com/madCode/newspaperss/pull/32))
 - **From device testing:** God Slave, Namesake and Cursed Princess Club (Webtoons), on top of the New Yorker cartoon and xkcd.
 - **Shipped:** the feed finder follows an ordinary link to a feed (God Slave's `/comic/rss`), shortest path first and never a comments feed; a page's own comic (`img#cc-comic`, `#comic`), every panel, beats the feed's thumbnail, captioned by the feed's text.
 - **Checks:** God Slave and Namesake now give their full comic, xkcd its 2x image, the New Yorker its cartoon; a live edition passes epubcheck.
