@@ -28,14 +28,19 @@ who'd rather not set up Python, a server and a scheduler.
   like Arts & Letters Daily, which picks a few links a day.
 - **A paper that ends.** Each edition fills a reading-time budget, taking
   turns between sites with at most one article from each (you can allow
-  more), so no site drowns out the others. The full article is fetched and cleaned for e-ink when a
-  site only sends summaries; the app works out which sites need that.
-- **A proper book.** Cover with the day's headlines, contents with reading
-  times, images sized for e-ink, "Next" links, and an end page.
+  more), so no site drowns out the others. The full article is fetched and
+  cleaned for e-ink when a site only sends summaries; the app works out
+  which sites need that.
+- **Ready when you are.** Set a "ready by" time; the app starts early so the
+  paper is there when you wake.
+- **A proper book.** A cover with the day's headlines, contents with reading
+  times, bylines and a link to each original, images and comics sized for
+  e-ink, each article tagged with its language, and an end page. Preview any
+  article in the app as your e-reader will show it.
 - **Delivered your way.** A notification with a Send button (Kindle app,
   Dropbox for a Kobo, email), a synced folder (KOReader), or Open on a
-  Boox. Articles are only used up once the edition is delivered: saved to
-  your folder, or confirmed by you after sending.
+  Boox. Articles are used up only once the edition is delivered: saved to
+  your folder, sent through an app you pick, or opened on a Boox.
 - **Didn't finish?** Bring articles back into tomorrow's edition.
 - **Take notes.** Export a Markdown notes file per edition, with a citation
   and reflection prompts for each article, for Obsidian, Logseq or any notes app.
@@ -52,6 +57,13 @@ who'd rather not set up Python, a server and a scheduler.
 **Status:** early development, not yet released. See
 [docs/DESIGN.md](docs/DESIGN.md) for the design and
 [docs/BACKLOG.md](docs/BACKLOG.md) for the plan.
+
+## Trying it
+
+The newest debug build is always at
+[newspapeRSS-debug.apk](https://github.com/madCode/newspaperss/releases/download/latest-debug/newspapeRSS-debug.apk)
+(Android 8 or later). It installs beside a release build, and Settings shows
+which build it is.
 
 ## Building
 

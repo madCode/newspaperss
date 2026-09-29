@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** each article tagged with its language ([#38](https://github.com/madCode/newspaperss/pull/38)); TalkBack and large-font fixes.
+- **In flight:** TalkBack and large-font fixes ([#39](https://github.com/madCode/newspaperss/pull/39)); a documentation pass.
 - **Next:** the rest of the accessibility audit (you asked for it); the audit's memory items (page DOM trimming); reading time for Chinese and Japanese.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 22: TalkBack and large fonts (16:30–)
+### Cycle 23: a documentation pass (16:50–)
+- **Why:** you asked for documentation passes in the cycles: readable, current, not onerous. CLAUDE.md now says so: behaviour changes update the docs in the same PR, and every few cycles a pass checks the docs against the code.
+- **Shipped:** DESIGN.md rewritten to describe the app as it is. It had SMTP delivery, edition profiles, user-named sections and a reading-speed setting that don't exist, and nothing on today's changes: timed editions starting early, the feed cache and 12-hour sync, when an edition counts as delivered, housekeeping, comics, language tags, the preview. The finished milestone plan and history are gone (BACKLOG and this log have them), and it's shorter. README: the delivery rule, "ready by", the book's features, a link to the debug APK, and fresh screenshots. CLAUDE.md: database migrations and debug builds.
+- **How:** an agent checked every statement in the three docs against the code and listed what was wrong or missing, with file references; I rewrote from that.
+
+### Cycle 22: TalkBack and large fonts (16:30–16:50, [#39](https://github.com/madCode/newspaperss/pull/39))
 - **Why:** the persona audit's TalkBack items, and you asked for an accessibility audit. These are the known gaps; the full audit is in the backlog.
 - **Shipped:** Today announces what the build is doing ("Checking your sources", "Making your edition", and the result) through a live region. The running count isn't announced, or TalkBack would read every number. Onboarding's progress bar says "Step 2 of 3" instead of "66 percent". Earlier editions say what tapping does. Onboarding's Add and the reading list's Save moved below their text fields, where a 200% font can't squeeze out the space to type.
 - **Review caught:** in Compose a live region announces when its text changes, not when it first appears, so the failure message and "Checking…" would have been silent. And if they had spoken, a failure WorkManager still remembered would have been read out every time Today opened. The status is now one always-present line whose text changes, and it's only live once a build has run while the screen is up. Onboarding's Add button stays put instead of being swapped for "Checking…" under TalkBack's focus. A second look found a new reader's very first "Checking…" still silent (the list rebuilt the panel when the first-edition prompt went away; items are keyed now), and success said nothing; it now says "Your edition is ready." Still to confirm with TalkBack on a device.

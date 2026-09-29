@@ -1,8 +1,8 @@
 # Backlog
 
 The running plan. Each work cycle picks what matters most for readers right now (device feedback
-first, then research and judgment), builds it with tests, and moves it to Done. Milestones are from
-[DESIGN.md §10](DESIGN.md#10-milestones). Sections below Next are proposals, not commitments.
+first, then research and judgment), builds it with tests, and moves it to Done. Feature proposals are
+ideas, not commitments.
 
 ## Next
 
@@ -11,12 +11,12 @@ first, then research and judgment), builds it with tests, and moves it to Done. 
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
 - [ ] Decide what tapping an article in a source's list does: open the original in the browser, render it, or offer "add to the next edition"
 
-### M4 leftovers
+### Delivery and schedule
 - [ ] If lead time isn't enough on a real device, wake for timed editions with an exact alarm (Doze defers WorkManager; expedited work was rejected: its API 31+ quota can silently restart a long build)
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
 - [ ] Verify folder delivery + chooser-from-notification on a real device
 
-### M8 Advanced
+### Later
 - [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
 
 ### From the persona audit (Day 2)
@@ -127,6 +127,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Documentation pass: DESIGN.md describes the app as it is (no SMTP, profiles or reading-speed setting; today's changes in), README and CLAUDE.md updated, fresh screenshots; documentation passes are now part of the cycles
 - [x] TalkBack: the build's stage is announced (not every count), onboarding's progress says "Step 2 of 3", earlier editions say "See what's inside"; Add and Save sit below their fields so large fonts leave room to type
 - [x] Each article is tagged with its language (`xml:lang`, `dir="rtl"`), detected from its text (writing system, common words) with the page's declared language as a tiebreaker
 - [x] The article preview shows at once and reads the book in the background, with one open zip per screen (the "first tap doesn't open it" report). The side-scroll came from the old EPUB's long URL line, already gone
