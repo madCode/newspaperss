@@ -196,7 +196,7 @@ object HtmlCleaner {
             // By length, not share of the page: before Readability the page includes navigation and
             // comments, and a paywalled article body can sit in one of these classes.
             if (el.classNames().any { it.lowercase() in SCREEN_READER_ONLY } && countWords(el) <= SCREEN_READER_MAX_WORDS &&
-                el.selectFirst("img") == null
+                el.selectFirst("img") == null && !isOnlyLabel(el)
             ) {
                 el.remove()
             }
@@ -204,14 +204,27 @@ object HtmlCleaner {
     }
 
     /**
-     * Removes a "Recommended stories" style list of links. Readability often flattens the box
-     * that held it, so this goes by the heading and the list after it rather than a class.
-     * A heading like that over paragraphs of the article's own text stays.
+     * Whether [el] is part of all the text a link or button has, as on an icon link: without its
+     * screen-reader text, the link would be empty.
+     */
+    private fun isOnlyLabel(el: Element): Boolean {
+        val control = el.parents().firstOrNull { it.tagName() == "a" || it.tagName() == "button" } ?: return false
+        val visible = control.clone()
+        visible.select("*").filter { e -> e.classNames().any { it.lowercase() in SCREEN_READER_ONLY } }.forEach { it.remove() }
+        return visible.text().isBlank()
+    }
+
+    /**
+     * Removes a "Recommended stories" style box of links. Readability often flattens the box, so this
+     * goes by the heading and the list right after it rather than a class; an extractor can also drop
+     * the list and leave the heading over the article's next paragraph, so such a heading goes on its
+     * own too. A list long enough to be a real part of the article stays, with its heading.
      */
     private fun removeRelatedLinks(body: Element) {
         val total = countWords(body).coerceAtLeast(1)
         for (heading in body.select("h2, h3, h4, h5, h6")) {
-            if (!heading.isAttached() || !RELATED_HEADING.matches(heading.text().trim())) continue
+            val text = heading.text().trim()
+            if (!heading.isAttached() || !FURNITURE_HEADING.matches(text)) continue
             val box = heading.parent()
             if (box != null && box !== body && heading === box.firstElementChild() && box.children().drop(1).all(::isLinkList) &&
                 box.childrenSize() > 1 && isSmallPart(box, total)
@@ -219,11 +232,18 @@ object HtmlCleaner {
                 box.remove()
                 continue
             }
-            val list = heading.nextElementSibling()?.takeIf(::isLinkList) ?: continue
-            // An essay's own "Further reading" can be a long list; a site's box of links is short.
-            if (!isSmallPart(list, total)) continue
-            list.remove()
-            heading.remove()
+            // The next node, not the next element: text between the heading and a list belongs to the heading.
+            var following = heading.nextSibling()
+            while (following is TextNode && following.isBlank) following = following.nextSibling()
+            if (following is Element && isLinkList(following)) {
+                // An essay's own reading list can be long; a site's box of links is short.
+                if (isSmallPart(following, total)) {
+                    following.remove()
+                    heading.remove()
+                }
+            } else if (LONE_FURNITURE_HEADING.matches(text) && !(following is Element && following.tagName() in CONTENT_TAGS)) {
+                heading.remove()
+            }
         }
     }
 
@@ -468,11 +488,20 @@ object HtmlCleaner {
     private val SCREEN_READER_ONLY = setOf(
         "screen-reader-text", "screen-reader-only", "sr-only", "sr-text", "visually-hidden", "visuallyhidden", "a11y-hidden",
     )
-    private val RELATED_HEADING = Regex(
-        "(recommended|related)( (stories|articles|reading|content|coverage|posts))?|more (on|from) .{1,40}|" +
-            "read (more|next)|you (may|might) also like|most (read|popular)|further reading",
+    // Headings that name a site's box of links, never a section of the article itself. "Related" and
+    // "Further reading" aren't here: authors use them for their own references.
+    private val FURNITURE_HEADING = Regex(
+        "recommended( (stories|articles|reading|for you))?|read (next|more)|you (may|might) also like|" +
+            "most (read|popular)|more (on|from) .{1,40}|related (stories|articles|coverage|posts|content)",
         RegexOption.IGNORE_CASE,
     )
+    // The ones no article uses for a section of its own paragraphs ("More on the method" can be), so they
+    // go even when the extractor dropped their links and left them over the article's next paragraph.
+    private val LONE_FURNITURE_HEADING = Regex(
+        "recommended( (stories|articles|reading|for you))?|read next|you (may|might) also like|most (read|popular)",
+        RegexOption.IGNORE_CASE,
+    )
+    private val CONTENT_TAGS = setOf("ul", "ol", "dl", "table")
     private const val LINK_TEXT_SHARE = 0.8
     private const val SCREEN_READER_MAX_WORDS = 12
     private val LIST_TAGS = setOf("ul", "ol")
