@@ -15,6 +15,7 @@ import com.app.newspaperss.edition.BuildResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.Instant
 
 class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -25,6 +26,7 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val result = try {
             container.editionRun.run(
                 scheduled = inputData.getBoolean(SCHEDULED, false),
+                dueAt = inputData.getLong(DUE_AT, 0L).takeIf { it > 0 }?.let(Instant::ofEpochMilli),
                 onProgress = { done -> setProgressAsync(workDataOf(STAGE to STAGE_FETCHING, FETCHED to done)) },
             )
         } catch (e: CancellationException) {
@@ -44,6 +46,7 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         // One build at a time: a scheduled build and "Make one now" share this name.
         const val UNIQUE = "edition-build"
         const val SCHEDULED = "scheduled"
+        const val DUE_AT = "dueAt"
         const val STAGE = "stage"
         const val STAGE_SYNCING = "syncing"
         const val STAGE_FETCHING = "fetching"
@@ -52,10 +55,11 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         const val NOTHING_NEW = "nothingNew"
         const val ERROR = "error"
 
-        fun buildNow(context: Context, scheduled: Boolean = false) {
+        /** @param dueAt for a timed edition, when it's due (epoch ms); it's titled and dated for then. */
+        fun buildNow(context: Context, scheduled: Boolean = false, dueAt: Long? = null) {
             val request = OneTimeWorkRequestBuilder<EditionWorker>()
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .setInputData(workDataOf(SCHEDULED to scheduled))
+                .setInputData(workDataOf(SCHEDULED to scheduled, DUE_AT to (dueAt ?: 0L)))
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.KEEP, request)
         }

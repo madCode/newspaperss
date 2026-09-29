@@ -28,6 +28,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Clock
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.UUID
@@ -53,7 +54,7 @@ class EditionBuilder(
     private val imageBudgetBytes: Long = ImageRules.MAX_EDITION_BYTES,
     private val cover: (CoverInfo) -> EpubImage? = { null },
 ) {
-    suspend fun build(settings: EditionSettings, onProgress: (done: Int) -> Unit = {}): BuildResult {
+    suspend fun build(settings: EditionSettings, dueAt: Instant? = null, onProgress: (done: Int) -> Unit = {}): BuildResult {
         failInterrupted()
         releaseUndelivered()
         val sources = db.sources().all().filter { !it.paused }
@@ -62,7 +63,8 @@ class EditionBuilder(
         val articles = db.articles().candidates().filter { it.sourceId in sourcesById }.distinctBy { it.url.ifBlank { "#${it.id}" } }
         if (articles.isEmpty()) return BuildResult.NothingNew
 
-        val now = LocalDateTime.now(clock.withZone(zone))
+        // A timed edition is built ahead of its time; it's titled and dated for when it's due.
+        val now = LocalDateTime.ofInstant(dueAt ?: clock.instant(), zone)
         val startOfDay = now.toLocalDate().atStartOfDay(zone).toInstant()
         val title = EditionTitles.title(now, db.editions().titlesSince(startOfDay))
         val rotation = db.editions().count()

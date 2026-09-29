@@ -90,14 +90,47 @@ class EditionSchedulerTest {
         assertEquals(sixThirty, prefs.getLong(EditionScheduler.PENDING, 0))
     }
 
+    private val day = 86_400_000L
+    private val sixTen = morning.withHour(6).withMinute(10)
+
+    /** As the 6:30 timer leaves things when it fires at 6:00: the build started, tomorrow's timer armed. */
+    private suspend fun firedEarly() {
+        prefs.edit { putLong(EditionScheduler.LAST_DUE, sixThirty) }
+        EditionScheduler.reschedule(context, settings, morning.withHour(6))
+    }
+
     @Test
     fun rescheduleDuringTheLeadDoesntArmTheEditionAlreadyStartedAgain() = runTest {
-        // The 6:30 timer fired at 6:00 and started the build; the app opens at 6:10.
-        prefs.edit { putLong(EditionScheduler.LAST_DUE, sixThirty) }
+        firedEarly()
+        val armed = timers().single().id
 
-        EditionScheduler.reschedule(context, settings, morning.withHour(6).withMinute(10))
+        EditionScheduler.reschedule(context, settings, sixTen)
 
-        assertEquals(sixThirty + 86_400_000, prefs.getLong(EditionScheduler.PENDING, 0))
+        assertEquals(armed, timers().single().id)
+        assertEquals(sixThirty + day, prefs.getLong(EditionScheduler.PENDING, 0))
+    }
+
+    @Test
+    fun movingTheTimeDuringTheLeadDoesntMakeASecondPaperToday() = runTest {
+        firedEarly()
+
+        for (minute in listOf(45, 15)) {
+            val moved = Settings(scheduleEnabled = true, schedule = Schedule(time = LocalTime.of(6, minute)))
+            EditionScheduler.reschedule(context, moved, sixTen)
+
+            val due = morning.withHour(6).withMinute(minute).toInstant().toEpochMilli() + day
+            assertEquals("moved to 6:$minute", due, prefs.getLong(EditionScheduler.PENDING, 0))
+        }
+    }
+
+    @Test
+    fun aClockSetAheadAndCorrectedDoesntHoldBackEditions() = runTest {
+        // A timer ran while the clock read a day ahead and recorded tomorrow's edition.
+        prefs.edit { putLong(EditionScheduler.LAST_DUE, sixThirty + day) }
+
+        EditionScheduler.reschedule(context, settings, morning)
+
+        assertEquals(sixThirty, prefs.getLong(EditionScheduler.PENDING, 0))
     }
 
     @Test

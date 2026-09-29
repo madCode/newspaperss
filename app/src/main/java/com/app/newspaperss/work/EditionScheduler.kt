@@ -33,7 +33,7 @@ object EditionScheduler {
     internal const val UNIQUE = "edition-schedule"
     internal const val PREFS = "edition-schedule"
     internal const val PENDING = "pending_epoch_ms"
-    /** The due time of the last edition a timer started, so that one isn't scheduled again during its lead. */
+    /** The due time of the last edition a timer started, so it isn't scheduled again around that time. */
     internal const val LAST_DUE = "last_due_epoch_ms"
     internal const val DUE = "due_epoch_ms"
     val LEAD: Duration = Duration.ofMinutes(30)
@@ -50,7 +50,7 @@ object EditionScheduler {
         // a stale one would stop timed editions for good: it only counts while the work exists.
         val armed = work.getWorkInfosForUniqueWorkFlow(UNIQUE).first().any { !it.state.isFinished }
         val pending = prefs.getLong(PENDING, 0L).takeIf { armed && it > 0 }?.let(Instant::ofEpochMilli)
-        val target = if (settings.scheduleEnabled) settings.schedule.nextAfter(after(now, prefs.getLong(LAST_DUE, 0L)))?.toInstant() else null
+        val target = if (settings.scheduleEnabled) nextDue(settings, now, prefs.getLong(LAST_DUE, 0L)) else null
         when (val action = ScheduleTimer.decide(pending, target, now.toInstant())) {
             TimerAction.Keep -> {}
             TimerAction.Cancel -> {
@@ -64,9 +64,21 @@ object EditionScheduler {
         }
     }
 
-    /** [now], or the last due time if that's later: the next edition comes after both. */
-    private fun after(now: ZonedDateTime, lastDueMs: Long): ZonedDateTime =
-        if (lastDueMs > now.toInstant().toEpochMilli()) Instant.ofEpochMilli(lastDueMs).atZone(now.zone) else now
+    fun lastDue(context: Context): Long =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(LAST_DUE, 0L)
+
+    /**
+     * The next due time, skipping any within [LEAD] of the last edition started: that one is
+     * being built already, and with the time moved from 6:30 to 6:45 during its lead, 6:45
+     * would be a second paper. Further away, [lastDueMs] is ignored, so a clock set far ahead
+     * and then corrected can't hold back timed editions until that date.
+     */
+    internal fun nextDue(settings: Settings, now: ZonedDateTime, lastDueMs: Long): Instant? {
+        val lastDue = Instant.ofEpochMilli(lastDueMs)
+        val nearLast = Duration.between(now.toInstant(), lastDue).abs() <= LEAD
+        val after = if (nearLast) lastDue.plus(LEAD).atZone(now.zone) else now
+        return settings.schedule.nextAfter(after)?.toInstant()
+    }
 
     private fun timer(due: Instant, now: Instant) = OneTimeWorkRequestBuilder<Timer>()
         .setInitialDelay(Duration.between(now, due.minus(LEAD)).coerceAtLeast(Duration.ZERO).toMillis(), TimeUnit.MILLISECONDS)
@@ -76,21 +88,23 @@ object EditionScheduler {
     class Timer(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
         override suspend fun doWork(): Result {
             val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val now = ZonedDateTime.now()
-            val due = inputData.getLong(DUE, now.toInstant().toEpochMilli())
-            EditionWorker.buildNow(applicationContext, scheduled = true)
-            prefs.edit {
-                remove(PENDING)
-                putLong(LAST_DUE, due)
-            }
             val settings = (applicationContext as NewspaperssApp).container.settings.current()
-            // After the due time, not now: fired in the lead, "the next 6:30" would be this one again.
-            val next = if (settings.scheduleEnabled) settings.schedule.nextAfter(after(now, due))?.toInstant() else null
-            if (next != null) {
-                // Appended rather than replaced: REPLACE on our own name would cancel this running worker.
-                WorkManager.getInstance(applicationContext)
-                    .enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.APPEND_OR_REPLACE, timer(next, now.toInstant()))
-                prefs.edit { putLong(PENDING, next.toEpochMilli()) }
+            // Locked: a reschedule between clearing PENDING and arming the next timer would see
+            // no timer and arm one with REPLACE, cancelling this worker.
+            lock.withLock {
+                val now = ZonedDateTime.now()
+                val due = inputData.getLong(DUE, now.toInstant().toEpochMilli())
+                EditionWorker.buildNow(applicationContext, scheduled = true, dueAt = due)
+                prefs.edit { putLong(LAST_DUE, due) }
+                val next = if (settings.scheduleEnabled) nextDue(settings, now, due) else null
+                if (next != null) {
+                    // Appended rather than replaced: REPLACE on our own name would cancel this running worker.
+                    WorkManager.getInstance(applicationContext)
+                        .enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.APPEND_OR_REPLACE, timer(next, now.toInstant()))
+                    prefs.edit { putLong(PENDING, next.toEpochMilli()) }
+                } else {
+                    prefs.edit { remove(PENDING) }
+                }
             }
             return Result.success()
         }
