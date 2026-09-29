@@ -20,7 +20,7 @@ class ExtractorContentProvider(private val extractor: ArticleExtractor) : Articl
             title = extracted.title,
             author = extracted.author,
             bodyHtml = extracted.html,
-            minutes = extracted.minutes,
+            wordCount = extracted.wordCount,
             note = extracted.note,
         )
     }

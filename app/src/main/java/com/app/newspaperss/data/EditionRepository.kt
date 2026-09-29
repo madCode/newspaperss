@@ -16,6 +16,8 @@ class EditionRepository(
 
     fun observeArticles(id: Long): Flow<List<EditionArticleEntity>> = db.editions().observeArticles(id)
 
+    suspend fun byId(id: Long): EditionEntity? = db.editions().byId(id)
+
     fun fileOf(edition: EditionEntity): File? = edition.fileName?.let { File(editionsDir, it) }?.takeIf { it.exists() }
 
     /** Delivery succeeded: only now are the edition's articles used up. */

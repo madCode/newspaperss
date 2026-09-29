@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -30,11 +31,15 @@ import com.app.newspaperss.ui.theme.NewspaperssTheme
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
 import com.app.newspaperss.work.EditionWorker
+import com.app.newspaperss.work.EditionScheduler
+import com.app.newspaperss.ui.settings.SettingsScreen
+import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.work.SyncWorker
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     TODAY("today", "Today", Icons.Default.Newspaper),
     SOURCES("sources", "Sources", Icons.AutoMirrored.Filled.List),
+    SETTINGS("settings", "Settings", Icons.Default.Settings),
 }
 
 class MainActivity : ComponentActivity() {
@@ -82,6 +87,11 @@ private fun App(container: AppContainer) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { SourcesViewModel(container.sources, container.feedFinder) { SyncWorker.syncNow(context) } }
                 SourcesScreen(vm)
+            }
+            composable(Tab.SETTINGS.route) {
+                val context = LocalContext.current.applicationContext
+                val vm = viewModel { SettingsViewModel(container.settings) { EditionScheduler.reschedule(context, it) } }
+                SettingsScreen(vm)
             }
         }
     }

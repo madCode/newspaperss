@@ -36,7 +36,7 @@ class EditionBuilderTest {
     private val sources = SourceRepository(db)
     private val unreadable = mutableSetOf<String>()
     private val content = ArticleContentProvider { a, _ ->
-        if (a.guid in unreadable) null else ArticleContent(a.title, null, "<p>${a.title} body</p>", minutes = 10.0)
+        if (a.guid in unreadable) null else ArticleContent(a.title, null, "<p>${a.title} body</p>", wordCount = 2000)
     }
     private val builder by lazy { EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) }
     private val editions by lazy { EditionRepository(db, tmp.root, clock) }
@@ -68,7 +68,7 @@ class EditionBuilderTest {
         source("b", "Culture", "b1")
         source("c", "World", "c1")
 
-        val result = builder.build(EditionSettings(minutes = 25, maxPerSource = 1)) as BuildResult.Built
+        val result = builder.build(EditionSettings(minutes = 25, maxPerSource = 1, wordsPerMinute = 200)) as BuildResult.Built
 
         val edition = db.editions().byId(result.editionId)!!
         assertEquals("Tuesday Morning Edition", edition.title)

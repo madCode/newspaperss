@@ -11,7 +11,10 @@ import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.edition.ArticleContentProvider
 import com.app.newspaperss.edition.EditionBuilder
-import com.app.newspaperss.edition.EditionSettings
+import com.app.newspaperss.edition.EditionRun
+import com.app.newspaperss.delivery.FolderDelivery
+import com.app.newspaperss.notify.Notifier
+import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
 import java.io.File
 
@@ -28,6 +31,7 @@ class AppContainer(
     val feedFinder = FeedFinder(http)
     val feedSync = FeedSync(db, http)
     val editionBuilder = EditionBuilder(db, content, editionsDir)
-
-    fun editionSettings() = EditionSettings()
+    val settings = SettingsStore(context)
+    val notifier = Notifier(context)
+    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, FolderDelivery(context.contentResolver), notifier)
 }
