@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +36,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -82,6 +85,25 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
         }
     }
 
+    var deleting by remember { mutableStateOf(false) }
+    detail?.edition?.takeIf { deleting }?.let { edition ->
+        AlertDialog(
+            onDismissRequest = { deleting = false },
+            title = { Text("Delete this edition?") },
+            text = {
+                Text(
+                    when (edition.status) {
+                        EditionStatus.READY -> "It hasn't been sent, so its articles go into your next edition."
+                        EditionStatus.DELIVERED -> "Its articles won't come back. The copy on your e-reader stays."
+                        else -> "The file on this phone is deleted too."
+                    },
+                )
+            },
+            confirmButton = { TextButton(onClick = { deleting = false; viewModel.delete(onBack) }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -90,6 +112,10 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                 actions = {
                     if (detail?.contents?.isNotEmpty() == true) {
                         TextButton(onClick = viewModel::writeNotes) { Text("Notes") }
+                    }
+                    val status = detail?.edition?.status
+                    if (status != null && status != EditionStatus.BUILDING) {
+                        TextButton(onClick = { deleting = true }) { Text("Delete") }
                     }
                 },
             )
@@ -236,4 +262,5 @@ private fun statusOf(edition: EditionEntity): String = when (edition.status) {
     EditionStatus.DELIVERED -> edition.deliveredAt?.takeIf { dateOf(it) != dateOf(edition.createdAt) }?.let { "Sent on ${dateOf(it)}" } ?: "Sent"
     EditionStatus.FAILED -> "Not sent"
     EditionStatus.BUILDING -> "Being made"
+    EditionStatus.DELETED -> "Deleted"
 }

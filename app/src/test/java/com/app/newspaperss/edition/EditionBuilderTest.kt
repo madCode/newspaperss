@@ -70,6 +70,20 @@ class EditionBuilderTest {
     }
 
     @Test
+    fun aDeletedEditionsTitleIsntReused() = runTest {
+        // Send to Kindle drops a title it has seen, and the deleted one may already have been sent.
+        source("a", "World", "a1")
+        val first = builder.build(EditionSettings()) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        assertTrue(editions.delete(first.editionId))
+
+        source("b", "World", "b1")
+        val second = builder.build(EditionSettings()) as BuildResult.Built
+
+        assertEquals("Tuesday Morning Edition, Sep 29 (2)", db.editions().byId(second.editionId)!!.title)
+    }
+
+    @Test
     fun aTimedEditionBuiltBeforeMidnightIsTitledForTheDayItsDue() = runTest {
         source("a", "World", "a1")
         val lateMonday = EditionBuilder(db, content, tmp.root, Clock.fixed(Instant.parse("2026-09-28T23:40:00Z"), ZoneOffset.UTC), ZoneOffset.UTC)

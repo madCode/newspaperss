@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** comics and cartoons keep their image.
-- **Next:** your device-testing list: edition preview and delete, an EPUB design pass (and the too-wide in-app article), the Sources page.
+- **In flight:** "See what's inside" and deleting an edition.
+- **Next:** your device-testing list: an EPUB design pass (and the too-wide in-app article, KOReader's dark-mode links), the Sources page, reading-list titles.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 11: comics keep their image (14:12–)
+### Cycle 12: see what's inside, delete an edition (14:24–)
+- **From device testing:** you couldn't find what went into an edition before sending it (tapping the title worked, but nothing said so), and couldn't delete one.
+- **Shipped:** a "See what's inside" button on the Today card, and Delete on the edition screen. An unsent edition's articles go into the next one; a sent one's stay used.
+- **Review caught:** deleting freed the title, so a remake the same morning got the exact same title and Send to Kindle would drop it silently. The row now stays as a hidden "deleted" marker holding the title.
+
+### Cycle 11: comics keep their image (14:12–14:24, [#28](https://github.com/madCode/newspaperss/pull/28))
 - **From device testing:** the New Yorker's cartoon and a webcomic reached the edition without their images. Two causes:
   - xkcd-style feed items are just the image, and an item with no words was treated as empty;
   - on an image-only page the article extractor gave up and took the footer ("58 words" of legal links on the New Yorker's cartoon page).

@@ -6,6 +6,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -32,12 +34,14 @@ import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -246,5 +250,62 @@ class EditionDetailScreenTest {
         compose.onNodeWithText("Monday Morning Edition").performClick()
 
         assertEquals(older, opened)
+    }
+
+    @Test
+    fun seeWhatsInsideOnTodayOpensTheLatestEdition() {
+        val latest = runBlocking {
+            db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.READY, articleCount = 5, minutes = 30.0))
+        }
+        val vm = TodayViewModel(repo, flowOf(null)) {}
+        var opened: Long? = null
+        compose.setContent { TodayScreen(vm, onOpenEdition = { opened = it }) }
+        idleUntil { vm.state.value.editions?.size == 1 }
+
+        compose.onNodeWithText("See what's inside").performClick()
+
+        assertEquals(latest, opened)
+    }
+
+    private fun deleteFromTheScreen(id: Long) {
+        var left = false
+        val vm = EditionDetailViewModel(repo, id, notes)
+        compose.setContent { EditionDetailScreen(vm, onBack = { left = true }) }
+        idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
+        compose.onNodeWithText("Delete").performClick()
+        compose.onNode(hasText("Delete") and hasAnyAncestor(isDialog())).performClick()
+        idleUntil { left }
+    }
+
+    private fun isGone(id: Long) = runBlocking { repo.observeAll().first().none { it.id == id } && repo.observe(id).first() == null }
+
+    @Test
+    fun deletingAnUnsentEditionGivesItsArticlesToTheNextOne() {
+        val (id, articles) = edition(EditionStatus.READY, listOf("A story"))
+
+        deleteFromTheScreen(id)
+
+        assertTrue(isGone(id))
+        assertEquals(ArticleState.NEW, runBlocking { db.articles().byId(articles[0]) }?.state)
+        assertFalse("its EPUB is gone", editionsDir.resolve("e.epub").exists())
+    }
+
+    @Test
+    fun deletingASentEditionDoesntBringItsArticlesBack() {
+        val (id, articles) = edition(EditionStatus.DELIVERED, listOf("A story"))
+
+        deleteFromTheScreen(id)
+
+        assertTrue(isGone(id))
+        assertEquals(ArticleState.DELIVERED, runBlocking { db.articles().byId(articles[0]) }?.state)
+        assertFalse("its EPUB is gone", editionsDir.resolve("e.epub").exists())
+    }
+
+    @Test
+    fun anEditionBeingMadeCantBeDeleted() {
+        val building = runBlocking { db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.BUILDING)) }
+
+        assertFalse(runBlocking { repo.delete(building) })
+        assertEquals(EditionStatus.BUILDING, runBlocking { db.editions().byId(building) }?.status)
     }
 }

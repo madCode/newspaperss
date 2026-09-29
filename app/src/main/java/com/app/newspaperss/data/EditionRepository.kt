@@ -63,6 +63,26 @@ class EditionRepository(
      */
     suspend fun bringBack(articleIds: List<Long>): Int = db.articles().bringBackDelivered(articleIds)
 
+    /**
+     * Deletes an edition's contents and EPUB. One that was never sent gives its articles back to
+     * the next edition first; a delivered one's stay used. An edition still being made is left
+     * alone. The row stays as [EditionStatus.DELETED], keeping its title taken.
+     *
+     * @return false if there was nothing to delete.
+     */
+    suspend fun delete(id: Long): Boolean {
+        val deleted = db.withTransaction {
+            val edition = db.editions().byId(id)
+                ?.takeIf { it.status != EditionStatus.BUILDING && it.status != EditionStatus.DELETED } ?: return@withTransaction null
+            if (edition.status == EditionStatus.READY) db.articles().bringBack(db.editions().articleIds(id))
+            db.editions().deleteArticles(id)
+            db.editions().update(edition.copy(status = EditionStatus.DELETED, fileName = null, articleCount = 0, minutes = 0.0, error = null))
+            edition
+        } ?: return false
+        deleted.fileName?.let { File(editionsDir, it) }?.delete()
+        return true
+    }
+
     private companion object {
         const val TAG = "EditionRepository"
     }

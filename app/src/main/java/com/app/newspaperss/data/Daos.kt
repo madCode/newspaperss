@@ -210,10 +210,10 @@ data class NotesRow(
 
 @Dao
 interface EditionDao {
-    @Query("SELECT * FROM editions ORDER BY createdAt DESC")
+    @Query("SELECT * FROM editions WHERE status != 'DELETED' ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<EditionEntity>>
 
-    @Query("SELECT * FROM editions WHERE id = :id")
+    @Query("SELECT * FROM editions WHERE id = :id AND status != 'DELETED'")
     fun observe(id: Long): Flow<EditionEntity?>
 
     @Query("SELECT * FROM editions WHERE id = :id")
@@ -233,6 +233,9 @@ interface EditionDao {
 
     @Update
     suspend fun update(edition: EditionEntity)
+
+    @Query("DELETE FROM edition_articles WHERE editionId = :editionId")
+    suspend fun deleteArticles(editionId: Long)
 
     @Insert
     suspend fun insertArticles(articles: List<EditionArticleEntity>)

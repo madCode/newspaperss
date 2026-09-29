@@ -109,7 +109,15 @@ data class DeliveredUrlEntity(
     val deliveredAt: Instant,
 )
 
-enum class EditionStatus { BUILDING, READY, DELIVERED, FAILED }
+enum class EditionStatus {
+    BUILDING, READY, DELIVERED, FAILED,
+
+    /**
+     * Deleted by the reader: only the row stays, holding its title, so a later edition can't
+     * take the same one (Send to Kindle drops a title it has seen). Hidden everywhere else.
+     */
+    DELETED,
+}
 
 @Entity(tableName = "editions")
 data class EditionEntity(
