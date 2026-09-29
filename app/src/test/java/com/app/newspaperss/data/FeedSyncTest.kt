@@ -124,4 +124,60 @@ class FeedSyncTest {
         assertEquals(1, result.newArticles)
         assertEquals(listOf("Two"), db.articles().candidates().map { it.title })
     }
+
+    private suspend fun deliver(vararg articles: ArticleEntity) {
+        val editionId = db.editions().insert(EditionEntity(title = "Edition", status = EditionStatus.READY))
+        db.editions().insertArticles(
+            articles.mapIndexed { i, a -> EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = a.title, sourceTitle = "Blog", minutes = 1.0) },
+        )
+        EditionRepository(db, java.io.File("unused"), clock).markDelivered(editionId)
+    }
+
+    /** Removing a source and adding it back, or meeting a story in a second source, mustn't deliver it again. */
+    @Test
+    fun aDeliveredLinkIsntOfferedAgainFromAnySource() = runTest {
+        repo.addFeed(url, "Blog")
+        repo.addFeed("https://other.example/feed", "Other")
+        http.page(url, rss("Blog", "1" to "One", "2" to "Two"))
+        // The same link under the other feed's own guid and title.
+        http.page("https://other.example/feed", rss("Other", "1" to "One, reposted"))
+        sync.syncAll()
+        deliver(db.articles().candidates().first { it.title == "One" })
+        assertEquals("a waiting copy is used up too", listOf("Two"), db.articles().candidates().map { it.title })
+
+        repo.remove(db.sources().byUrl(url)!!)
+        repo.addFeed(url, "Blog")
+
+        assertEquals(1, sync.syncAll().newArticles)
+        assertEquals(setOf("Two"), db.articles().candidates().map { it.title }.toSet())
+    }
+
+    /** Saving a link on purpose is the reader asking for it, whatever was delivered before. */
+    @Test
+    fun aDeliveredLinkCanStillBeSavedToTheReadingList() = runTest {
+        repo.addFeed(url, "Blog")
+        http.page(url, rss("Blog", "1" to "One"))
+        sync.syncAll()
+        deliver(db.articles().candidates().single())
+
+        ReadingListRepository(db).save("https://example.com/1", "One")
+
+        assertEquals(listOf("https://example.com/1"), db.articles().candidates().map { it.url })
+    }
+
+    @Test
+    fun deliveredLinksAreForgottenAfterAYear() = runTest {
+        repo.addFeed(url, "Blog")
+        http.page(url, rss("Blog", "1" to "One"))
+        sync.syncAll()
+        deliver(db.articles().candidates().single())
+        repo.remove(db.sources().byUrl(url)!!)
+
+        now = now.plus(FeedSync.REMEMBER_DELIVERED).plusSeconds(60)
+        sync.syncAll()
+        repo.addFeed(url, "Blog")
+        sync.syncAll()
+
+        assertEquals(listOf("One"), db.articles().candidates().map { it.title })
+    }
 }

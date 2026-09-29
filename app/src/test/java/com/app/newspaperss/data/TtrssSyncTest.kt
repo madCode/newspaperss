@@ -163,6 +163,18 @@ class TtrssSyncTest {
         assertEquals(server.ops.count { it == "login" }, server.ops.count { it == "logout" })
     }
 
+    /** Still unread on the server means tt-rss hasn't been told it was delivered: skipped, it would stay unread there. */
+    @Test
+    fun aLinkDeliveredFromAnotherSourceStillArrivesFromTtrss() = runTest {
+        connect()
+        val feed = sources.addFeed("https://news.example/feed", "News")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = feed, guid = "n10", url = "https://news.example/10", title = "One")))
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionWith(feed, "n10"))
+        server.add(10, "One", feedId = 1, feedTitle = "Example News")
+
+        assertEquals(1, sync.syncAll().newArticles)
+    }
+
     @Test
     fun aFailedMarkReadIsNotedOnTheSourceAndRetried() = runTest {
         val source = connect()

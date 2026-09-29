@@ -58,7 +58,8 @@ class EditionBuilder(
         releaseUndelivered()
         val sources = db.sources().all().filter { !it.paused }
         val sourcesById = sources.associateBy { it.id }
-        val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
+        // The same link from two sources goes in once.
+        val articles = db.articles().candidates().filter { it.sourceId in sourcesById }.distinctBy { it.url.ifBlank { "#${it.id}" } }
         if (articles.isEmpty()) return BuildResult.NothingNew
 
         val now = LocalDateTime.now(clock.withZone(zone))

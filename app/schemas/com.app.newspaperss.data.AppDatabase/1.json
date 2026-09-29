@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "0f2b67f768b47a2aabaaf6275d3f681c",
+    "identityHash": "89644ff3c121b382505407d3fa6f05cd",
     "entities": [
       {
         "tableName": "sources",
@@ -409,11 +409,35 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "delivered_urls",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`url` TEXT NOT NULL, `deliveredAt` INTEGER NOT NULL, PRIMARY KEY(`url`))",
+        "fields": [
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deliveredAt",
+            "columnName": "deliveredAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "url"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0f2b67f768b47a2aabaaf6275d3f681c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '89644ff3c121b382505407d3fa6f05cd')"
     ]
   }
 }

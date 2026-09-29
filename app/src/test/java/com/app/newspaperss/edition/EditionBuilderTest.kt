@@ -134,6 +134,17 @@ class EditionBuilderTest {
     }
 
     @Test
+    fun aLinkInTwoSourcesGoesInOnce() = runTest {
+        source("a", null, "a1")
+        val b = sources.addFeed("https://b.example/feed", "b")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
+
+        val built = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+
+        assertEquals(1, editions.observeArticles(built.editionId).first().size)
+    }
+
+    @Test
     fun pausedSourcesAreLeftOut() = runTest {
         val id = source("a", null, "a1")
         sources.update(db.sources().byId(id)!!.copy(paused = true))
