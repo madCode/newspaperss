@@ -7,6 +7,7 @@ with tests, and moves it to Done with its PR. Milestones are from
 ## Next
 
 ### From device testing (Day 2)
+- [ ] An app icon: there's none, so the launcher shows Android's default. An adaptive icon (a folded-newspaper mark, monochrome layer for themed icons), matching the calm monochrome app
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
 - [ ] Sources page: easier-to-scan recent-article rows and a stronger "Recent articles" heading
 - [ ] Reading list: fetch each link's title and reading time; tap to open in the browser
