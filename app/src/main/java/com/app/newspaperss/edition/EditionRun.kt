@@ -11,6 +11,7 @@ import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.CancellationException
+import java.time.Instant
 
 /** One edition from start to finish: sync, build, deliver, tell the reader. */
 class EditionRun(
@@ -26,12 +27,13 @@ class EditionRun(
      * @param scheduled true for the timed run. Only then does a shared edition
      *   get a "ready" notification; someone who tapped "Make one now" is
      *   already looking at it.
+     * @param dueAt when a timed edition is due, which is what it's titled and dated for.
      */
-    suspend fun run(scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}): BuildResult {
+    suspend fun run(scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}, dueAt: Instant? = null): BuildResult {
         val s = settings.current()
         sync.syncAll()
         onSyncDone()
-        val result = builder.build(s.edition, onProgress)
+        val result = builder.build(s.edition, dueAt, onProgress)
         when (result) {
             is BuildResult.Built -> deliver(result.editionId, s, scheduled)
             is BuildResult.Failed -> if (scheduled) notifier.problem("Today's edition couldn't be made", result.reason)

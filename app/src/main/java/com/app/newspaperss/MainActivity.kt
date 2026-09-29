@@ -136,7 +136,7 @@ private fun App(container: AppContainer) {
         ) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings) { EditionWorker.buildNow(context) } }
+                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, lastDue = { EditionScheduler.lastDue(context) }) { EditionWorker.buildNow(context) } }
                 TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->

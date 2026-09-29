@@ -44,6 +44,9 @@ class TodayViewModelTest {
         try {
         assertEquals("Tomorrow at 6:30\u202fAM \u00b7 about 30 min", TodayViewModel.nextEdition(on, now))
         assertEquals(null, TodayViewModel.nextEdition(on.copy(scheduleEnabled = false), now))
+        // At 6:10, today's 6:30 edition has already been started early.
+        val started = now.withHour(6).withMinute(30).toInstant().toEpochMilli()
+        assertEquals("Tomorrow at 6:30\u202fAM \u00b7 about 30 min", TodayViewModel.nextEdition(on, now.withHour(6).withMinute(10), started))
         val weekends = on.copy(schedule = on.schedule.copy(days = setOf(java.time.DayOfWeek.SATURDAY)))
         assertEquals("Saturday at 6:30\u202fAM \u00b7 about 30 min", TodayViewModel.nextEdition(weekends, now))
         } finally {

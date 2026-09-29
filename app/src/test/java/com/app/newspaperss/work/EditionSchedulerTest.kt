@@ -8,6 +8,8 @@ import androidx.work.Configuration
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
+import androidx.work.testing.TestListenableWorkerBuilder
+import androidx.work.workDataOf
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.app.newspaperss.core.edition.Schedule
 import com.app.newspaperss.settings.Settings
@@ -15,6 +17,7 @@ import com.app.newspaperss.testutil.TestApp
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -75,6 +78,77 @@ class EditionSchedulerTest {
 
         assertEquals(armed, timers().single().id)
         assertEquals(sixThirty, prefs.getLong(EditionScheduler.PENDING, 0))
+    }
+
+    @Test
+    fun theTimerIsArmedToFireTheLeadTimeBeforeTheEditionIsDue() = runTest {
+        EditionScheduler.reschedule(context, settings, morning)
+
+        val due = java.time.Instant.ofEpochMilli(sixThirty)
+        val expected = java.time.Duration.between(morning.toInstant(), due.minus(EditionScheduler.LEAD)).toMillis()
+        assertEquals(expected, timers().single().initialDelayMillis)
+        assertEquals(sixThirty, prefs.getLong(EditionScheduler.PENDING, 0))
+    }
+
+    private val day = 86_400_000L
+    private val sixTen = morning.withHour(6).withMinute(10)
+
+    /** As the 6:30 timer leaves things when it fires at 6:00: the build started, tomorrow's timer armed. */
+    private suspend fun firedEarly() {
+        prefs.edit { putLong(EditionScheduler.LAST_DUE, sixThirty) }
+        EditionScheduler.reschedule(context, settings, morning.withHour(6))
+    }
+
+    @Test
+    fun rescheduleDuringTheLeadDoesntArmTheEditionAlreadyStartedAgain() = runTest {
+        firedEarly()
+        val armed = timers().single().id
+
+        EditionScheduler.reschedule(context, settings, sixTen)
+
+        assertEquals(armed, timers().single().id)
+        assertEquals(sixThirty + day, prefs.getLong(EditionScheduler.PENDING, 0))
+    }
+
+    @Test
+    fun movingTheTimeDuringTheLeadDoesntMakeASecondPaperToday() = runTest {
+        firedEarly()
+
+        for (minute in listOf(45, 15)) {
+            val moved = Settings(scheduleEnabled = true, schedule = Schedule(time = LocalTime.of(6, minute)))
+            EditionScheduler.reschedule(context, moved, sixTen)
+
+            val due = morning.withHour(6).withMinute(minute).toInstant().toEpochMilli() + day
+            assertEquals("moved to 6:$minute", due, prefs.getLong(EditionScheduler.PENDING, 0))
+        }
+    }
+
+    @Test
+    fun aClockSetAheadAndCorrectedDoesntHoldBackEditions() = runTest {
+        // A timer ran while the clock read a day ahead and recorded tomorrow's edition.
+        prefs.edit { putLong(EditionScheduler.LAST_DUE, sixThirty + day) }
+
+        EditionScheduler.reschedule(context, settings, morning)
+
+        assertEquals(sixThirty, prefs.getLong(EditionScheduler.PENDING, 0))
+    }
+
+    @Test
+    fun aTimerFiringInTheLeadArmsTheNextEditionNotTheOneItStarted() = runTest {
+        val app = ApplicationProvider.getApplicationContext<TestApp>()
+        val now = ZonedDateTime.now()
+        val soon = Settings(scheduleEnabled = true, schedule = Schedule(time = now.toLocalTime().plusMinutes(20).withSecond(0).withNano(0)))
+        app.container.settings.update { soon }
+        val due = soon.schedule.nextAfter(now)!!.toInstant().toEpochMilli()
+
+        val timer = TestListenableWorkerBuilder<EditionScheduler.Timer>(app)
+            .setInputData(workDataOf(EditionScheduler.DUE to due))
+            .build()
+        timer.doWork()
+
+        assertEquals(due, prefs.getLong(EditionScheduler.LAST_DUE, 0))
+        val next = prefs.getLong(EditionScheduler.PENDING, 0)
+        assertTrue("next edition $next should come well after $due", next - due > 3_600_000)
     }
 
     @Test

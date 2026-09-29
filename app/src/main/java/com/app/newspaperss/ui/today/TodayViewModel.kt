@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
+import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
@@ -46,13 +47,14 @@ class TodayViewModel(
     work: Flow<WorkInfo?>,
     settings: Flow<Settings> = flowOf(Settings()),
     private val now: () -> ZonedDateTime = { ZonedDateTime.now() },
+    private val lastDue: () -> Long = { 0L },
     private val startBuild: () -> Unit,
 ) : ViewModel() {
     val state: StateFlow<TodayState> = combine(editions.observeAll(), work, settings) { list, info, s ->
         TodayState(
             editions = list,
             build = buildStateOf(info),
-            next = nextEdition(s, now()),
+            next = nextEdition(s, now(), lastDue()),
             preferOpen = s.device == Device.BOOX,
             deviceName = when (s.device) {
                 Device.KINDLE -> "Kindle"
@@ -74,9 +76,10 @@ class TodayViewModel(
     }
 
     companion object {
-        fun nextEdition(s: Settings, now: ZonedDateTime): String? {
+        /** @param lastDueMs [EditionScheduler.LAST_DUE], so an edition started early isn't shown as still to come. */
+        fun nextEdition(s: Settings, now: ZonedDateTime, lastDueMs: Long = 0L): String? {
             if (!s.scheduleEnabled) return null
-            val next = s.schedule.nextAfter(now) ?: return null
+            val next = EditionScheduler.nextDue(s, now, lastDueMs)?.atZone(now.zone) ?: return null
             val time = next.toLocalTime().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
             val day = when (next.toLocalDate()) {
                 now.toLocalDate() -> "Today"

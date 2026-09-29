@@ -8,13 +8,24 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** extraction fixes from the rss-to-e-reader review, ported to the app.
-- **Next:** expedite scheduled builds; stream images to disk; the competitor research.
+- **In flight:** timed editions start 30 minutes early.
+- **Next:** stream images to disk; then an audit (security, resources) and a design pass.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 2: extraction fixes from the library review (12:15–)
+### Cycle 4: timed editions start early (12:34–)
+- **Shipped:**
+  - A timed edition's timer fires 30 minutes before it's due. When Doze holds delayed work, the hold eats into that lead instead of making the paper late.
+  - Two traps that would have built the paper twice: the early timer asking for "the next 6:30" gets today's again, and opening the app during the lead would re-arm the edition already building. The timer now carries its due time, and the scheduler remembers the last one it started.
+- **Also:** the competitor research is in [docs/research/competitors.md](research/competitors.md). The headline: nobody else sizes the paper to a reading time; most rivals are paid, Kindle-only email digests. Its best ideas are in the backlog.
+
+### Cycle 3: expedited builds, closed (12:28–12:33, [#20](https://github.com/madCode/newspaperss/pull/20))
+- **Tried:** running scheduled builds as expedited work, so Android runs them promptly.
+- **Review caught:** on Android 12+ expedited work has a quota, and a long build over it would be restarted silently. Keeping it running on older versions needs a foreground service, which Google Play makes you declare and justify.
+- **Outcome:** closed and reverted. Cycle 4's lead time gets most of the benefit without either cost.
+
+### Cycle 2: extraction fixes from the library review (12:15–12:27, [#19](https://github.com/madCode/newspaperss/pull/19))
 - **Shipped:** the app gets the fixes the rss-to-e-reader review found in the same code:
   - A short "Further reading" list or a section titled "More on the method" is no longer removed.
   - A heading is never left without its list.
