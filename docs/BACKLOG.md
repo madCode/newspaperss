@@ -28,18 +28,14 @@ with tests, and moves it to Done with its PR. Milestones are from
 
 ### M7 Polish
 - [ ] Source health view; remove-and-re-add shouldn't re-deliver (soft delete sources)
-- [ ] OPML import/export UI
 
 ### M8 Advanced
 - [ ] tt-rss source (mark read on server after delivery); SMTP delivery; notes export
 
 ### UX (from the persona audit)
-- [ ] E-ink: replace indeterminate spinners with stepped text ("Fetching 7 of 12…"); no nav transitions when animations are off
-- [ ] First edition: counted progress and a clear "Your first edition is ready" moment
 - [ ] Import Pocket/Instapaper exports (CSV/HTML) into the reading list
 - [ ] Article preview in the edition detail screen (matters most on Boox)
-- [ ] Source health line ("full text", "last new article 2 days ago") instead of just Working/error
-- [ ] Try again button on failed editions
+- [ ] Per-source "full text" health (needs the ContentMode auto-tune stats)
 
 ### Tech debt
 - [ ] Parser tests run on kxml2, the app ships Android's KXmlParser: add a Robolectric smoke test through the platform parser
@@ -50,6 +46,10 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [x] Edition detail screen: contents, send/open, "I've sent it", bring back articles
 - [x] M1 Skeleton: Gradle (AGP 9.1, Kotlin 2.3, Compose), `:core` + `:app`, CI, design doc (#1)
 - [x] M2 Feeds: parser, finder, OPML, Room, FeedSync, Sources screen (#1)
+- [x] OPML import/export in Sources; source freshness ("last new article 2 days ago") instead of unread counts (#8)
+- [x] Architecture pass: no stuck editions, timer can't go stale, IO off main; e-ink progress, first-edition moment, Try again (#7)
+- [x] UX pass from persona audit: delivery confirmation, notification permission, Boox Open, next-edition line, check chips (#6)
+- [x] Edition detail with bring back; generated cover image (#5)
 - [x] M6 Reading list: share target, reading list screen, markdown checklist import/export compatible with rss-to-e-reader (#4)
 - [x] M5 Onboarding: device, starter packs, paste a site, size and schedule, first edition (#3)
 - [x] Images in editions: 1200px JPEG, per-edition allowance so over-budget images aren't downloaded (#3)

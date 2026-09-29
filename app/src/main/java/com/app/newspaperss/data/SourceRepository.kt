@@ -9,7 +9,7 @@ class SourceRepository(private val db: AppDatabase) {
 
     fun observe(): Flow<List<SourceEntity>> = sources.observeAll()
 
-    fun observeWaitingCounts(): Flow<List<SourceCount>> = db.articles().observeWaitingCounts()
+    fun observeActivity(): Flow<List<SourceActivity>> = db.articles().observeActivity()
 
     /** Adds a feed unless one with this URL exists; returns its id either way. */
     suspend fun addFeed(url: String, title: String?, section: String? = null): Long {
