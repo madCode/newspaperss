@@ -26,15 +26,23 @@ interface EditionNotifier {
     fun problem(title: String, reason: String)
 }
 
-/** Failures are loud, successes quiet: a failed edition should never go unnoticed. */
+/**
+ * Failures are loud and successes quiet, but "ready" makes a sound: for share delivery it's the
+ * reader's only prompt to send the edition.
+ */
 class Notifier(private val context: Context) : EditionNotifier {
     private val manager = NotificationManagerCompat.from(context)
 
     fun createChannels() {
         val system = context.getSystemService(NotificationManager::class.java)
         system.createNotificationChannel(
-            NotificationChannel(EDITIONS, "Editions", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Your edition is ready or has been delivered"
+            NotificationChannel(READY, "Edition ready", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Your edition is ready to send or open"
+            },
+        )
+        system.createNotificationChannel(
+            NotificationChannel(EDITIONS, "Edition delivered", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Your edition was saved to your folder"
             },
         )
         system.createNotificationChannel(
@@ -57,7 +65,7 @@ class Notifier(private val context: Context) : EditionNotifier {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         notify(
-            NotificationCompat.Builder(context, EDITIONS)
+            NotificationCompat.Builder(context, READY)
                 .setContentTitle("${edition.title} is ready")
                 .setContentText(summary(edition))
                 .addAction(0, if (openInstead) "Open" else "Send", action),
@@ -96,6 +104,8 @@ class Notifier(private val context: Context) : EditionNotifier {
         "${plural(edition.articleCount, "article")} · about ${ReadingTime.format(edition.minutes)}"
 
     companion object {
+        // A new id, not EDITIONS made louder: Android keeps a channel's importance once created.
+        const val READY = "edition-ready"
         const val EDITIONS = "editions"
         const val PROBLEMS = "problems"
         private const val EDITION_ID = 1

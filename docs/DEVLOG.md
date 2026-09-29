@@ -8,14 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** dated edition titles.
-- **Next:** more from the persona audit (a louder "ready" notification, saved links in onboarding, saying why there's no edition); a resource-usage audit.
+- **In flight:** a louder "edition ready" notification.
+- **Next:** more from the persona audit (saved links in onboarding, saying why there's no edition); a resource-usage audit.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 7: dated titles (13:31–)
+### Cycle 8: "ready" makes a sound (13:41–)
+- **Shipped:** "Edition ready" has its own channel at default importance. It was silent, and many phones fold silent notifications away, but for share delivery it's the only prompt to send the paper. "Delivered" (folder delivery, nothing to do) stays quiet.
+
+### Cycle 7: dated titles (13:31–13:41, [#24](https://github.com/madCode/newspaperss/pull/24))
 - **Shipped:** "Tuesday Morning Edition, Sep 29". Without the date, every Tuesday's paper had the same name, so they collided in the Kindle and Kobo libraries and overwrote each other in a synced folder.
+- **Review caught:** the title mixed the phone's language into "Morning Edition" (now English, like the rest of the book), and the Today card showed a second, sometimes different date (dropped).
 
 ### Cycle 6: persona audit, and sends that count (13:06–13:31, [#23](https://github.com/madCode/newspaperss/pull/23))
 - **Audit:** walked the app as a Pocket refugee with a Kobo, a tt-rss + KOReader self-hoster, a casual Kindle owner, a Boox owner and a TalkBack user. Ten findings; the rest are in the backlog.
