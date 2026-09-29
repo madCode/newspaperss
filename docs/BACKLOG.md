@@ -28,11 +28,10 @@ with tests, and moves it to Done with its PR. Milestones are from
 - [ ] SMTP delivery; notes export
 
 ### Tech debt
-- [ ] Parser tests run on kxml2, the app ships Android's KXmlParser: add a Robolectric smoke test through the platform parser
-- [ ] Charset sniffing for HTML pages without a header charset
 
 ## Done
 
+- [x] Tech debt: feed parser smoke-tested on Android's own XmlPullParser; HTML meta-charset and byte-order-mark sniffing
 - [x] App shell: splash until settings load, onboarding survives process death, timer re-armed on time-zone change, launch test
 - [x] Auto-tune each source's ContentMode from its articles (three in a row), a manual choice that's never overridden, and per-source full-text health on the Sources screen
 - [x] Import Pocket (HTML, CSV) and Instapaper (CSV) exports into the reading list; saved links without a title get the page's title in the background
