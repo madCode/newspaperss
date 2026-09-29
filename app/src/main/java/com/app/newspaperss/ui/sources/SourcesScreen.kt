@@ -150,7 +150,7 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
 }
 
 @Composable
-private fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
+internal fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
     AlertDialog(
         onDismissRequest = viewModel::closeTtrss,
         title = { Text("Add tt-rss account") },

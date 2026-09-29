@@ -38,6 +38,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -52,7 +53,10 @@ import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.feed.StarterPacks
 import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.ui.components.CheckChip
+import com.app.newspaperss.ui.sources.SourcesViewModel
+import com.app.newspaperss.ui.sources.TtrssDialog
 import com.app.newspaperss.ui.today.Masthead
 import java.time.LocalDate
 import java.time.LocalTime
@@ -61,7 +65,8 @@ import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
 @Composable
-fun OnboardingScreen(viewModel: OnboardingViewModel) {
+/** @param sources offers importing from another reader: an OPML file or a tt-rss account. */
+fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? = null) {
     val s by viewModel.state.collectAsState()
     BackHandler(enabled = s.step != Step.WELCOME) { viewModel.back() }
     // Asked here, as the first edition is made, because a scheduled edition is only
@@ -83,7 +88,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel) {
                 when (s.step) {
                     Step.WELCOME -> Welcome()
                     Step.DEVICE -> DeviceStep(s, viewModel)
-                    Step.SOURCES -> SourcesStep(s, viewModel)
+                    Step.SOURCES -> SourcesStep(s, viewModel, sources)
                     Step.SIZE -> SizeStep(s, viewModel)
                 }
             }
@@ -154,9 +159,10 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel) {
+private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel, sources: SourcesViewModel?) {
     Title("What do you like to read?")
     Text("Pick a few to start. You can change them any time.", style = MaterialTheme.typography.bodyMedium)
+    if (sources != null) FromAnotherReader(s.added, vm, sources)
     Text(
         "Saw something to read later? In any app, tap Share and choose \u201cRead in newspapeRSS\u201d.",
         style = MaterialTheme.typography.bodySmall,
@@ -199,6 +205,26 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel) {
             }
         }
     }
+}
+
+@Composable
+private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sources: SourcesViewModel) {
+    val context = LocalContext.current
+    val message by sources.message.collectAsState()
+    val ttrssForm by sources.ttrssForm.collectAsState()
+    val rows by sources.rows.collectAsState()
+    LaunchedEffect(rows) { rows?.let { onboarding.sourcesAdded(it.size) } }
+    val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) sources.importOpml(context.contentResolver, uri)
+    }
+    Text("Already use a feed reader?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Import an OPML file") }
+        if (sources.canAddTtrss) OutlinedButton(onClick = sources::openTtrss) { Text("Connect tt-rss") }
+    }
+    val status = message ?: if (added > 0) "${plural(added, "source")} added. Pick more below, or go on." else null
+    status?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
+    ttrssForm?.let { TtrssDialog(it, sources) }
 }
 
 @Composable

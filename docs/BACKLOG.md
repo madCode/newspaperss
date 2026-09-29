@@ -46,6 +46,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Onboarding: import an OPML file or connect tt-rss on the sources step, instead of only after setup
 - [x] Research: competing and neighbouring apps, in [docs/research/competitors.md](research/competitors.md)
 - [x] Timed editions start 30 minutes before they're due, so Doze's hold on delayed work becomes lead time instead of a late paper
 - [x] Extraction: screen-reader-only text ("list 1 of 4") and "Recommended stories" link lists no longer reach the edition (found in a live edition's Al Jazeera article)
