@@ -284,7 +284,7 @@ class EditionBuilderTest {
 
         val edition = db.editions().byId(failed.editionId)!!
         assertEquals(EditionStatus.FAILED, edition.status)
-        assertTrue(edition.error!!.contains("progress reporting broke"))
+        assertEquals(EditionBuilder.UNEXPECTED, edition.error)
         assertEquals(ArticleState.NEW, stateOf("a1"))
         assertTrue(builder.build(EditionSettings()) is BuildResult.Built)
     }

@@ -25,6 +25,6 @@ class EditionWorkerTest {
 
         assertTrue(result is ListenableWorker.Result.Failure)
         val error = result.outputData.getString(EditionWorker.ERROR)
-        assertTrue(error, error!!.startsWith("Couldn't make the edition"))
+        assertTrue(error, error!!.startsWith("Something went wrong"))
     }
 }

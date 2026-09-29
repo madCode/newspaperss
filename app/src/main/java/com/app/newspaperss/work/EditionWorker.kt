@@ -30,7 +30,8 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return Result.failure(workDataOf(ERROR to "Couldn't make the edition (${e.message ?: e.javaClass.simpleName})."))
+            // The run also delivers, so the edition may already exist; don't claim it wasn't made.
+            return Result.failure(workDataOf(ERROR to "Something went wrong. If an edition was made, it's below."))
         }
         return when (result) {
             is BuildResult.Built -> Result.success(workDataOf(EDITION_ID to result.editionId))

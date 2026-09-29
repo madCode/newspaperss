@@ -75,7 +75,10 @@ class EditionBuilder(
             withContext(NonCancellable) { fail(editionId, STOPPED) }
             throw e
         } catch (e: Exception) {
-            fail(editionId, "Something went wrong while making the edition (${e.message ?: e.javaClass.simpleName}).")
+            fail(editionId, UNEXPECTED)
+        } catch (e: OutOfMemoryError) {
+            // Plausible on low-memory e-readers with image-heavy articles; the next build may fit.
+            fail(editionId, UNEXPECTED)
         }
     }
 
@@ -145,7 +148,7 @@ class EditionBuilder(
         val fitted = ImageBudget.fit(arranged.map { it.second.images }, articleImageBudget)
         val withImages = arranged.zip(fitted) { (a, c), images -> a to c.copy(images = images) }
 
-        val fileName = "edition-$editionId.epub"
+        val fileName = fileNameOf(editionId)
         val doc = EditionDoc(
             title = title,
             date = now.toLocalDate(),
@@ -167,7 +170,7 @@ class EditionBuilder(
                 e
             }
         }
-        if (writeError != null) return fail(editionId, "Something went wrong making this edition. Your articles are safe and will be in the next one.")
+        if (writeError != null) return fail(editionId, UNEXPECTED)
 
         db.withTransaction {
             db.editions().insertArticles(
@@ -224,6 +227,8 @@ class EditionBuilder(
     }
 
     private suspend fun fail(editionId: Long, reason: String): BuildResult {
+        // A file written before the failure would otherwise sit in editions/ with nothing pointing at it.
+        File(editionsDir, fileNameOf(editionId)).delete()
         db.editions().update(db.editions().byId(editionId)!!.copy(status = EditionStatus.FAILED, error = reason))
         return BuildResult.Failed(editionId, reason)
     }
@@ -241,8 +246,10 @@ class EditionBuilder(
     )
 
     companion object {
+        private fun fileNameOf(editionId: Long) = "edition-$editionId.epub"
         private const val TAG = "EditionBuilder"
         const val INTERRUPTED = "Interrupted; its articles will be in the next edition."
         const val STOPPED = "Stopped before it was finished; its articles will be in the next edition."
+        const val UNEXPECTED = "Something went wrong making this edition. Your articles are safe and will be in the next one."
     }
 }
