@@ -89,12 +89,14 @@ private fun App(container: AppContainer) {
         bottomBar = {
             NavigationBar {
                 Tab.entries.forEach { tab ->
+                    val route = current?.destination?.route
+                    val inTab = route == tab.route || (tab == Tab.SOURCES && route == READING_LIST) || (tab == Tab.TODAY && route == EDITION)
                     NavigationBarItem(
-                        selected = current?.destination?.route.let {
-                            it == tab.route || (tab == Tab.SOURCES && it == READING_LIST) || (tab == Tab.TODAY && it == EDITION)
-                        },
+                        selected = inTab,
                         onClick = {
-                            nav.navigate(tab.route) {
+                            // Tapping the tab you're in goes back to its top screen; restoring
+                            // saved state would otherwise reopen the detail screen you're on.
+                            if (inTab) nav.popBackStack(tab.route, inclusive = false) else nav.navigate(tab.route) {
                                 popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
