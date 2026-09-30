@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -157,6 +158,8 @@ internal fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
     if (categories != null) {
         AlertDialog(
             onDismissRequest = viewModel::closeTtrss,
+            // A stray tap beside it (easy on e-ink) shouldn't throw the choice away.
+            properties = DialogProperties(dismissOnClickOutside = false),
             title = { Text("Which articles?") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -172,7 +175,8 @@ internal fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = viewModel::finishTtrss) { Text("Done") } },
+            confirmButton = { TextButton(onClick = viewModel::finishTtrss, enabled = !form.testing) { Text("Add") } },
+            dismissButton = { TextButton(onClick = viewModel::closeTtrss) { Text("Cancel") } },
         )
         return
     }

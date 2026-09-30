@@ -15,22 +15,50 @@ class TtrssRepository(
     private val accounts: TtrssAccountStore,
     private val sources: SourceRepository,
 ) {
+    sealed interface Check {
+        data class Failed(val message: String) : Check
+        /** The login works; [categories] is empty if they couldn't be read. */
+        data class Passed(val categories: List<TtrssCategory>) : Check
+    }
+
+    /** Logs in to check the account and reads its categories if asked, saving nothing. */
+    suspend fun check(address: String, user: String, password: String, readCategories: Boolean = true): Check {
+        val client = TtrssAccount(TtrssClient.apiUrl(address), user.trim(), password).client(http)
+        try {
+            client.login()
+            val categories = if (!readCategories) emptyList() else try {
+                client.categories()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyList()
+            }
+            return Check.Passed(categories)
+        } catch (e: TtrssException) {
+            return Check.Failed(e.message ?: "tt-rss reported an error.")
+        } catch (e: IOException) {
+            return Check.Failed("Couldn't reach ${address.trim()}. Check the address and your connection.")
+        } finally {
+            logOut(client)
+        }
+    }
+
     /**
      * Logs in to check the account and, if that works, saves it and adds its source.
      * Returns an error to show the reader, or null on success.
      */
     suspend fun connect(address: String, user: String, password: String): String? {
+        val check = check(address, user, password, readCategories = false)
+        if (check is Check.Failed) return check.message
+        return add(address, user, password, category = null)
+    }
+
+    /**
+     * Saves an account that [check] passed and adds its source, taking articles from [category]
+     * (null for all unread) from the first sync. Returns an error to show the reader, or null.
+     */
+    suspend fun add(address: String, user: String, password: String, category: TtrssCategory?): String? {
         val account = TtrssAccount(TtrssClient.apiUrl(address), user.trim(), password)
-        val client = account.client(http)
-        try {
-            client.login()
-        } catch (e: TtrssException) {
-            return e.message
-        } catch (e: IOException) {
-            return "Couldn't reach ${address.trim()}. Check the address and your connection."
-        } finally {
-            logOut(client)
-        }
         try {
             accounts.save(account)
         } catch (e: Exception) {
@@ -39,13 +67,11 @@ class TtrssRepository(
             return "Couldn't store the password securely on this phone."
         }
         val sourceId = sources.addTtrss(account.apiUrl)
-        // Category ids belong to each tt-rss user, and this may be another user on the same server.
-        db.sources().setTtrssCategory(sourceId, null, null)
+        // Always set: category ids belong to each tt-rss user, and this may be another user on the
+        // same server.
+        db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
         return null
     }
-
-    /** The account's source, if one is connected. */
-    suspend fun sourceId(): Long? = db.sources().all().firstOrNull { it.kind == SourceKind.TTRSS }?.id
 
     sealed interface Categories {
         data class Loaded(val categories: List<TtrssCategory>) : Categories
