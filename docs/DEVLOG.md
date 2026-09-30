@@ -8,12 +8,22 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** Night 2, focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. Shipped so far: stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync and a category choice, fair turns across many feeds, Obsidian-friendly notes, a dark preview.
+- **In flight:** Night 2, focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. Shipped so far: stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync and a category choice, fair turns across many feeds, Obsidian-friendly notes saved to your vault, a question at the end of each paper, a dark preview.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Night 2 · Tue 29 Sep, 20:30 PT –
 
-### Cycle 51: article rows, a star and Select (23:41–08:02, [#66](https://github.com/madCode/newspaperss/pull/66))
+### Cycle 53: a question at the end of the paper (01:27–01:42, [#69](https://github.com/madCode/newspaperss/pull/69))
+- **From the persona audit:** the book's closing page could ask a question, but the app never gave it one.
+- **Shipped:** each edition ends with one of twelve open questions ("What surprised you?", "Which piece was hardest to put down?"), and its notes show the same one above the prompts, so what you turned over on the Kindle is waiting in Obsidian.
+- **Review caught:** questions that assumed opinion pieces ("Whose point of view was missing?") don't fit a one-article or all-comics paper, so the list was rewritten; "you" questions mixed into the notes' "I" prompts; a blank question printed as "Untitled"; tests that couldn't catch a duplicated question; a claim that consecutive papers never repeat, which empty builds make untrue.
+
+### Cycle 52: reading notes, into your vault (01:10–01:27, [#68](https://github.com/madCode/newspaperss/pull/68))
+- **From the persona audit:** notes were only saved beside editions with folder delivery, so sharing to the Kindle app meant exporting them by hand every day.
+- **Shipped:** Settings › Reading notes takes a folder (your vault); each edition's notes are saved there once it's delivered, however it was sent, in the background.
+- **Review caught:** a folder copy finishing after you'd tapped Sent delivered the edition twice and saved "notes (1).md"; the Notes button and the background save rewrote the same file, so a half-written copy could reach the vault; a worker test that never reached the code it named.
+
+### Cycle 51: article rows, a star and Select (23:41–01:02, [#66](https://github.com/madCode/newspaperss/pull/66))
 - **From you:** the labelled buttons under every row felt heavy on such a small row.
 - **Design audit first:** how Gmail, Feedly, Pocket, NetNewsWire, Readwise Reader and e-reader lists do it, and four options checked against five readers (you over breakfast, a Boox, TalkBack, 200% font, a first-timer). A trailing star plus a Select mode won.
 - **Shipped:** one star at the right of each row; "Mark as read" for several at once in Select (long-press or the Select button), with one Undo; a TalkBack action per row; the same star on delivered editions. A 30-row list is about five screens instead of seven, and nothing moves on e-ink when selection starts or ends.
