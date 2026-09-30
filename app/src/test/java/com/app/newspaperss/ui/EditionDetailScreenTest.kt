@@ -543,6 +543,10 @@ class EditionDetailScreenTest {
         val building = runBlocking { db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.BUILDING)) }
 
         assertFalse(runBlocking { repo.delete(building) })
+        val vm = EditionDetailViewModel(repo, building, notes) {}
+        compose.setContent { EditionDetailScreen(vm, onBack = {}) }
+        idleUntil { vm.detail.value?.edition != null }
+        compose.onNodeWithContentDescription("More options").assertDoesNotExist()
         assertEquals(EditionStatus.BUILDING, runBlocking { db.editions().byId(building) }?.status)
     }
 }
