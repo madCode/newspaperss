@@ -19,6 +19,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -120,6 +121,20 @@ class EditionBuilderTest {
         }
         assertEquals(ArticleState.IN_EDITION, stateOf("a2"))
         assertEquals("the second article of a capped source waits", ArticleState.NEW, stateOf("a1"))
+    }
+
+    @Test
+    fun theNextEditionStartsWithTheSourcesTheLastOneLeftOut() = runTest {
+        for (name in listOf("a", "b", "c", "d")) source(name, null, "${name}1", "${name}2", "${name}3")
+        val settings = EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)
+        fun sourcesOf(id: Long) = runBlocking { editions.observeArticles(id).first().map { it.title.substringBefore(' ') }.toSet() }
+
+        val first = builder.build(settings) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        val second = builder.build(settings) as BuildResult.Built
+
+        assertEquals(setOf("a", "b"), sourcesOf(first.editionId))
+        assertEquals("not b and c, sliding by one", setOf("c", "d"), sourcesOf(second.editionId))
     }
 
     @Test

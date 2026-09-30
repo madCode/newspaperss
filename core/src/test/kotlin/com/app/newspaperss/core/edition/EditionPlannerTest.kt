@@ -10,6 +10,8 @@ class EditionPlannerTest {
     private fun c(id: String, source: String, day: Int, starredDay: Int? = null) =
         Candidate(id, source, Instant.parse("2026-09-%02dT00:00:00Z".format(day)), starredDay?.let { Instant.parse("2026-09-%02dT12:00:00Z".format(it)) })
 
+    private fun day(d: Int) = Instant.parse("2026-09-%02dT06:00:00Z".format(d))
+
     private val pool = listOf(
         c("a1", "a", 1), c("a2", "a", 2), c("a3", "a", 3),
         c("b1", "b", 1),
@@ -75,16 +77,33 @@ class EditionPlannerTest {
         // Ten sources, room for three: the star mustn't wait for its source's turn to come round.
         val sources = (0 until 10).map { "src$it" }
         val candidates = sources.flatMap { s -> (1..3).map { day -> c("$s-$day", s, day) } } + c("src8-star", "src8", 1, starredDay = 5)
-        val ordered = EditionPlanner.order(candidates, sources, Ordering.TAKE_TURNS, rotation = 0)
+        val ordered = EditionPlanner.order(candidates, sources, Ordering.TAKE_TURNS)
         val result = EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(3), maxPerSource = 1), { 1.0 }) { it.id }
         assertEquals(listOf("src8-star", "src0-3", "src1-3"), result)
     }
 
     @Test
-    fun rotationChangesWhoGoesFirstAndUnknownSourcesGoLast() {
+    fun theSourceFeaturedLongestAgoGoesFirstAndUnknownSourcesGoLast() {
         val withStray = listOf(c("a1", "a", 1), c("b1", "b", 1), c("c1", "c", 1), c("z1", "z", 1))
-        assertEquals(listOf("b1", "c1", "z1", "a1"), ids(EditionPlanner.order(withStray, abc, Ordering.TAKE_TURNS, rotation = 1)))
-        assertEquals(listOf("a1", "b1", "c1", "z1"), ids(EditionPlanner.order(withStray, abc, Ordering.TAKE_TURNS, rotation = 4)))
+        assertEquals(listOf("a1", "b1", "c1", "z1"), ids(EditionPlanner.order(withStray, abc, Ordering.TAKE_TURNS)))
+        val featured = mapOf("a" to day(3), "c" to day(1))
+        // b and z never featured, in the reader's order; then c (day 1), then a (day 3).
+        assertEquals(listOf("b1", "z1", "c1", "a1"), ids(EditionPlanner.order(withStray, abc, Ordering.TAKE_TURNS, lastFeatured = featured)))
+    }
+
+    @Test
+    fun everySourceGetsItsTurnOverAFewEditions() = runTest {
+        // Twenty sources, room for five: four editions cover them all rather than sliding by one.
+        val sources = (0 until 20).map { "src$it" }
+        val featured = mutableMapOf<String, Instant>()
+        val seen = mutableSetOf<String>()
+        for (edition in 1..4) {
+            val candidates = sources.map { c("$it-$edition", it, edition) }
+            val ordered = EditionPlanner.order(candidates, sources, Ordering.TAKE_TURNS, lastFeatured = featured)
+            val picked = EditionPlanner.fill<Candidate>(ordered, PlanRules(Budget.Articles(5), maxPerSource = 1), { 1.0 }) { it }
+            picked.forEach { featured[it.sourceId] = day(edition); seen += it.sourceId }
+        }
+        assertEquals(sources.toSet(), seen)
     }
 
     @Test
@@ -96,7 +115,7 @@ class EditionPlannerTest {
 
     @Test
     fun emptyPool() {
-        assertEquals(emptyList<Candidate>(), EditionPlanner.order(emptyList(), listOf("a"), Ordering.TAKE_TURNS, rotation = 5))
+        assertEquals(emptyList<Candidate>(), EditionPlanner.order(emptyList(), listOf("a"), Ordering.TAKE_TURNS))
     }
 
     @Test

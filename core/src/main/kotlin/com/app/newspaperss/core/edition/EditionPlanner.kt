@@ -56,30 +56,29 @@ object EditionPlanner {
      * ----------
      * candidates: in any order.
      * sourceOrder: source ids in the reader's order; sources not listed go last.
-     * rotation: shifts which source goes first, so the same source doesn't
-     *   always get the first slot (pass the edition number).
+     * lastFeatured: when each source last had an article in an edition. Sources go in turn from
+     *   the one featured longest ago (never first), then in the reader's order, so over a few
+     *   editions every source gets its turn however many there are.
      */
     fun order(
         candidates: List<Candidate>,
         sourceOrder: List<String>,
         ordering: Ordering,
-        rotation: Int = 0,
+        lastFeatured: Map<String, Instant> = emptyMap(),
         random: Random = Random.Default,
     ): List<Candidate> {
         val (starred, rest) = candidates.partition { it.starredAt != null }
-        val sources = sourcesInTurn(candidates, sourceOrder, rotation)
+        val sources = sourcesInTurn(candidates, sourceOrder, lastFeatured)
         val oldestStarFirst = compareBy<Candidate> { it.starredAt }
         val newestFirst = compareByDescending<Candidate> { it.published ?: Instant.MIN }
         return arrange(starred, sources, oldestStarFirst, ordering, random) + arrange(rest, sources, newestFirst, ordering, random)
     }
 
-    private fun sourcesInTurn(candidates: List<Candidate>, sourceOrder: List<String>, rotation: Int): List<String> {
+    private fun sourcesInTurn(candidates: List<Candidate>, sourceOrder: List<String>, lastFeatured: Map<String, Instant>): List<String> {
         val present = candidates.map { it.sourceId }.toSet()
         val known = sourceOrder.filter { it in present }
-        val sources = known + (present - known.toSet()).sorted()
-        if (sources.isEmpty()) return sources
-        val shift = Math.floorMod(rotation, sources.size)
-        return sources.drop(shift) + sources.take(shift)
+        // A stable sort: sources featured equally long ago keep the reader's order.
+        return (known + (present - known.toSet()).sorted()).sortedBy { lastFeatured[it] ?: Instant.MIN }
     }
 
     private fun arrange(

@@ -95,6 +95,8 @@ interface SourceDao {
  */
 internal val BUILD_HOLD: Duration = Duration.ofHours(2)
 
+data class Featured(val sourceId: Long, val originId: String?, val createdAt: Instant)
+
 /**
  * Whether an edition is being made, counting one started more than [BUILD_HOLD] ago as a crashed
  * build. It turns false by itself when the hold runs out, since nothing in the database changes
@@ -336,6 +338,14 @@ interface EditionDao {
 
     @Query("SELECT COUNT(*) FROM editions")
     suspend fun count(): Int
+
+    /** When each source (and each tt-rss publication) last had an article in a ready or delivered edition. */
+    @Query(
+        """SELECT a.sourceId AS sourceId, a.originId AS originId, MAX(e.createdAt) AS createdAt
+           FROM edition_articles ea JOIN articles a ON a.id = ea.articleId JOIN editions e ON e.id = ea.editionId
+           WHERE e.status IN ('READY', 'DELIVERED') GROUP BY a.sourceId, a.originId""",
+    )
+    suspend fun lastFeatured(): List<Featured>
 
     /** When the newest edition being made was started, or null if none is. */
     @Query("SELECT MAX(createdAt) FROM editions WHERE status = 'BUILDING'")
