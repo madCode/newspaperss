@@ -14,7 +14,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
-### Cycle 60: the author in Send to Kindle (09:10–, this PR)
+### UX pass (afternoon)
+Four hours of UX design only, no new features. The patterns audited, the research behind each and what was decided are in the session's UX report page.
+
+### Cycle 62: Today puts the finished paper first (13:30–, this PR)
+- **Audit:** once today's edition was sent, a filled "Make an edition now" sat above it, the loudest thing on the screen, inviting a second paper; a failed build's reason sat under the button that answers it; a failed edition said "Not sent" twice and offered two retry buttons.
+- **Shipped:** the filled button only before the first edition, then a quiet "Make another edition"; a failure reads first, then "Try again"; one retry per failure; "2 starred articles will go in your next edition" says what the count means; "3 articles so far" while making (not "read", which sounded like you'd read them).
+- **Kept:** Send filled with Open outlined, and the "I've sent it" explanation.
+
+### Cycle 61: older editions under their title (09:40–10:05, [#79](https://github.com/madCode/newspaperss/pull/79), reverted in [#80](https://github.com/madCode/newspaperss/pull/80))
+- Shared editions made before cycle 59 under their title too. You'd rather make the day's edition again than carry code for a handful of old files, so it's reverted.
+
+### Cycle 60: the author in Send to Kindle (09:10–09:30, [#78](https://github.com/madCode/newspaperss/pull/78))
 - **From you:** the author should be newspapeRSS. The book already says so, but the Kindle app's form fills in the Amazon account's name, and nothing an app sends changes it (Amazon reads the book's author only for emailed documents).
 - **Shipped:** the Kindle tip, in onboarding and Settings, says to change Author to newspapeRSS in the form, so editions sit together in the library.
 

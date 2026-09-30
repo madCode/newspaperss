@@ -12,6 +12,8 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -38,6 +40,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.clearFileProviderCache
@@ -198,8 +201,8 @@ class EditionDetailScreenTest {
 
         runBlocking { articles.forEach { repo.setStarred(it, true) } }
 
-        idleUntil { compose.onAllNodes(hasContentDescription("2 starred articles are waiting")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("2 starred articles are waiting").assertIsDisplayed()
+        idleUntil { compose.onAllNodes(hasContentDescription("2 starred articles are waiting for your next edition")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("2 starred articles are waiting for your next edition").assertIsDisplayed()
     }
 
     @Test
@@ -354,7 +357,7 @@ class EditionDetailScreenTest {
         compose.waitForIdle()
         assertEquals(status, statusNode().id)
         assertEquals("Making your edition", text())
-        compose.onNode(hasText("3 articles read so far") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertDoesNotExist()
+        compose.onNode(hasText("3 articles so far") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertDoesNotExist()
 
         work.value = work(WorkInfo.State.SUCCEEDED)
         idleUntil { vm.state.value.build == BuildState.Idle }
@@ -398,6 +401,64 @@ class EditionDetailScreenTest {
 
         compose.onNodeWithText("Couldn't reach any of your sources.").assertExists()
         compose.onNode(hasText("Couldn't reach any of your sources.") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertDoesNotExist()
+    }
+
+    @Test
+    fun onceAnEditionIsSentAnotherIsOfferedButNotPushed() {
+        // An edition that ends: after today's is sent, making another is a quiet option.
+        edition(EditionStatus.DELIVERED, listOf("A story"))
+        var started = 0
+        val vm = TodayViewModel(repo, flowOf(null)) { started++ }
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.editions?.size == 1 }
+
+        compose.onNodeWithText("Make an edition now").assertDoesNotExist()
+        compose.onNodeWithText("Make another edition").performClick()
+        assertEquals(1, started)
+    }
+
+    @Test
+    fun aFailedEditionOffersOneWayToTryAgain() {
+        // The build that made it failed too, with the same reason.
+        runBlocking { db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.FAILED, error = EditionBuilder.UNEXPECTED)) }
+        val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to EditionBuilder.UNEXPECTED))
+        val vm = TodayViewModel(repo, flowOf(failed)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.editions?.size == 1 && vm.state.value.build is BuildState.Failed }
+
+        assertEquals("said once", 1, compose.onAllNodes(hasText(EditionBuilder.UNEXPECTED)).fetchSemanticsNodes().size)
+        // In the status line, where TalkBack announces a build's result.
+        compose.onNodeWithTag(BUILD_STATUS).assertTextEquals(EditionBuilder.UNEXPECTED)
+
+        assertEquals(1, compose.onAllNodes(hasText("Try again") and hasClickAction()).fetchSemanticsNodes().size)
+        compose.onNodeWithText("Make another edition").assertDoesNotExist()
+        compose.onNodeWithText("Make an edition now").assertDoesNotExist()
+    }
+
+    @Test
+    fun aReadyEditionsSendComesBeforeARetry() {
+        // A run can fail after making an edition; sending that one comes first.
+        edition(EditionStatus.READY, listOf("A story"))
+        val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Something went wrong."))
+        val vm = TodayViewModel(repo, flowOf(failed)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.build is BuildState.Failed && vm.state.value.editions?.size == 1 }
+
+        compose.onNodeWithText("Try again").assertDoesNotExist()
+        compose.onNodeWithText("Make another edition").assertExists()
+    }
+
+    @Test
+    fun aFailedBuildAfterASentEditionOffersToTryAgain() {
+        edition(EditionStatus.DELIVERED, listOf("A story"))
+        var started = 0
+        val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Couldn't reach any of your sources."))
+        val vm = TodayViewModel(repo, flowOf(failed)) { started++ }
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.build is BuildState.Failed }
+
+        compose.onNodeWithText("Try again").performClick()
+        assertEquals(1, started)
     }
 
     @Test

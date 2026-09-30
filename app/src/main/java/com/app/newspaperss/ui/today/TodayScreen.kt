@@ -67,7 +67,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
             item(key = "starred") {
                 // Right after a build, these are exactly the stars that didn't fit. The glyph is
                 // decoration, so TalkBack reads only the words.
-                val words = if (state.starredWaiting == 1) "1 starred article is waiting" else "${state.starredWaiting} starred articles are waiting"
+                val words = if (state.starredWaiting == 1) "1 starred article is waiting for your next edition" else "${state.starredWaiting} starred articles are waiting for your next edition"
                 Text(
                     "★ $words",
                     style = MaterialTheme.typography.bodyMedium,
@@ -87,13 +87,26 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         }
         // A ready edition waiting to be sent comes first; making another is secondary.
         val readyWaiting = latest?.status == EditionStatus.READY
+        // A filled button only when there's no edition yet: once one is made, another is optional.
+        // A failed edition's card has its own Try again, and a ready one's Send comes before a retry.
+        val make = when {
+            latest == null -> MakeButton.PRIMARY
+            latest.status == EditionStatus.FAILED -> MakeButton.NONE
+            readyWaiting -> MakeButton.ANOTHER
+            state.build is BuildState.Failed -> MakeButton.RETRY
+            else -> MakeButton.ANOTHER
+        }
+        // A build that failed making an edition leaves its reason on the card too; the status line
+        // keeps it, so TalkBack announces it, and the card doesn't say it again.
+        val saidAbove = (state.build as? BuildState.Failed)?.reason
         // The same key in both places: only one exists at a time, and it moves rather than restarts.
-        if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, primary = true, onMake = viewModel::makeOneNow) }
+        if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
         if (latest != null) {
             item(key = "latest") {
                 LatestEdition(
                     latest,
                     first = editions.size == 1,
+                    saidAbove = saidAbove,
                     deviceName = state.deviceName,
                     preferOpen = state.preferOpen,
                     offerOpen = state.offerOpen,
@@ -110,7 +123,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 )
             }
         }
-        if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, primary = false, onMake = viewModel::makeOneNow) }
+        if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
         if (editions.size > 1) {
             item(key = "earlier") {
                 Text(
@@ -139,6 +152,8 @@ fun Masthead(date: LocalDate, modifier: Modifier = Modifier) {
 
 internal const val BUILD_STATUS = "buildStatus"
 
+private enum class MakeButton { PRIMARY, RETRY, ANOTHER, NONE }
+
 /**
  * What the build status has seen while Today was up. A plain holder, not state: it only has to be
  * right when the status line is next composed, which a build's every change causes.
@@ -158,16 +173,12 @@ private class BuildAnnouncer {
 }
 
 @Composable
-private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, primary: Boolean, onMake: () -> Unit) {
+private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeButton, onMake: () -> Unit) {
     val running = build == BuildState.Syncing || build == BuildState.WaitingForNetwork || build is BuildState.Retrying || build is BuildState.Fetching
     // Announced only once a build has run while this screen was up: a failure WorkManager still
     // remembers from earlier would otherwise be read out every time Today opens.
     announcer.update(build)
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (!running) {
-            if (primary) Button(onClick = onMake) { Text("Make an edition now") }
-            else TextButton(onClick = onMake, modifier = Modifier.padding(top = 8.dp)) { Text("Make another edition") }
-        }
         // One status line, always composed, whose text changes: TalkBack announces a change to a
         // live region, not one appearing. Stepped text rather than a spinner, which smears on e-ink.
         Text(
@@ -188,9 +199,19 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, primary: Bo
         // the page doesn't shift by a line (an extra refresh on e-ink) when fetching starts.
         if (running) {
             Text(
-                (build as? BuildState.Fetching)?.done?.let { if (it == 1) "1 article read so far" else "$it articles read so far" }.orEmpty(),
+                (build as? BuildState.Fetching)?.done?.let { if (it == 1) "1 article so far" else "$it articles so far" }.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
             )
+        }
+        // Below the status, so a failure or "nothing new" reads before the button that answers it.
+        if (!running) {
+            val top = Modifier.padding(top = 8.dp)
+            when (make) {
+                MakeButton.PRIMARY -> Button(onClick = onMake, modifier = top) { Text("Make an edition now") }
+                MakeButton.RETRY -> OutlinedButton(onClick = onMake, modifier = top) { Text("Try again") }
+                MakeButton.ANOTHER -> TextButton(onClick = onMake, modifier = top) { Text("Make another edition") }
+                MakeButton.NONE -> {}
+            }
         }
     }
 }
@@ -199,6 +220,7 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, primary: Bo
 private fun LatestEdition(
     edition: EditionEntity,
     first: Boolean,
+    saidAbove: String?,
     deviceName: String,
     preferOpen: Boolean,
     offerOpen: Boolean,
@@ -212,7 +234,10 @@ private fun LatestEdition(
         Column(Modifier.padding(16.dp)) {
             Column(Modifier.fillMaxWidth().clickable(onClickLabel = "See what's inside", onClick = onDetails)) {
                 Text(edition.title, style = MaterialTheme.typography.headlineSmall)
-                Text(summary(edition), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                // An empty failed edition's summary is just "Not sent", which its error already says.
+                if (!(edition.status == EditionStatus.FAILED && edition.articleCount == 0 && edition.error != null && edition.error != saidAbove)) {
+                    Text(summary(edition), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                }
             }
             // The title opens the contents too, but nothing about it says so.
             if (edition.articleCount > 0 && edition.status != EditionStatus.BUILDING) {
@@ -250,11 +275,8 @@ private fun LatestEdition(
                     if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }
                 }
                 EditionStatus.FAILED -> {
-                    Text(
-                        edition.error ?: "This edition couldn't be made.",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+                    val error = edition.error ?: "This edition couldn't be made."
+                    if (error != saidAbove) Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
                     OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") }
                 }
                 EditionStatus.BUILDING, EditionStatus.DELETED -> {}
