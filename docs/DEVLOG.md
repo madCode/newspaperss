@@ -16,7 +16,8 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ### Cycle 31: no feed? Save the page instead (18:25–)
 - **From the persona audit:** pasting a site with no feed ended at "No feed found at …", a dead end.
-- **Shipped:** when the page loads but has no feed, Add a source offers "Save this page to your reading list instead". An address that can't be reached isn't offered.
+- **Shipped:** when an article's page loads but its site has no feed, Add a source offers "Save this page to your reading list instead". An address that can't be reached isn't offered.
+- **Review caught:** a site's front page was offered too, the most common case, and would make an edition of navigation; so would a paywall's sign-in page a redirect landed on. Only an article-like page on the same site is offered now.
 
 ### Cycle 30: change your e-reader later (18:10–18:25, in [#42](https://github.com/madCode/newspaperss/pull/42))
 - **From the persona audit:** the e-reader picked in onboarding couldn't be changed; a Kobo owner who got a Boox had to reinstall.

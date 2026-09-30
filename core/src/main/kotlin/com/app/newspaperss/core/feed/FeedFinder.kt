@@ -55,7 +55,21 @@ class FeedFinder(private val http: HttpClient) {
                 return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)))
             }
         }
-        return FindResult.NotFound("No feed found at $url.", page = response.finalUrl)
+        return FindResult.NotFound("No feed found at $url.", page = response.finalUrl.takeIf { articleLike(url, it, response.contentType) })
+    }
+
+    /**
+     * Whether a page with no feed is worth saving to read later: an article, not a site's front
+     * page (it would make an edition of navigation), and not somewhere a redirect took it on
+     * another site (a paywall's sign-in page).
+     */
+    private fun articleLike(asked: String, landed: String, contentType: String?): Boolean {
+        if (contentType != null && "html" !in contentType.lowercase()) return false
+        val a = runCatching { URI(asked) }.getOrNull() ?: return false
+        val l = runCatching { URI(landed) }.getOrNull() ?: return false
+        fun host(u: URI) = u.host?.lowercase()?.removePrefix("www.")
+        if (host(a) == null || host(a) != host(l)) return false
+        return !l.path.isNullOrEmpty() && l.path != "/"
     }
 
     companion object {

@@ -20,6 +20,7 @@ import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.SourceRepository
@@ -58,7 +59,10 @@ class SourcesScreenTest {
     fun show() {
         val sources = SourceRepository(db)
         val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
-        val vm = SourcesViewModel(sources, FeedFinder(http), TtrssRepository(db, http, accounts, sources)) { syncRequests++ }
+        val vm = SourcesViewModel(
+            sources, FeedFinder(http), TtrssRepository(db, http, accounts, sources),
+            saveToReadingList = { com.app.newspaperss.data.ReadingListRepository(db).save(it) },
+        ) { syncRequests++ }
         compose.setContent { SourcesScreen(vm, onOpenSource = { opened = it }) }
         // Room delivers on its own executor, which Compose's idling doesn't track.
         waitFor("No sources yet")
@@ -108,6 +112,18 @@ class SourcesScreenTest {
         waitFor("Posts")
         compose.onNodeWithText("Posts").assertIsDisplayed()
         assertEquals(1, syncRequests)
+    }
+
+    @Test
+    fun anArticleFromASiteWithNoFeedCanBeSavedToReadLater() {
+        http.page("https://example.com/2026/a-story", "<html><body><p>No feed on this site.</p></body></html>")
+
+        addSource("https://example.com/2026/a-story")
+        waitFor("Save this page to your reading list instead")
+        compose.onNodeWithText("Save this page to your reading list instead").performClick()
+
+        waitFor("Saved to your reading list")
+        assertEquals(1, runBlocking { com.app.newspaperss.data.ReadingListRepository(db).observe().first().size })
     }
 
     @Test

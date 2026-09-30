@@ -55,21 +55,51 @@ class SourcesViewModelTest {
 
     @Test
     fun aSiteWithNoFeedCanBeSavedToTheReadingListInstead() {
-        val http = FakeHttp().apply { page("https://blog.example", "<html><body><p>No feed here.</p></body></html>") }
+        val article = "https://blog.example/2026/a-post"
+        val http = FakeHttp().apply { page(article, "<html><body><p>No feed here.</p></body></html>") }
         val reading = ReadingListRepository(db)
         val vm = SourcesViewModel(SourceRepository(db), FeedFinder(http), saveToReadingList = { reading.save(it) }) {}
 
         vm.openAdd()
-        vm.editInput("blog.example")
+        vm.editInput(article)
         vm.find()
         idleUntil { (vm.add.value as? AddState.Editing)?.error != null }
-        assertEquals("https://blog.example", (vm.add.value as AddState.Editing).page)
+        assertEquals(article, (vm.add.value as AddState.Editing).page)
 
         vm.saveInstead()
         idleUntil { vm.message.value != null }
         assertEquals(AddState.Closed, vm.add.value)
         assertEquals("Saved to your reading list", vm.message.value)
-        assertEquals(listOf("https://blog.example"), runBlocking { reading.observe().first() }.map { it.url })
+        assertEquals(listOf(article), runBlocking { reading.observe().first() }.map { it.url })
+    }
+
+    @Test
+    fun aFrontPageIsntOfferedItWouldMakeAnEditionOfNavigation() {
+        val http = FakeHttp().apply { page("https://blog.example", "<html><body><p>No feed here.</p></body></html>") }
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(http), saveToReadingList = { true }) {}
+        vm.openAdd()
+        vm.editInput("blog.example")
+        vm.find()
+        idleUntil { (vm.add.value as? AddState.Editing)?.error != null }
+        assertEquals(null, (vm.add.value as AddState.Editing).page)
+    }
+
+    @Test
+    fun editingTheAddressWithdrawsTheOffer() {
+        val article = "https://blog.example/2026/a-post"
+        val http = FakeHttp().apply { page(article, "<html><body><p>No feed here.</p></body></html>") }
+        var saved = 0
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(http), saveToReadingList = { saved++; true }) {}
+        vm.openAdd()
+        vm.editInput(article)
+        vm.find()
+        idleUntil { (vm.add.value as? AddState.Editing)?.page != null }
+
+        vm.editInput("other.example")
+        vm.saveInstead()
+
+        assertEquals(0, saved)
+        assertEquals(AddState.Editing("other.example"), vm.add.value)
     }
 
     @Test
