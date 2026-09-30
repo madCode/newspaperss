@@ -14,10 +14,10 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 2 · Tue 29 Sep, 11:47–19:30 PT
 
-### Cycle 32: wrap-up (18:20–19:30)
+### Cycle 32: wrap-up (18:06–19:30)
 - **Shipped:** a 30-minute timeout on CI (a hung test would otherwise hold a PR for six hours), and the Day 2 report and retro pages.
 
-### Cycle 31: no feed? Save the page instead (17:53–18:20, [#43](https://github.com/madCode/newspaperss/pull/43))
+### Cycle 31: no feed? Save the page instead (17:53–18:06, [#43](https://github.com/madCode/newspaperss/pull/43))
 - **From the persona audit:** pasting a site with no feed ended at "No feed found at …", a dead end.
 - **Shipped:** when an article's page loads but its site has no feed, Add a source offers "Save this page to your reading list instead". An address that can't be reached isn't offered.
 - **Review caught:** a site's front page was offered too, the most common case, and would make an edition of navigation; so would a paywall's sign-in page a redirect landed on. Only an article-like page on the same site is offered now.
