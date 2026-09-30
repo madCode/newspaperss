@@ -210,6 +210,10 @@ class ArticleExtractorTest {
             "blocked" to FakeHttp(mapOf(url to page("<html>Forbidden</html>", code = 403))),
             "challenge" to FakeHttp(mapOf(url to page("<html><head><title>Just a moment...</title></head><body>Checking your browser</body></html>"))),
             "pdf" to FakeHttp(mapOf(url to page("%PDF-1.7 binary", type = "application/pdf"))),
+            "fastly" to FakeHttp(mapOf(url to page(
+                "<html><head><link href=\"/_fs-ch-1T1w/assets/styles.css\" rel=\"stylesheet\"/><title>Client Challenge</title></head>" +
+                    "<body><div id=\"loading-error\">Checking your browser. A required part of this site couldn't load.</div></body></html>",
+            ))),
         )
         for ((name, http) in cases) {
             val article = ArticleExtractor(http).extract(input(teaser))
@@ -217,7 +221,7 @@ class ArticleExtractorTest {
             assertTrue(name, article.note!!.startsWith("Couldn't fetch the full article"))
             assertTrue(name, "particular pleasure" in article.html)
             assertFalse(name, "Checking your browser" in article.html)
-            assertEquals("only a refusal or bot check counts as blocked: $name", name in setOf("blocked", "challenge"), article.pageBlocked)
+            assertEquals("only a refusal or bot check counts as blocked: $name", name in setOf("blocked", "challenge", "fastly"), article.pageBlocked)
         }
     }
 

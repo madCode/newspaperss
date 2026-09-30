@@ -268,6 +268,8 @@ class ArticleExtractor(private val http: HttpClient) {
             "<title>Just a moment...</title>", "<title>Verifying Device</title>", "cf-browser-verification",
             "challenge-platform", "_Incapsula_Resource", "captcha-delivery.com", "px-captcha",
             "Enable JavaScript and cookies to continue",
+            // Fastly's bot challenge (Le Monde): its assets load from /_fs-ch-….
+            "<title>Client Challenge</title>", "/_fs-ch-",
         )
         private val WHITESPACE = Regex("\\s+")
 

@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** lighter extraction and the docs regrouping ([#40](https://github.com/madCode/newspaperss/pull/40)); Chinese and Japanese reading time.
-- **Next:** the Le Monde script wall; the rest of the accessibility audit; saying why there's no edition.
+- **In flight:** Chinese and Japanese reading time ([#41](https://github.com/madCode/newspaperss/pull/41)); Le Monde's bot check.
+- **Next:** saying why there's no edition; the rest of the accessibility audit.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 26: Chinese and Japanese reading time (17:20–)
+### Cycle 27: Le Monde's bot check (17:30–)
+- **From a live edition:** Le Monde articles came out as "A required part of this site couldn't load": the app fetched Fastly's bot challenge ("Client Challenge", a 3 KB page served with a 200) and took it for the article.
+- **Shipped:** the challenge is recognised, so the feed's text is used with a note, and the source learns the site blocks fetching.
+- **Checks:** a live Le Monde edition has the feed's text and the note, and no challenge text.
+
+### Cycle 26: Chinese and Japanese reading time (17:20–17:30, [#41](https://github.com/madCode/newspaperss/pull/41))
 - **From the language work:** Chinese and Japanese have no spaces between words, so a whole NHK paragraph counted as one word: no reading time, and the full-text check would take a long Japanese feed for a teaser and fetch pages it didn't need.
 - **Shipped:** one word count everywhere, which counts each Chinese or Japanese character as about 2/3 of a word (people read about 350 characters a minute, against 238 English words). Korean uses spaces and is counted by word.
 - **Checks:** a live edition with BBC Chinese gives 3–7 minute articles instead of seconds, and passes epubcheck.
