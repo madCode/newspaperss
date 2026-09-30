@@ -173,7 +173,8 @@ class FeedSync(
             } catch (e: TtrssException) {
                 e.message ?: "tt-rss reported an error."
             } catch (e: IOException) {
-                ttrssUnreachable(e)
+                // The periodic sync, and every edition, tries again.
+                ttrssUnreachable(e) + if (tooSlow(e)) " It'll be tried again at the next sync." else ""
             } catch (e: SQLiteConstraintException) {
                 return null
             } catch (e: Exception) {
@@ -246,13 +247,17 @@ class FeedSync(
         const val SIGN_IN_AGAIN = "Sign in to tt-rss again: tap the menu at the top of Sources."
 
         /**
-         * What to tell the reader when tt-rss couldn't be read. A timeout gets its own words: a home
-         * server on a slow line answers eventually, and "couldn't reach" sends people to check a
-         * connection that works.
+         * What to tell the reader when tt-rss couldn't be read. A slow answer gets its own words: a
+         * home server on a slow line answers eventually, and "couldn't reach" sends people to check a
+         * connection that works. A connect timeout isn't slowness: a switched-off VPN or a wrong
+         * address behind a firewall drops packets rather than refusing them.
          */
-        fun ttrssUnreachable(e: IOException): String = when (e) {
-            is InterruptedIOException -> "tt-rss took too long to answer. It'll be tried again at the next sync."
-            else -> "Couldn't reach tt-rss."
+        fun ttrssUnreachable(e: IOException): String =
+            if (tooSlow(e)) "tt-rss took too long to answer." else "Couldn't reach tt-rss."
+
+        /** A read or whole-call timeout; OkHttp reports a connect timeout as one too, told apart by its message. */
+        fun tooSlow(e: IOException): Boolean =
+            e is InterruptedIOException && e.message?.contains("connect", ignoreCase = true) != true
         }
     }
 }

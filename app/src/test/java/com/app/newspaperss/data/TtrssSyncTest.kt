@@ -541,6 +541,20 @@ class TtrssSyncTest {
     }
 
     @Test
+    fun aConnectTimeoutIsAConnectionProblemNotASlowServer() = runTest {
+        // A switched-off VPN or a wrong address behind a firewall times out connecting.
+        assertEquals("Couldn't reach tt-rss.", FeedSync.ttrssUnreachable(java.net.SocketTimeoutException("connect timed out")))
+        assertEquals("tt-rss took too long to answer.", FeedSync.ttrssUnreachable(java.net.SocketTimeoutException("timeout")))
+    }
+
+    @Test
+    fun startingFreshThatTimesOutDoesntPromiseARetry() = runTest {
+        val source = connect()
+        http.timingOut += server.apiUrl
+        assertEquals("tt-rss took too long to answer. It may still be working through it: check in tt-rss before trying again.", ttrss.startFresh(source.id))
+    }
+
+    @Test
     fun startingFreshWithTtrssUnreachableSaysSo() = runTest {
         val source = connect()
         http.unreachable += server.apiUrl

@@ -15,7 +15,8 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ### Cycle 57: a slow tt-rss server says so (02:37–, this PR)
 - **From the persona audit:** a home server on a slow line timed out and the app said "Couldn't reach tt-rss", sending you to check a connection that works.
-- **Shipped:** a timeout now says tt-rss took too long and will be tried again, on the source, when signing in, choosing a category, starting fresh and marking read.
+- **Shipped:** a slow answer now says tt-rss took too long: on the source (with "it'll be tried again at the next sync", which is true there), when signing in, choosing a category and marking read. Start fresh says the server may still be working through it.
+- **Review caught:** the retry promise shown where nothing retries (start fresh, categories, the mark-read note); a connect timeout, which means an unreachable server (a VPN off, a wrong address), taken for slowness.
 
 ### Cycle 56: leave a tt-rss feed out (02:15–02:37, [#72](https://github.com/madCode/newspaperss/pull/72))
 - **From the persona audit:** a noisy feed (a live blog, press releases) kept taking a slot, and the only fix was on the server.
