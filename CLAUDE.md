@@ -21,6 +21,7 @@ changed and why.
     ./gradlew :app:testDebugUnitTest     # Robolectric tests
     ./gradlew build                      # everything CI runs
     ./gradlew koverHtmlReport            # coverage: build/reports/kover/html
+    ./gradlew koverVerify                # fails below 90% line coverage (CI runs it)
 
 JDK 21 and the Android SDK (compileSdk 37) are required.
 
