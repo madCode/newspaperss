@@ -306,6 +306,8 @@ class SourceDetailScreenTest {
         settle { visible("Undo") }
         assertEquals("the row and the snackbar", 2, compose.onAllNodes(hasText("Marked as read", substring = true)).fetchSemanticsNodes().size)
         assertEquals("the row doesn't move", top, compose.onNodeWithText("Article waiting").fetchSemanticsNode().boundsInRoot.top)
+        compose.onNodeWithText("Tap ☆ to put one in your next edition.").assertExists()
+        assertFalse("nothing left to mark read, so Select isn't suggested for it", visible("Tap Select"))
         assertEquals(ArticleState.SKIPPED, state(waiting))
         assertNull("marking read clears the star", runBlocking { db.articles().byId(waiting)!!.starredAt })
         assertNull(markReadAction("Article waiting"))
@@ -370,6 +372,7 @@ class SourceDetailScreenTest {
         compose.onNodeWithText("Select").performClick()
         settle { visible("0 selected") }
         compose.onNodeWithText("Tap articles to choose them.").assertExists()
+        compose.onNodeWithText("Tap ☆ to put one in your next edition. Tap articles to choose them.").assertExists()
         row("Article waiting").performClick()
         row("Article delivered").performClick()
         compose.onNodeWithContentDescription("Put 2 articles in your next edition").performClick()
@@ -580,6 +583,25 @@ class SourceDetailScreenTest {
         val mark = compose.onNodeWithText("Mark 1 as read").fetchSemanticsNode().boundsInRoot
         assertTrue("stacked", mark.top >= star.bottom)
         assertEquals("full width", star.width, mark.width, 1f)
+    }
+
+    /** Selecting while an Undo is showing mustn't put the bar's buttons under the snackbar. */
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun theSnackbarSitsAboveTheSelectionBar() {
+        val (id, ids) = sourceWithArticles(moreWaiting = 1)
+        show(id)
+        markReadAction("Article waiting")!!.action()
+        settle { visible("Undo") }
+
+        row("Article more1").performTouchInput { longClick() }
+        settle { visible("Mark 1 as read") }
+
+        val undo = compose.onNodeWithText("Undo").fetchSemanticsNode().boundsInRoot
+        val mark = compose.onNodeWithText("Mark 1 as read").fetchSemanticsNode().boundsInRoot
+        assertTrue("snackbar above the bar", undo.bottom <= mark.top)
+        compose.onNodeWithText("Mark 1 as read").performClick()
+        settle { state(ids.getValue("more1")) == ArticleState.SKIPPED }
     }
 
     @Test

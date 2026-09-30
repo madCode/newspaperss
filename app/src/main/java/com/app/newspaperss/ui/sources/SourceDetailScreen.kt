@@ -183,7 +183,6 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 )
             }
         },
-        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (source == null) {
             Box(Modifier.fillMaxSize().padding(padding))
@@ -195,6 +194,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         // redraw on e-ink) on the way in or out of selection mode.
         val density = LocalDensity.current
         var barRoom by remember { mutableStateOf(0.dp) }
+        var barHeight by remember { mutableStateOf(0.dp) }
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp + barRoom)) {
                 item {
@@ -241,10 +241,13 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     onMarkRead = { ids -> viewModel.markRead(ids); stopSelecting() },
                     modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged {
                         val height = with(density) { it.height.toDp() }
+                        barHeight = height
                         if (height > barRoom) barRoom = height
                     },
                 )
             }
+            // Here rather than in the Scaffold, so it sits above the bar instead of over its buttons.
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = if (selecting) barHeight else 0.dp))
         }
     }
     if (choosingMode && source != null) {
@@ -383,25 +386,31 @@ private fun ArticlesHeading(articles: List<ArticleEntity>, selecting: Boolean, o
     }
     if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
     if (articles.isNotEmpty()) {
-        // Both wordings are laid out, one of them invisible, so the line keeps the height of the
-        // longer one: a change in its line count would move every row below it.
+        val canStar = articles.any { it.state != ArticleState.IN_EDITION }
+        val second = if (selecting) CHOOSE_HELP else SELECT_HELP.takeIf { articles.any { it.state == ArticleState.NEW } }
+        val shown = listOfNotNull(STAR_HELP.takeIf { canStar }, second).joinToString(" ")
+        // The longest wordings are laid out invisibly under the one shown, so the line keeps one
+        // height as what it says changes: a change in its line count would move every row below it.
         Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp)) {
-            HelperText(STAR_HELP + " Tap Select to mark some as read.", "Tap the star to put one in your next edition. Tap Select to mark some as read.", shown = !selecting)
-            HelperText(STAR_HELP + " Tap articles to choose them.", "Tap the star to put one in your next edition. Tap articles to choose them.", shown = selecting)
+            HelperText("$STAR_HELP $SELECT_HELP", shown = false)
+            HelperText("$STAR_HELP $CHOOSE_HELP", shown = false)
+            if (shown.isNotEmpty()) HelperText(shown, shown = true)
         }
     }
 }
 
 private const val STAR_HELP = "Tap ☆ to put one in your next edition."
+private const val SELECT_HELP = "Tap Select to mark some as read."
+private const val CHOOSE_HELP = "Tap articles to choose them."
 
-/** @param spoken the text for TalkBack, which would read ☆ as "white star". */
 @Composable
-private fun HelperText(text: String, spoken: String, shown: Boolean) {
+private fun HelperText(text: String, shown: Boolean) {
     Text(
         text,
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = if (shown) Modifier.semantics { contentDescription = spoken } else Modifier.alpha(0f).clearAndSetSemantics {},
+        // TalkBack would read ☆ as "white star".
+        modifier = if (shown) Modifier.semantics { contentDescription = text.replace("☆", "the star") } else Modifier.alpha(0f).clearAndSetSemantics {},
     )
 }
 
