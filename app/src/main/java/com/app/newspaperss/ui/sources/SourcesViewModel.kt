@@ -17,6 +17,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import java.time.Instant
 import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.core.ttrss.TtrssCategory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -46,6 +47,10 @@ data class TtrssForm(
     val password: String = "",
     val testing: Boolean = false,
     val error: String? = null,
+    /** Set once the login is checked: its categories, to choose from before the account is added. */
+    val categories: List<TtrssCategory>? = null,
+    /** The chosen category; null is all unread articles. */
+    val category: TtrssCategory? = null,
 )
 
 /**
@@ -153,13 +158,35 @@ class SourcesViewModel(
         val repo = ttrss ?: return
         _ttrssForm.value = form.copy(testing = true, error = null)
         connecting = viewModelScope.launch {
-            val error = repo.connect(form.address, form.user, form.password)
-            if (error == null) {
-                _ttrssForm.value = null
-                onSourcesChanged()
-            } else {
-                _ttrssForm.value = form.copy(error = error)
+            when (val check = repo.check(form.address, form.user, form.password)) {
+                is TtrssRepository.Check.Failed -> _ttrssForm.value = form.copy(error = check.message)
+                // Nothing's saved until the reader has chosen, so no sync can take articles from
+                // the wrong place first. With only Uncategorized there's nothing to choose.
+                is TtrssRepository.Check.Passed ->
+                    if (check.categories.none { it.id != 0 }) add(form, category = null)
+                    else _ttrssForm.value = form.copy(testing = false, categories = check.categories)
             }
+        }
+    }
+
+    fun pickTtrssCategory(category: TtrssCategory?) {
+        _ttrssForm.value = _ttrssForm.value?.takeIf { it.categories != null && !it.testing }?.copy(category = category)
+    }
+
+    fun finishTtrss() {
+        val form = _ttrssForm.value?.takeIf { it.categories != null && !it.testing } ?: return
+        _ttrssForm.value = form.copy(testing = true)
+        connecting = viewModelScope.launch { add(form, form.category) }
+    }
+
+    private suspend fun add(form: TtrssForm, category: TtrssCategory?) {
+        val repo = ttrss ?: return
+        val error = repo.add(form.address, form.user, form.password, category)
+        if (error == null) {
+            _ttrssForm.value = null
+            onSourcesChanged()
+        } else {
+            _ttrssForm.value = form.copy(testing = false, categories = null, category = null, error = error)
         }
     }
 

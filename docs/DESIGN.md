@@ -173,8 +173,9 @@ articles go back, keeping their stars, before the new one is planned.
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
   read on the server once delivered, and ones you marked as read at the next
   sync (so Undo never has to reach the server). A source can turn that off, or
-  take one category instead of all unread. tt-rss's own stars aren't synced:
-  there a star usually means "keep this", not "for tomorrow".
+  take one category instead of all unread; adding the account asks which,
+  before the first sync. tt-rss's own stars aren't synced: there a star
+  usually means "keep this", not "for tomorrow".
 - **Housekeeping.** Only the newest 14 editions keep their EPUB on the
   phone (ready ones always do). An article's feed text is dropped a month
   after it's delivered or expires; its row stays, so it's never re-offered.
