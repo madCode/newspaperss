@@ -142,9 +142,9 @@ module so it's all unit-tested without Android.
   - each article: section and source, headline, "By … · date · N min read",
     the body, an end mark, "Read the original at site", and a "Next" link
     with its source and time; then "That's all for today" with the day's
-    totals and a question to think about. Editions take a short list of
-    open questions in turn ("Which two pieces would argue with each
-    other?"), and the notes file asks the same one first;
+    totals and a question to think about, one of a short list of open
+    questions that suit any paper ("What surprised you?"). It changes from
+    one edition to the next, and the notes file shows the same one;
   - styles Kindle's conversion keeps: plain class selectors, relative
     sizes, no side margins, headings aligned explicitly;
   - images as JPEG up to 1200px, about 15 MB in all including the cover, up

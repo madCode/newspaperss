@@ -6,9 +6,10 @@ import org.junit.Test
 
 class ReflectionTest {
     @Test
-    fun editionsTakeTheQuestionsInTurnWithoutRepeatingTheLastOne() {
-        val asked = (1L..Reflection.QUESTIONS.size.toLong()).map(Reflection::forEdition)
-        assertEquals("a run of editions asks every question once", Reflection.QUESTIONS.toSet(), asked.toSet())
-        assertNotEquals(Reflection.forEdition(Reflection.QUESTIONS.size.toLong()), Reflection.forEdition(Reflection.QUESTIONS.size + 1L))
+    fun editionsInARowGetDifferentQuestionsAndEveryQuestionComesUp() {
+        val n = Reflection.QUESTIONS.size.toLong()
+        assertEquals("no question listed twice", Reflection.QUESTIONS.size, Reflection.QUESTIONS.distinct().size)
+        (1L..n).forEach { assertNotEquals(Reflection.forEdition(it), Reflection.forEdition(it + 1)) }
+        assertEquals(Reflection.QUESTIONS.toSet(), (1L..n).map(Reflection::forEdition).toSet())
     }
 }

@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.notes.Reflection
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
@@ -35,7 +36,6 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.zip.ZipFile
-import com.app.newspaperss.core.notes.Reflection
 
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
@@ -126,12 +126,10 @@ class EditionBuilderTest {
 
     @Test
     fun theClosingPageAsksTheSameQuestionTheNotesStartWith() = runTest {
-        // What she turned over on the Kindle is waiting in her notes app, and tomorrow brings a new one.
-        source("a", null, "a1", "a2")
-        val first = (builder.build(EditionSettings(maxPerSource = 1, minutes = 5)) as BuildResult.Built).editionId
-        val second = (builder.build(EditionSettings(maxPerSource = 1, minutes = 5)) as BuildResult.Built).editionId
+        // What she turned over on the Kindle is waiting in her notes app.
+        source("a", null, "a1")
+        val first = (builder.build(EditionSettings()) as BuildResult.Built).editionId
         val question = Reflection.forEdition(first)
-        assertTrue(question != Reflection.forEdition(second))
 
         val end = ZipFile(editions.fileOf(db.editions().byId(first)!!)!!).use { zip ->
             javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
@@ -139,7 +137,7 @@ class EditionBuilderTest {
         }
         assertTrue(end.contains(question))
         val notes = EditionNotes(db, tmp.newFolder("notes")).write(first)!!.readText()
-        assertTrue(notes.contains("- $question"))
+        assertTrue(notes.contains("From the end of the paper: *$question*"))
     }
 
     @Test

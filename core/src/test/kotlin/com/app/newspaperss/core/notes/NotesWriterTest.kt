@@ -70,9 +70,10 @@ class NotesWriterTest {
     }
 
     @Test
-    fun theClosingPagesQuestionIsAskedFirst() {
-        val notes = NotesWriter.write(edition().copy(question = "Which sentence stayed with you?"))
-        assertTrue(notes.contains("Some questions to start:\n\n- Which sentence stayed with you?\n- What's the main claim"))
+    fun theClosingPagesQuestionComesBeforeThePrompts() {
+        val notes = NotesWriter.write(edition().copy(question = "What surprised you?"))
+        assertTrue(notes.contains("# Tuesday Morning Edition\n\nFrom the end of the paper: *What surprised you?*\n\nPick one piece"))
+        assertEquals("a blank question adds nothing", NotesWriter.write(edition()), NotesWriter.write(edition().copy(question = " ")))
     }
 
     @Test
