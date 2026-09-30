@@ -119,6 +119,30 @@ class LinkPostEditionTest {
         assertFalse("story2500" in book)
     }
 
+    /**
+     * A short post whose one outbound link is tagged with its blog's name (Ghost does that to every
+     * link) is still the post when the linked page is about something else: its own words, its
+     * own blog's credit and its own page as the original.
+     */
+    @Test
+    fun aCommentaryPostWithOneTaggedLinkStaysThePost() = runTest {
+        addFeed(
+            "blog",
+            item("blog", "leaving", "Why I finally deleted my accounts", "<p>$pitchWords</p><p>As <a href=\"$story?ref=blog.example\">this</a> says.</p>"),
+        )
+        storyPage()
+        sync.syncAll()
+
+        val built = builder.build(EditionSettings(minutes = 60)) as BuildResult.Built
+
+        val entry = editions.observeArticles(built.editionId).first().single()
+        assertEquals("Blog", entry.sourceTitle)
+        val book = bookText(built.editionId)
+        assertTrue("pitch150" in book)
+        assertFalse("story2500" in book)
+        assertTrue("Read the original at <a href=\"https://blog.example/2026/09/leaving/\">" in book)
+    }
+
     /** A story two sources picked, one tagging the link with its name and one with analytics tags, goes out once. */
     @Test
     fun aStoryPickedByTwoSourcesGoesOutOnceAndNotAgainFromAThird() = runTest {

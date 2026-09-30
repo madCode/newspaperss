@@ -1,7 +1,9 @@
 package com.app.newspaperss.core.feed
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LinkPostsTest {
@@ -46,6 +48,44 @@ class LinkPostsTest {
         // link has no referral tag.
         assertEquals(16, found.size)
         assertEquals("tracking is gone from every story link", emptyList<String>(), found.filter { "src=" in it })
+    }
+
+    /**
+     * Longreads titles a pick with the story's headline, so even the story's address alone (its
+     * page title isn't in the sample) mostly confirms it. A retitled pick ("Oh, How Lucky We Are"
+     * for "oh-how-happy-we-are") keeps its pitch, which is only a missed story.
+     */
+    @Test
+    fun aPicksTitleMatchesItsStory() {
+        val picks = longreads.items.mapNotNull { item -> LinkPosts.storyUrl(item.url, item.contentHtml, longreads.siteUrl)?.let { item.title to it } }
+        val confirmed = picks.filter { (title, story) -> LinkPosts.isTheStory(title, null, story) }.map { it.first }
+        assertTrue("${confirmed.size} of ${picks.size}", confirmed.size >= 12)
+        assertTrue(confirmed.any { it.startsWith("Dusklands") })
+        assertTrue(confirmed.any { it.startsWith("A Tale of Two Trap Houses") })
+        assertTrue(
+            "the page's own title counts too",
+            LinkPosts.isTheStory("Oh, How Lucky We Are", "Oh, How Lucky We Are | The Bitter Southerner", "https://bittersoutherner.com/issue-no-15/oh-how-happy"),
+        )
+    }
+
+    @Test
+    fun aCommentaryPostsTitleDoesntMatchThePageItLinks() {
+        assertFalse(
+            LinkPosts.isTheStory(
+                "Why I finally deleted my social media accounts",
+                "Quarterly earnings beat forecasts at Example Corp",
+                "https://news.example/business/2026/09/example-corp-earnings",
+            ),
+        )
+    }
+
+    /** "blog" names no one, so a common `utm_source=blog` tag on a blog.example.com post isn't its own site's credit. */
+    @Test
+    fun aGenericSubdomainDoesntMakeACommonTagACredit() {
+        val html = """<p>Some thoughts. <a href="https://news.example/story?utm_source=blog">A story</a></p>"""
+        assertNull(LinkPosts.storyUrl("https://blog.example.com/post", html, "https://blog.example.com/"))
+        val credited = """<p>Our pick. <a href="https://news.example/story?utm_source=example">A story</a></p>"""
+        assertEquals("https://news.example/story", LinkPosts.storyUrl("https://blog.example.com/post", credited, "https://blog.example.com/"))
     }
 
     @Test

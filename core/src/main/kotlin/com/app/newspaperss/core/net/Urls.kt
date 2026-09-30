@@ -33,12 +33,15 @@ fun registrableDomainOf(url: String): String? {
 /**
  * The name a site goes by in referral tags: "longreads" for longreads.com. For a host below its
  * registrable domain, its own leftmost label ("foo" for foo.substack.com): a tag naming the
- * platform (`utm_source=substack`) says nothing about which of its sites put it there.
+ * platform (`utm_source=substack`) says nothing about which of its sites put it there. A generic
+ * label (blog.example.com, en.example.com) names no one, and common tag values (`utm_source=blog`)
+ * would match it, so the registrable name stands in.
  */
 fun siteNameOf(url: String): String? {
     val labels = hostLabels(url) ?: return null
     val index = registrableIndex(labels)
-    return if (index > 0) labels.first() else labels[index]
+    val own = labels.first().takeIf { index > 0 && it.length > 2 && it !in GENERIC_LABELS }
+    return own ?: labels[index]
 }
 
 /** Whether [url] has a referral parameter (`src=longreads`, `utm_source=longreads.com`) naming one of [siteNames]. */
@@ -105,6 +108,10 @@ private fun decode(text: String): String = runCatching { URLDecoder.decode(text,
 private val WEB_SCHEMES = setOf("http", "https")
 private val NOT_ALPHANUMERIC = Regex("[^a-z0-9]+")
 private val LEADING_LABELS = setOf("www", "m")
+private val GENERIC_LABELS = setOf(
+    "www", "www2", "m", "mobile", "amp", "blog", "blogs", "news", "feed", "feeds", "rss", "web", "home", "app",
+    "api", "cdn", "static", "media", "beta", "shop", "store", "mail", "newsletter", "newsletters", "edition", "int",
+)
 private val SECOND_LEVEL = setOf("co", "com", "org", "net", "ac", "gov", "edu", "or", "ne", "go", "gob", "nic", "ltd", "plc", "sch", "nhs")
 private val CLICK_IDS = setOf("fbclid", "gclid", "dclid", "msclkid", "mc_cid", "mc_eid")
 private val REFERRAL_KEYS = setOf("src", "ref", "source", "via", "ref_src")

@@ -91,17 +91,30 @@ module so it's all unit-tested without Android.
     two sources goes out once, and a delivered story isn't stored again.
     The feed's guid is kept, so the pitch isn't offered twice.
   - The edition fetches the story's page, with the usual paywall, bot
-    check and size rules. The page has to have twice the pitch's words to
-    replace it; if it can't be fetched, the pitch goes in with a note.
-  - It's credited to both: "Equator via Longreads", and "Read the original"
-    links the story. Only "Feed's text", chosen by the reader, keeps the
-    pitch.
+    check and size rules. It replaces the pitch only if it's clearly the
+    story: at least half the words of the item's title are in the page's
+    title or address (pointer sites title a pick with the story's
+    headline), and it has twice the pitch's words.
+  - The story goes in credited to both ("Equator via Longreads"), with
+    the story's own author, and "Read the original" links the story.
+  - A page that's too short (a paywall preview) or can't be fetched leaves
+    the pitch, with a note, still credited to both.
+  - A page titled for something else means the post wasn't a pointer (a
+    short commentary post with one tagged link): the post goes in as
+    itself, credited to its source, with its own page as the original.
+    It's still stored under the linked address, so two such posts about
+    the same page, or the page itself from another source, go out once.
+  - Only "Feed's text", chosen by the reader, always keeps the pitch.
   - Link posts aren't evidence for the source's article text: a Longreads
     source is judged by its own full-text posts.
 - **Tracking.** `utm_*`, click ids and a referral tag naming the source's
   own site are removed from stored feed, tt-rss and curated-list links,
-  so one story compares equal wherever it came from. The guid is left as
-  the feed gave it. Saved links are kept as the reader saved them.
+  so one story compares equal wherever it came from. The link as fetched
+  is still checked against delivered links. The guid is left as the feed
+  gave it. Saved links are kept as the reader saved them.
+- **One story, one delivery.** When a link goes out, its waiting copies
+  in other sources are used up, tt-rss ones included; those are marked
+  read on the server along with the edition's own tt-rss articles.
 - **Comics and image posts.** A feed item that's just an image counts as
   content. When a page's text is clearly not the article, the page's main
   image is used, and a webcomic's own comic (all its panels) beats the

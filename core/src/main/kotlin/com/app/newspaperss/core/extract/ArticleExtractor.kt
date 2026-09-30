@@ -1,6 +1,7 @@
 package com.app.newspaperss.core.extract
 
 import com.app.newspaperss.core.ReadingTime
+import com.app.newspaperss.core.feed.LinkPosts
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.net.HttpResponse
 import org.jsoup.Jsoup
@@ -57,8 +58,14 @@ data class ExtractedArticle(
     val pageFailure: PageFailure? = null,
     /** The article's language as a BCP 47 tag, if the text or the page says. */
     val language: String? = null,
-    /** The name of the site whose page the text came from, if it was the page and the page says. */
+    /** The name of the site the story is from, if its page was read and says. */
     val siteName: String? = null,
+    /**
+     * A link post whose page turned out not to be the story it pitched (see
+     * [com.app.newspaperss.core.feed.LinkPosts.isTheStory]): the article is the item alone, and
+     * belongs to the item's own page.
+     */
+    val notTheStory: Boolean = false,
 )
 
 /** Why a page couldn't be read, when the site didn't turn the app away. */
@@ -89,7 +96,8 @@ class ArticleExtractor(private val http: HttpClient) {
 
         fun fromFeed(
             clean: CleanResult, note: String?, pageWords: Int?, blocked: Boolean = false, declaredLanguage: String? = null, failure: PageFailure? = null,
-        ) = article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked, declaredLanguage, failure)
+            siteName: String? = null,
+        ) = article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked, declaredLanguage, failure, siteName)
 
         // A FEED source's item with no content still gets its page fetched: better than an empty article.
         if (feed != null && (input.mode == ContentMode.FEED || (input.mode == ContentMode.AUTO && feedWords >= FULL_TEXT_WORDS))) {
@@ -102,6 +110,9 @@ class ArticleExtractor(private val http: HttpClient) {
                 else failed(input, page.reason, page.blocked, page.failure)
             is PageResult.Fetched -> {
                 val words = page.clean.wordCount
+                if (input.feedUrl != null && feed != null) return linkPost(input, page, feedWords) { note, siteName ->
+                    fromFeed(feed, note, words, declaredLanguage = page.content.language, siteName = siteName)
+                }
                 // A cartoon or comic: extraction found little text and no image. Only on strong
                 // signs, so a short brief doesn't get a stray picture: a feed item that's
                 // essentially just the image, or page text that isn't from the article at all
@@ -120,12 +131,9 @@ class ArticleExtractor(private val http: HttpClient) {
                         if (image != null) imagePost(input, page, image, feed, feedAuthor, feedWords)?.let { return it }
                     }
                 }
-                // A link post's page has to be clearly the story to replace the pitch: a short page is a
-                // paywall preview, or the post wasn't pointing at a story after all.
-                val keepFeedBelow = if (input.feedUrl != null) TEASER_RATIO else KEEP_FEED_RATIO
                 when {
                     // Extraction that keeps well under the feed's text missed the article; the feed is better.
-                    feed != null && words < keepFeedBelow * feedWords -> fromFeed(feed, null, words, declaredLanguage = page.content.language)
+                    feed != null && words < KEEP_FEED_RATIO * feedWords -> fromFeed(feed, null, words, declaredLanguage = page.content.language)
                     words == 0 -> failed(input, "no article text found on the page")
                     else -> article(
                         title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) },
@@ -136,11 +144,36 @@ class ArticleExtractor(private val http: HttpClient) {
                         feedWords = feedWords,
                         pageWords = words,
                         declaredLanguage = page.content.language,
-                        siteName = page.content.siteName,
                     )
                 }
             }
         }
+    }
+
+    /**
+     * A link post's story page, or its pitch (from [pitch], given a note and the story's site name)
+     * when the page isn't clearly the story: a page titled for something else means the post wasn't
+     * pointing at a story after all, and a page with little more text than the pitch is a paywall
+     * preview.
+     */
+    private fun linkPost(
+        input: ExtractInput, page: PageResult.Fetched, feedWords: Int, pitch: (note: String?, siteName: String?) -> ExtractedArticle,
+    ): ExtractedArticle {
+        if (!LinkPosts.isTheStory(input.feedTitle, page.content.title, page.url)) return pitch(null, null).copy(notTheStory = true)
+        val words = page.clean.wordCount
+        if (words < TEASER_RATIO * feedWords) return pitch(SHORT_STORY_NOTE, page.content.siteName)
+        return article(
+            title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) },
+            // The item's author wrote the pitch, not the story.
+            author = page.content.author,
+            clean = page.clean,
+            usedFeed = false,
+            note = null,
+            feedWords = feedWords,
+            pageWords = words,
+            declaredLanguage = page.content.language,
+            siteName = page.content.siteName,
+        )
     }
 
     private sealed interface PageResult {
@@ -264,6 +297,7 @@ class ArticleExtractor(private val http: HttpClient) {
     companion object {
         /** Feed content with at least this many words is taken as the full text in [ContentMode.AUTO]. */
         const val FULL_TEXT_WORDS = 300
+        const val SHORT_STORY_NOTE = "Only the summary: the story's own page had little more to read."
         private const val KEEP_FEED_RATIO = 0.7
         private const val IMAGE_POST_MAX_WORDS = 150
         private const val IMAGE_CAPTION_WORDS = 25

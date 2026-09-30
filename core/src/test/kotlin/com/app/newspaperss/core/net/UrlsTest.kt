@@ -50,5 +50,7 @@ class UrlsTest {
         assertEquals("longreads", siteNameOf("https://www.longreads.com/feed/"))
         assertEquals("theguardian", siteNameOf("https://theguardian.co.uk/"))
         assertEquals("writer", siteNameOf("https://writer.substack.com/feed"))
+        assertEquals("a generic subdomain names no one", "example", siteNameOf("https://blog.example.com/feed"))
+        assertEquals("example", siteNameOf("https://en.example.com/"))
     }
 }

@@ -272,7 +272,7 @@ class EditionBuilder(
     private fun toEpub(a: ArticleEntity, c: ArticleContent, minutes: Double, source: SourceEntity) = EditionArticle(
         title = c.title,
         sourceTitle = bylineOf(a, c, source),
-        url = a.url,
+        url = a.viaUrl?.takeIf { c.notTheStory } ?: a.url,
         bodyHtml = c.bodyHtml,
         minutes = minutes,
         author = c.author,
@@ -290,7 +290,7 @@ class EditionBuilder(
     /** Where [a] came from: its source, or for a link post "Equator via Longreads". */
     private fun bylineOf(a: ArticleEntity, c: ArticleContent, source: SourceEntity): String {
         val from = a.originTitle ?: source.title
-        return if (a.viaUrl == null) from else "${c.siteName ?: hostOf(a.url)} via $from"
+        return if (a.viaUrl == null || c.notTheStory) from else "${c.siteName ?: hostOf(a.url)} via $from"
     }
 
     companion object {

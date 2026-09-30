@@ -67,6 +67,7 @@ class ExtractorContentProvider(
             images = embedded.images,
             language = extracted.language,
             siteName = extracted.siteName,
+            notTheStory = extracted.notTheStory,
         )
     }
 

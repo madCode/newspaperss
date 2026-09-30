@@ -319,27 +319,52 @@ class ArticleExtractorTest {
 
     private fun words(n: Int, prefix: String) = (1..n).joinToString(" ") { "$prefix$it" }
 
-    private fun storyPage(words: Int) =
-        page("<html><head><meta property=\"og:site_name\" content=\"Equator\"></head><body><article><h1>Dusklands</h1><p>${words(words, "story")}</p></article></body></html>")
+    private fun storyPage(words: Int, title: String = "Dusklands", author: String? = "Ann Writer") = page(
+        "<html><head><title>$title</title><meta property=\"og:site_name\" content=\"Equator\">" +
+            (author?.let { "<meta name=\"author\" content=\"$it\">" } ?: "") +
+            "</head><body><article><h1>$title</h1><p>${words(words, "story")}</p></article></body></html>",
+    )
 
-    /**
-     * A link post's pitch gives way only to a page that's clearly the story: a page not much
-     * longer is a paywall preview, or the post wasn't pointing at a story after all.
-     */
+    private val pitch = "<p>${words(200, "pitch")} <a href=\"/2026/09/about\">About</a></p>"
+
+    private fun linkPost(title: String = "Dusklands") =
+        ExtractInput(url, title, pitch, feedAuthor = "Pick Editor", mode = ContentMode.PAGE, feedUrl = "https://picks.example/2026/09/dusklands/")
+
     @Test
-    fun aLinkPostsPitchGivesWayOnlyToAPageThatsClearlyTheStory() = runTest {
-        val pitch = "<p>${words(200, "pitch")} <a href=\"/2026/09/about\">About</a></p>"
-        fun linkPost() = ExtractInput(url, "Dusklands", pitch, feedAuthor = null, mode = ContentMode.PAGE, feedUrl = "https://picks.example/2026/09/dusklands/")
-
-        val preview = ArticleExtractor(FakeHttp(mapOf(url to storyPage(300)))).extract(linkPost())
-        assertTrue(preview.usedFeedContent)
-        assertTrue("the pitch's own links resolve against its page", "https://picks.example/2026/09/about" in preview.html)
-        val ordinary = ArticleExtractor(FakeHttp(mapOf(url to storyPage(300)))).extract(linkPost().copy(feedUrl = null))
-        assertFalse("an ordinary teaser gives way to the same page", ordinary.usedFeedContent)
-
+    fun aLinkPostsStoryReplacesItsPitchAndIsBylinedByTheStorysAuthor() = runTest {
         val story = ArticleExtractor(FakeHttp(mapOf(url to storyPage(3000)))).extract(linkPost())
         assertFalse(story.usedFeedContent)
         assertTrue("story3000" in story.html)
         assertEquals("Equator", story.siteName)
+        assertEquals("the pick's editor wrote the pitch, not the story", "Ann Writer", story.author)
+
+        val unsigned = ArticleExtractor(FakeHttp(mapOf(url to storyPage(3000, author = null)))).extract(linkPost())
+        assertNull(unsigned.author)
+    }
+
+    /** A page not much longer than the pitch is a paywall preview: the pitch stays, saying why, still credited to the story's site. */
+    @Test
+    fun aLinkPostWhoseStoryPageIsShortKeepsItsPitchWithANote() = runTest {
+        val preview = ArticleExtractor(FakeHttp(mapOf(url to storyPage(300)))).extract(linkPost())
+        assertTrue(preview.usedFeedContent)
+        assertEquals(ArticleExtractor.SHORT_STORY_NOTE, preview.note)
+        assertEquals("Equator", preview.siteName)
+        assertFalse(preview.notTheStory)
+        assertTrue("the pitch's own links resolve against its page", "https://picks.example/2026/09/about" in preview.html)
+
+        val ordinary = ArticleExtractor(FakeHttp(mapOf(url to storyPage(300)))).extract(linkPost().copy(feedUrl = null))
+        assertFalse("an ordinary teaser gives way to the same page", ordinary.usedFeedContent)
+    }
+
+    /** A short commentary post whose one tagged link is to a page about something else stays the post. */
+    @Test
+    fun aLinkPostWhosePageIsTitledForSomethingElseStaysItself() = runTest {
+        val http = FakeHttp(mapOf(url to storyPage(3000, title = "Quarterly earnings beat forecasts at Example Corp")))
+        val post = ArticleExtractor(http).extract(linkPost(title = "Why I finally deleted my social media accounts"))
+        assertTrue(post.usedFeedContent)
+        assertTrue(post.notTheStory)
+        assertNull(post.note)
+        assertNull(post.siteName)
     }
 }
+
