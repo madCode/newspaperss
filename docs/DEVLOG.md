@@ -10,7 +10,6 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 - **Last night:** Night 2 focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. It shipped stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync, a category choice, fair turns across many feeds, Start fresh and leaving feeds out, Obsidian-friendly notes saved to your vault, a question at the end of each paper, and a dark preview.
 - **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
-- **Waiting on your test:** Send to Kindle after [#82](https://github.com/madCode/newspaperss/pull/82): does an edition now reach Content and Devices?
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 3 · Wed 30 Sep
@@ -32,7 +31,7 @@ UX design only, no new features. Twelve patterns listed, four research sweeps (o
 ### Cycle 63: Send to Kindle can read the book (14:25–14:45, [#82](https://github.com/madCode/newspaperss/pull/82))
 - **From you:** the first Send to the Kindle app errors (not when Kindle is already open); the second gets through the form and bounces back, but nothing arrives, in the library or in Content and Devices, and no email.
 - **Likely cause:** a share lets only the receiving screen read the file. Send to Kindle reads it for the form, then uploads after the form closes, when it can't any more, and fails without a word.
-- **Shipped:** the Kindle app may read the edition before the share sheet opens, and the app picked may read it until the phone restarts. Waiting on your test.
+- **Shipped:** the Kindle app may read the edition before the share sheet opens, and the app picked may read it until the phone restarts. **Confirmed by you:** the edition now reaches the Kindle.
 
 ### Cycle 61: older editions under their title (09:40–10:05, [#79](https://github.com/madCode/newspaperss/pull/79), reverted in [#80](https://github.com/madCode/newspaperss/pull/80))
 - Shared editions made before cycle 59 under their title too. You'd rather make the day's edition again than carry code for a handful of old files, so it's reverted.
