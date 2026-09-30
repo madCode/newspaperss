@@ -10,9 +10,14 @@ import com.app.newspaperss.core.lists.CuratedList
 import com.app.newspaperss.core.lists.CuratedLists
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 
-class SourceRepository(private val db: AppDatabase) {
+/** What "Mark as read" changed, so Undo can put it back. */
+data class MarkedRead(val articleId: Long, val starredAt: Instant?)
+
+class SourceRepository(private val db: AppDatabase, private val clock: Clock = Clock.systemUTC()) {
     private val sources = db.sources()
 
     fun observe(): Flow<List<SourceEntity>> = sources.observeAll()
@@ -65,7 +70,26 @@ class SourceRepository(private val db: AppDatabase) {
 
     suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int) = sources.stepMaxArticles(id, delta, default, limit)
 
+    /** Removes the source with its articles, stars included. Past editions keep their contents. */
     suspend fun remove(source: SourceEntity) = sources.delete(source)
+
+    /** See [EditionRepository.setStarred]. */
+    suspend fun setStarred(articleId: Long, starred: Boolean): Boolean =
+        (if (starred) db.articles().star(articleId, clock.instant()) else db.articles().unstar(articleId)) > 0
+
+    /**
+     * Marks a waiting article as read: it never goes in an edition, and a tt-rss source marks it
+     * read on the server at its next sync, so Undo never has to reach the server. Returns what
+     * [undoMarkRead] needs, or null if the article wasn't waiting (it may have just gone into an
+     * edition).
+     */
+    suspend fun markRead(articleId: Long): MarkedRead? = db.withTransaction {
+        val article = db.articles().byId(articleId) ?: return@withTransaction null
+        if (db.articles().markRead(articleId) == 0) null else MarkedRead(articleId, article.starredAt)
+    }
+
+    /** Puts a marked-read article back to waiting, with its star, unless something has moved it on since. */
+    suspend fun undoMarkRead(marked: MarkedRead): Boolean = db.articles().undoMarkRead(marked.articleId, marked.starredAt) > 0
 
     /**
      * Sets how a source's articles get their text. [ContentMode.AUTO] hands the choice back to

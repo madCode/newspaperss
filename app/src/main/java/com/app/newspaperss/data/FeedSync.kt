@@ -99,10 +99,14 @@ class FeedSync(
                 val headlines = client.unreadHeadlines(feedId = category ?: TtrssClient.ALL_ARTICLES, isCategory = category != null)
                 // A link already delivered (from a feed, or before the account was reconnected) is
                 // skipped like any other, and tt-rss is told it's read unless the reader said not to:
-                // otherwise it would sit unread there for good.
+                // otherwise it would sit unread there for good. Articles the reader marked read in
+                // the app are told here too, rather than when marked, so Undo never reaches the server.
                 if (source.markReadOnServer) {
-                    val delivered = db.articles().deliveredAmong(headlines.map { it.link }.distinct()).toSet()
-                    client.markRead(headlines.filter { it.link in delivered }.map { it.id })
+                    // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
+                    val delivered = headlines.map { it.link }.distinct().chunked(500).flatMap { db.articles().deliveredAmong(it) }.toSet()
+                    val markedRead = headlines.map { "$TTRSS_GUID_PREFIX${it.id}" }.chunked(500)
+                        .flatMap { db.articles().markedReadAmong(source.id, it) }.toSet()
+                    client.markRead(headlines.filter { it.link in delivered || "$TTRSS_GUID_PREFIX${it.id}" in markedRead }.map { it.id })
                 }
                 val added = db.articles().insertNew(
                     headlines.map {

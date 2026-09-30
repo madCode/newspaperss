@@ -17,7 +17,7 @@ class Converters {
 
 @Database(
     entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -33,7 +33,43 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * `articles.broughtBack` becomes `starredAt` (a brought-back article is a starred one,
+         * starred when it was found), and edition articles remember whether they were starred.
+         * SQLite before 3.35 (Android before 14) can't drop a column, so articles is rebuilt.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Room turns foreign keys on only after migrating, but if they were on, dropping
+                // articles would set every past edition's articleId to null. Kept aside to be sure.
+                db.execSQL("CREATE TEMP TABLE edition_article_links AS SELECT id, articleId FROM edition_articles WHERE articleId IS NOT NULL")
+                db.execSQL(
+                    "CREATE TABLE articles_new (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, " +
+                        "`guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, " +
+                        "`feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `starredAt` INTEGER, " +
+                        "`originId` TEXT, `originTitle` TEXT, `pageWords` INTEGER, " +
+                        "FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL(
+                    "INSERT INTO articles_new (id, sourceId, guid, url, title, author, published, feedHtml, discoveredAt, state, starredAt, originId, originTitle, pageWords) " +
+                        "SELECT id, sourceId, guid, url, title, author, published, feedHtml, discoveredAt, state, " +
+                        "CASE WHEN broughtBack != 0 THEN discoveredAt END, originId, originTitle, pageWords FROM articles",
+                )
+                db.execSQL("DROP TABLE articles")
+                db.execSQL("ALTER TABLE articles_new RENAME TO articles")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_articles_sourceId_guid` ON `articles` (`sourceId`, `guid`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_articles_url` ON `articles` (`url`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_articles_state` ON `articles` (`state`)")
+                db.execSQL(
+                    "UPDATE edition_articles SET articleId = (SELECT articleId FROM edition_article_links WHERE edition_article_links.id = edition_articles.id) " +
+                        "WHERE id IN (SELECT id FROM edition_article_links)",
+                )
+                db.execSQL("DROP TABLE edition_article_links")
+                db.execSQL("ALTER TABLE edition_articles ADD COLUMN `starred` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun open(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db").addMigrations(MIGRATION_1_2).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
     }
 }

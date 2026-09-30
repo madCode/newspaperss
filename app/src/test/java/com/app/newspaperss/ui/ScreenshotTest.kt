@@ -112,6 +112,8 @@ class ScreenshotTest {
             val now = Instant.parse("2026-09-29T06:30:00Z")
             db.editions().insert(EditionEntity(title = "Monday Morning Edition", createdAt = now.minusSeconds(86_400), status = EditionStatus.DELIVERED, articleCount = 7, minutes = 31.0))
             db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = now, status = EditionStatus.READY, fileName = "x.epub", articleCount = 8, minutes = 33.4))
+            val source = db.sources().insert(SourceEntity(url = "https://example.com/feed", title = "The Example Review"))
+            (1..2).forEach { db.articles().insertIgnoring(ArticleEntity(sourceId = source, guid = "$it", url = "https://example.com/$it", title = "Starred $it", starredAt = now)) }
         }
         val vm = TodayViewModel(EditionRepository(db, tmp.newFolder()), flowOf(null)) {}
         shoot("05-today", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
@@ -119,7 +121,7 @@ class ScreenshotTest {
 
     @Test
     fun editionDetail() {
-        val (id, lastArticle) = runBlocking {
+        val id = runBlocking {
             val source = db.sources().insert(SourceEntity(url = "https://example.com/feed", title = "The Example Review"))
             val titles = listOf(
                 "The quiet return of the night train",
@@ -129,7 +131,10 @@ class ScreenshotTest {
             )
             val articles = titles.mapIndexed { i, title ->
                 db.articles().insertIgnoring(
-                    ArticleEntity(sourceId = source, guid = "$i", url = "https://example.com/$i", title = title, state = if (i == 2) ArticleState.NEW else ArticleState.DELIVERED),
+                    ArticleEntity(
+                        sourceId = source, guid = "$i", url = "https://example.com/$i", title = title, state = ArticleState.DELIVERED,
+                        starredAt = if (i == 1) Instant.parse("2026-09-29T08:00:00Z") else null,
+                    ),
                 )
             }
             val now = Instant.parse("2026-09-29T06:30:00Z")
@@ -138,12 +143,12 @@ class ScreenshotTest {
             )
             db.editions().insertArticles(
                 titles.mapIndexed { i, title ->
-                    EditionArticleEntity(editionId = edition, articleId = articles[i], position = i, title = title, sourceTitle = "The Example Review", minutes = 4.0 + 3 * i)
+                    EditionArticleEntity(editionId = edition, articleId = articles[i], position = i, title = title, sourceTitle = "The Example Review", minutes = 4.0 + 3 * i, starred = i == 0)
                 },
             )
-            edition to articles.last()
+            edition
         }
-        val vm = EditionDetailViewModel(EditionRepository(db, tmp.newFolder().apply { resolve("e.epub").writeText("epub") }), id, EditionNotes(db, tmp.newFolder())) {}.apply { toggle(lastArticle) }
+        val vm = EditionDetailViewModel(EditionRepository(db, tmp.newFolder().apply { resolve("e.epub").writeText("epub") }), id, EditionNotes(db, tmp.newFolder())) {}
         shoot("05b-edition-detail", ready = { vm.detail.value?.contents?.isNotEmpty() == true }) { EditionDetailScreen(vm, onBack = {}) }
     }
 
@@ -167,7 +172,9 @@ class ScreenshotTest {
             val titles = listOf("Talks resume after a week of storms", "The town that voted to keep its library open", "What the census says about who moves where", "A short history of the night train")
             db.articles().insertNew(titles.mapIndexed { i, t -> ArticleEntity(sourceId = id, guid = "$i", url = "https://www.theguardian.com/$i", title = t, discoveredAt = Instant.now().minusSeconds(86_400L * i)) })
             val ids = db.articles().candidates().sortedBy { it.guid }.map { it.id }
-            db.articles().setState(ids.drop(1).take(2), ArticleState.DELIVERED)
+            repo.setStarred(ids[0], true)
+            db.articles().setState(ids.drop(1).take(1), ArticleState.SKIPPED)
+            db.articles().setState(ids.drop(2).take(1), ArticleState.DELIVERED)
             db.articles().setState(ids.drop(3), ArticleState.EXPIRED)
             db.sources().recordSuccess(id, Instant.now(), null, "https://www.theguardian.com", "")
             db.sources().setFullText(id, ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3, null)

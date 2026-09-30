@@ -66,8 +66,10 @@ class EditionBuilder(
         releaseUndelivered()
         val sources = db.sources().all().filter { !it.paused }
         val sourcesById = sources.associateBy { it.id }
-        // The same link from two sources goes in once.
-        val articles = db.articles().candidates().filter { it.sourceId in sourcesById }.distinctBy { it.url.ifBlank { "#${it.id}" } }
+        // The same link from two sources goes in once, and a starred copy is the one kept.
+        val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
+            .sortedBy { it.starredAt == null }
+            .distinctBy { it.url.ifBlank { "#${it.id}" } }
         if (articles.isEmpty()) return BuildResult.NothingNew
 
         // A timed edition is built ahead of its time; it's titled and dated for when it's due.
@@ -114,7 +116,7 @@ class EditionBuilder(
             else listOf(s.id.toString())
         }
         val ordered = EditionPlanner.order(
-            candidates = articles.map { Candidate(it.id.toString(), publicationOf(it), it.published ?: it.discoveredAt, it.broughtBack) },
+            candidates = articles.map { Candidate(it.id.toString(), publicationOf(it), it.published ?: it.discoveredAt, it.starredAt) },
             sourceOrder = publicationOrder,
             ordering = settings.ordering,
             rotation = rotation,
@@ -199,7 +201,7 @@ class EditionBuilder(
         db.withTransaction {
             db.editions().insertArticles(
                 arranged.mapIndexed { i, (a, c) ->
-                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = bylineOf(a, sourcesById.getValue(a.sourceId)), minutes = minutesOf(c))
+                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = bylineOf(a, sourcesById.getValue(a.sourceId)), minutes = minutesOf(c), starred = a.starredAt != null)
                 },
             )
             db.articles().setState(arranged.map { it.first.id }, ArticleState.IN_EDITION)
@@ -215,7 +217,7 @@ class EditionBuilder(
 
     /**
      * An edition still READY when the next one is built was never confirmed as
-     * delivered, so its articles go back in the pool, first in line.
+     * delivered, so its articles go back in the pool, keeping their stars.
      */
     private suspend fun releaseUndelivered() {
         val editions = db.editions()
@@ -223,8 +225,8 @@ class EditionBuilder(
             db.withTransaction {
                 // Read again inside the transaction: it may have been sent since it was listed.
                 val edition = editions.byId(listed.id)?.takeIf { it.status == EditionStatus.READY } ?: return@withTransaction
-                db.articles().bringBack(editions.articleIds(edition.id))
-                editions.update(edition.copy(status = EditionStatus.FAILED, error = "Not sent; its articles went into the next edition."))
+                db.articles().release(editions.articleIds(edition.id))
+                editions.update(edition.copy(status = EditionStatus.FAILED, error = NOT_SENT))
             }
         }
     }
@@ -280,6 +282,7 @@ class EditionBuilder(
     companion object {
         private fun fileNameOf(editionId: Long) = "edition-$editionId.epub"
         private const val TAG = "EditionBuilder"
+        const val NOT_SENT = "Not sent; its articles went back for the next edition."
         const val INTERRUPTED = "Interrupted; its articles will be in the next edition."
         const val STOPPED = "Stopped before it was finished; its articles will be in the next edition."
         const val UNEXPECTED = "Something went wrong making this edition. Your articles are safe and will be in the next one."

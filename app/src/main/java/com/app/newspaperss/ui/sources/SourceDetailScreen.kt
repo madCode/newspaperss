@@ -1,6 +1,17 @@
 package com.app.newspaperss.ui.sources
 
+import android.content.Intent
+import android.net.Uri
 import android.text.format.DateFormat
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import com.app.newspaperss.ui.components.ArticleButtons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -84,6 +95,14 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     var choosingMode by remember { mutableStateOf(false) }
     val gone = detail != null && source == null
     LaunchedEffect(gone) { if (gone) onGone() }
+    val snackbar = remember { SnackbarHostState() }
+    val markedRead by viewModel.markedRead.collectAsState()
+    LaunchedEffect(markedRead) {
+        val marked = markedRead ?: return@LaunchedEffect
+        // Long: on e-ink the reader may not see it straight away. Missed, starring still brings it back.
+        val result = snackbar.showSnackbar("Marked as read", actionLabel = "Undo", duration = SnackbarDuration.Long)
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoMarkRead(marked) else viewModel.markedReadDismissed(marked)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -91,6 +110,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (source == null) {
             Box(Modifier.fillMaxSize().padding(padding))
@@ -123,7 +143,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
             }
             items(articles, key = { it.id }) { article ->
-                RecentArticle(article, locale)
+                RecentArticle(article, locale, onStar = { viewModel.setStarred(article.id, it) }, onMarkRead = { viewModel.markRead(article.id) })
                 // Inset: full-width rules chopped the list into boxes to track across.
                 HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
@@ -170,7 +190,7 @@ private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onM
         Column(Modifier.weight(1f)) {
             Text("Mark as read in tt-rss")
             Text(
-                if (source.markReadOnServer) "Articles are marked read once they're delivered" else "Delivered articles are left unread in tt-rss",
+                if (source.markReadOnServer) "Articles are marked read once they're delivered or you mark them read" else "Articles are left unread in tt-rss",
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
             )
@@ -241,22 +261,51 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
     }
 }
 
+/**
+ * Tapping the row opens the original and changes nothing; the buttons under it star the article
+ * or mark it as read. A marked-read row stays where it is, so the list doesn't reflow (a full
+ * refresh on e-ink) and the reader keeps her place.
+ */
 @Composable
-private fun RecentArticle(article: ArticleEntity, locale: Locale) {
-    val details = listOfNotNull(article.originTitle, shortDate(article.discoveredAt, locale), articleStatus(article)).joinToString(" · ")
-    ListItem(
-        // A shape per state, not a colour, so it reads on e-ink; the words are in the line below.
-        leadingContent = {
-            Text(statusMark(article.state), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(min = 24.dp).clearAndSetSemantics {})
-        },
-        headlineContent = {
-            Text(article.title.ifBlank { SourceRepository.hostOf(article.url) }, maxLines = 2, fontWeight = FontWeight.Medium)
-        },
-        supportingContent = { Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-    )
+private fun RecentArticle(article: ArticleEntity, locale: Locale, onStar: (Boolean) -> Unit, onMarkRead: () -> Unit) {
+    val context = LocalContext.current
+    val status = articleStatus(article)
+    val details = buildAnnotatedString {
+        append(listOfNotNull(article.originTitle, shortDate(article.discoveredAt, locale)).joinToString(" · "))
+        append(" · ")
+        if (isStarred(article)) withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(status) } else append(status)
+    }
+    val title = article.title.ifBlank { SourceRepository.hostOf(article.url) }
+    Column {
+        ListItem(
+            modifier = Modifier.clickable(onClickLabel = "open in browser") {
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            },
+            // A shape per state, not a colour, so it reads on e-ink; the words are in the line below.
+            leadingContent = {
+                Text(statusMark(article), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(min = 24.dp).clearAndSetSemantics {})
+            },
+            headlineContent = { Text(title, maxLines = 2, fontWeight = FontWeight.Medium) },
+            supportingContent = { Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        )
+        // Nothing to change on an article already in an unsent edition: it's going out.
+        if (article.state != ArticleState.IN_EDITION) {
+            ArticleButtons(
+                title = title,
+                starred = article.starredAt != null,
+                onStar = onStar,
+                onMarkRead = onMarkRead.takeIf { article.state == ArticleState.NEW },
+                // Lines the button text up with the title, past the buttons' own padding.
+                modifier = Modifier.padding(start = 44.dp, end = 16.dp, bottom = 4.dp),
+            )
+        }
+    }
 }
 
-private fun statusMark(state: ArticleState) = when (state) {
+/** A star counts unless the article is already in an unsent edition, where it can't change. */
+private fun isStarred(article: ArticleEntity) = article.starredAt != null && article.state != ArticleState.IN_EDITION
+
+private fun statusMark(article: ArticleEntity) = if (isStarred(article)) "●" else when (article.state) {
     ArticleState.NEW, ArticleState.IN_EDITION -> "●"
     ArticleState.DELIVERED -> "✓"
     ArticleState.SKIPPED, ArticleState.EXPIRED -> "○"
@@ -274,11 +323,11 @@ private fun modeName(source: SourceEntity) = when {
 private fun textLine(source: SourceEntity): String? = fullTextLine(source)
     ?: if (source.kind == SourceKind.FEED && source.contentMode == ContentMode.AUTO) "Still working out whether this site sends full articles" else null
 
-internal fun articleStatus(article: ArticleEntity): String = when (article.state) {
-    ArticleState.NEW -> if (article.broughtBack) "Brought back for your next edition" else "Waiting for an edition"
+internal fun articleStatus(article: ArticleEntity): String = if (isStarred(article)) "Starred for your next edition" else when (article.state) {
+    ArticleState.NEW -> "Waiting for an edition"
     ArticleState.IN_EDITION -> "In an edition you haven't sent yet"
     ArticleState.DELIVERED -> "Delivered"
-    ArticleState.SKIPPED -> "Skipped"
+    ArticleState.SKIPPED -> "Marked as read"
     ArticleState.EXPIRED -> "Not picked before it got old"
 }
 
