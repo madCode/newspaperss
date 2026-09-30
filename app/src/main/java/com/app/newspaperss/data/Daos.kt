@@ -179,6 +179,9 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE id = :id")
     suspend fun byId(id: Long): ArticleEntity?
 
+    @Query("SELECT * FROM articles WHERE id IN (:ids)")
+    suspend fun byIds(ids: Collection<Long>): List<ArticleEntity>
+
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt DESC, id DESC")
     fun observeAllForSource(sourceId: Long): Flow<List<ArticleEntity>>
 
@@ -238,6 +241,17 @@ interface ArticleDao {
     )
     suspend fun unstar(id: Long, buildingSince: Instant): Int
 
+    /** [star] for several articles at once. */
+    @Query("UPDATE articles SET starredAt = COALESCE(starredAt, :at) WHERE id IN (:ids) AND state != 'IN_EDITION'")
+    suspend fun starAll(ids: Collection<Long>, at: Instant): Int
+
+    /** [unstar] for several articles at once, with the same hold during a build. */
+    @Query(
+        """UPDATE articles SET starredAt = NULL WHERE id IN (:ids) AND state != 'IN_EDITION'
+           AND NOT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :buildingSince)""",
+    )
+    suspend fun unstarAll(ids: Collection<Long>, buildingSince: Instant): Int
+
     suspend fun setStarred(id: Long, starred: Boolean, now: Instant): Boolean =
         (if (starred) star(id, now) else unstar(id, now.minus(BUILD_HOLD))) > 0
 
@@ -247,6 +261,13 @@ interface ArticleDao {
            AND NOT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :buildingSince)""",
     )
     suspend fun markRead(id: Long, buildingSince: Instant): Int
+
+    /** [markRead] for several articles at once, with the same hold during a build. */
+    @Query(
+        """UPDATE articles SET state = 'SKIPPED', starredAt = NULL WHERE id IN (:ids) AND state = 'NEW'
+           AND NOT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :buildingSince)""",
+    )
+    suspend fun markReadAll(ids: Collection<Long>, buildingSince: Instant): Int
 
     /** Keeps a star given since it was marked read. */
     @Query("UPDATE articles SET state = 'NEW', starredAt = COALESCE(starredAt, :starredAt) WHERE id = :id AND state = 'SKIPPED'")

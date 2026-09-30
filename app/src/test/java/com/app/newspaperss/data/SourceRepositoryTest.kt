@@ -101,4 +101,68 @@ class SourceRepositoryTest {
         record(ttrss, FullTextEvidence.PAGE_LONGER, 3)
         assertEquals(ContentMode.AUTO, source(ttrss).contentMode)
     }
+
+    /** Articles by guid, each inserted in [states]' state, with the star given. */
+    private suspend fun articles(vararg states: Pair<String, ArticleState>, starred: Map<String, java.time.Instant> = emptyMap()): Map<String, Long> {
+        val id = repo.addFeed("https://a.example/feed", "A")
+        db.articles().insertNew(states.map { (guid, state) -> ArticleEntity(sourceId = id, guid = guid, url = "https://a.example/$guid", title = guid, state = state, starredAt = starred[guid]) })
+        return db.articles().allForSource(id).associate { it.guid to it.id }
+    }
+
+    private suspend fun article(id: Long) = db.articles().byId(id)!!
+
+    @Test
+    fun markingSeveralReadTakesOnlyWaitingOnesAndOneUndoPutsThemAllBackWithTheirStars() = runTest {
+        val starredAt = java.time.Instant.parse("2026-09-01T08:00:00Z")
+        val ids = articles("a" to ArticleState.NEW, "b" to ArticleState.NEW, "sent" to ArticleState.DELIVERED, "going" to ArticleState.IN_EDITION, starred = mapOf("b" to starredAt))
+
+        val batch = repo.markRead(ids.values)
+
+        assertEquals(setOf(ids["a"], ids["b"]), batch.marked.map { it.articleId }.toSet())
+        assertEquals(0, batch.heldBack)
+        assertEquals(ArticleState.SKIPPED, article(ids.getValue("b")).state)
+        assertEquals(ArticleState.DELIVERED, article(ids.getValue("sent")).state)
+        assertEquals(ArticleState.IN_EDITION, article(ids.getValue("going")).state)
+
+        assertEquals(2, repo.undoMarkRead(batch.marked))
+        assertEquals(ArticleState.NEW, article(ids.getValue("a")).state)
+        assertEquals(starredAt, article(ids.getValue("b")).starredAt)
+    }
+
+    /** A build takes the waiting articles as candidates, so a batch is held whole, never half-applied. */
+    @Test
+    fun whileAnEditionIsBeingMadeBatchesOfMarkingAndUnstarringAreHeldButStarringIsNot() = runTest {
+        val ids = articles("a" to ArticleState.NEW, "b" to ArticleState.DELIVERED, starred = mapOf("b" to java.time.Instant.now()))
+        db.editions().insert(EditionEntity(title = "Being made", createdAt = java.time.Instant.now()))
+
+        val read = repo.markRead(ids.values)
+        assertEquals(emptyList<MarkedRead>(), read.marked)
+        assertEquals(1, read.heldBack)
+        assertEquals(ArticleState.NEW, article(ids.getValue("a")).state)
+
+        val unstar = repo.setStarred(ids.values, starred = false)
+        assertEquals(1, unstar.heldBack)
+        assertTrue(article(ids.getValue("b")).starredAt != null)
+
+        val star = repo.setStarred(ids.values, starred = true)
+        assertEquals(listOf(ids["a"]), star.changed.map { it.articleId })
+        assertEquals("undoing a star is unstarring, which waits too", 1, repo.undoStars(star))
+        assertTrue(article(ids.getValue("a")).starredAt != null)
+    }
+
+    @Test
+    fun undoingABatchUnstarPutsBackEachStarsOwnTimeSoTheyKeepTheirPlaceInLine() = runTest {
+        val first = java.time.Instant.parse("2026-09-01T08:00:00Z")
+        val second = java.time.Instant.parse("2026-09-02T08:00:00Z")
+        val ids = articles("a" to ArticleState.NEW, "b" to ArticleState.DELIVERED, "c" to ArticleState.NEW, starred = mapOf("a" to first, "b" to second))
+
+        val batch = repo.setStarred(ids.values, starred = false)
+        assertEquals("c wasn't starred, so there's nothing to undo for it", setOf(ids["a"], ids["b"]), batch.changed.map { it.articleId }.toSet())
+        assertEquals(null, article(ids.getValue("a")).starredAt)
+
+        assertEquals(0, repo.undoStars(batch))
+        assertEquals(first, article(ids.getValue("a")).starredAt)
+        assertEquals(second, article(ids.getValue("b")).starredAt)
+        assertEquals(null, article(ids.getValue("c")).starredAt)
+    }
 }

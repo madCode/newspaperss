@@ -3,7 +3,6 @@ package com.app.newspaperss.ui.sources
 import android.content.Intent
 import android.net.Uri
 import android.text.format.DateFormat
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -11,7 +10,39 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
-import com.app.newspaperss.ui.components.ArticleButtons
+import com.app.newspaperss.ui.components.ArticleRowFrame
+import com.app.newspaperss.ui.components.StarToggle
+import com.app.newspaperss.ui.components.rowIconSize
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material3.Button
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.style.TextAlign
 import com.app.newspaperss.ui.components.BUILDING_NOTE
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,7 +72,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -57,7 +87,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.font.FontWeight
@@ -98,6 +127,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     LaunchedEffect(gone) { if (gone) onGone() }
     val snackbar = remember { SnackbarHostState() }
     val undoOffer by viewModel.undoOffer.collectAsState()
+    val notice by viewModel.notice.collectAsState()
     val building by viewModel.building.collectAsState()
     LaunchedEffect(undoOffer) {
         val offer = undoOffer ?: return@LaunchedEffect
@@ -105,18 +135,60 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         // Undo never comes back. Missed, starring still brings the article back.
         try {
             // Long: on e-ink the reader may not see it straight away.
-            val result = snackbar.showSnackbar("Marked as read", actionLabel = "Undo", duration = SnackbarDuration.Long)
-            if (result == SnackbarResult.ActionPerformed) viewModel.undoMarkRead(offer)
+            val result = snackbar.showSnackbar(undoMessage(offer.change), actionLabel = "Undo", duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed) viewModel.undo(offer)
         } finally {
             viewModel.undoOfferEnded(offer)
         }
     }
+    LaunchedEffect(notice) {
+        val text = notice ?: return@LaunchedEffect
+        try {
+            snackbar.showSnackbar(text, duration = SnackbarDuration.Long)
+        } finally {
+            viewModel.noticeShown()
+        }
+    }
+    // Ids rather than articles, so a selected article that changes state underneath is counted
+    // as it is now; saved so a rotation keeps the selection.
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    var selected by rememberSaveable(stateSaver = IdSetSaver) { mutableStateOf(emptySet<Long>()) }
+    fun stopSelecting() {
+        selecting = false
+        selected = emptySet()
+    }
+    BackHandler(enabled = selecting) { stopSelecting() }
+    LaunchedEffect(detail) {
+        // Only once loaded: straight after a process restart the list is briefly empty.
+        val ids = detail?.articles?.mapTo(HashSet()) { it.id } ?: return@LaunchedEffect
+        if (ids.isEmpty()) stopSelecting() else if (!ids.containsAll(selected)) selected = selected intersect ids
+    }
+    val articles = detail?.articles.orEmpty()
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(source?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-            )
+            if (selecting) {
+                TopAppBar(
+                    title = { Text("${selected.size} selected") },
+                    navigationIcon = { IconButton(onClick = ::stopSelecting) { Icon(Icons.Default.Close, contentDescription = "Stop selecting") } },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    modifier = Modifier.semantics { paneTitle = "Selecting. Tap articles to choose them." },
+                )
+            } else {
+                TopAppBar(
+                    title = { Text(source?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+                )
+            }
+        },
+        bottomBar = {
+            if (selecting && source != null) {
+                SelectionBar(
+                    chosen = articles.filter { it.id in selected },
+                    building = building,
+                    onStar = { ids, starred -> viewModel.setStarred(ids, starred); stopSelecting() },
+                    onMarkRead = { ids -> viewModel.markRead(ids); stopSelecting() },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -124,7 +196,6 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
             Box(Modifier.fillMaxSize().padding(padding))
             return@Scaffold
         }
-        val articles = detail?.articles.orEmpty()
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
             item {
                 Health(source, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
@@ -139,22 +210,25 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     ArticleCap(source.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
                 }
                 HorizontalDivider(Modifier.padding(top = 16.dp))
-                Text(
-                    if (articles.isEmpty()) "Recent articles" else "Recent articles · ${articles.size}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp).semantics {
-                        heading()
-                        contentDescription = if (articles.isEmpty()) "Recent articles" else "Recent articles, ${articles.size}"
-                    },
-                )
-                if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
+                ArticlesHeading(articles, selecting, onSelect = { selecting = true })
                 if (building && articles.isNotEmpty()) {
                     Text(BUILDING_NOTE, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
                 }
             }
             items(articles, key = { it.id }) { article ->
-                RecentArticle(article, locale, building, onStar = { viewModel.setStarred(article.id, it) }, onMarkRead = { viewModel.markRead(article.id) })
+                RecentArticle(
+                    article,
+                    locale,
+                    building,
+                    selection = if (selecting) article.id in selected else null,
+                    onStar = { viewModel.setStarred(article.id, it) },
+                    onMarkRead = { viewModel.markRead(article.id) },
+                    onSelect = { selected = if (article.id in selected) selected - article.id else selected + article.id },
+                    onStartSelecting = {
+                        selecting = true
+                        selected = selected + article.id
+                    },
+                )
                 // Inset: full-width rules chopped the list into boxes to track across.
                 HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
@@ -272,13 +346,147 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
     }
 }
 
+@Composable
+private fun ArticlesHeading(articles: List<ArticleEntity>, selecting: Boolean, onSelect: () -> Unit) {
+    Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            if (articles.isEmpty()) "Recent articles" else "Recent articles · ${articles.size}",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f).semantics {
+                heading()
+                contentDescription = if (articles.isEmpty()) "Recent articles" else "Recent articles, ${articles.size}"
+            },
+        )
+        if (articles.isNotEmpty()) {
+            // Hidden rather than removed while selecting: removing it would change the heading's
+            // height and width, and move every row on the way in and out of selection mode.
+            TextButton(
+                onClick = onSelect,
+                enabled = !selecting,
+                modifier = Modifier.heightIn(min = 48.dp).then(if (selecting) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier),
+            ) { Text("Select") }
+        }
+    }
+    if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
+    if (articles.any { it.state != ArticleState.IN_EDITION }) {
+        val markSome = articles.any { it.state == ArticleState.NEW }
+        Text(
+            if (markSome) "Tap ☆ to put one in your next edition. Tap Select to mark some as read." else "Tap ☆ to put one in your next edition.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp).semantics {
+                contentDescription = "Tap the star to put one in your next edition." + if (markSome) " Tap Select to mark some as read." else ""
+            },
+        )
+    }
+}
+
 /**
- * Tapping the row opens the original and changes nothing; the buttons under it star the article
- * or mark it as read. A marked-read row stays where it is, so the list doesn't reflow (a full
- * refresh on e-ink) and the reader keeps her place.
+ * The actions for the selected articles, labelled once here instead of on every row. Counts are
+ * of what each action would change: articles in an unsent edition can be selected but nothing
+ * applies to them. The buttons stack at large font sizes rather than truncating.
  */
 @Composable
-private fun RecentArticle(article: ArticleEntity, locale: Locale, building: Boolean, onStar: (Boolean) -> Unit, onMarkRead: () -> Unit) {
+private fun SelectionBar(chosen: List<ArticleEntity>, building: Boolean, onStar: (List<Long>, Boolean) -> Unit, onMarkRead: (List<Long>) -> Unit) {
+    val waiting = chosen.filter { it.state == ArticleState.NEW }.map { it.id }
+    val starrable = chosen.filter { it.state != ArticleState.IN_EDITION }
+    val takeOut = starrable.isNotEmpty() && starrable.all { it.starredAt != null }
+    val toChange = starrable.filter { (it.starredAt != null) == takeOut }.map { it.id }
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column {
+            // A rule, not a shadow: it still reads on e-ink.
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            if (toChange.isEmpty() && waiting.isEmpty()) {
+                Text(
+                    if (chosen.isEmpty()) "Tap articles to choose them." else "These are in an edition you haven't sent yet, so there's nothing to change.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+                return@Column
+            }
+            val starLabel = if (takeOut) "Take out of next edition" else "Next edition"
+            val markLabel = "Mark ${waiting.size} as read"
+            val measurer = rememberTextMeasurer()
+            val labelStyle = MaterialTheme.typography.labelLarge
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                // Side by side only if each label fits on one line in half the width; otherwise
+                // stacked at full width. Squeezed side by side, large text would wrap inside the
+                // buttons word by word.
+                val half = (maxWidth - 8.dp) / 2
+                val density = LocalDensity.current
+                fun fits(label: String, chrome: Dp) = with(density) { measurer.measure(label, labelStyle).size.width.toDp() } + chrome <= half
+                val sideBySide = toChange.isEmpty() || waiting.isEmpty() || (fits(starLabel, BUTTON_CHROME + 26.dp) && fits(markLabel, BUTTON_CHROME))
+                val starButton: @Composable (Modifier) -> Unit = { modifier ->
+                    val articles = plural(toChange.size, "article")
+                    OutlinedButton(
+                        onClick = { onStar(toChange, !takeOut) },
+                        enabled = !(takeOut && building),
+                        modifier = modifier.heightIn(min = 48.dp).semantics {
+                            contentDescription = if (takeOut) "Take $articles out of your next edition" else "Put $articles in your next edition"
+                        },
+                    ) {
+                        Icon(if (takeOut) Icons.Filled.Star else Icons.Outlined.StarOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(starLabel, textAlign = TextAlign.Center)
+                    }
+                }
+                val markButton: @Composable (Modifier) -> Unit = { modifier ->
+                    Button(
+                        onClick = { onMarkRead(waiting) },
+                        enabled = !building,
+                        modifier = modifier.heightIn(min = 48.dp).semantics { contentDescription = "Mark ${plural(waiting.size, "article")} as read" },
+                    ) { Text(markLabel, textAlign = TextAlign.Center) }
+                }
+                if (sideBySide) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (toChange.isNotEmpty()) starButton(Modifier.weight(1f))
+                        if (waiting.isNotEmpty()) markButton(Modifier.weight(1f))
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        starButton(Modifier.fillMaxWidth())
+                        markButton(Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A button's own horizontal padding around its label (Material's 24dp a side). */
+private val BUTTON_CHROME = 48.dp
+
+private fun undoMessage(change: SourceDetailViewModel.Change): String = when (change) {
+    is SourceDetailViewModel.Change.Read -> if (change.marked.size == 1) "Marked as read" else "Marked ${change.marked.size} as read"
+    is SourceDetailViewModel.Change.Stars -> {
+        val count = change.batch.changed.size
+        if (change.batch.starred) "$count in your next edition" else "$count taken out of your next edition"
+    }
+}
+
+private val IdSetSaver = Saver<Set<Long>, LongArray>(save = { it.toLongArray() }, restore = { it.toSet() })
+
+/**
+ * Tapping the row opens the original and changes nothing; the star beside it puts the article in
+ * the next edition. Marking read is in selection mode, or the row's accessibility action. A
+ * marked-read row stays where it is, so the list doesn't reflow (a full refresh on e-ink) and the
+ * reader keeps her place.
+ *
+ * @param selection whether the row is selected, or null outside selection mode. In it, a tap
+ *   selects instead of opening, and a checkbox takes the status mark's place.
+ */
+@Composable
+private fun RecentArticle(
+    article: ArticleEntity,
+    locale: Locale,
+    building: Boolean,
+    selection: Boolean?,
+    onStar: (Boolean) -> Unit,
+    onMarkRead: () -> Unit,
+    onSelect: () -> Unit,
+    onStartSelecting: () -> Unit,
+) {
     val context = LocalContext.current
     val status = articleStatus(article)
     val details = buildAnnotatedString {
@@ -289,31 +497,55 @@ private fun RecentArticle(article: ArticleEntity, locale: Locale, building: Bool
         if (isStarred(article)) withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(status) } else append(status)
     }
     val title = article.title.ifBlank { SourceRepository.hostOf(article.url) }
-    Column {
-        ListItem(
-            modifier = Modifier.clickable(onClickLabel = "open in browser") {
+    val action = if (selection != null) {
+        Modifier
+            // Extra to the checkbox's shape, which carries the state on e-ink.
+            .background(if (selection) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .combinedClickable(onClickLabel = if (selection) "deselect" else "select", role = Role.Checkbox, onClick = onSelect)
+            .semantics {
+                toggleableState = ToggleableState(selection)
+                stateDescription = if (selection) "Selected" else "Not selected"
+            }
+    } else {
+        Modifier.combinedClickable(
+            onClickLabel = "open in browser",
+            onLongClickLabel = "select",
+            onLongClick = onStartSelecting,
+            onClick = {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             },
-            // A shape per state, not a colour, so it reads on e-ink; the words are in the line below.
-            leadingContent = {
-                Text(statusMark(article), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(min = 24.dp).clearAndSetSemantics {})
-            },
-            headlineContent = { Text(title, maxLines = 2, fontWeight = FontWeight.Medium) },
-            supportingContent = { Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         )
-        // Nothing to change on an article already in an unsent edition: it's going out.
-        if (article.state != ArticleState.IN_EDITION) {
-            ArticleButtons(
-                title = title,
-                starred = article.starredAt != null,
-                onStar = onStar,
-                onMarkRead = onMarkRead.takeIf { article.state == ArticleState.NEW },
-                building = building,
-                // Lines the button text up with the title, past the buttons' own padding.
-                modifier = Modifier.padding(start = 44.dp, end = 16.dp, bottom = 4.dp),
-            )
-        }
     }
+    // One step for TalkBack and Switch Access, where selecting would take several.
+    val markRead = if (article.state == ArticleState.NEW && !building) {
+        Modifier.semantics { customActions = listOf(CustomAccessibilityAction("Mark as read") { onMarkRead(); true }) }
+    } else {
+        Modifier
+    }
+    ArticleRowFrame(
+        modifier = action.then(markRead),
+        leading = {
+            if (selection != null) {
+                Icon(
+                    if (selection) Icons.Filled.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
+                    contentDescription = null,
+                    modifier = Modifier.size(rowIconSize()),
+                    tint = if (selection) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                // A shape per state, not a colour, so it reads on e-ink; the words are in the line below.
+                Text(statusMark(article), style = MaterialTheme.typography.bodyLarge, softWrap = false, modifier = Modifier.clearAndSetSemantics {})
+            }
+        },
+        title = { Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium) },
+        details = { Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        // Nothing to change on an article already in an unsent edition: it's going out. Its slot
+        // stays empty so the titles line up.
+        trailing = if (article.state == ArticleState.IN_EDITION) null else {
+            { StarToggle(title, article.starredAt != null, onStar, enabled = !(building && article.starredAt != null)) }
+        },
+        reserveTrailing = true,
+    )
 }
 
 /** A star counts unless the article is already in an unsent edition, where it can't change. */
