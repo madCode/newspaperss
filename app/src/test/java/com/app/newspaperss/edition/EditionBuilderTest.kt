@@ -121,6 +121,8 @@ class EditionBuilderTest {
         ZipFile(editions.fileOf(edition)!!).use { zip ->
             assertTrue(zip.entries().toList().any { it.name.endsWith(".xhtml") })
         }
+        // Send to Kindle titles the book after the file it's given.
+        assertEquals("Tuesday Morning Edition, Sep 29.epub", edition.fileName)
         assertEquals(ArticleState.IN_EDITION, stateOf("a2"))
         assertEquals("the second article of a capped source waits", ArticleState.NEW, stateOf("a1"))
     }

@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
+### Cycle 59: Send to Kindle gets the edition's title (08:30–, this PR)
+- **From you:** Send to Kindle's form said "edition-3" as the title.
+- **Cause:** the Kindle app titles a document after the shared file's name, and editions were stored as `edition-<id>.epub`.
+- **Shipped:** new editions are stored under their title ("Wednesday Morning Edition, Sep 30.epub"), so that's what the Kindle library shows. Editions made before the update keep their old name.
+
 ### Cycle 58: Arts & Letters Daily picks get their titles (07:40–, this PR)
 - **From you:** the source's page listed its picks as nplusonemag.com, wsj.com, english.elpais.com.
 - **Cause:** the list gives a teaser and a link, no headline, so picks were stored untitled; the page's title was only read when an edition fetched it.
