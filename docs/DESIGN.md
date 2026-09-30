@@ -88,12 +88,16 @@ module so it's all unit-tested without Android.
 - **The EPUB.** Built to be accepted by Send to Kindle:
   - strict XHTML, EPUB 3 nav *and* NCX in the same order, the cover in the
     spine;
-  - a generated cover image (masthead, date, first headlines) so library
-    thumbnails show the edition;
-  - "In this edition" contents with each article's source and reading time;
-  - each article: source, headline, "By … · date · N min read", the body,
-    "Read the original at site", and a "Next" link; then "That's all for
-    today";
+  - a generated cover image (masthead, a large date, first headlines) so
+    library thumbnails show which day's edition it is;
+  - "In this edition" contents with each section's and article's reading
+    time. Kindle opens the book here, like a paper's front page;
+  - each article: section and source, headline, "By … · date · N min read",
+    the body, an end mark, "Read the original at site", and a "Next" link
+    with its source and time; then "That's all for today" with the day's
+    totals and, if given, a question to reflect on;
+  - styles Kindle's conversion keeps: plain class selectors, relative
+    sizes, no side margins, headings aligned explicitly;
   - images as JPEG up to 1200px, about 15 MB in all including the cover, up
     to 20 per article. The budget goes to articles in reading order, and an
     image that can't fit isn't downloaded;

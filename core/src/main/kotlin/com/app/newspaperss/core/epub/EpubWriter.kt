@@ -15,7 +15,8 @@ import java.util.zip.ZipOutputStream
  * Writes an [EditionDoc] as an EPUB 3 book that also carries an NCX and a `<guide>` for EPUB 2
  * readers, in the shape Send to Kindle accepts.
  *
- * The book reads: cover page, contents, one page per article, and a closing page.
+ * The book reads: cover page, contents, one page per article, and a closing page. Kindle opens
+ * it at the contents, the paper's front page.
  */
 object EpubWriter {
     private const val MIMETYPE = "application/epub+zip"
@@ -31,6 +32,7 @@ object EpubWriter {
     // The page text is English whatever the content language, so dates are formatted to match.
     private val COVER_DATE = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH)
     private val BYLINE_DATE = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH)
+    private val DATELINE = DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.ENGLISH)
 
     /**
      * Writes [doc] to [out] as a zip. [out] is not closed. Everything is validated before the
@@ -78,8 +80,14 @@ object EpubWriter {
         val articleHrefs = articles.indices.map { "article-%03d.xhtml".format(it + 1) }
         val images = collectImages()
         val totalMinutes = articles.sumOf { it.minutes }
+        val sections = doc.sections.filter { it.articles.isNotEmpty() }
+        val articleSections = sections.flatMap { section -> section.articles.map { section.title?.trim().orEmpty() } }
+        val sources = articles.map { it.sourceTitle.trim() }.filter { it.isNotEmpty() }.distinct()
 
         fun articleTitle(index: Int): String = articles[index].title.trim().ifEmpty { "Article ${index + 1}" }
+
+        // An article with no words (a comic, a photo) would otherwise read "0 min".
+        fun minutesLabel(minutes: Double): String? = if (minutes <= 0.0) null else ReadingTime.format(minutes)
 
         fun entries(): List<Pair<String, ByteArray>> {
             val pages = listOf(coverPage(), contentsPage()) + articles.indices.map(::articlePage) + endPage()
@@ -123,7 +131,7 @@ object EpubWriter {
         private fun toc(): List<TocEntry> {
             val entries = mutableListOf(TocEntry("Contents", CONTENTS))
             var index = 0
-            doc.sections.filter { it.articles.isNotEmpty() }.forEachIndexed { sectionIndex, section ->
+            for (section in sections) {
                 val articleEntries = section.articles.map {
                     TocEntry(articleTitle(index), articleHrefs[index]).also { index++ }
                 }
@@ -131,7 +139,10 @@ object EpubWriter {
                 if (title.isEmpty()) {
                     entries += articleEntries
                 } else {
-                    entries += TocEntry(title, "$CONTENTS#${sectionId(sectionIndex)}", articleEntries)
+                    // The section's first article, not its heading on the contents page: an entry
+                    // pointing back to the contents takes the TOC out of reading order, and Kindle's
+                    // "next chapter" would jump back to the front.
+                    entries += TocEntry(title, articleEntries.first().href, articleEntries)
                 }
             }
             return entries
@@ -140,7 +151,6 @@ object EpubWriter {
         private fun sectionId(index: Int) = "section-${index + 1}"
 
         private fun coverPage(): Page {
-            val sources = articles.map { it.sourceTitle.trim() }.filter { it.isNotEmpty() }.distinct()
             val sourceLine = sources.take(MAX_COVER_SOURCES).joinToString(", ") +
                 if (sources.size > MAX_COVER_SOURCES) " and more" else ""
             val date = COVER_DATE.format(doc.date)
@@ -168,15 +178,19 @@ object EpubWriter {
 
         private fun contentsPage(): Page {
             val body = buildString {
-                append("<h1>In this edition</h1>\n")
+                append("<p class=\"dateline\">${esc(DATELINE.format(doc.date))}</p>\n")
+                append("<h1 class=\"contents-title\">In this edition</h1>\n")
                 append("<p class=\"totals\">${esc(totalsLine())}</p>\n")
                 var index = 0
-                doc.sections.filter { it.articles.isNotEmpty() }.forEachIndexed { sectionIndex, section ->
+                sections.forEachIndexed { sectionIndex, section ->
                     val title = section.title?.trim().orEmpty()
-                    if (title.isNotEmpty()) append("<h2 id=\"${sectionId(sectionIndex)}\">${esc(title)}</h2>\n")
+                    if (title.isNotEmpty()) {
+                        val minutes = ReadingTime.format(section.articles.sumOf { it.minutes })
+                        append("<h2 class=\"section-title\" id=\"${sectionId(sectionIndex)}\">${esc(title)} <span class=\"meta\">· ${esc(minutes)}</span></h2>\n")
+                    }
                     append("<ol class=\"contents\" start=\"${index + 1}\">\n")
                     for (article in section.articles) {
-                        val meta = listOf(article.sourceTitle.trim(), ReadingTime.format(article.minutes))
+                        val meta = listOfNotNull(article.sourceTitle.trim(), minutesLabel(article.minutes))
                             .filter { it.isNotEmpty() }.joinToString(" · ")
                         append("<li><a href=\"${articleHrefs[index]}\"${languageAttributes(article.language, lang)}>${esc(articleTitle(index))}</a>")
                         append("<br/><span class=\"meta\">${esc(meta)}</span></li>\n")
@@ -195,19 +209,22 @@ object EpubWriter {
             val byline = listOfNotNull(
                 article.author?.trim()?.ifEmpty { null }?.let { "By $it" },
                 article.published?.let { BYLINE_DATE.format(it) },
-                "${ReadingTime.format(article.minutes)} read",
+                minutesLabel(article.minutes)?.let { "$it read" },
             ).joinToString(" · ")
+            // The section goes in the kicker, since the book has no section pages to say where one starts.
+            val kicker = listOf(articleSections[index], source).filter { it.isNotEmpty() }.distinct().joinToString(" · ")
             val imageHrefs = article.images.map { it.href }.toSet()
             val body = buildString {
-                if (source.isNotEmpty()) append("<p class=\"kicker\">${esc(source)}</p>\n")
+                if (kicker.isNotEmpty()) append("<p class=\"kicker\">${esc(kicker)}</p>\n")
                 val langAttrs = languageAttributes(article.language, lang)
                 append("<h1 class=\"article-title\"$langAttrs>${esc(title)}</h1>\n")
-                append("<p class=\"byline\">${esc(byline)}</p>\n")
+                if (byline.isNotEmpty()) append("<p class=\"byline\">${esc(byline)}</p>\n")
                 append("<hr class=\"rule\"/>\n")
                 article.note?.trim()?.takeIf { it.isNotEmpty() }?.let { append("<p class=\"note\">${esc(it)}</p>\n") }
                 append("<div class=\"article-body\"$langAttrs>")
                 append(ArticleBody.toXhtml(article.bodyHtml, "a${index + 1}-", imageHrefs))
                 append("</div>\n")
+                append("<p class=\"end-mark\" aria-hidden=\"true\">&#9632;</p>\n")
                 val url = article.url.trim()
                 if (url.isNotEmpty()) {
                     val href = externalHref(url)
@@ -222,14 +239,32 @@ object EpubWriter {
                 }
                 if (index + 1 < articles.size) {
                     append("<p class=\"article-nav\">Next: <a href=\"${articleHrefs[index + 1]}\"${languageAttributes(articles[index + 1].language, lang)}>")
-                    append("${esc(articleTitle(index + 1))}</a></p>\n")
+                    append(esc(articleTitle(index + 1)))
+                    val next = articles[index + 1]
+                    val meta = listOfNotNull(next.sourceTitle.trim(), minutesLabel(next.minutes)).filter { it.isNotEmpty() }
+                    append("</a>")
+                    if (meta.isNotEmpty()) append(" <span class=\"meta\">· ${esc(meta.joinToString(" · "))}</span>")
+                    append("</p>\n")
                 }
             }
             return Page("article-${index + 1}", articleHrefs[index], title, xhtmlPage(title, lang, body))
         }
 
         private fun endPage(): Page {
-            val body = "<p class=\"end\">That's all for today.</p>\n<p class=\"end meta\">${esc(doc.masthead)} · ${esc(COVER_DATE.format(doc.date))}</p>"
+            val body = buildString {
+                append("<h1 class=\"end-title\">That's all for today.</h1>\n")
+                val from = when {
+                    sources.size <= 1 -> sources.joinToString()
+                    sources.size <= MAX_COVER_SOURCES -> sources.dropLast(1).joinToString(", ") + " and " + sources.last()
+                    else -> sources.take(MAX_COVER_SOURCES - 1).joinToString(", ") + " and ${sources.size - MAX_COVER_SOURCES + 1} more"
+                }
+                val summary = totalsLine() + if (from.isEmpty()) "" else ", from $from"
+                append("<p class=\"end-summary\">${esc(summary)}</p>\n")
+                doc.reflection?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                    append("<div class=\"reflection\">\n<p class=\"reflection-label\">To think about</p>\n<p>${esc(it)}</p>\n</div>\n")
+                }
+                append("<p class=\"end-imprint\">${esc(doc.masthead)} · ${esc(COVER_DATE.format(doc.date))}</p>")
+            }
             return Page("end", END, "The end", xhtmlPage("The end", lang, body))
         }
 
@@ -264,7 +299,8 @@ object EpubWriter {
                 append("</spine>\n<guide>\n")
                 append("<reference type=\"cover\" title=\"Cover\" href=\"$COVER\"/>\n")
                 append("<reference type=\"toc\" title=\"Contents\" href=\"$CONTENTS\"/>\n")
-                append("<reference type=\"text\" title=\"Start\" href=\"${articleHrefs.firstOrNull() ?: END}\"/>\n")
+                // Where Kindle opens the book: the contents, as a paper opens at its front page.
+                append("<reference type=\"text\" title=\"Start\" href=\"$CONTENTS\"/>\n")
                 append("</guide>\n</package>\n")
             }
         }
@@ -280,18 +316,21 @@ object EpubWriter {
                 append("\n</nav>\n<nav epub:type=\"landmarks\" id=\"landmarks\" hidden=\"hidden\">\n<ol>\n")
                 append("<li><a epub:type=\"cover\" href=\"$COVER\">Cover</a></li>\n")
                 append("<li><a epub:type=\"toc\" href=\"$CONTENTS\">Contents</a></li>\n")
-                append("<li><a epub:type=\"bodymatter\" href=\"${articleHrefs.firstOrNull() ?: END}\">Start</a></li>\n")
+                append("<li><a epub:type=\"bodymatter\" href=\"$CONTENTS\">Start</a></li>\n")
                 append("</ol>\n</nav>")
             }
             return xhtmlPage("Contents", lang, body)
         }
 
         fun ncx(toc: List<TocEntry>): String {
-            var playOrder = 0
+            var id = 0
+            // A section and its first article point at the same page, and NCX requires entries
+            // with the same target to share a playOrder.
+            val playOrders = HashMap<String, Int>()
             fun points(entries: List<TocEntry>): String = entries.joinToString("\n") { entry ->
-                val order = ++playOrder
+                val order = playOrders.getOrPut(entry.href) { playOrders.size + 1 }
                 val children = if (entry.children.isEmpty()) "" else "\n" + points(entry.children)
-                "<navPoint id=\"nav-$order\" playOrder=\"$order\">" +
+                "<navPoint id=\"nav-${++id}\" playOrder=\"$order\">" +
                     "<navLabel><text>${esc(entry.label)}</text></navLabel>" +
                     "<content src=\"${esc(entry.href)}\"/>$children</navPoint>"
             }

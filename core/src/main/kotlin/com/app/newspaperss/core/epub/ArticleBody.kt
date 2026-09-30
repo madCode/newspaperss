@@ -58,12 +58,14 @@ internal object ArticleBody {
         root.forEachNode { if (it is Comment) it.remove() }
     }
 
+    // Classes go too: the book's stylesheet styles the edition's own parts by class, and an
+    // article's own class="kicker" or "byline" would take their look.
     private fun cleanAttributes(root: Element) {
         for (element in root.select("*")) {
             val names = element.attributes().map { it.key }
             for (name in names) {
                 val drop = !(PLAIN_NAME.matches(name) || name == "xml:lang") ||
-                    name.startsWith("on") || name == "style" || name == "name" || name == "xmlns" ||
+                    name.startsWith("on") || name == "style" || name == "class" || name == "name" || name == "xmlns" ||
                     name in ID_REFERENCE_ATTRIBUTES
                 if (drop) element.removeAttr(name)
             }

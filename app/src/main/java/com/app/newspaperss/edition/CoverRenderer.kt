@@ -56,19 +56,25 @@ class CoverRenderer {
         }
     }
 
-    // Top to bottom: masthead between rules, date, edition title, then headlines until the space
-    // above the footer runs out, then the totals footer pinned to the bottom.
+    // Top to bottom: masthead over a heavy and a thin rule, the date, then headlines until the
+    // space above the footer runs out, then the totals footer pinned to the bottom.
     private fun draw(canvas: Canvas, info: CoverInfo) {
         canvas.drawColor(Color.WHITE)
         val width = WIDTH - 2 * MARGIN
         var y = MARGIN.toFloat()
 
-        y = drawText(canvas, "newspapeRSS", paint(136f, SERIF_BOLD), width, y, Layout.Alignment.ALIGN_CENTER, 1)
-        y += 24f
+        y = drawText(canvas, MASTHEAD, fitted(MASTHEAD, 150f, width), width, y, Layout.Alignment.ALIGN_CENTER, 1)
+        y += 20f
         y = rule(canvas, y, 10f) + 10f
-        y = rule(canvas, y, 3f) + 30f
-        y = drawText(canvas, DATE.format(info.date), paint(46f, SERIF), width, y, Layout.Alignment.ALIGN_CENTER, 1) + 16f
-        y = drawText(canvas, info.title, paint(76f, SERIF_BOLD), width, y, Layout.Alignment.ALIGN_CENTER, 2) + 32f
+        y = rule(canvas, y, 3f) + 36f
+        // In the library the cover is a thumbnail about 200 pixels tall, where only the largest
+        // type survives, and every edition's masthead is the same. The date is what tells one
+        // morning's paper from the next, so it gets the biggest type. The edition's title
+        // repeats the date and is shown as text beside the thumbnail anyway.
+        val weekday = WEEKDAY.format(info.date).uppercase(Locale.ENGLISH)
+        y = drawText(canvas, weekday, paint(64f, SERIF_BOLD).apply { letterSpacing = 0.2f }, width, y, Layout.Alignment.ALIGN_CENTER, 1) + 4f
+        val day = DAY.format(info.date)
+        y = drawText(canvas, day, fitted(day, 176f, width), width, y, Layout.Alignment.ALIGN_CENTER, 1) + 28f
         y = rule(canvas, y, 3f) + 40f
 
         val footer = paint(52f, SERIF)
@@ -94,6 +100,14 @@ class CoverRenderer {
 
         rule(canvas, footerTop, 3f)
         drawText(canvas, totals(info), footer, width, footerTop + 30f, Layout.Alignment.ALIGN_CENTER, 1)
+    }
+
+    /** Bold serif at [size], or smaller if [text] would not fit on one line of [width]. */
+    private fun fitted(text: String, size: Float, width: Int): TextPaint {
+        val paint = paint(size, SERIF_BOLD)
+        val measured = paint.measureText(text)
+        if (measured > width) paint.textSize = size * width / measured
+        return paint
     }
 
     private fun paint(size: Float, typeface: Typeface) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -140,7 +154,10 @@ class CoverRenderer {
         private val SERIF_BOLD = Typeface.create(Typeface.SERIF, Typeface.BOLD)
         private val SANS = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
 
+        private const val MASTHEAD = "newspapeRSS"
+
         // English like the rest of the book's own text.
-        private val DATE = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH)
+        private val WEEKDAY = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
+        private val DAY = DateTimeFormatter.ofPattern("MMMM d", Locale.ENGLISH)
     }
 }
