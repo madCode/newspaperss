@@ -6,6 +6,8 @@ data class NotesEdition(
     val title: String,
     val date: LocalDate,
     val articles: List<NotesArticle>,
+    /** The closing page's question ([Reflection]), asked first. */
+    val question: String? = null,
 )
 
 data class NotesArticle(
@@ -44,7 +46,7 @@ object NotesWriter {
         append("---\n\n")
         append("# ").append(editionTitle).append("\n\n")
         append("Pick one piece that stayed with you. Some questions to start:\n\n")
-        PROMPTS.forEach { append("- ").append(it).append('\n') }
+        (listOfNotNull(edition.question?.let(::text)?.takeIf { it.isNotEmpty() }) + PROMPTS).forEach { append("- ").append(it).append('\n') }
         for (article in edition.articles) {
             val title = text(article.title)
             val source = text(article.sourceTitle)

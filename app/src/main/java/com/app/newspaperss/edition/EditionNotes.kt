@@ -3,6 +3,7 @@ package com.app.newspaperss.edition
 import com.app.newspaperss.core.notes.NotesArticle
 import com.app.newspaperss.core.notes.NotesEdition
 import com.app.newspaperss.core.notes.NotesWriter
+import com.app.newspaperss.core.notes.Reflection
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.delivery.FolderDelivery
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,7 @@ class EditionNotes(
                 articles = rows.map {
                     NotesArticle(it.title, it.sourceTitle, it.url, it.author, it.published?.atZone(zone)?.toLocalDate())
                 },
+                question = Reflection.forEdition(editionId),
             ),
         )
         return withContext(Dispatchers.IO) {

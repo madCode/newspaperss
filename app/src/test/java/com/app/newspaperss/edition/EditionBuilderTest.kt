@@ -35,6 +35,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.zip.ZipFile
+import com.app.newspaperss.core.notes.Reflection
 
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
@@ -121,6 +122,24 @@ class EditionBuilderTest {
         }
         assertEquals(ArticleState.IN_EDITION, stateOf("a2"))
         assertEquals("the second article of a capped source waits", ArticleState.NEW, stateOf("a1"))
+    }
+
+    @Test
+    fun theClosingPageAsksTheSameQuestionTheNotesStartWith() = runTest {
+        // What she turned over on the Kindle is waiting in her notes app, and tomorrow brings a new one.
+        source("a", null, "a1", "a2")
+        val first = (builder.build(EditionSettings(maxPerSource = 1, minutes = 5)) as BuildResult.Built).editionId
+        val second = (builder.build(EditionSettings(maxPerSource = 1, minutes = 5)) as BuildResult.Built).editionId
+        val question = Reflection.forEdition(first)
+        assertTrue(question != Reflection.forEdition(second))
+
+        val end = ZipFile(editions.fileOf(db.editions().byId(first)!!)!!).use { zip ->
+            javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(zip.getInputStream(zip.getEntry("OEBPS/end.xhtml"))).documentElement.textContent
+        }
+        assertTrue(end.contains(question))
+        val notes = EditionNotes(db, tmp.newFolder("notes")).write(first)!!.readText()
+        assertTrue(notes.contains("- $question"))
     }
 
     @Test

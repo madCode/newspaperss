@@ -70,6 +70,12 @@ class NotesWriterTest {
     }
 
     @Test
+    fun theClosingPagesQuestionIsAskedFirst() {
+        val notes = NotesWriter.write(edition().copy(question = "Which sentence stayed with you?"))
+        assertTrue(notes.contains("Some questions to start:\n\n- Which sentence stayed with you?\n- What's the main claim"))
+    }
+
+    @Test
     fun missingDetailsAreLeftOutRatherThanLeftBlank() {
         val notes = NotesWriter.write(edition(NotesArticle("A story", "Blog", url = null, author = " ", published = null)))
 
