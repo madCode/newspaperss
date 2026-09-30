@@ -62,13 +62,16 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun notesWithEachEditionCanBeTurnedOnForFolderDelivery() {
-        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") } }
-        waitFor("Also save notes with each edition")
+    fun notesCanBeSavedWhateverTheDeliveryAndTurnedOff() {
+        // A Kindle reader shares each edition, and still gets notes in her vault.
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.SHARE, notesFolderUri = "content://vault", notesFolderName = "Vault") } }
+        waitFor("Saved to Vault when an edition is delivered.")
 
-        compose.onNodeWithText("Also save notes with each edition").performScrollTo().performClick()
+        compose.onNodeWithText("Save notes for each edition").performScrollTo().performClick()
 
-        idleUntil { runBlocking { store.current().notesWithEdition } }
+        idleUntil { runBlocking { store.current().notesFolderUri } == null }
+        waitFor("Pick your vault or notes folder")
+        assertEquals("the delivery folder is left alone", DeliveryMethod.SHARE, runBlocking { store.current().delivery })
     }
 
     @Test

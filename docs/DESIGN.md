@@ -277,8 +277,14 @@ articles go back, keeping their stars, before the new one is planned.
   checklist (compatible with the library); Pocket and Instapaper exports
   import too.
 - **Settings:** the edition (size, per-source cap, order), the schedule
-  (time and days), your e-reader, delivery (share or folder, optionally the notes file
-  beside each edition), and the app's version.
+  (time and days), your e-reader, delivery (share or folder), reading notes, and the
+  app's version.
+  - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
+    vault, say). Each edition's notes file is saved there once the edition is
+    delivered, by share, folder or Open, in the background so a slow cloud folder
+    doesn't hold up delivery. A folder that refuses the file gets a notification;
+    **Notes** on the edition still shares them. It can be the delivery folder too;
+    changing one folder never drops the app's access to the other.
 
 The look: a newspaper feel (serif headlines, a masthead with the date), but
 calm, with no badges, counts or endless animations, which smear on e-ink.
@@ -290,7 +296,7 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 ├─ feed/     parsing, feed discovery,    ├─ data/      Room database, repositories
 │            OPML, starter packs         ├─ settings/  DataStore settings
 ├─ edition/  planner, titles, schedule   ├─ edition/   EditionBuilder, EditionRun, cover, notes
-├─ extract/  page and article            ├─ work/      edition, sync and title workers, the scheduler
+├─ extract/  page and article            ├─ work/      background workers, the scheduler
 │            extraction, language        ├─ delivery/  share, folder, the sent callback
 ├─ images/   image rules and budget      ├─ notify/    the "ready" notification
 ├─ epub/     the EPUB writer             ├─ ui/        Compose screens and ViewModels
@@ -306,7 +312,8 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 - **One activity, Jetpack Compose, ViewModels with StateFlow.**
 - **Room** holds sources, articles and editions, with exported schemas
   (`app/schemas`) and tested migrations. **DataStore** holds settings.
-- **WorkManager** runs the sync, the build and the timers.
+- **WorkManager** runs the sync, the build, the timers, and what follows
+  delivery (marking tt-rss read, saving notes).
 - **Manual dependency injection** (`AppContainer`): the app is small enough
   that Hilt isn't worth its machinery.
 - **Permissive dependencies only** (Apache/MIT): Readability4J, jsoup,

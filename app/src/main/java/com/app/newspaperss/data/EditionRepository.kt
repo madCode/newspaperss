@@ -7,6 +7,8 @@ import java.io.File
 import java.time.Clock
 
 /**
+ * @param onDelivered called with an edition's id once it's delivered, for work that follows
+ *   delivery (saving its reading notes). Like [onTtrssDelivered], it must return quickly.
  * @param onTtrssDelivered called with an edition's id once it's delivered with tt-rss articles
  *   in it, to mark them read on the server. It must return quickly and leave the work to run
  *   elsewhere: delivery doesn't wait for tt-rss.
@@ -15,6 +17,7 @@ class EditionRepository(
     private val db: AppDatabase,
     val editionsDir: File,
     private val clock: Clock = Clock.systemUTC(),
+    private val onDelivered: (editionId: Long) -> Unit = {},
     private val onTtrssDelivered: (editionId: Long) -> Unit = {},
 ) {
     fun observeAll(): Flow<List<EditionEntity>> = db.editions().observeAll()
@@ -41,7 +44,9 @@ class EditionRepository(
             val edition = db.editions().byId(id) ?: return@withTransaction false
             // Checked inside the transaction: a build may be releasing unsent editions at the same
             // time, and the reader may have deleted this one while a folder copy was finishing.
-            if (edition.status == EditionStatus.DELETED) return@withTransaction false
+            // Already delivered (the reader tapped Sent while a folder copy was finishing): the
+            // work that follows delivery, like saving notes, mustn't run twice.
+            if (edition.status == EditionStatus.DELETED || edition.status == EditionStatus.DELIVERED) return@withTransaction false
             if (onlyIfReady && edition.status != EditionStatus.READY) return@withTransaction false
             val articleIds = db.editions().articleIds(id)
             db.articles().setDelivered(articleIds)
@@ -51,7 +56,14 @@ class EditionRepository(
             db.editions().update(edition.copy(status = EditionStatus.DELIVERED, deliveredAt = clock.instant(), error = null))
             true
         }
-        if (!delivered || db.articles().ttrssInEdition(id).isEmpty()) return
+        if (!delivered) return
+        try {
+            onDelivered(id)
+        } catch (e: Exception) {
+            // The edition is delivered either way; only its notes are missing.
+            Log.w(TAG, "Couldn't schedule saving the notes: ${e.javaClass.name}")
+        }
+        if (db.articles().ttrssInEdition(id).isEmpty()) return
         try {
             onTtrssDelivered(id)
         } catch (e: Exception) {
