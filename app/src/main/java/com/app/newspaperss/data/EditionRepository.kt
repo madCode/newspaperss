@@ -2,6 +2,7 @@ package com.app.newspaperss.data
 
 import android.util.Log
 import androidx.room.withTransaction
+import com.app.newspaperss.delivery.FolderDelivery
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 import java.time.Clock
@@ -114,6 +115,23 @@ class EditionRepository(
             if (edition.status == EditionStatus.READY || edition.status == EditionStatus.BUILDING) continue
             edition.fileName?.let { File(editionsDir, it).delete() }
             db.editions().clearFile(edition.id)
+        }
+    }
+
+    /**
+     * Renames EPUBs made before files were named after their edition: Send to Kindle titles the
+     * book after the shared file, so "edition-3" would land in the Kindle library. An unsent
+     * edition keeps its name, as its Ready notification holds a link to the old file; it's sent
+     * or released within a day.
+     */
+    suspend fun nameFilesAfterTitles() {
+        for (edition in db.editions().withFiles()) {
+            if (edition.status == EditionStatus.READY || edition.status == EditionStatus.BUILDING) continue
+            val name = FolderDelivery.fileName(edition.title)
+            if (edition.fileName == name) continue
+            val target = File(editionsDir, name)
+            if (target.exists() || !File(editionsDir, edition.fileName!!).renameTo(target)) continue
+            db.editions().setFile(edition.id, name)
         }
     }
 

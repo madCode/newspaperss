@@ -14,7 +14,12 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
-### Cycle 60: the author in Send to Kindle (09:10–, this PR)
+### Cycle 61: older editions share under their title too (09:40–, this PR)
+- **From you:** on the new version, sharing Wednesday's edition still offered "edition-3.epub".
+- **Cause:** that edition was made before cycle 59, and its file kept the old name.
+- **Shipped:** at app start, a sent edition's file stored as `edition-<id>.epub` is renamed after its title. An edition not sent yet keeps its name until it's sent or released, since its Ready notification links the old file.
+
+### Cycle 60: the author in Send to Kindle (09:10–09:30, [#78](https://github.com/madCode/newspaperss/pull/78))
 - **From you:** the author should be newspapeRSS. The book already says so, but the Kindle app's form fills in the Amazon account's name, and nothing an app sends changes it (Amazon reads the book's author only for emailed documents).
 - **Shipped:** the Kindle tip, in onboarding and Settings, says to change Author to newspapeRSS in the form, so editions sit together in the library.
 
