@@ -429,12 +429,15 @@ private fun CategoryChoice(label: String, selected: Boolean, onClick: () -> Unit
     }
 }
 
+/** The font scale from which rows stack rather than squeeze. */
+private const val LARGE_TEXT = 1.3f
+
 @Composable
 private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowDefault: () -> Unit) {
     val max = own ?: default
     // The edition's number gives way when there's room; a site's own number is a hard limit.
-    Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
+    val words: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier) {
             Text(
                 if (own == null) "${plural(default, "article")} from this site, then more if there's room"
                 else "At most ${plural(own, "article")} from this site in each edition",
@@ -446,6 +449,8 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+    val buttons: @Composable () -> Unit = {
         OutlinedButton(onClick = { onStep(-1) }, enabled = own == null || own > 1, modifier = Modifier.semantics { contentDescription = "Fewer articles from this site" }) {
             Text("−")
         }
@@ -454,6 +459,20 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
             enabled = max < SettingsViewModel.MAX_PER_SOURCE,
             modifier = Modifier.padding(start = 8.dp).semantics { contentDescription = "More articles from this site" },
         ) { Text("+") }
+    }
+    val padding = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
+    // At large text the buttons get their own line: beside the words they squeezed them to a few
+    // words a line.
+    if (LocalDensity.current.fontScale >= LARGE_TEXT) {
+        Column(padding) {
+            words(Modifier)
+            Row(Modifier.padding(top = 8.dp)) { buttons() }
+        }
+    } else {
+        Row(padding, verticalAlignment = Alignment.CenterVertically) {
+            words(Modifier.weight(1f))
+            buttons()
+        }
     }
     if (own != null) {
         TextButton(onClick = onFollowDefault, modifier = Modifier.padding(horizontal = 4.dp)) { Text("Use your edition setting") }
@@ -673,7 +692,7 @@ private fun RecentArticle(
                 Text(statusMark(article), style = MaterialTheme.typography.bodyLarge, softWrap = false, modifier = Modifier.clearAndSetSemantics {})
             }
         },
-        title = { Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium) },
+        title = { Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium) },
         details = { Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         // Nothing to change on an article already in an unsent edition: it's going out. Its slot
         // stays empty so the titles line up.

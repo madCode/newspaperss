@@ -272,6 +272,18 @@ class SourceDetailScreenTest {
      * Waiting, delivered and in an unsent edition, plus [moreWaiting] more waiting ones ("Article
      * more1"…), newest first. Returns the source and article ids by guid.
      */
+    @Test
+    @Config(fontScale = 2f)
+    fun atLargeTextThePerSiteButtonsGetTheirOwnLine() {
+        // Beside the words, they squeezed them to a few words a line.
+        val (id, _) = sourceWithArticles()
+        compose.setContent { SourceDetailScreen(SourceDetailViewModel(repo, id, flowOf(1)), onBack = {}) }
+        idleUntil { visible("from this site") }
+        val words = compose.onNodeWithText("from this site", substring = true).fetchSemanticsNode().boundsInRoot
+        val more = compose.onNodeWithContentDescription("More articles from this site").fetchSemanticsNode().boundsInRoot
+        assertTrue("below the words", more.top >= words.bottom)
+    }
+
     private fun sourceWithArticles(moreWaiting: Int = 0): Pair<Long, Map<String, Long>> = runBlocking {
         val id = repo.addFeed("https://example.com/feed", "Example")
         val guids = listOf("waiting", "delivered", "unsent") + (1..moreWaiting).map { "more$it" }
