@@ -17,6 +17,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
@@ -60,6 +62,18 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         item(key = "masthead") { Masthead(today, Modifier.padding(top = 24.dp, bottom = 16.dp)) }
         state.next?.let { next ->
             item(key = "next") { Text("Next edition: $next", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp)) }
+        }
+        if (state.starredWaiting > 0) {
+            item(key = "starred") {
+                // Right after a build, these are exactly the stars that didn't fit. The glyph is
+                // decoration, so TalkBack reads only the words.
+                val words = if (state.starredWaiting == 1) "1 starred article is waiting" else "${state.starredWaiting} starred articles are waiting"
+                Text(
+                    "★ $words",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp).clearAndSetSemantics { contentDescription = words },
+                )
+            }
         }
         if (state.editions != null && latest == null && state.build == BuildState.Idle) {
             item(key = "firstPrompt") {

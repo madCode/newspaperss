@@ -10,6 +10,8 @@ import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.data.MarkedRead
+import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.TestApp
@@ -28,6 +30,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.zip.ZipFile
@@ -40,7 +43,7 @@ class EditionBuilderTest {
     @get:Rule val dbRule = DbRule()
     private val db = dbRule.db
     private val clock = Clock.fixed(Instant.parse("2026-09-29T06:30:00Z"), ZoneOffset.UTC)
-    private val sources = SourceRepository(db)
+    private val sources = SourceRepository(db, clock)
     private val unreadable = mutableSetOf<String>()
     private val broken = mutableSetOf<String>()
     private val content = ArticleContentProvider { a, _, _ ->
@@ -63,10 +66,8 @@ class EditionBuilderTest {
         return id
     }
 
-    private suspend fun stateOf(guid: String) = db.articles().candidates().none { it.guid == guid }.let { notNew ->
-        if (!notNew) ArticleState.NEW else db.query("SELECT state FROM articles WHERE guid = ?", arrayOf(guid)).use { c ->
-            c.moveToFirst(); ArticleState.valueOf(c.getString(0))
-        }
+    private fun stateOf(guid: String) = db.query("SELECT state FROM articles WHERE guid = ?", arrayOf(guid)).use { c ->
+        c.moveToFirst(); ArticleState.valueOf(c.getString(0))
     }
 
     @Test
@@ -194,16 +195,206 @@ class EditionBuilderTest {
         assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
     }
 
+    private suspend fun idOf(guid: String) = db.query("SELECT id FROM articles WHERE guid = ?", arrayOf(guid)).use { c -> c.moveToFirst(); c.getLong(0) }
+
+    private suspend fun starredAt(guid: String) = db.articles().byId(idOf(guid))!!.starredAt
+
     @Test
-    fun bringBackPutsArticlesFirstInLine() = runTest {
+    fun aStarredDeliveredArticleComesBackAndLosesItsStarOnceDeliveredAgain() = runTest {
         source("a", null, "a1", "a2")
-        val first = builder.build(EditionSettings()) as BuildResult.Built
+        val first = builder.build(EditionSettings(minutes = 5)) as BuildResult.Built
         editions.markDelivered(first.editionId)
         val delivered = db.editions().articleIds(first.editionId)
-        editions.bringBack(delivered)
+        assertTrue(editions.setStarred(delivered.single(), true))
 
-        val second = builder.build(EditionSettings()) as BuildResult.Built
-        assertEquals(delivered, db.editions().articleIds(second.editionId))
+        val second = builder.build(EditionSettings(minutes = 5)) as BuildResult.Built
+        assertEquals("the star takes a's one slot ahead of its waiting article", delivered, db.editions().articleIds(second.editionId))
+        assertTrue("the edition remembers it went in starred", editions.observeContents(second.editionId).first().single().entry.starred)
+        editions.markDelivered(second.editionId)
+        assertEquals(ArticleState.DELIVERED, db.articles().byId(delivered.single())!!.state)
+        assertEquals(null, db.articles().byId(delivered.single())!!.starredAt)
+    }
+
+    @Test
+    fun anArticleInAnUnsentEditionCantBeStarredOrUnstarred() = runTest {
+        source("a", null, "a1")
+        editions.setStarred(idOf("a1"), true)
+        builder.build(EditionSettings()) as BuildResult.Built
+
+        assertFalse(editions.setStarred(idOf("a1"), false))
+        assertTrue(starredAt("a1") != null)
+    }
+
+    @Test
+    fun anEditionNeverSentGivesBackItsStarsAndADeliveredLinkGoesBackToDelivered() = runTest {
+        source("a", null, "a1", "a2")
+        val first = builder.build(EditionSettings(minutes = 5)) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        editions.setStarred(idOf("a2"), true)
+        editions.setStarred(idOf("a1"), true)
+        val unsent = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+        assertEquals(2, db.editions().articleIds(unsent.editionId).size)
+
+        editions.delete(unsent.editionId)
+
+        assertEquals("delivered before, so delivered again rather than waiting", ArticleState.DELIVERED, stateOf("a2"))
+        assertEquals(ArticleState.NEW, stateOf("a1"))
+        assertTrue(starredAt("a1") != null && starredAt("a2") != null)
+        editions.setStarred(idOf("a2"), false)
+        assertEquals(ArticleState.DELIVERED, stateOf("a2"))
+    }
+
+    @Test
+    fun whenALinkWaitsInTwoSourcesTheStarredCopyGoesIn() = runTest {
+        source("a", null, "a1")
+        val b = sources.addFeed("https://b.example/feed", "b")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
+        editions.setStarred(idOf("b-copy"), true)
+
+        val built = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+
+        assertEquals(listOf("b copy"), editions.observeArticles(built.editionId).first().map { it.title })
+    }
+
+    @Test
+    fun starringAnotherSourcesCopyOfALinkInAnUnsentEditionDoesntSendItTwice() = runTest {
+        source("a", null, "a1")
+        val b = sources.addFeed("https://b.example/feed", "b")
+        val unsent = builder.build(EditionSettings()) as BuildResult.Built
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
+        editions.setStarred(idOf("b-copy"), true)
+
+        editions.markDelivered(unsent.editionId)
+
+        assertEquals(ArticleState.DELIVERED, stateOf("b-copy"))
+        assertEquals(null, starredAt("b-copy"))
+        assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
+    }
+
+    @Test
+    fun marksAndUnstarsDuringABuildWaitSoTheBookAndTheArticlesAgree() = runTest {
+        source("a", null, "a1")
+        source("b", null, "b1")
+        editions.setStarred(idOf("b1"), true)
+        var markedDuringBuild: MarkedRead? = null
+        var unstarredDuringBuild: Boolean? = null
+        val meddling = ArticleContentProvider { a, _, _ ->
+            if (a.guid == "a1") {
+                markedDuringBuild = sources.markRead(a.id)
+                unstarredDuringBuild = sources.setStarred(idOf("b1"), false)
+            }
+            ArticleContent(a.title, null, "<p>${a.title}</p>", wordCount = 200)
+        }
+        val built = EditionBuilder(db, meddling, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+
+        assertEquals(null, markedDuringBuild)
+        assertEquals(false, unstarredDuringBuild)
+        assertEquals(2, db.editions().articleIds(built.editionId).size)
+        assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
+        assertTrue("still starred, as the edition says", starredAt("b1") != null)
+
+        editions.delete(built.editionId)
+        assertTrue("allowed again once the build is over", sources.markRead(idOf("a1")) != null)
+    }
+
+    @Test
+    fun aBuildWithNothingToPickLeavesNoEditionBehindToHoldTheButtons() = runTest {
+        assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
+        assertEquals(0, db.editions().count())
+        assertFalse(editions.observeBuilding().first())
+    }
+
+    @Test
+    fun aBuildLeftBehindByACrashStopsHoldingTheButtonsAfterTwoHours() = runTest {
+        db.editions().insert(EditionEntity(title = "Crashed", createdAt = clock.instant().minus(Duration.ofHours(3))))
+        assertFalse(editions.observeBuilding().first())
+        db.editions().insert(EditionEntity(title = "Running", createdAt = clock.instant().minusSeconds(60)))
+        assertTrue(editions.observeBuilding().first())
+    }
+
+    @Test
+    fun aReSavedLinkThatWasDeliveredBeforeGoesBackToWaitingIfItsEditionIsNeverSent() = runTest {
+        val list = ReadingListRepository(db)
+        list.save("https://saved.example/1")
+        editions.markDelivered((builder.build(EditionSettings()) as BuildResult.Built).editionId)
+        // Saved again after going out, as a new row (the old one removed from the list).
+        db.articles().delete(idOf("https://saved.example/1"))
+        list.save("https://saved.example/1")
+
+        val unsent = builder.build(EditionSettings()) as BuildResult.Built
+        editions.delete(unsent.editionId)
+
+        assertEquals(ArticleState.NEW, stateOf("https://saved.example/1"))
+    }
+
+    @Test
+    fun aStarredArticleThatWasMarkedReadIsStillMarkedReadIfItsEditionIsNeverSentAndItsUnstarred() = runTest {
+        source("a", null, "a1")
+        sources.markRead(idOf("a1"))
+        editions.setStarred(idOf("a1"), true)
+        val unsent = builder.build(EditionSettings()) as BuildResult.Built
+
+        editions.delete(unsent.editionId)
+        assertEquals(ArticleState.SKIPPED, stateOf("a1"))
+        assertTrue(starredAt("a1") != null)
+        editions.setStarred(idOf("a1"), false)
+
+        assertEquals(ArticleState.SKIPPED, stateOf("a1"))
+        assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
+    }
+
+    @Test
+    fun aLinkStarredInTwoSourcesCountsOnceOnToday() = runTest {
+        source("a", null, "a1")
+        val b = sources.addFeed("https://b.example/feed", "b")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
+        editions.setStarred(idOf("a1"), true)
+        editions.setStarred(idOf("b-copy"), true)
+
+        assertEquals(1, editions.observeStarredWaiting().first())
+    }
+
+    @Test
+    fun aPausedSourceHoldsItsStarsAndTheyArentCountedAsWaiting() = runTest {
+        val a = source("a", null, "a1")
+        source("b", null, "b1")
+        editions.setStarred(idOf("a1"), true)
+        assertEquals(1, editions.observeStarredWaiting().first())
+        sources.setPaused(a, true)
+        assertEquals(0, editions.observeStarredWaiting().first())
+
+        val built = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+
+        assertEquals(listOf("b b1"), editions.observeArticles(built.editionId).first().map { it.title })
+        assertTrue(starredAt("a1") != null)
+    }
+
+    @Test
+    fun starsThatDontFitWaitAndAreCountedOnToday() = runTest {
+        source("a", null, "a1", "a2", "a3")
+        listOf("a1", "a2", "a3").forEach { editions.setStarred(idOf(it), true) }
+
+        builder.build(EditionSettings(minutes = 5, maxPerSource = 5, wordsPerMinute = 200)) as BuildResult.Built
+
+        assertEquals("one 10-minute article fills a 5-minute paper", 2, editions.observeStarredWaiting().first())
+    }
+
+    @Test
+    fun removingASourceTakesItsStarsWithIt() = runTest {
+        val a = source("a", null, "a1")
+        editions.setStarred(idOf("a1"), true)
+        sources.remove(db.sources().byId(a)!!)
+        assertEquals(0, editions.observeStarredWaiting().first())
+    }
+
+    @Test
+    fun anArticleMarkedReadIsNeverPickedUntilUndone() = runTest {
+        source("a", null, "a1")
+        val marked = sources.markRead(idOf("a1"))!!
+        assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
+
+        assertTrue(sources.undoMarkRead(marked))
+        assertTrue(builder.build(EditionSettings()) is BuildResult.Built)
     }
 
     @Test
@@ -297,19 +488,6 @@ class EditionBuilderTest {
             val images = zip.entries().toList().map { it.name }.filter { it.startsWith("OEBPS/images/") }
             assertEquals("60 + 50 bytes is over the 100 byte budget", listOf("OEBPS/images/cover.jpg"), images)
         }
-    }
-
-    @Test
-    fun onlyDeliveredArticlesCanBeBroughtBack() = runTest {
-        source("a", null, "a1")
-        val built = builder.build(EditionSettings()) as BuildResult.Built
-        val ids = db.editions().articleIds(built.editionId)
-
-        assertEquals("still in an unsent edition", 0, editions.bringBack(ids))
-        assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
-        editions.markDelivered(built.editionId)
-        assertEquals(1, editions.bringBack(ids))
-        assertEquals(0, editions.bringBack(ids))
     }
 
     @Test

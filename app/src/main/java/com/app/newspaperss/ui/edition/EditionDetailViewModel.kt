@@ -26,15 +26,14 @@ data class EditionDetail(
     val file: File?,
 ) {
     /**
-     * Only articles that were delivered can come back: one still in an unsent
-     * edition would be marked delivered again when that edition is sent.
+     * A delivered edition's articles can be starred to bring them back. Not one already in an
+     * unsent edition, which is going out anyway, nor one whose source was removed.
      */
-    fun canBringBack(content: EditionContent): Boolean =
-        edition?.status == EditionStatus.DELIVERED && content.entry.articleId != null && content.state == ArticleState.DELIVERED
+    fun canStar(content: EditionContent): Boolean =
+        edition?.status == EditionStatus.DELIVERED && content.entry.articleId != null &&
+            content.state != null && content.state != ArticleState.IN_EDITION
 
-    /** An unsent edition's articles also go back to NEW when it's abandoned, so NEW only means brought back once sent. */
-    fun wasBroughtBack(content: EditionContent): Boolean =
-        edition?.status == EditionStatus.DELIVERED && content.state == ArticleState.NEW
+    fun isStarred(content: EditionContent): Boolean = canStar(content) && content.starredAt != null
 }
 
 class EditionDetailViewModel(
@@ -47,10 +46,6 @@ class EditionDetailViewModel(
     val detail: StateFlow<EditionDetail?> = combine(editions.observe(id), editions.observeContents(id)) { edition, contents ->
         EditionDetail(edition, contents, edition?.let(editions::fileOf))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    private val _selected = MutableStateFlow<Set<Long>>(emptySet())
-    /** Article ids ticked for bringing back. */
-    val selected: StateFlow<Set<Long>> = _selected.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
@@ -74,8 +69,11 @@ class EditionDetailViewModel(
 
     fun notesShared() { _notesFile.value = null }
 
-    fun toggle(articleId: Long) {
-        _selected.value = _selected.value.let { if (articleId in it) it - articleId else it + articleId }
+    /** An edition is being made: see [com.app.newspaperss.ui.components.ArticleButtons]. */
+    val building: StateFlow<Boolean> = editions.observeBuilding().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setStarred(articleId: Long, starred: Boolean) {
+        viewModelScope.launch { editions.setStarred(articleId, starred) }
     }
 
     /** Deletes this edition, then [onDeleted] (to leave the screen) if it was deleted. */
@@ -90,19 +88,5 @@ class EditionDetailViewModel(
 
     fun markSent() {
         viewModelScope.launch { editions.markSent(id) }
-    }
-
-    fun bringBack() {
-        val ids = _selected.value.toList()
-        if (ids.isEmpty()) return
-        _selected.value = emptySet()
-        viewModelScope.launch {
-            val moved = editions.bringBack(ids)
-            _message.value = when (moved) {
-                0 -> "Those articles are already on their way back"
-                1 -> "1 article will be in your next edition"
-                else -> "$moved articles will be in your next edition"
-            }
-        }
     }
 }

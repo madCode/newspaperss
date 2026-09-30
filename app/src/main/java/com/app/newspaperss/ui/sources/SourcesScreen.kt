@@ -331,8 +331,8 @@ internal fun RemoveSourceDialog(source: SourceEntity, onConfirm: () -> Unit, onD
         text = {
             Text(
                 when (source.kind) {
-                    SourceKind.TTRSS -> "This also signs newspapeRSS out of your tt-rss account. Your articles stay on the server."
-                    else -> "Its waiting articles go with it. If you add it again, articles you already got won't be sent again."
+                    SourceKind.TTRSS -> "Its waiting and starred articles go with it. This also signs newspapeRSS out of your tt-rss account; your articles stay on the server."
+                    else -> "Its waiting and starred articles go with it. If you add it again, articles you already got won't be sent again."
                 },
             )
         },

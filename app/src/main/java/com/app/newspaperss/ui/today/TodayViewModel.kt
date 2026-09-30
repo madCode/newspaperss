@@ -44,6 +44,8 @@ data class TodayState(
     val preferOpen: Boolean = false,
     /** What to call the reader's e-reader in prompts. */
     val deviceName: String = "e-reader",
+    /** Starred articles not yet in an edition, from sources that aren't paused. */
+    val starredWaiting: Int = 0,
 )
 
 class TodayViewModel(
@@ -55,7 +57,7 @@ class TodayViewModel(
     private val lastDue: () -> Long = { 0L },
     private val startBuild: () -> Unit,
 ) : ViewModel() {
-    val state: StateFlow<TodayState> = combine(editions.observeAll(), work, settings, online) { list, info, s, isOnline ->
+    val state: StateFlow<TodayState> = combine(editions.observeAll(), work, settings, online, editions.observeStarredWaiting()) { list, info, s, isOnline, starred ->
         TodayState(
             editions = list,
             build = buildStateOf(info, isOnline),
@@ -67,6 +69,7 @@ class TodayViewModel(
                 Device.POCKETBOOK -> "PocketBook"
                 else -> "e-reader"
             },
+            starredWaiting = starred,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayState(null, BuildState.Idle))
 

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
+import com.app.newspaperss.data.MarkedRead
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
@@ -105,6 +106,34 @@ class SourceDetailViewModel(
     fun setMarkReadOnServer(markRead: Boolean) {
         val repo = ttrss ?: return
         viewModelScope.launch { repo.setMarkRead(id, markRead) }
+    }
+
+    fun setStarred(articleId: Long, starred: Boolean) {
+        viewModelScope.launch { repository.setStarred(articleId, starred) }
+    }
+
+    /** An edition is being made: see [com.app.newspaperss.ui.components.ArticleButtons]. */
+    val building: StateFlow<Boolean> = repository.observeBuilding().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** One "Marked as read · Undo" to show. [seq] makes each mark its own offer, even of the same article twice. */
+    data class UndoOffer(val marked: MarkedRead, val seq: Long)
+
+    private var offers = 0L
+    private val _undoOffer = MutableStateFlow<UndoOffer?>(null)
+    /** The Undo to offer now, or null. The screen shows it once and calls [undoOfferEnded]. */
+    val undoOffer: StateFlow<UndoOffer?> = _undoOffer.asStateFlow()
+
+    fun markRead(articleId: Long) {
+        viewModelScope.launch { repository.markRead(articleId)?.let { _undoOffer.value = UndoOffer(it, ++offers) } }
+    }
+
+    fun undoMarkRead(offer: UndoOffer) {
+        undoOfferEnded(offer)
+        viewModelScope.launch { repository.undoMarkRead(offer.marked) }
+    }
+
+    fun undoOfferEnded(offer: UndoOffer) {
+        _undoOffer.compareAndSet(offer, null)
     }
 
     /** The screen leaves by itself once [detail] shows the source gone. */

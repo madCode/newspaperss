@@ -85,6 +85,19 @@ class ReadingListRepositoryTest {
     }
 
     @Test
+    fun aDeliveredLinkStarredAgainIsWaitingAndUntickedInTheExport() = runTest {
+        list.save("https://a.example/1")
+        val saved = byUrl("https://a.example/1")
+        db.articles().setDelivered(listOf(saved.id))
+        assertEquals(0, list.observeWaiting().first())
+
+        SourceRepository(db).setStarred(saved.id, true)
+
+        assertEquals(1, list.observeWaiting().first())
+        assertEquals("- [ ] https://a.example/1\n", list.exportMarkdown())
+    }
+
+    @Test
     fun aLinkTickedElsewhereIsMarkedReadOnReimport() = runTest {
         list.import("- [ ] https://a.example/1\n")
         list.import("- [x] https://a.example/1 (error 404)\n")
