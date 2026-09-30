@@ -51,9 +51,9 @@ fun creditsSite(url: String, siteNames: Set<String>): Boolean =
  * parameters, their order and encoding as they were: a site may need them exactly so.
  */
 fun withoutTracking(url: String, siteNames: Set<String> = emptySet()): String {
-    val queryStart = url.indexOf('?')
-    if (queryStart < 0) return url
-    val fragmentStart = url.indexOf('#', queryStart).let { if (it < 0) url.length else it }
+    val fragmentStart = url.indexOf('#').let { if (it < 0) url.length else it }
+    // A '?' inside the fragment is a single-page app's route, not the query.
+    val queryStart = url.indexOf('?').takeIf { it in 0 until fragmentStart } ?: return url
     val kept = url.substring(queryStart + 1, fragmentStart).split('&').filter { pair ->
         val key = decode(pair.substringBefore('=')).lowercase()
         val tracking = key.startsWith("utm_") || key in CLICK_IDS ||
@@ -82,7 +82,7 @@ private fun registrableIndex(labels: List<String>): Int {
 }
 
 private fun queryOf(url: String): List<Pair<String, String>> =
-    url.substringAfter('?', "").substringBefore('#').split('&').filter { it.isNotEmpty() }
+    url.substringBefore('#').substringAfter('?', "").split('&').filter { it.isNotEmpty() }
         .map { decode(it.substringBefore('=')) to decode(it.substringAfter('=', "")) }
 
 /**

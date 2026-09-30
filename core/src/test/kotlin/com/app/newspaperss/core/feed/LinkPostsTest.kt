@@ -68,6 +68,16 @@ class LinkPostsTest {
         assertNull(LinkPosts.storyUrl("https://writer.substack.com/p/note", html, "https://writer.substack.com/"))
     }
 
+    /** Ghost tags every outbound link `ref=<site>`, so a short post with several links is just a post. */
+    @Test
+    fun aShortPostWhoseEveryLinkIsTaggedIsntALinkPost() {
+        val html = """<p>Two things this week: <a href="https://one.example/a?ref=blog.example">this</a> and
+            <a href="https://two.example/b?ref=blog.example">that</a>.</p>"""
+        assertNull(LinkPosts.storyUrl("https://blog.example/week", html))
+        val once = """<p>Worth reading: <a href="https://one.example/a?ref=blog.example">this</a>, and again <a href="https://one.example/a?ref=blog.example">here</a>.</p>"""
+        assertEquals("the same story linked twice is still one", "https://one.example/a", LinkPosts.storyUrl("https://blog.example/week", once))
+    }
+
     @Test
     fun aLongPostIsntALinkPostWhateverItLinksTo() {
         val words = (1..600).joinToString(" ") { "word$it" }

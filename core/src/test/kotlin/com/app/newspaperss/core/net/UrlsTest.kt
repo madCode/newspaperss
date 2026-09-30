@@ -37,6 +37,7 @@ class UrlsTest {
             "https://news.example/story?src=homepage" to "https://news.example/story?src=homepage",
             "https://news.example/search?q=a%20b&ref=Longreads" to "https://news.example/search?q=a%20b",
             "https://news.example/story" to "https://news.example/story",
+            "https://app.example/#/story?utm_source=x" to "https://app.example/#/story?utm_source=x",
         )
         for ((url, expected) in cases) assertEquals(url, expected, withoutTracking(url, longreads))
     }

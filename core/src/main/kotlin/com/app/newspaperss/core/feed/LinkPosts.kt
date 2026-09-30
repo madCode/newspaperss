@@ -33,19 +33,22 @@ object LinkPosts {
      *   another host); null if unknown.
      */
     fun storyUrl(itemUrl: String, html: String?, siteUrl: String? = null): String? {
-        if (html.isNullOrBlank()) return null
+        // No query string anywhere, no referral tag: saves parsing every item of every sync.
+        if (html.isNullOrBlank() || '?' !in html) return null
         val ownDomains = listOfNotNull(itemUrl, siteUrl).mapNotNull(::registrableDomainOf).toSet()
         val names = siteNames(itemUrl, siteUrl)
         if (ownDomains.isEmpty() || names.isEmpty()) return null
         val body = Jsoup.parseBodyFragment(html, itemUrl).body()
         body.select("[hidden], script, style").remove()
         if (ReadingTime.words(body.text()) >= MAX_WORDS) return null
-        // The last: the story link closes a pick, after any background links in its text.
-        val story = body.select("a[href]").map { it.absUrl("href") }.lastOrNull { href ->
+        val tagged = body.select("a[href]").map { it.absUrl("href") }.filter { href ->
             val domain = registrableDomainOf(href)
             domain != null && domain !in ownDomains && creditsSite(href, names)
-        } ?: return null
-        return withoutTracking(story, names)
+        }.map { withoutTracking(it, names) }.distinct()
+        // Exactly one: some blogging platforms (Ghost's `ref=`, beehiiv's `utm_source=`) tag every
+        // outbound link with the site's name, and a short post of theirs linking to several pages
+        // isn't pointing at any one of them.
+        return tagged.singleOrNull()
     }
 
     /** The names [withoutTracking] should treat as the item's own site, for [itemUrl] from a feed of [siteUrl]. */

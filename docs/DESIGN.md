@@ -84,8 +84,9 @@ module so it's all unit-tested without Android.
   `equator.org/…?src=longreads`). A feed or tt-rss item counts as a link
   post when its own text is under 500 words and it links to another site
   with a referral tag naming its own site (`src=`, `ref=`, `source=`,
-  `via=`, `utm_source=`); the last such link is the story. Nothing is set
-  up per site.
+  `via=`, `utm_source=`), and to only one such page: that's the story.
+  (Some platforms tag every outbound link, so a short post linking to
+  several isn't a pointer.) Nothing is set up per site.
   - The article is stored as the story's address, so the same story from
     two sources goes out once, and a delivered story isn't stored again.
     The feed's guid is kept, so the pitch isn't offered twice.

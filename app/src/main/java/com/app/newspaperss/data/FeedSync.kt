@@ -132,12 +132,6 @@ class FeedSync(
                 // A few from each feed rather than the newest 200 overall: busy news feeds would
                 // fill those 200, and a feed that posts monthly would never reach the paper.
                 val headlines = fromEachFeed(client, client.unreadFeeds(category).filter { it.unread > 0 })
-                // A link already delivered (from a feed, or before the account was reconnected) is
-                // skipped like any other, and tt-rss is told it's read unless the reader said not to:
-                // otherwise it would sit unread there for good. Articles the reader marked read in
-                // the app are told here too, rather than when marked, so Undo never reaches the server.
-                // They're taken from the database, not these headlines: a few per feed may no longer
-                // include them.
                 val articles = headlines.map {
                     it to ArticleEntity(
                         sourceId = source.id, guid = "$TTRSS_GUID_PREFIX${it.id}", url = it.link, title = it.title,
@@ -145,9 +139,17 @@ class FeedSync(
                         discoveredAt = now, originId = it.feedId, originTitle = it.feedTitle,
                     ).linkedToStory(siteUrl = null)
                 }
+                // A link already delivered (from a feed, or before the account was reconnected) is
+                // skipped like any other, and tt-rss is told it's read unless the reader said not to:
+                // otherwise it would sit unread there for good. Articles the reader marked read in
+                // the app are told here too, rather than when marked, so Undo never reaches the server.
+                // They're taken from the database, not these headlines: a few per feed may no longer
+                // include them.
                 if (source.markReadOnServer) {
                     // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
-                    fun linksOf(h: TtrssHeadline, a: ArticleEntity) = listOfNotNull(h.link, a.url, a.viaUrl)
+                    // The headline's own link as well as the stored one (a link post's story, tracking
+                    // removed): delivered_urls holds whichever went out.
+                    fun linksOf(h: TtrssHeadline, a: ArticleEntity) = listOf(h.link, a.url)
                     val delivered = articles.flatMap { (h, a) -> linksOf(h, a) }.distinct().chunked(500).flatMap { db.articles().deliveredAmong(it) }.toSet()
                     val markedRead = db.articles().unreportedRead(source.id, limit = 500)
                     client.markRead(
