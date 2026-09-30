@@ -275,4 +275,27 @@ class ArticleExtractorTest {
         val fromFeed = ArticleExtractor(FakeHttp(emptyMap())).extract(input("<p>${portuguese.repeat(4)}</p>", mode = ContentMode.FEED, feedTitle = "Ciclovias"))
         assertEquals("pt", fromFeed.language)
     }
+
+    @Test
+    fun aHugePageIsntParsedAndTheFeedsTextIsUsed() = runTest {
+        val huge = "<html><body><article>" + "<p>${sentence.repeat(20)}</p>".repeat(3_500) + "</article></body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(huge)))).extract(input(teaser))
+
+        assertTrue(article.usedFeedContent)
+        assertTrue(article.note!!, "too large" in article.note!!)
+    }
+
+    @Test
+    fun aPageThatCantBeReadDoesntTeachTheSourceToStopFetchingPages() = runTest {
+        // A source the check set to pages, with long teasers: a page too big to parse (every day,
+        // the same) mustn't read as "the feed is enough", or the source would be stuck on teasers.
+        val huge = "<html><body><article>" + "<p>${sentence.repeat(20)}</p>".repeat(3_500) + "</article></body></html>"
+        val longTeaser = "<p>${sentence.repeat(20)}</p>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(huge)))).extract(input(longTeaser, mode = ContentMode.PAGE))
+
+        assertTrue(article.usedFeedContent)
+        assertTrue(article.feedWordCount >= ArticleExtractor.FULL_TEXT_WORDS)
+        assertEquals(PageFailure.PERMANENT, article.pageFailure)
+        assertNull(FullTextCheck.evidence(article))
+    }
 }

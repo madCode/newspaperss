@@ -50,7 +50,7 @@ fun main(args: Array<String>) = runBlocking {
     val picked = EditionPlanner.fill<EditionArticle>(ordered, rules, { it.minutes }) { c ->
         val (source, item) = items.getValue(c.id)
         val e = extractor.extract(ExtractInput(item.url, item.title, item.contentHtml, item.author))
-        println("${"%-26s".format(source)} ${"%4d".format(e.wordCount)} words  ${if (e.usedFeedContent) "feed" else "page"}  ${e.title}")
+        println("${"%-26s".format(source)} ${"%4d".format(e.wordCount)} words ${"%2d".format(e.imageUrls.size)} img  ${if (e.usedFeedContent) "feed" else "page"}  ${e.title}")
         EditionArticle(
             title = e.title, sourceTitle = source, url = item.url, bodyHtml = e.html,
             minutes = ReadingTime.minutes(e.wordCount), author = e.author,

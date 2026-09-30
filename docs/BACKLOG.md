@@ -6,48 +6,57 @@ ideas, not commitments.
 
 ## Next
 
-### From device testing (Day 2)
-- [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap; the app's user agent is redirected to m.webtoons.com, whose series page doesn't link the feed. Support strips properly
-- [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader)
-- [ ] Decide what tapping an article in a source's list does: open the original in the browser, render it, or offer "add to the next edition"
+Grouped by part of the app. The tag says where each item came from: *device* (your testing),
+*personas* ([docs/research/personas.md](research/personas.md)), *resources* (the resource audit),
+*live* (building real editions), *a11y* (the accessibility audit).
+
+### Onboarding and setup
+- [ ] Saved links in onboarding: Pocket/Instapaper import there, and a reading-list-only setup *(personas)*
+- [ ] Change the device in Settings after onboarding *(personas)*
+- [ ] A short Kindle how-to: same Amazon account, pick the device in Send to Kindle, Library › Docs *(personas)*
+- [ ] Explain per device what counts as "delivered" *(personas)*
+
+### Sources and fetching
+- [ ] Say why there's no edition: nothing new on schedule, all sources failed, waiting for a connection *(personas)*
+- [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
+- [ ] "No feed found": offer to save the page to the reading list instead *(personas)*
+- [ ] Decide what tapping an article in a source's list does: open the original, render it, or offer "add to the next edition" *(device)*
+- [ ] Le Monde serves a script wall ("A required part of this site couldn't load", `id="loading-error"`) with a 200; count it as a bot check so the feed's text is used *(live)*
+- [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
+- [ ] Webcomic title text (xkcd's hover text) is dropped; show it as a caption *(device)*
+
+### The book
+- [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
+- [ ] Reading time for Chinese and Japanese, which aren't space-separated (an NHK article counted as "1 word") *(live)*
 
 ### Delivery and schedule
-- [ ] If lead time isn't enough on a real device, wake for timed editions with an exact alarm (Doze defers WorkManager; expedited work was rejected: its API 31+ quota can silently restart a long build)
-- [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; Drive/Dropbox SAF providers don't expose folder trees
-- [ ] Verify folder delivery + chooser-from-notification on a real device
+- [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; waiting on an app key ([#18](https://github.com/madCode/newspaperss/issues/18)) *(personas)*
+- [ ] Boox: offer folder delivery into the Books folder, so editions stay in the library *(personas)*
+- [ ] Folder delivery: tt-rss marks articles read as soon as the file is saved, before Syncthing has synced; old editions pile up in the folder *(personas)*
+- [ ] Verify folder delivery and the chooser from the notification on a real device
+- [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
+- [ ] Deleting an edition leaves its "ready" notification up; its Send would share a missing file
 
-### Later
-- [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
+### Reading list
+- [ ] Saved links that can never be read (a PDF, a video, a page over 5 MB, a 410) wait silently forever. Show them in the reading list as unreadable, with the reason and a way to open or remove them. Not as "couldn't fetch" pages in the edition: they cost no reading time, so a backlog of them could fill one
+- [ ] Links saved before database version 2 with a title never get a reading time (no backfill)
 
-### From the persona audit (Day 2)
-- [ ] Saved links in onboarding: Pocket/Instapaper import there, and a reading-list-only setup
-- [ ] Say why there's no edition: nothing new on schedule, all sources failed, waiting for a connection
-- [ ] Boox: offer folder delivery into the Books folder, so editions stay in the library
-- [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs
-- [ ] "No feed found": offer to save the page to the reading list instead
-- [ ] Change the device in Settings after onboarding
-- [ ] A short Kindle how-to (same Amazon account, Library › Docs)
-
-### Accessibility audit (asked for, Day 2)
+### Accessibility *(a11y, you asked for it)*
 A full pass over the app and the book, not just spot fixes:
-- [ ] App: TalkBack walk-through of every screen (labels, headings, focus order, live regions), font scale at 200%, display size, touch targets ≥ 48dp, contrast in light and dark, e-ink (Boox) readability, and no meaning carried by colour or animation alone (respect "remove animations")
-- [ ] Book: EPUB Accessibility 1.1 metadata (`schema:accessMode`, `accessibilityFeature`, `accessibilitySummary`), image alt text carried through, a page-list or landmarks where they help, and reading order checked with a screen reader (VoiceOver Books, TalkBack with an EPUB reader)
-- [ ] Tooling: Compose accessibility checks in the Robolectric tests (`enableAccessibilityChecks`), Accessibility Scanner on a device, Ace by DAISY on a live edition
+- [ ] App: TalkBack walk-through of every screen (labels, headings, focus order), font scale at 200%, display size, touch targets ≥ 48dp, contrast in light and dark, e-ink readability, nothing carried by colour or animation alone. Confirm the new live regions with TalkBack on a device
+- [ ] Book: EPUB Accessibility 1.1 metadata (`schema:accessMode`, `accessibilityFeature`, `accessibilitySummary`), image alt text carried through, reading order checked with a screen reader
+- [ ] Tooling: Compose accessibility checks in the Robolectric tests, Accessibility Scanner on a device, Ace by DAISY on a live edition
 
-### From live editions (Day 2)
-- [ ] Le Monde serves a script wall ("A required part of this site couldn't load", `id="loading-error"`) with a 200; count it as a bot check so the feed's text is used and the source learns it's blocked
-
-### From the resource audit (Day 2)
-- [ ] tt-rss: pass sinceId, so each sync doesn't re-download the same 200 unread items. Careful: a since-id cursor changes what "unread" returns (category switches, items marked unread again); rss-to-e-reader's #28 hit a similar trap
-- [ ] Strip script/style/svg before the Readability DOM clone, and cap article pages at ~4 MB (the worst-case memory peak)
+### Performance *(resources)*
+- [ ] tt-rss: pass sinceId, so each sync doesn't re-download the same 200 unread items. Careful: a since-id cursor changes what "unread" returns; rss-to-e-reader's #28 hit a similar trap
 - [ ] Load build candidates without feedHtml; fetch it per article
 - [ ] EPUB zip: buffered output, JPEGs stored uncompressed
 
 ### Tech debt
-- [ ] Reading-list links saved before database version 2 with a title never get a reading time (no backfill)
-- [ ] Deleting an edition leaves its "ready" notification up; its Send would share a missing file
-- [ ] Webcomic title text (xkcd's hover text) is dropped with the img title attribute; show it as a caption
-- [ ] `SettingsScreenTest` can fail under full-suite load: DataStore "Unable to rename s.preferences_pb.tmp", likely a write still running when the temp folder is deleted. Give test DataStores a scope that's finished before cleanup
+- [ ] `SettingsScreenTest` can fail under full-suite load (DataStore "Unable to rename …tmp", a write still running when the temp folder is deleted). Give test DataStores a scope that finishes before cleanup
+
+### Later
+- [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
 
 ## Feature proposals
 
@@ -127,6 +136,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Extraction drops scripts, styles and SVGs before Readability copies the page (a 2.6 MB script-heavy page: 36 MB allocated before, 16 MB after, twice as fast); pages over 5 MB aren't parsed and use the feed's text
 - [x] Documentation pass: DESIGN.md describes the app as it is (no SMTP, profiles or reading-speed setting; today's changes in), README and CLAUDE.md updated, fresh screenshots; documentation passes are now part of the cycles
 - [x] TalkBack: the build's stage is announced (not every count), onboarding's progress says "Step 2 of 3", earlier editions say "See what's inside"; Add and Save sit below their fields so large fonts leave room to type
 - [x] Each article is tagged with its language (`xml:lang`, `dir="rtl"`), detected from its text (writing system, common words) with the page's declared language as a tiebreaker
