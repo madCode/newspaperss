@@ -8,7 +8,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** nothing; Day 2 is wrapped up.
+- **In flight:** nothing; Day 2 is wrapped up. Its [report](https://claude.ai/artifact/MEiSg7nZzZLhubU3v5r6Bj) and [cycle retro](https://claude.ai/artifact/Piy8RvgmffBE3CSC1ByaP3) are published (private to your account).
 - **Next:** the rest of the accessibility audit (a TalkBack walk-through on a device first); language-aware page cleanup; saved links in onboarding; unreadable saved links shown in the reading list.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
