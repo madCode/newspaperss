@@ -9,7 +9,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
 ## Status
 
 - **Last night:** Night 2 focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. It shipped stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync, a category choice, fair turns across many feeds, Start fresh and leaving feeds out, Obsidian-friendly notes saved to your vault, a question at the end of each paper, and a dark preview.
-- **Watching:** a settings test that failed once on a DataStore file rename (#66); not reproduced since.
+- **Watching:** a settings test that failed on a DataStore file rename (#66, #81). Its store now stops before the test's folder is deleted; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 3 · Wed 30 Sep
