@@ -8,6 +8,7 @@ import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.offersOpen
 import com.app.newspaperss.settings.Settings
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -42,6 +43,8 @@ data class TodayState(
     val next: String? = null,
     /** Readers who read on this device (a Boox) open editions rather than send them. */
     val preferOpen: Boolean = false,
+    /** False for a Kindle or Kobo, where the book is sent, never opened here. */
+    val offerOpen: Boolean = true,
     /** What to call the reader's e-reader in prompts. */
     val deviceName: String = "e-reader",
     /** Starred articles not yet in an edition, from sources that aren't paused. */
@@ -63,6 +66,7 @@ class TodayViewModel(
             build = buildStateOf(info, isOnline),
             next = nextEdition(s, now(), lastDue()),
             preferOpen = s.device == Device.BOOX,
+            offerOpen = s.device.offersOpen,
             deviceName = when (s.device) {
                 Device.KINDLE -> "Kindle"
                 Device.KOBO -> "Kobo"

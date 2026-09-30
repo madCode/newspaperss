@@ -96,6 +96,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                     first = editions.size == 1,
                     deviceName = state.deviceName,
                     preferOpen = state.preferOpen,
+                    offerOpen = state.offerOpen,
                     onRetry = viewModel::makeOneNow,
                     onDetails = { onOpenEdition(latest.id) },
                     onSend = { viewModel.fileOf(latest)?.let { launch(EditionIntents.share(context, it, latest.title, latest.id)) } },
@@ -200,6 +201,7 @@ private fun LatestEdition(
     first: Boolean,
     deviceName: String,
     preferOpen: Boolean,
+    offerOpen: Boolean,
     onRetry: () -> Unit,
     onDetails: () -> Unit,
     onSend: () -> Unit,
@@ -232,7 +234,7 @@ private fun LatestEdition(
                             OutlinedButton(onClick = onSend) { Text("Send") }
                         } else {
                             Button(onClick = onSend) { Text("Send") }
-                            OutlinedButton(onClick = onOpen) { Text("Open") }
+                            if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }
                         }
                     }
                     Text(
@@ -245,7 +247,7 @@ private fun LatestEdition(
                 }
                 EditionStatus.DELIVERED -> Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onSend) { Text("Send again") }
-                    OutlinedButton(onClick = onOpen) { Text("Open") }
+                    if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }
                 }
                 EditionStatus.FAILED -> {
                     Text(

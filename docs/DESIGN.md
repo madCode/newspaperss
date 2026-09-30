@@ -252,7 +252,9 @@ articles go back, keeping their stars, before the new one is planned.
 - **Today** (home): when the next edition is due, how many starred articles
   are waiting (only when some are), **Make an edition now**, and the latest
   edition with **Send**, **Open** and **I've sent it** (**Send again** once
-  delivered). Earlier editions are listed below.
+  delivered). Earlier editions are listed below. Kindle and Kobo readers
+  aren't offered **Open**, here or on an edition's page: it opens the book
+  on the phone, and they get it by sending it.
 - **Edition:** its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
   network). **Notes** exports a Markdown file for a notes app: front matter

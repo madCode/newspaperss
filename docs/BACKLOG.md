@@ -200,6 +200,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] No Open for Kindle and Kobo readers, who send the book rather than open it on the phone *(personas)*
 - [x] tt-rss "Start fresh" for a reader back after a break: marks everything older than two weeks read on the server, after asking, and refuses on servers too old to limit it *(personas)*
 - [x] A question to think about on each edition's closing page, from a short list that suits any paper, and shown in its notes *(personas)*
 - [x] Reading notes saved to a folder of your choice (an Obsidian vault) for every delivered edition, whether it was shared, saved to a folder or opened *(personas)*

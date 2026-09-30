@@ -38,6 +38,12 @@ enum class Device(val label: String) {
     OTHER("Something else / just the file"),
 }
 
+/**
+ * Whether Open is any use: it opens the book on this phone, and a Kindle or Kobo reader gets it
+ * onto their e-reader by sending it. Unknown (settings not loaded yet) keeps Open.
+ */
+val Device?.offersOpen: Boolean get() = this != Device.KINDLE && this != Device.KOBO
+
 data class Settings(
     val onboarded: Boolean = false,
     val device: Device? = null,

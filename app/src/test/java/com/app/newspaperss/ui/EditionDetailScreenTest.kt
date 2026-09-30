@@ -1,5 +1,8 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.settings.offersOpen
+import com.app.newspaperss.settings.Settings
+import com.app.newspaperss.settings.Device
 import android.app.Application
 import android.content.Intent
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -112,9 +115,9 @@ class EditionDetailScreenTest {
         editionId to ids
     }
 
-    private fun show(editionId: Long, preferOpen: Boolean = false): EditionDetailViewModel {
+    private fun show(editionId: Long, preferOpen: Boolean = false, offerOpen: Boolean = true): EditionDetailViewModel {
         val vm = EditionDetailViewModel(repo, editionId, notes) {}
-        compose.setContent { EditionDetailScreen(vm, onBack = {}, preferOpen = preferOpen) }
+        compose.setContent { EditionDetailScreen(vm, onBack = {}, preferOpen = preferOpen, offerOpen = offerOpen) }
         idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
         return vm
     }
@@ -206,6 +209,24 @@ class EditionDetailScreenTest {
         compose.onNodeWithText("Open").performClick()
         assertEquals(Intent.ACTION_VIEW, shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity.action)
         assertEquals("a phone may just be previewing it", EditionStatus.READY, runBlocking { db.editions().byId(onPhone) }?.status)
+    }
+
+    @Test
+    fun aKindleReaderIsOfferedSendButNotOpen() {
+        // Open would put the book on the phone, where a Kindle reader doesn't read it.
+        val (id, _) = edition(EditionStatus.READY, listOf("A story"))
+        show(id, offerOpen = Device.KINDLE.offersOpen)
+        compose.onNodeWithText("Send").assertExists()
+        compose.onNodeWithText("Open").assertDoesNotExist()
+    }
+
+    @Test
+    fun todayOffersAKindleReaderSendButNotOpen() {
+        edition(EditionStatus.READY, listOf("A story"))
+        val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(Settings(device = Device.KINDLE))) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { compose.waitForIdle(); compose.onAllNodes(hasText("Send")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Open").assertDoesNotExist()
     }
 
     @Test

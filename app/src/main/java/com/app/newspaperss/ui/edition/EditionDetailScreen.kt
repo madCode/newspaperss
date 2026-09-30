@@ -55,10 +55,13 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
-/** @param preferOpen the reader reads on this device (a Boox), so opening an edition delivers it. */
+/**
+ * @param preferOpen the reader reads on this device (a Boox), so opening an edition delivers it.
+ * @param offerOpen false for a Kindle or Kobo, whose reader sends the book rather than opening it here.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, onReadArticle: (position: Int) -> Unit = {}, preferOpen: Boolean = false) {
+fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, onReadArticle: (position: Int) -> Unit = {}, preferOpen: Boolean = false, offerOpen: Boolean = true) {
     val detail by viewModel.detail.collectAsState()
     val message by viewModel.message.collectAsState()
     val building by viewModel.building.collectAsState()
@@ -133,7 +136,9 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                     edition,
                     fileMissing = current.file == null,
                     onSend = { current.file?.let { launch(EditionIntents.share(context, it, edition.title, edition.id)) } },
-                    onOpen = { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } },
+                    onOpen = if (offerOpen) {
+                        { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } }
+                    } else null,
                     onSent = viewModel::markSent,
                 )
             }
@@ -176,7 +181,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
 }
 
 @Composable
-private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> Unit, onOpen: () -> Unit, onSent: () -> Unit) {
+private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> Unit, onOpen: (() -> Unit)?, onSent: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(edition.title, style = MaterialTheme.typography.headlineSmall)
         Text(dateOf(edition.createdAt), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
@@ -195,7 +200,7 @@ private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> U
                 } else {
                     OutlinedButton(onClick = onSend, enabled = !fileMissing) { Text("Send again") }
                 }
-                OutlinedButton(onClick = onOpen, enabled = !fileMissing) { Text("Open") }
+                if (onOpen != null) OutlinedButton(onClick = onOpen, enabled = !fileMissing) { Text("Open") }
             }
             if (fileMissing) {
                 Text(

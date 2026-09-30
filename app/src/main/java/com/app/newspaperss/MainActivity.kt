@@ -1,5 +1,6 @@
 package com.app.newspaperss
 
+import com.app.newspaperss.settings.offersOpen
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.ComponentActivity
@@ -96,7 +97,7 @@ class MainActivity : ComponentActivity() {
                         val readingList = viewModel { ReadingListViewModel(container.readingList) }
                         OnboardingScreen(vm, sources, readingList)
                     }
-                    true -> App(container, preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX)
+                    true -> App(container, preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX, offerOpen = settings?.device.offersOpen)
                 }
             }
         }
@@ -104,7 +105,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun App(container: AppContainer, preferOpen: Boolean) {
+private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean) {
     val nav = rememberNavController()
     val current by nav.currentBackStackEntryAsState()
     Scaffold(
@@ -150,6 +151,7 @@ private fun App(container: AppContainer, preferOpen: Boolean) {
                 EditionDetailScreen(
                     vm,
                     preferOpen = preferOpen,
+                    offerOpen = offerOpen,
                     onBack = { nav.navigateUp() },
                     onReadArticle = { position -> nav.navigate("edition/$id/article/$position") { launchSingleTop = true } },
                 )
