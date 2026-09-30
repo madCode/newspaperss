@@ -126,7 +126,7 @@ class SourceDetailScreenTest {
 
         compose.onNodeWithText("Remove").performClick()
         compose.onNodeWithText("Remove Example?").assertExists()
-        compose.onNode(hasText("Remove") and hasAnyAncestor(isDialog())).performClick()
+        compose.onNode(hasText("Remove source") and hasAnyAncestor(isDialog())).performClick()
         // Compose only recomposes for the removal when its test clock runs.
         idleUntil { compose.waitForIdle(); back }
 
