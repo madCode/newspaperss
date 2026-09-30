@@ -71,7 +71,7 @@ People who want RSS on an e-reader have plenty of options, but most of them are 
 2. **A fixed, predictable delivery time** ("your paper at 6:30"), plus a missed-edition catch-up. This is what fans of Kindle4RSS and RSS to Kindle say they value ([benkuhn](https://www.benkuhn.net/krss/); [rsstokindle](https://www.rsstokindle.com/)).
 3. **Close the loop from the device.** Finished on the device means archived, and not finished means brought back (Readwise KOReader plugin). Add highlights and notes import from KOReader's sidecar files or Kobo's annotations, to feed the notes export.
 4. **More importers.** Matter, Readwise, Raindrop and Omnivore CSV/JSON, as Folio has done. This is cheap and catches people leaving shut-down apps.
-5. **Optional short summaries per article**, done on-device or left off by default. That meets Readivio and the finite news apps where they compete, without the cloud.
+5. **Optional short summaries per article**, done on-device or left off by default. That meets Readivio and the finite news apps where they compete, without the cloud. *(Decided against on 2026-09-30: the paper gives whole articles.)*
 6. **An OPDS catalog served from the phone**, for KOReader and jailbroken Kindles (the HTG setup uses OPDS).
 7. **Listen mode that reuses the edition.** Readwise and ElevenReader have set the bar for TTS quality. The edition plan (ordered and sized to a time) maps naturally onto a "20-minute listen".
 8. **Kobo-style QR-code pairing** for any web or email step, as Instapaper does ([Kobo help](https://help.kobo.com/hc/en-us/articles/33359968957463-Use-Instapaper-with-your-Kobo-eReader)).

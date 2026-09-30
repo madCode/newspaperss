@@ -90,13 +90,6 @@ then show up in their other reader apps too, and read state stays in one place. 
 - whether the phone-side source is then dropped, so articles don't arrive twice;
 - what to do for an OPML import.
 
-### Local news for your city or country
-Help people find news sources near them: local papers, public broadcasters, city blogs.
-- Options include a curated starter pack per country or region, and location-based Google News feeds.
-- A "near me" search could use the device's locale, without needing a location permission.
-- The hard part is keeping curated lists current and fair. Starter packs must stay public, well-known
-  feeds only.
-
 ### Languages
 What to do with non-English sources and readers. Today:
 - the book's language is always `en`;
@@ -110,8 +103,16 @@ time is counted by character.
 Questions:
 - the book's `dc:language` when a whole edition is in one language other than English (Kindle
   picks its dictionary from it);
-- whether the app UI and the book's own text should be translated;
 - whether an edition should mix languages or keep them in sections.
+
+Translation, decided: people translate, not a machine. Nobody on the project can check a machine
+translation, so it goes to volunteers who read the language. What that needs first:
+- the app's text moved out of the code into `strings.xml` (today almost all of it is written
+  inline in the screens), and the book's own words ("Contents", "min read") into a table per language;
+- a CONTRIBUTING section on how to translate: which file to copy, how to test it, how to send it;
+- optionally a hosted tool such as Weblate, whose free plan for open-source projects needs a
+  license on the repo;
+- then a call for translators in the README.
 
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
@@ -133,7 +134,28 @@ phone. What's missing:
   library's Markdown checklist, settings), for people without Google services or moving to another
   reader, and a matching import.
 
-### An iOS app
+### From the competitor research ([docs/research/competitors.md](research/competitors.md))
+- **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
+  has no folder trees, so this needs the Drive API (an OAuth client, like Dropbox's app key).
+- **Close the loop from the device:** finished on the e-reader means archived; KOReader highlights feed the notes export.
+- **More importers:** Matter, Readwise, Raindrop and Omnivore exports, for people leaving shut-down apps.
+- **An OPDS catalog served from the phone,** for KOReader and jailbroken Kindles.
+
+## Parked and decided against
+
+- **Generated summaries:** not doing. The paper gives whole articles; AI-shortened digests are what
+  the competitors do, not what this app is for.
+
+### Local news for your city or country (parked)
+Parked: hard to do well, and curated lists go stale. Adding a local paper by its address already works.
+Help people find news sources near them: local papers, public broadcasters, city blogs.
+- Options include a curated starter pack per country or region, and location-based Google News feeds.
+- A "near me" search could use the device's locale, without needing a location permission.
+- The hard part is keeping curated lists current and fair. Starter packs must stay public, well-known
+  feeds only.
+
+### An iOS app (parked)
+Parked: Android comes first. Kept here for the notes.
 Possible, but a second app rather than a port:
 - `:core` is plain Kotlin, but leans on JVM libraries (jsoup, Readability4J, OkHttp). Kotlin
   Multiplatform would need replacements (Ksoup, Ktor, a Readability port), then Compose
@@ -144,13 +166,6 @@ Possible, but a second app rather than a port:
   KOReader users are mostly on Android anyway.
 - It needs a Mac to build and an Apple developer account ($99 a year) to ship.
 A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps the logic shared.
-
-### From the competitor research ([docs/research/competitors.md](research/competitors.md))
-- **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
-  has no folder trees, so this needs the Drive API (an OAuth client, like Dropbox's app key).
-- **Close the loop from the device:** finished on the e-reader means archived; KOReader highlights feed the notes export.
-- **More importers:** Matter, Readwise, Raindrop and Omnivore exports, for people leaving shut-down apps.
-- **An OPDS catalog served from the phone,** for KOReader and jailbroken Kindles.
 
 ## Done
 
