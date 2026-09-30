@@ -90,13 +90,6 @@ then show up in their other reader apps too, and read state stays in one place. 
 - whether the phone-side source is then dropped, so articles don't arrive twice;
 - what to do for an OPML import.
 
-### Local news for your city or country
-Help people find news sources near them: local papers, public broadcasters, city blogs.
-- Options include a curated starter pack per country or region, and location-based Google News feeds.
-- A "near me" search could use the device's locale, without needing a location permission.
-- The hard part is keeping curated lists current and fair. Starter packs must stay public, well-known
-  feeds only.
-
 ### Languages
 What to do with non-English sources and readers. Today:
 - the book's language is always `en`;
@@ -144,6 +137,14 @@ phone. What's missing:
 
 - **Generated summaries:** not doing. The paper gives whole articles; AI-shortened digests are what
   the competitors do, not what this app is for.
+
+### Local news for your city or country (parked)
+Parked: hard to do well, and curated lists go stale. Adding a local paper by its address already works.
+Help people find news sources near them: local papers, public broadcasters, city blogs.
+- Options include a curated starter pack per country or region, and location-based Google News feeds.
+- A "near me" search could use the device's locale, without needing a location permission.
+- The hard part is keeping curated lists current and fair. Starter packs must stay public, well-known
+  feeds only.
 
 ### An iOS app (parked)
 Parked: Android comes first. Kept here for the notes.
