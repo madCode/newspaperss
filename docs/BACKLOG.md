@@ -34,6 +34,9 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] Book: EPUB Accessibility 1.1 metadata (`schema:accessMode`, `accessibilityFeature`, `accessibilitySummary`), image alt text carried through, a page-list or landmarks where they help, and reading order checked with a screen reader (VoiceOver Books, TalkBack with an EPUB reader)
 - [ ] Tooling: Compose accessibility checks in the Robolectric tests (`enableAccessibilityChecks`), Accessibility Scanner on a device, Ace by DAISY on a live edition
 
+### Reading list
+- [ ] Saved links that can never be read (a PDF, a video, a page over 5 MB, a 410) wait silently forever. Show them in the reading list as unreadable, with the reason and a way to open or remove them. Not as "couldn't fetch" pages in the edition: they cost no reading time, so a backlog of them could fill one
+
 ### From live editions (Day 2)
 - [ ] Le Monde serves a script wall ("A required part of this site couldn't load", `id="loading-error"`) with a 200; count it as a bot check so the feed's text is used and the source learns it's blocked
 

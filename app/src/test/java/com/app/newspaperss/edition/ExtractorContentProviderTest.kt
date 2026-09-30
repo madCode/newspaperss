@@ -111,16 +111,6 @@ class ExtractorContentProviderTest {
     }
 
     @Test
-    fun aSavedLinkThatWillNeverBeReadableGoesInSayingWhyRatherThanWaitingForever() = runTest {
-        http.page("https://example.com/huge", "<html><body>" + "<p>word </p>".repeat(600_000) + "</body></html>")
-        val saved = ArticleEntity(id = 9, sourceId = 2, guid = "https://example.com/huge", url = "https://example.com/huge", title = "A huge page")
-
-        val content = provider.contentFor(saved, readingList, ImageAllowance())!!
-
-        assertTrue(content.bodyHtml, "too large" in content.bodyHtml)
-    }
-
-    @Test
     fun eachArticleReportsWhatItShowedAboutItsSource() = runTest {
         val auto = source.copy(contentMode = ContentMode.AUTO)
         val words = (1..600).joinToString(" ") { "word$it" }
