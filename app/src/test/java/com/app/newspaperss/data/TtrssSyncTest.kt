@@ -148,11 +148,16 @@ class TtrssSyncTest {
     }
 
     @Test
-    fun signingInAgainClearsLeftOutFeeds() = runTest {
-        // Feed ids belong to each tt-rss user; this may be someone else on the same server.
+    fun leftOutFeedsStayForTheSameUserAndGoForAnother() = runTest {
+        // Feed ids belong to each tt-rss user; another user on the same server has their own.
         val source = connect()
         sources.setFeedInPaper(source.id, FeedChoice("42", "Press Office", inPaper = true), inPaper = false)
+
         assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
+        assertEquals(listOf("42"), db.sources().allLeftOut().map { it.originId })
+
+        server.user = "partner"
+        assertNull(ttrss.connect("rss.example.com/tt-rss", "partner", "secret"))
         assertTrue(db.sources().allLeftOut().isEmpty())
     }
 
