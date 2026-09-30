@@ -15,7 +15,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -27,6 +26,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -71,13 +72,14 @@ fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: St
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title, maxLines = 1) },
+                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
             )
         },
     ) { padding ->
         when (val p = preview) {
-            Preview.Loading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(padding))
+            // Words, not an animated bar, which smears on e-ink.
+            Preview.Loading -> Text("Opening…", Modifier.padding(padding).padding(24.dp))
             Preview.Missing -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("This edition's file is gone, so the article can't be shown.")
             }
