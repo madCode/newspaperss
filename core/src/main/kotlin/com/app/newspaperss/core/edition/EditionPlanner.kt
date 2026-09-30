@@ -8,8 +8,11 @@ data class Candidate(
     val id: String,
     val sourceId: String,
     val published: Instant?,
-    /** Articles the reader asked to bring back go ahead of the rest of their source. */
-    val broughtBack: Boolean = false,
+    /**
+     * When the reader starred it for the next edition, or null. Starred articles go ahead of
+     * every unstarred one, oldest star first within a source.
+     */
+    val starredAt: Instant? = null,
 )
 
 sealed interface Budget {
@@ -44,6 +47,11 @@ object EditionPlanner {
      * and budget are applied by [fill], since an article only counts once it
      * has been fetched successfully.
      *
+     * Starred candidates come first, arranged among themselves by [ordering] (taking turns
+     * across sources, oldest star first within one), then the rest the same way. So a star
+     * takes its source's slot ahead of unstarred articles, and [fill] holds back extra stars
+     * ahead of extra unstarred ones.
+     *
      * Parameters
      * ----------
      * candidates: in any order.
@@ -58,18 +66,31 @@ object EditionPlanner {
         rotation: Int = 0,
         random: Random = Random.Default,
     ): List<Candidate> {
+        val (starred, rest) = candidates.partition { it.starredAt != null }
+        val sources = sourcesInTurn(candidates, sourceOrder, rotation)
+        val oldestStarFirst = compareBy<Candidate> { it.starredAt }
+        val newestFirst = compareByDescending<Candidate> { it.published ?: Instant.MIN }
+        return arrange(starred, sources, oldestStarFirst, ordering, random) + arrange(rest, sources, newestFirst, ordering, random)
+    }
+
+    private fun sourcesInTurn(candidates: List<Candidate>, sourceOrder: List<String>, rotation: Int): List<String> {
+        val present = candidates.map { it.sourceId }.toSet()
+        val known = sourceOrder.filter { it in present }
+        val sources = known + (present - known.toSet()).sorted()
+        if (sources.isEmpty()) return sources
+        val shift = Math.floorMod(rotation, sources.size)
+        return sources.drop(shift) + sources.take(shift)
+    }
+
+    private fun arrange(
+        candidates: List<Candidate>,
+        sources: List<String>,
+        withinSource: Comparator<Candidate>,
+        ordering: Ordering,
+        random: Random,
+    ): List<Candidate> {
         val bySource = candidates.groupBy { it.sourceId }
-        val known = sourceOrder.filter { it in bySource }
-        val sources = known + (bySource.keys - known.toSet()).sorted()
-        val rotated = if (sources.isEmpty()) sources else {
-            val shift = Math.floorMod(rotation, sources.size)
-            sources.drop(shift) + sources.take(shift)
-        }
-        val queues = rotated.map { id ->
-            bySource.getValue(id).sortedWith(
-                compareByDescending<Candidate> { it.broughtBack }.thenByDescending { it.published ?: Instant.MIN },
-            )
-        }
+        val queues = sources.mapNotNull { bySource[it]?.sortedWith(withinSource) }
         return when (ordering) {
             Ordering.IN_ORDER -> queues.flatten()
             Ordering.SHUFFLE -> queues.flatten().shuffled(random)
@@ -86,7 +107,8 @@ object EditionPlanner {
      * Fetches [ordered] candidates one at a time until the budget is met,
      * taking at most `maxPerSource` from each source (or its own entry in `sourceCaps`).
      * If that leaves the budget unfilled, the articles `maxPerSource` held back are
-     * tried next, in the same order. A source's own cap is a hard limit.
+     * tried next, in the same order (so held-back stars before held-back unstarred ones,
+     * given [order]'s stars-first list). A source's own cap is a hard limit, stars included.
      *
      * The budget is checked before each fetch, so a minutes budget is
      * exceeded by at most one article, and a larger pool doesn't mean more
