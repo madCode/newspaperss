@@ -28,6 +28,11 @@ data class ExtractInput(
     val feedHtml: String?,
     val feedAuthor: String?,
     val mode: ContentMode = ContentMode.AUTO,
+    /**
+     * The page [feedHtml] is from, when that isn't [url]: a link post, whose [url] is the story it
+     * points to (see [com.app.newspaperss.core.feed.LinkPosts]).
+     */
+    val feedUrl: String? = null,
 )
 
 data class ExtractedArticle(
@@ -52,6 +57,8 @@ data class ExtractedArticle(
     val pageFailure: PageFailure? = null,
     /** The article's language as a BCP 47 tag, if the text or the page says. */
     val language: String? = null,
+    /** The name of the site whose page the text came from, if it was the page and the page says. */
+    val siteName: String? = null,
 )
 
 /** Why a page couldn't be read, when the site didn't turn the app away. */
@@ -74,7 +81,7 @@ class ArticleExtractor(private val http: HttpClient) {
 
     suspend fun extract(input: ExtractInput): ExtractedArticle {
         val feed = input.feedHtml?.takeIf { it.isNotBlank() }
-            ?.let { HtmlCleaner.clean(it, input.url, input.feedTitle) }
+            ?.let { HtmlCleaner.clean(it, input.feedUrl ?: input.url, input.feedTitle) }
             // An image with no text is still content: a webcomic's feed item is often just the comic.
             ?.takeIf { it.wordCount > 0 || it.imageUrls.isNotEmpty() }
         val feedWords = feed?.wordCount ?: 0
@@ -113,9 +120,12 @@ class ArticleExtractor(private val http: HttpClient) {
                         if (image != null) imagePost(input, page, image, feed, feedAuthor, feedWords)?.let { return it }
                     }
                 }
+                // A link post's page has to be clearly the story to replace the pitch: a short page is a
+                // paywall preview, or the post wasn't pointing at a story after all.
+                val keepFeedBelow = if (input.feedUrl != null) TEASER_RATIO else KEEP_FEED_RATIO
                 when {
                     // Extraction that keeps well under the feed's text missed the article; the feed is better.
-                    feed != null && words < KEEP_FEED_RATIO * feedWords -> fromFeed(feed, null, words, declaredLanguage = page.content.language)
+                    feed != null && words < keepFeedBelow * feedWords -> fromFeed(feed, null, words, declaredLanguage = page.content.language)
                     words == 0 -> failed(input, "no article text found on the page")
                     else -> article(
                         title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) },
@@ -126,6 +136,7 @@ class ArticleExtractor(private val http: HttpClient) {
                         feedWords = feedWords,
                         pageWords = words,
                         declaredLanguage = page.content.language,
+                        siteName = page.content.siteName,
                     )
                 }
             }
@@ -232,7 +243,7 @@ class ArticleExtractor(private val http: HttpClient) {
 
     private fun article(
         title: String, author: String?, clean: CleanResult, usedFeed: Boolean, note: String?, feedWords: Int, pageWords: Int?,
-        blocked: Boolean = false, declaredLanguage: String? = null, failure: PageFailure? = null,
+        blocked: Boolean = false, declaredLanguage: String? = null, failure: PageFailure? = null, siteName: String? = null,
     ) = ExtractedArticle(
         title = title.replace(WHITESPACE, " ").trim(),
         author = author,
@@ -247,6 +258,7 @@ class ArticleExtractor(private val http: HttpClient) {
         pageBlocked = blocked,
         pageFailure = failure,
         language = LanguageDetector.detect(title + "\n" + Jsoup.parse(clean.html).text(), declaredLanguage),
+        siteName = siteName,
     )
 
     companion object {

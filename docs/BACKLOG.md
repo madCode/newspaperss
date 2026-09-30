@@ -198,6 +198,8 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Link posts (Longreads' picks): a short item whose link to another site carries a referral tag naming its own site is stored as that story, fetched and credited "Equator via Longreads", with its pitch as the fallback; tracking tags come off stored links, so a story two sources picked goes out once *(you asked)*
+
 - [x] Sources take turns starting with the one featured longest ago, not shifting by one each edition, so with many feeds every one gets its turn *(personas)*
 - [x] Stars: `☆ Next edition` on a source's articles and on delivered editions puts an article first in the next edition (it replaces bring back); the planner takes stars first, taking turns across sources, within each source's slots and the budget; Today says how many are waiting
 - [x] Article rows in a source's list: tap opens the original; "Mark as read" with Undo, marked read in tt-rss at the next sync

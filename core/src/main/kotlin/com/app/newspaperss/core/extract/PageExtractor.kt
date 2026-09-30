@@ -29,6 +29,8 @@ internal data class PageContent(
     val comicImage: String? = null,
     /** The language the page declares, as written (`<html lang>`, else `og:locale`). */
     val language: String? = null,
+    /** The site's own name (`og:site_name`, else the JSON-LD publisher). */
+    val siteName: String? = null,
 )
 
 /**
@@ -104,6 +106,7 @@ internal object PageExtractor {
             comicImage = doc.select(COMIC_IMAGE).take(MAX_COMIC_PANELS).joinToString("") { figureOf(it) }.ifEmpty { null },
             language = doc.selectFirst("html")?.let { html -> html.attr("lang").ifBlank { html.attr("xml:lang") } }?.ifBlank { null }
                 ?: doc.metaContent("og:locale"),
+            siteName = siteName?.trim()?.ifBlank { null },
         )
     }
 

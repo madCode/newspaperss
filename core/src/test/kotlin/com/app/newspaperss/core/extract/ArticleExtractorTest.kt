@@ -316,4 +316,30 @@ class ArticleExtractorTest {
         assertTrue(http.requested.isEmpty())
         assertTrue("${article.minutes}", article.minutes > 3)
     }
+
+    private fun words(n: Int, prefix: String) = (1..n).joinToString(" ") { "$prefix$it" }
+
+    private fun storyPage(words: Int) =
+        page("<html><head><meta property=\"og:site_name\" content=\"Equator\"></head><body><article><h1>Dusklands</h1><p>${words(words, "story")}</p></article></body></html>")
+
+    /**
+     * A link post's pitch gives way only to a page that's clearly the story: a page not much
+     * longer is a paywall preview, or the post wasn't pointing at a story after all.
+     */
+    @Test
+    fun aLinkPostsPitchGivesWayOnlyToAPageThatsClearlyTheStory() = runTest {
+        val pitch = "<p>${words(200, "pitch")} <a href=\"/2026/09/about\">About</a></p>"
+        fun linkPost() = ExtractInput(url, "Dusklands", pitch, feedAuthor = null, mode = ContentMode.PAGE, feedUrl = "https://picks.example/2026/09/dusklands/")
+
+        val preview = ArticleExtractor(FakeHttp(mapOf(url to storyPage(300)))).extract(linkPost())
+        assertTrue(preview.usedFeedContent)
+        assertTrue("the pitch's own links resolve against its page", "https://picks.example/2026/09/about" in preview.html)
+        val ordinary = ArticleExtractor(FakeHttp(mapOf(url to storyPage(300)))).extract(linkPost().copy(feedUrl = null))
+        assertFalse("an ordinary teaser gives way to the same page", ordinary.usedFeedContent)
+
+        val story = ArticleExtractor(FakeHttp(mapOf(url to storyPage(3000)))).extract(linkPost())
+        assertFalse(story.usedFeedContent)
+        assertTrue("story3000" in story.html)
+        assertEquals("Equator", story.siteName)
+    }
 }

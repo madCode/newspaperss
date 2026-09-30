@@ -225,6 +225,25 @@ class TtrssSyncTest {
         assertEquals(listOf(10L), server.markedRead)
     }
 
+    /** A pick read through tt-rss is the story it points to, like one from the feed itself, so a story already delivered isn't sent again. */
+    @Test
+    fun aTtrssLinkPostIsItsStoryAndIsMarkedReadIfTheStoryWasDelivered() = runTest {
+        val source = connect()
+        val feed = sources.addFeed("https://other.example/feed", "Other")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = feed, guid = "o1", url = "https://story.example/delivered", title = "Delivered")))
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionWith(feed, "o1"))
+        fun pitchFor(link: String) = "<p>A short pitch.</p><p><a href=\"$link\">Read the story</a></p>"
+        server.unread += FakeTtrss.Item(20, "Pick", feedId = 1, feedTitle = "News", content = pitchFor("https://story.example/new?src=news"))
+        server.unread += FakeTtrss.Item(21, "Old pick", feedId = 1, feedTitle = "News", content = pitchFor("https://story.example/delivered?src=news"))
+
+        assertEquals(1, sync.syncAll().newArticles)
+
+        val pick = db.articles().allForSource(source.id).single()
+        assertEquals("https://story.example/new", pick.url)
+        assertEquals("https://news.example/20", pick.viaUrl)
+        assertEquals(listOf(21L), server.markedRead)
+    }
+
     /** Marking read in the app reaches tt-rss at the next sync, so an Undo before then never has to. */
     @Test
     fun articlesMarkedReadInTheAppAreMarkedReadInTtrssAtTheNextSync() = runTest {

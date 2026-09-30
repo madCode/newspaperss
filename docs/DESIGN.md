@@ -79,6 +79,28 @@ module so it's all unit-tested without Android.
   preview. If the page can't be fetched (or is over 5 MB, too big to parse
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
+- **Link posts.** Some feeds mostly pitch stories on other sites
+  (Longreads' picks: a few paragraphs, then "Read the story" at
+  `equator.org/…?src=longreads`). A feed or tt-rss item counts as a link
+  post when its own text is under 500 words and it links to another site
+  with a referral tag naming its own site (`src=`, `ref=`, `source=`,
+  `via=`, `utm_source=`); the last such link is the story. Nothing is set
+  up per site.
+  - The article is stored as the story's address, so the same story from
+    two sources goes out once, and a delivered story isn't stored again.
+    The feed's guid is kept, so the pitch isn't offered twice.
+  - The edition fetches the story's page, with the usual paywall, bot
+    check and size rules. The page has to have twice the pitch's words to
+    replace it; if it can't be fetched, the pitch goes in with a note.
+  - It's credited to both: "Equator via Longreads", and "Read the original"
+    links the story. Only "Feed's text", chosen by the reader, keeps the
+    pitch.
+  - Link posts aren't evidence for the source's article text: a Longreads
+    source is judged by its own full-text posts.
+- **Tracking.** `utm_*`, click ids and a referral tag naming the source's
+  own site are removed from stored feed, tt-rss and curated-list links,
+  so one story compares equal wherever it came from. The guid is left as
+  the feed gave it. Saved links are kept as the reader saved them.
 - **Comics and image posts.** A feed item that's just an image counts as
   content. When a page's text is clearly not the article, the page's main
   image is used, and a webcomic's own comic (all its panels) beats the
