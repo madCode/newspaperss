@@ -174,12 +174,12 @@ class SourcesScreenTest {
         assertEquals(id, opened)
 
         compose.onNodeWithContentDescription("More for Posts").performClick()
-        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithText("Remove source").performClick()
         compose.onNodeWithText("Keep").performClick()
         assertEquals(1, runBlocking { db.sources().all().size })
 
         compose.onNodeWithContentDescription("More for Posts").performClick()
-        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithText("Remove source").performClick()
         compose.onNode(hasText("Remove source") and hasAnyAncestor(isDialog())).performClick()
         waitFor("Posts", present = false)
     }
