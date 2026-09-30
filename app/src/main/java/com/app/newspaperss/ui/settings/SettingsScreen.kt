@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
@@ -43,7 +44,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.core.plural
@@ -91,7 +98,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
 @Composable
 private fun Heading(text: String) =
-    Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
+    Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp).semantics { heading() })
 
 @Composable
 private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
@@ -103,17 +110,25 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
         onValueChange = { minutes = ((it / 5).roundToInt() * 5).toFloat() },
         onValueChangeFinished = { vm.setMinutes(minutes.roundToInt()) },
         valueRange = SettingsViewModel.MIN_MINUTES.toFloat()..SettingsViewModel.MAX_MINUTES.toFloat(),
+        // Stops every 5 minutes, so TalkBack's adjust gestures move by 5 and say minutes, not a percentage.
+        steps = (SettingsViewModel.MAX_MINUTES - SettingsViewModel.MIN_MINUTES) / 5 - 1,
+        modifier = Modifier.semantics { stateDescription = "${minutes.roundToInt()} minutes" },
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
+        // A live region, so pressing − or + is followed by the new number.
         Text(
             "${plural(s.edition.maxPerSource, "article")} from each site, then more if there's room",
-            Modifier.weight(1f),
+            Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
         )
-        OutlinedButton(onClick = { vm.setMaxPerSource(s.edition.maxPerSource - 1) }, enabled = s.edition.maxPerSource > 1) { Text("−") }
+        OutlinedButton(
+            onClick = { vm.setMaxPerSource(s.edition.maxPerSource - 1) },
+            enabled = s.edition.maxPerSource > 1,
+            modifier = Modifier.semantics { contentDescription = "Fewer from each site" },
+        ) { Text("−") }
         OutlinedButton(
             onClick = { vm.setMaxPerSource(s.edition.maxPerSource + 1) },
             enabled = s.edition.maxPerSource < SettingsViewModel.MAX_PER_SOURCE,
-            modifier = Modifier.padding(start = 8.dp),
+            modifier = Modifier.padding(start = 8.dp).semantics { contentDescription = "More from each site" },
         ) { Text("+") }
     }
     Text(
@@ -121,18 +136,20 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Text("Order", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
-    listOf(
-        Ordering.TAKE_TURNS to "Take turns between sources",
-        Ordering.IN_ORDER to "Source by source, in list order",
-        Ordering.SHUFFLE to "Shuffle",
-    ).forEach { (ordering, label) ->
-        Row(
-            Modifier.fillMaxWidth().selectable(s.edition.ordering == ordering, role = Role.RadioButton) { vm.setOrdering(ordering) }.padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(selected = s.edition.ordering == ordering, onClick = null)
-            Text(label, Modifier.padding(start = 12.dp))
+    Text("Order", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp).semantics { heading() })
+    Column(Modifier.selectableGroup()) {
+        listOf(
+            Ordering.TAKE_TURNS to "Take turns between sources",
+            Ordering.IN_ORDER to "Source by source, in list order",
+            Ordering.SHUFFLE to "Shuffle",
+        ).forEach { (ordering, label) ->
+            Row(
+                Modifier.fillMaxWidth().selectable(s.edition.ordering == ordering, role = Role.RadioButton) { vm.setOrdering(ordering) }.heightIn(min = 48.dp).padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = s.edition.ordering == ordering, onClick = null)
+                Text(label, Modifier.padding(start = 12.dp))
+            }
         }
     }
 }
@@ -147,7 +164,7 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
         Modifier.fillMaxWidth().toggleable(s.scheduleEnabled, role = Role.Switch) { on ->
             vm.setScheduleEnabled(on)
             if (on && Build.VERSION.SDK_INT >= 33) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }.padding(vertical = 4.dp),
+        }.heightIn(min = 48.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("Make an edition automatically", Modifier.weight(1f))
@@ -183,7 +200,7 @@ private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
     Column(Modifier.selectableGroup()) {
         Device.entries.forEach { device ->
             Row(
-                Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.setDevice(device) }.padding(vertical = 8.dp),
+                Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.setDevice(device) }.heightIn(min = 48.dp).padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = s.device == device, onClick = null)
@@ -266,7 +283,7 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
                 release(context, s.notesFolderUri, keep = setOf(s.folderUri))
                 vm.setNotesFolder(null, null)
             }
-        }.padding(vertical = 8.dp),
+        }.heightIn(min = 48.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
