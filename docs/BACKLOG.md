@@ -180,6 +180,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] A daily live check of each curated list's page in CI (`live-check.yml`), after Arts & Letters Daily's markup changed under the app
 - [x] Saved links in onboarding: import a Pocket or Instapaper export there, and start with saved links alone
 - [x] "No feed found" in Sources offers to save the page to the reading list instead of a dead end
 - [x] Change the e-reader in Settings after onboarding (it decides Send or Open, and the tips)
