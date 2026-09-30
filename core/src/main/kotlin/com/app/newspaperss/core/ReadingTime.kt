@@ -20,7 +20,7 @@ object ReadingTime {
             var i = 0
             while (i < token.length) {
                 val cp = token.codePointAt(i)
-                if (Character.UnicodeScript.of(cp) in IDEOGRAPHIC) ideographs++ else if (Character.isLetterOrDigit(cp)) other = true
+                if (Character.UnicodeScript.of(cp) in IDEOGRAPHIC || cp in KANA_MARKS) ideographs++ else if (Character.isLetterOrDigit(cp)) other = true
                 i += Character.charCount(cp)
             }
             words += ideographs * WORDS_PER_IDEOGRAPH + if (other || ideographs == 0) 1 else 0
@@ -45,4 +45,6 @@ object ReadingTime {
     private val WHITESPACE = Regex("\\s+")
     private val IDEOGRAPHIC = setOf(Character.UnicodeScript.HAN, Character.UnicodeScript.HIRAGANA, Character.UnicodeScript.KATAKANA)
     private const val WORDS_PER_IDEOGRAPH = 238.0 / 350.0
+    // The long-vowel mark (ー, and its half-width form) is in no script but is part of katakana words.
+    private val KANA_MARKS = setOf(0x30FC, 0xFF70)
 }

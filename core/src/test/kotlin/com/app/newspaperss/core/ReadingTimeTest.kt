@@ -35,6 +35,8 @@ class ReadingTimeTest {
     @Test
     fun englishCountsWordsBetweenSpaces() {
         assertEquals(9, ReadingTime.words("The council voted on Tuesday to extend the lanes."))
+        // A token of punctuation, a number or an emoji still counts, as it always has.
+        assertEquals(4, ReadingTime.words("Yes — 100% 🎉"))
     }
 
     @Test
@@ -44,6 +46,8 @@ class ReadingTimeTest {
         assertEquals(238, ReadingTime.words("あ".repeat(175) + "東".repeat(175)))
         // Mixed with Latin words and spaces: each part counts its own way.
         assertEquals(2 + 34, ReadingTime.words("Nintendo Switch " + "発".repeat(50)))
+        // The long-vowel mark is part of a katakana word, not a word of its own.
+        assertEquals(ReadingTime.words("ホムニュススポツ"), ReadingTime.words("ホームニュースス"))
     }
 
     @Test
