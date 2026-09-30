@@ -8,13 +8,17 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** saying why there's no edition ([#42](https://github.com/madCode/newspaperss/pull/42)); a deleted edition's notification.
+- **In flight:** saying why there's no edition and a deleted edition's notification ([#42](https://github.com/madCode/newspaperss/pull/42)); changing the e-reader in Settings.
 - **Next:** the rest of the accessibility audit; language-aware page cleanup; saved links in onboarding.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 29: a deleted edition's notification (18:00–)
+### Cycle 30: change your e-reader later (18:10–)
+- **From the persona audit:** the e-reader picked in onboarding couldn't be changed; a Kobo owner who got a Boox had to reinstall.
+- **Shipped:** Settings has "Your e-reader", with the same list and tip as onboarding. It decides whether editions offer Send or Open.
+
+### Cycle 29: a deleted edition's notification (18:00–18:10, in [#42](https://github.com/madCode/newspaperss/pull/42))
 - **From the backlog (tech debt):** deleting an edition left its "ready" notification up, and its Send would share a file that no longer exists.
 - **Shipped:** the notification carries its edition's id, and deleting that edition takes it down. Only if it's still about that edition: the slot is shared, and a newer edition's news stays.
 

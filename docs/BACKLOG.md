@@ -12,7 +12,6 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 
 ### Onboarding and setup
 - [ ] Saved links in onboarding: Pocket/Instapaper import there, and a reading-list-only setup *(personas)*
-- [ ] Change the device in Settings after onboarding *(personas)*
 - [ ] A short Kindle how-to: same Amazon account, pick the device in Send to Kindle, Library › Docs *(personas)*
 - [ ] Explain per device what counts as "delivered" *(personas)*
 
@@ -132,6 +131,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Change the e-reader in Settings after onboarding (it decides Send or Open, and the tips)
 - [x] Deleting an edition takes down its "ready" or "delivered" notification, whose Send would have shared a missing file
 - [x] Say why there's no edition: a timed run with nothing new sends a quiet "No new edition"; when every source failed it's retried, then a failure that says so, not "nothing new"; a build queued offline shows "Waiting for an internet connection"
 - [x] Fastly's bot challenge (Le Monde's "Client Challenge") is recognised: the feed's text is used with a note, and the source learns the site blocks fetching

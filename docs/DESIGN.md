@@ -191,7 +191,7 @@ articles go into the new one.
   checklist (compatible with the library); Pocket and Instapaper exports
   import too.
 - **Settings:** the edition (size, per-source cap, order), the schedule
-  (time and days), delivery (share or folder, optionally the notes file
+  (time and days), your e-reader, delivery (share or folder, optionally the notes file
   beside each edition), and the app's version.
 
 The look: a newspaper feel (serif headlines, a masthead with the date), but

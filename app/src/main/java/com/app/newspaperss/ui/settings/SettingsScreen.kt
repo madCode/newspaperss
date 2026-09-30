@@ -48,6 +48,8 @@ import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.core.plural
 import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.ui.components.CheckChip
+import com.app.newspaperss.settings.Device
+import com.app.newspaperss.ui.onboarding.DeviceTips
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Settings as AppSettings
 import java.time.DayOfWeek
@@ -67,6 +69,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             EditionSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             ScheduleSection(s, viewModel)
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            ReaderSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             DeliverySection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
@@ -166,6 +170,29 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
     }
     if (s.schedule.days.isEmpty()) {
         Text("Pick at least one day.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** The e-reader chosen in onboarding, changeable later: it decides Send or Open, and the tips shown. */
+@Composable
+private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
+    Heading("Your e-reader")
+    Device.entries.forEach { device ->
+        Row(
+            Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.setDevice(device) }.padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(selected = s.device == device, onClick = null)
+            Text(device.label, Modifier.padding(start = 12.dp))
+        }
+    }
+    s.device?.let {
+        Text(
+            DeviceTips.tip(it),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 

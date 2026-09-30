@@ -72,6 +72,14 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun theEReaderCanBeChangedAfterOnboarding() {
+        compose.onNodeWithText("Boox or another Android e-reader").performScrollTo().performClick()
+
+        idleUntil { runBlocking { store.current().device } == com.app.newspaperss.settings.Device.BOOX }
+        compose.onNodeWithText("Boox or another Android e-reader").assertIsSelected()
+    }
+
+    @Test
     fun theBuildIsNamedAtTheBottomSoFeedbackCanSayWhichOne() {
         compose.onNodeWithText("newspapeRSS 0.1.0", substring = true).performScrollTo().assertExists()
     }
