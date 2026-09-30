@@ -9,6 +9,8 @@ import androidx.room.withTransaction
 import org.jsoup.nodes.Entities
 import com.app.newspaperss.core.ttrss.TtrssClient
 import com.app.newspaperss.core.ttrss.TtrssException
+import com.app.newspaperss.core.ttrss.TtrssFeed
+import com.app.newspaperss.core.ttrss.TtrssHeadline
 import java.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -87,6 +89,35 @@ class FeedSync(
         return null
     }
 
+    /**
+     * The newest few unread articles of each feed. One feed tt-rss can't serve (a 500 on a bad
+     * article, a timeout) is skipped rather than failing the others; a problem with the login
+     * or the whole server still fails the sync, and so does every feed failing.
+     */
+    private suspend fun fromEachFeed(client: TtrssClient, feeds: List<TtrssFeed>): List<TtrssHeadline> {
+        var failure: Exception? = null
+        val headlines = feeds.flatMap { feed ->
+            try {
+                client.unreadHeadlines(feedId = feed.id, limit = TTRSS_PER_FEED, newestFirst = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: TtrssException.LoginFailed) {
+                throw e
+            } catch (e: TtrssException.ApiDisabled) {
+                throw e
+            } catch (e: TtrssException.ApiError) {
+                if (e.code == "NOT_LOGGED_IN") throw e
+                failure = failure ?: e
+                emptyList()
+            } catch (e: Exception) {
+                failure = failure ?: e
+                emptyList()
+            }
+        }
+        failure?.let { if (headlines.isEmpty()) throw it }
+        return headlines
+    }
+
     private suspend fun syncTtrss(source: SourceEntity): Int? {
         val now = clock.instant()
         val account = (ttrssAccounts?.load() as? StoredAccount.Ready)?.account
@@ -98,8 +129,7 @@ class FeedSync(
                 val category = source.ttrssCategoryId
                 // A few from each feed rather than the newest 200 overall: busy news feeds would
                 // fill those 200, and a feed that posts monthly would never reach the paper.
-                val headlines = client.unreadFeeds(category).filter { it.unread > 0 }
-                    .flatMap { client.unreadHeadlines(feedId = it.id, limit = TTRSS_PER_FEED) }
+                val headlines = fromEachFeed(client, client.unreadFeeds(category).filter { it.unread > 0 })
                 // A link already delivered (from a feed, or before the account was reconnected) is
                 // skipped like any other, and tt-rss is told it's read unless the reader said not to:
                 // otherwise it would sit unread there for good.

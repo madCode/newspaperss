@@ -134,6 +134,14 @@ class TtrssClientTest {
     }
 
     @Test
+    fun newestFirstAsksForDateOrderRatherThanScore() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("[]"))
+        client().unreadHeadlines(feedId = 7, limit = 5, newestFirst = true)
+        assertEquals("\"feed_dates\"", server.sent[1].str("order_by"))
+    }
+
+    @Test
     fun categoriesLeaveOutTtrssOwnGroups() = runTest {
         server.reply(loggedIn)
         server.reply(ok("""[{"id":"2","title":"News","unread":4},{"id":-1,"title":"Special"},{"id":-2,"title":"Labels"},{"id":0,"title":"Uncategorized"}]"""))
