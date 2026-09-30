@@ -119,7 +119,7 @@ class SourceDetailScreenTest {
         idleUntil { visible("Pause") }
         val list = compose.onNode(hasScrollAction())
         list.performScrollToNode(hasText("Went out"))
-        compose.onNodeWithText("In an edition you sent", substring = true).assertExists()
+        compose.onNodeWithText("Delivered", substring = true).assertExists()
         list.performScrollToNode(hasText("Waiting for an edition", substring = true))
         list.performScrollToIndex(0)
 

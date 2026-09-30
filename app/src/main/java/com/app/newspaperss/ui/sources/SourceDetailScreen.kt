@@ -708,7 +708,7 @@ private fun textLine(source: SourceEntity): String? = fullTextLine(source)
 internal fun articleStatus(article: ArticleEntity): String = if (isStarred(article)) "Starred for your next edition" else when (article.state) {
     ArticleState.NEW -> "Waiting for an edition"
     ArticleState.IN_EDITION -> "In an edition you haven't sent yet"
-    ArticleState.DELIVERED -> "In an edition you sent"
+    ArticleState.DELIVERED -> "Delivered"
     ArticleState.SKIPPED -> "Marked as read"
     ArticleState.EXPIRED -> "Not picked before it got old"
 }
