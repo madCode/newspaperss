@@ -30,7 +30,8 @@ class CuratedListSyncTest {
         override fun withZone(zone: java.time.ZoneId?) = this
         override fun instant() = now
     }
-    private val sync = FeedSync(db, http, clock, keepFor = Duration.ofDays(30), listKeep = 4)
+    private val untitled = mutableListOf<List<Long>>()
+    private val sync = FeedSync(db, http, clock, keepFor = Duration.ofDays(30), listKeep = 4, onUntitled = { untitled += it })
     private val repo = SourceRepository(db)
 
     /** The shape of aldaily.com's front page, with [day]'s picks at the top of each column. */
@@ -142,5 +143,27 @@ class CuratedListSyncTest {
         val id = repo.addList(ArtsAndLettersDaily)
         assertEquals(id, repo.addList(ArtsAndLettersDaily))
         assertEquals(1, db.sources().all().size)
+    }
+
+    @Test
+    fun picksWithoutATitleAreLookedUpAndTitledOnesArent() = runTest {
+        // Arts & Letters Daily gives only a teaser; without the page's title the source's page
+        // would list its picks by site name.
+        val id = repo.addList(ArtsAndLettersDaily)
+        publishDay(1)
+        sync.syncAll()
+        val picks = db.articles().allForSource(id).map { it.id }
+        assertEquals(listOf(picks.toSet()), untitled.map { it.toSet() })
+
+        db.articles().setTitleIfUntitled(picks[0], "An essay")
+        untitled.clear()
+        sync.syncAll()
+        assertEquals("a lookup that failed is asked for again; a titled pick isn't", listOf(picks.drop(1).toSet()), untitled.map { it.toSet() })
+
+        // A pick that never gives a title (a paywall, a PDF) stops being fetched after a couple of days.
+        now = now.plus(Duration.ofDays(3))
+        untitled.clear()
+        sync.syncAll()
+        assertTrue(untitled.isEmpty())
     }
 }

@@ -55,7 +55,7 @@ class AppContainer(
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)
-    val feedSync = FeedSync(db, http, ttrssAccounts = ttrssAccounts)
+    val feedSync = FeedSync(db, http, ttrssAccounts = ttrssAccounts, onUntitled = fetchReadingListTitles)
     val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render)
     val settings = SettingsStore(context)
     val notifier = Notifier(context)

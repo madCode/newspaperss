@@ -207,11 +207,7 @@ class ArticleExtractor(private val http: HttpClient) {
         // Parsed, a page takes several times its size in memory, and Readability copies it. Real
         // articles are well under this; the feed's text is the better bet for anything bigger.
         if (response.body.length > MAX_PAGE_CHARS) return PageResult.Failed("the page is too large", permanent = true)
-        // Bot checks are small pages served with a 200 status.
-        if (response.body.length < CHALLENGE_PAGE_MAX_CHARS) {
-            val head = response.body.take(30_000)
-            if (CHALLENGE_MARKERS.any { it in head }) return PageResult.Failed("the site asked for a bot check", blocked = true)
-        }
+        if (isBotCheck(response.body)) return PageResult.Failed("the site asked for a bot check", blocked = true)
         return null
     }
 
@@ -319,6 +315,10 @@ class ArticleExtractor(private val http: HttpClient) {
             "<title>Client Challenge</title>", "/_fs-ch-",
         )
         private val WHITESPACE = Regex("\\s+")
+
+        /** Whether a page is a bot check rather than the page asked for: they're small pages served with a 200 status. */
+        fun isBotCheck(body: String): Boolean =
+            body.length < CHALLENGE_PAGE_MAX_CHARS && body.take(30_000).let { head -> CHALLENGE_MARKERS.any { it in head } }
 
         /**
          * The per-source check: given one article's feed and page word

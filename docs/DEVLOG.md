@@ -12,6 +12,14 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Watching:** a settings test that failed once on a DataStore file rename (#66); not reproduced since.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
+## Day 3 · Wed 30 Sep
+
+### Cycle 58: Arts & Letters Daily picks get their titles (07:40–, this PR)
+- **From you:** the source's page listed its picks as nplusonemag.com, wsj.com, english.elpais.com.
+- **Cause:** the list gives a teaser and a link, no headline, so picks were stored untitled; the page's title was only read when an edition fetched it.
+- **Shipped:** after each sync, a curated list's untitled picks go to the same background lookup saved links use, which reads each page's title.
+- **Review caught:** a bot-check page's title ("Client Challenge") would have stuck as the headline, and the edition prefers a stored title; picks that never get a title (a paywall, a PDF) would have been fetched every sync (now for two days); a failure to schedule the lookup could have marked a good sync as failed.
+
 ## Night 2 · Tue 29 Sep, 20:30 PT – Wed 30 Sep, 05:45 PT
 
 ### Cycle 57: a slow tt-rss server says so (02:37–02:49, [#73](https://github.com/madCode/newspaperss/pull/73))

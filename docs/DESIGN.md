@@ -213,6 +213,9 @@ articles go back, keeping their stars, before the new one is planned.
 - **Everything else expires.** Unplanned articles older than the source's
   keep window (7 days for news feeds, never for the reading list) quietly
   go. Curated lists keep only their newest 12 unread links.
+- **Titles for curated picks.** A list that gives only a teaser (Arts & Letters
+  Daily) has each pick's title looked up from its page in the background, as
+  saved links do, retried for two days; a bot-check page's title is never taken.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
   read on the server once delivered, and ones you marked as read at the next

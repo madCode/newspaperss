@@ -232,6 +232,9 @@ interface ArticleDao {
     @Query("DELETE FROM articles WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("SELECT id FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND title = '' AND discoveredAt >= :since")
+    suspend fun untitledWaiting(sourceId: Long, since: Instant): List<Long>
+
     /** Only while the article is untitled and waiting: never over a title the reader gave, or one in an edition. */
     @Query("UPDATE articles SET title = :title WHERE id = :id AND title = '' AND state = 'NEW'")
     suspend fun setTitleIfUntitled(id: Long, title: String): Int
