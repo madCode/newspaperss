@@ -76,6 +76,11 @@ pitch, so it has to be the reader's own.
 Share an article with someone. The link is easy; the full extracted text raises copyright questions and
 shouldn't become a way around paywalls. A likely middle: the link plus a short excerpt.
 
+- [ ] **First step: Share the original's link** *(you asked)*. Android's share sheet with the title and the original URL (tracking tags already stripped; a link post's story, not the list's pick), nothing else.
+  - Where: the article preview's top bar, and on rows (in Select mode's bar, or a TalkBack action) so rows don't get a second icon on e-ink.
+  - From the book: each article already ends with "Read the original"; a Kindle can share that link itself, so nothing needed there.
+  - Later: the excerpt, if the link alone feels bare.
+
 ### Notes: what should they be?
 The edition notes export (a markdown checklist of each edition's articles) went in without much thought
 about who uses it. Research first: what people do with a read list; whether to import highlights from
