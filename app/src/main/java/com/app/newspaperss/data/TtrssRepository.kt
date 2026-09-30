@@ -67,9 +67,10 @@ class TtrssRepository(
             return "Couldn't store the password securely on this phone."
         }
         val sourceId = sources.addTtrss(account.apiUrl)
-        // Always set: category ids belong to each tt-rss user, and this may be another user on the
-        // same server.
+        // Always set: category and feed ids belong to each tt-rss user, and this may be another user
+        // on the same server.
         db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
+        db.sources().clearLeftOut(sourceId)
         return null
     }
 

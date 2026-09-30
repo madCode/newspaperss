@@ -329,7 +329,7 @@ private fun FeedsRow(feeds: List<FeedChoice>, onChange: (FeedChoice, Boolean) ->
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text(
-                        "A feed left out stays in tt-rss; it just doesn't come to the paper. A starred article still does.",
+                        "A feed left out stays in tt-rss but stops coming to the paper. Its articles waiting here go too, except ones you starred.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp),

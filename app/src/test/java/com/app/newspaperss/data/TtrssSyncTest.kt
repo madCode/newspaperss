@@ -36,7 +36,7 @@ class TtrssSyncTest {
     private val server = FakeTtrss(http)
     private val now = Instant.parse("2026-09-29T06:00:00Z")
     private val accounts by lazy { TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher()) }
-    private val sources = SourceRepository(db)
+    private val sources by lazy { SourceRepository(db, Clock.fixed(now, ZoneOffset.UTC)) }
     private val ttrss by lazy { TtrssRepository(db, http, accounts, sources) }
     private val sync by lazy { FeedSync(db, http, Clock.fixed(now, ZoneOffset.UTC), Duration.ofDays(7), accounts) }
 
@@ -131,10 +131,29 @@ class TtrssSyncTest {
         sync.syncAll()
 
         assertTrue(db.articles().allForSource(source.id).none { it.title == "Another press release" })
+        assertEquals("nothing left waiting in vain", ArticleState.EXPIRED, db.articles().allForSource(source.id).single { it.title == "A press release" }.state)
         assertEquals(
             listOf(FeedChoice("42", "Press Office", inPaper = false), FeedChoice("7", "Quarterly Review", inPaper = true)),
             sources.observeFeeds(source.id).first(),
         )
+    }
+
+    @Test
+    fun theFeedListShowsRecentFeedsUnderTheirLatestName() = runTest {
+        val source = connect()
+        fun article(guid: String, feed: String, title: String, daysAgo: Long) =
+            ArticleEntity(sourceId = source.id, guid = guid, url = "https://news.example/$guid", title = guid, originId = feed, originTitle = title, discoveredAt = now.minus(Duration.ofDays(daysAgo)))
+        db.articles().insertNew(listOf(article("a", "1", "Zeit Online", 10), article("b", "1", "Die Zeit", 2), article("c", "2", "Unsubscribed long ago", 60)))
+        assertEquals(listOf(FeedChoice("1", "Die Zeit", inPaper = true)), sources.observeFeeds(source.id).first())
+    }
+
+    @Test
+    fun signingInAgainClearsLeftOutFeeds() = runTest {
+        // Feed ids belong to each tt-rss user; this may be someone else on the same server.
+        val source = connect()
+        sources.setFeedInPaper(source.id, FeedChoice("42", "Press Office", inPaper = true), inPaper = false)
+        assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
+        assertTrue(db.sources().allLeftOut().isEmpty())
     }
 
     @Test

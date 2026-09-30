@@ -12,6 +12,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 
@@ -45,16 +46,26 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     /** The source's newest articles, newest first, whatever their state. */
     fun observeRecentArticles(id: Long, limit: Int = 30): Flow<List<ArticleEntity>> = db.articles().observeRecentForSource(id, limit)
 
-    /** An aggregator's feeds by name, left-out ones included after their articles are gone. */
-    fun observeFeeds(id: Long): Flow<List<FeedChoice>> = combine(sources.observeFeeds(id), sources.observeLeftOut(id)) { seen, leftOut ->
+    /**
+     * An aggregator's feeds seen in the last month, by name, and every left-out one: a feed outside
+     * the chosen category or gone from the server drops off; a left-out one stays so it can come back.
+     */
+    fun observeFeeds(id: Long): Flow<List<FeedChoice>> =
+        combine(sources.observeFeeds(id, clock.instant().minus(FEEDS_LISTED_FOR)), sources.observeLeftOut(id)) { seen, leftOut ->
         val out = leftOut.associateBy { it.originId }
         val names = seen.associate { it.originId to (it.title ?: out[it.originId]?.title ?: it.originId) } +
             leftOut.filter { it.originId !in seen.map { s -> s.originId } }.associate { it.originId to it.title }
         names.map { (originId, title) -> FeedChoice(originId, title, inPaper = originId !in out) }.sortedBy { it.title.lowercase() }
     }
 
-    suspend fun setFeedInPaper(sourceId: Long, feed: FeedChoice, inPaper: Boolean) {
-        if (inPaper) sources.takeBack(sourceId, feed.originId) else sources.leaveOut(LeftOutFeedEntity(sourceId, feed.originId, feed.title))
+    /** Leaving a feed out lets its waiting articles go too, except starred ones, so none shows as waiting in vain. */
+    suspend fun setFeedInPaper(sourceId: Long, feed: FeedChoice, inPaper: Boolean) = db.withTransaction {
+        if (inPaper) {
+            sources.takeBack(sourceId, feed.originId)
+        } else {
+            sources.leaveOut(LeftOutFeedEntity(sourceId, feed.originId, feed.title))
+            db.articles().expireWaitingFromFeed(sourceId, feed.originId)
+        }
     }
 
     /** Adds a feed unless one with this URL exists; returns its id either way. */
@@ -186,6 +197,8 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     )
 
     companion object {
+        private val FEEDS_LISTED_FOR: Duration = Duration.ofDays(30)
+
         // The tt-rss API has no name for an installation; the list shows the host beneath it.
         const val TTRSS_TITLE = "Tiny Tiny RSS"
 

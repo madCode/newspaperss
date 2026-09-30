@@ -121,14 +121,9 @@ data class ArticleEntity(
 }
 
 /**
- * A link that went out in a delivered edition. Kept apart from articles, which go when their
- * source is removed, so a source removed and added again, or a story that turns up later in
- * another source, doesn't deliver it a second time.
- */
-/**
- * A tt-rss feed the reader left out of the paper: the planner skips its articles (unless starred)
- * and sync stops fetching it. [originId] is tt-rss's feed id; [title] keeps its name listed after
- * its articles are gone.
+ * A tt-rss feed the reader left out of the paper: sync stops fetching it and the planner skips
+ * any of its articles still here, unless starred. [originId] is tt-rss's feed id; [title] keeps
+ * it listed, so it can come back, after its articles are gone.
  */
 @Entity(
     tableName = "left_out_feeds",
@@ -138,8 +133,13 @@ data class ArticleEntity(
 data class LeftOutFeedEntity(val sourceId: Long, val originId: String, val title: String)
 
 /** A feed an aggregator's articles came from, as the source page lists it. */
-data class FeedName(val originId: String, val title: String?)
+data class FeedName(val originId: String, val title: String?, val lastSeen: Instant)
 
+/**
+ * A link that went out in a delivered edition. Kept apart from articles, which go when their
+ * source is removed, so a source removed and added again, or a story that turns up later in
+ * another source, doesn't deliver it a second time.
+ */
 @Entity(tableName = "delivered_urls")
 data class DeliveredUrlEntity(
     @PrimaryKey val url: String,

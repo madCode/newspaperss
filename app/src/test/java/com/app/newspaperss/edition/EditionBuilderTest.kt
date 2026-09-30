@@ -187,14 +187,15 @@ class EditionBuilderTest {
                 (1..2).map { n -> ArticleEntity(sourceId = account, guid = "ttrss:$feed$n", url = "https://$feed.example/$n", title = "$feed $n", originId = feed, originTitle = feed) }
             },
         )
-        sources.setFeedInPaper(account, FeedChoice("news", "news", inPaper = true), inPaper = false)
         val starred = db.articles().allForSource(account).single { it.guid == "ttrss:news2" }.id
         db.articles().setStarred(starred, true, clock.instant())
+        sources.setFeedInPaper(account, FeedChoice("news", "news", inPaper = true), inPaper = false)
 
         val built = builder.build(EditionSettings(minutes = 120)) as BuildResult.Built
 
         val titles = editions.observeArticles(built.editionId).first().map { it.title }.toSet()
         assertEquals(setOf("news 2", "essays 1", "essays 2"), titles)
+        assertEquals(ArticleState.EXPIRED, stateOf("ttrss:news1"))
     }
 
     @Test
