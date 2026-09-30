@@ -21,13 +21,12 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
 - [ ] "No feed found": offer to save the page to the reading list instead *(personas)*
 - [ ] Decide what tapping an article in a source's list does: open the original, render it, or offer "add to the next edition" *(device)*
-- [ ] Le Monde serves a script wall ("A required part of this site couldn't load", `id="loading-error"`) with a 200; count it as a bot check so the feed's text is used *(live)*
+- [ ] Page cleanup's furniture patterns ("Recommended stories", "Subscribe to", "Read more:") are English only, so "Lire aussi", "Mehr zum Thema" and "Lee también" slip into French, German and Spanish articles. Key them by the article's language *(live)*
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
 - [ ] Webcomic title text (xkcd's hover text) is dropped; show it as a caption *(device)*
 
 ### The book
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
-- [ ] Reading time for Chinese and Japanese, which aren't space-separated (an NHK article counted as "1 word") *(live)*
 
 ### Delivery and schedule
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; waiting on an app key ([#18](https://github.com/madCode/newspaperss/issues/18)) *(personas)*
@@ -109,11 +108,10 @@ What to do with non-English sources and readers. Today:
 - reading time assumes English words per minute.
 
 Done: each article is tagged with its own language (`xml:lang`, and `dir="rtl"` for Arabic,
-Hebrew, Persian), so e-readers hyphenate and lay it out correctly.
+Hebrew, Persian), so e-readers hyphenate and lay it out correctly; Chinese and Japanese reading
+time is counted by character.
 
 Questions:
-- reading time for languages that aren't space-separated (Chinese, Japanese), which is roughly
-  characters per minute. A live NHK article counted as "1 word";
 - the book's `dc:language` when a whole edition is in one language other than English (Kindle
   picks its dictionary from it);
 - whether the app UI and the book's own text should be translated;
@@ -136,6 +134,8 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Fastly's bot challenge (Le Monde's "Client Challenge") is recognised: the feed's text is used with a note, and the source learns the site blocks fetching
+- [x] Reading time for Chinese and Japanese counts characters (about 350 a minute), so a paragraph isn't one word; the full-text check no longer takes a long Japanese feed for a teaser
 - [x] Extraction drops scripts, styles and SVGs before Readability copies the page (a 2.6 MB script-heavy page: 36 MB allocated before, 16 MB after, twice as fast); pages over 5 MB aren't parsed and use the feed's text
 - [x] Documentation pass: DESIGN.md describes the app as it is (no SMTP, profiles or reading-speed setting; today's changes in), README and CLAUDE.md updated, fresh screenshots; documentation passes are now part of the cycles
 - [x] TalkBack: the build's stage is announced (not every count), onboarding's progress says "Step 2 of 3", earlier editions say "See what's inside"; Add and Save sit below their fields so large fonts leave room to type

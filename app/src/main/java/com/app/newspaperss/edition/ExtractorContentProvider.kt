@@ -1,5 +1,6 @@
 package com.app.newspaperss.edition
 
+import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
 import org.jsoup.Jsoup
@@ -92,7 +93,7 @@ class ExtractorContentProvider(
          */
         fun modeFor(article: ArticleEntity, source: SourceEntity): ContentMode {
             if (source.contentModeChosen || source.contentMode != ContentMode.FEED) return source.contentMode
-            val words = article.feedHtml?.let { Jsoup.parse(it).text().split(Regex("\\s+")).count(String::isNotBlank) } ?: 0
+            val words = article.feedHtml?.let { ReadingTime.words(Jsoup.parse(it).text()) } ?: 0
             return if (words < ArticleExtractor.FULL_TEXT_WORDS) ContentMode.AUTO else ContentMode.FEED
         }
 

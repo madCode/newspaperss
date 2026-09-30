@@ -208,8 +208,13 @@ class ArticleExtractorTest {
             "network" to FakeHttp(emptyMap()),
             "404" to FakeHttp(mapOf(url to page("<html><body>Not found</body></html>", code = 404))),
             "blocked" to FakeHttp(mapOf(url to page("<html>Forbidden</html>", code = 403))),
+            "paywall" to FakeHttp(mapOf(url to page("<html><head><title>Accès restreint</title></head></html>", code = 402))),
             "challenge" to FakeHttp(mapOf(url to page("<html><head><title>Just a moment...</title></head><body>Checking your browser</body></html>"))),
             "pdf" to FakeHttp(mapOf(url to page("%PDF-1.7 binary", type = "application/pdf"))),
+            "fastly" to FakeHttp(mapOf(url to page(
+                "<html><head><link href=\"/_fs-ch-1T1w/assets/styles.css\" rel=\"stylesheet\"/><title>Client Challenge</title></head>" +
+                    "<body><div id=\"loading-error\">Checking your browser. A required part of this site couldn't load.</div></body></html>",
+            ))),
         )
         for ((name, http) in cases) {
             val article = ArticleExtractor(http).extract(input(teaser))
@@ -217,7 +222,7 @@ class ArticleExtractorTest {
             assertTrue(name, article.note!!.startsWith("Couldn't fetch the full article"))
             assertTrue(name, "particular pleasure" in article.html)
             assertFalse(name, "Checking your browser" in article.html)
-            assertEquals("only a refusal or bot check counts as blocked: $name", name in setOf("blocked", "challenge"), article.pageBlocked)
+            assertEquals("only a refusal or bot check counts as blocked: $name", name in setOf("blocked", "paywall", "challenge", "fastly"), article.pageBlocked)
         }
     }
 
@@ -297,5 +302,18 @@ class ArticleExtractorTest {
         assertTrue(article.feedWordCount >= ArticleExtractor.FULL_TEXT_WORDS)
         assertEquals(PageFailure.PERMANENT, article.pageFailure)
         assertNull(FullTextCheck.evidence(article))
+    }
+
+    @Test
+    fun aLongJapaneseFeedItemIsTheFullArticleNotATeaser() = runTest {
+        // Japanese has no spaces: counted by them, 1,500 characters would be "a few words", a
+        // teaser, and the page would be fetched even though the feed has the whole article.
+        val japanese = "<p>" + "市議会は火曜日、川沿いの自転車専用レーンを延長することを決めた。".repeat(50) + "</p>"
+        val http = FakeHttp(emptyMap())
+        val article = ArticleExtractor(http).extract(input(japanese, feedTitle = "自転車専用レーン"))
+
+        assertTrue(article.usedFeedContent)
+        assertTrue(http.requested.isEmpty())
+        assertTrue("${article.minutes}", article.minutes > 3)
     }
 }

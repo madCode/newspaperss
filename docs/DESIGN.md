@@ -83,6 +83,8 @@ module so it's all unit-tested without Android.
 - **Language.** Each article is tagged with its language (`xml:lang`, and
   `dir="rtl"` for right-to-left scripts) so e-readers hyphenate and lay it
   out correctly. The text decides; the page's declared language breaks ties.
+  Reading time counts Chinese and Japanese by character, since they have no
+  spaces between words.
 - **The EPUB.** Built to be accepted by Send to Kindle:
   - strict XHTML, EPUB 3 nav *and* NCX in the same order, the cover in the
     spine;

@@ -8,13 +8,24 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** lighter extraction of large pages ([#40](https://github.com/madCode/newspaperss/pull/40)); the backlog regrouped by part of the app, and the persona research written up.
-- **Next:** the rest of the accessibility audit; reading time for Chinese and Japanese; the Le Monde script wall.
+- **In flight:** Chinese and Japanese reading time ([#41](https://github.com/madCode/newspaperss/pull/41)); Le Monde's bot check.
+- **Next:** saying why there's no edition; the rest of the accessibility audit.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 25: where things are tracked (17:15–)
+### Cycle 27: Le Monde's bot check (17:30–)
+- **From a live edition:** Le Monde articles came out as "A required part of this site couldn't load": the app fetched Fastly's bot challenge ("Client Challenge", a 3 KB page served with a 200) and took it for the article.
+- **Shipped:** the challenge is recognised, so the feed's text is used with a note, and the source learns the site blocks fetching.
+- **Checks:** a live Le Monde edition has the feed's text and the note, and no challenge text.
+- **Review caught:** from a server, Le Monde can also answer 402 "Accès restreint", which wasn't counted as the site refusing. It is now, like 401, 403 and 429.
+
+### Cycle 26: Chinese and Japanese reading time (17:20–17:30, [#41](https://github.com/madCode/newspaperss/pull/41))
+- **From the language work:** Chinese and Japanese have no spaces between words, so a whole NHK paragraph counted as one word: no reading time, and the full-text check would take a long Japanese feed for a teaser and fetch pages it didn't need.
+- **Shipped:** one word count everywhere, which counts each Chinese or Japanese character as about 2/3 of a word (people read about 350 characters a minute, against 238 English words). Korean uses spaces and is counted by word.
+- **Checks:** a live edition with BBC Chinese gives 3–7 minute articles instead of seconds, and passes epubcheck.
+
+### Cycle 25: where things are tracked (17:15–17:20, in [#40](https://github.com/madCode/newspaperss/pull/40))
 - **From your question:** onboarding items and the research were hard to find. The backlog was sorted by where each item came from, and the persona audits only existed as backlog bullets.
 - **Shipped:** the backlog is grouped by part of the app (onboarding, sources, the book, delivery, reading list, accessibility, performance), each item tagged with its origin. The two persona audits are written up in [research/personas.md](research/personas.md), with each finding's status. The README has a short documentation index.
 
