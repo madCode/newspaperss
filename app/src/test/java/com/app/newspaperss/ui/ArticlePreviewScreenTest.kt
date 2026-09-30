@@ -11,7 +11,7 @@ import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import com.app.newspaperss.ui.edition.EpubPages
-import com.app.newspaperss.ui.edition.withPreviewMargins
+import com.app.newspaperss.ui.edition.forPreview
 import org.junit.Assert.assertTrue
 import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
@@ -60,14 +60,14 @@ class ArticlePreviewScreenTest {
     }
 
     @Test
-    fun thePreviewGivesTheBookSideMarginsTheEReaderWouldAdd() {
+    fun thePreviewGivesTheBookTheMarginsAndColoursTheEReaderWouldAdd() {
         val file = tmp.newFile("m.epub")
         val article = EditionArticle(title = "A story", sourceTitle = "S", url = "https://a.example/", bodyHtml = "<p>x</p>", minutes = 1.0)
         file.outputStream().use {
             EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
         }
         val page = EpubPages(file).use { it.article(0)!! }
-        val head = withPreviewMargins(page).substringBefore("</head>")
-        assertTrue(head.contains("body { margin: 0 5%; }"))
+        val head = forPreview(page, background = 0xFF1C1B1F.toInt(), text = 0xFFE6E1E5.toInt()).substringBefore("</head>")
+        assertTrue(head, head.contains("body { margin: 0 5%; background: #1C1B1F; color: #E6E1E5; }"))
     }
 }

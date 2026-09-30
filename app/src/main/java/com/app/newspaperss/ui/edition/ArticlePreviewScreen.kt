@@ -24,6 +24,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +78,10 @@ fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: St
                 Text("This edition's file is gone, so the article can't be shown.")
             }
             // Keyed: the WebView is built once, so a new article needs a new one.
-            is Preview.Ready -> key(p) { BookView(p.pages, p.xhtml, Modifier.fillMaxSize().padding(padding)) }
+            is Preview.Ready -> key(p) {
+                val colors = MaterialTheme.colorScheme
+                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), Modifier.fillMaxSize().padding(padding))
+            }
         }
     }
 }
@@ -95,11 +100,13 @@ internal fun bookResponse(url: String, pages: EpubPages): Pair<String, ByteArray
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun BookView(pages: EpubPages, xhtml: String, modifier: Modifier) {
+private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, modifier: Modifier) {
     AndroidView(
         modifier = modifier,
         factory = { context ->
             WebView(context).apply {
+                // Before the page loads too, so a dark screen doesn't flash white.
+                setBackgroundColor(background)
                 // The book has no scripts; keep the preview inert.
                 settings.javaScriptEnabled = false
                 settings.allowFileAccess = false
@@ -121,15 +128,18 @@ private fun BookView(pages: EpubPages, xhtml: String, modifier: Modifier) {
                         return true
                     }
                 }
-                loadDataWithBaseURL(BOOK_ORIGIN, withPreviewMargins(xhtml), "application/xhtml+xml", "utf-8", null)
+                loadDataWithBaseURL(BOOK_ORIGIN, forPreview(xhtml, background, text), "application/xhtml+xml", "utf-8", null)
             }
         },
     )
 }
 
 /**
- * The book leaves side margins to the e-reader's own setting, so the preview adds some: a
- * WebView has none, and the text would run to the screen's edges.
+ * The book leaves side margins and colours to the e-reader's own settings, so the preview supplies
+ * them: a WebView has no margins, and would show the page black on white in the app's dark mode.
+ * The book's links and rules take the text's colour, so they follow.
  */
-internal fun withPreviewMargins(xhtml: String): String =
-    xhtml.replaceFirst("</head>", "<style>body { margin: 0 5%; }</style></head>")
+internal fun forPreview(xhtml: String, background: Int, text: Int): String =
+    xhtml.replaceFirst("</head>", "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; }</style></head>")
+
+private fun css(argb: Int) = "#%06X".format(argb and 0xFFFFFF)
