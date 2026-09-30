@@ -142,6 +142,20 @@ Many of the writers worth reading publish as newsletters. Two routes, from easy 
   footers and tracking pixels, so it needs its own cleanup pass.
 - Start with the first route (it's mostly cleanup rules) and a help line pointing email-only
   newsletters at a Kill the Newsletter address; IMAP only if that proves too fiddly.
+- **The app could make the Kill the Newsletter inbox itself** *(you asked)*: "Add a newsletter" asks
+  for a name, creates the inbox (a form post to the service, or a self-hosted instance), shows the
+  email address to paste into the newsletter's signup, and adds the inbox's feed as a source. The
+  confirmation email arrives in that feed first, so the app can surface its "Confirm" link instead of
+  putting it in a paper. Risks: it depends on a third party's form and goodwill (be a polite client,
+  let people point it at their own instance), and the inbox address is effectively a password.
+
+### Link posts: Longreads and friends *(you asked)*
+Longreads' feed works, but most posts are picks: a ~200-word excerpt on longreads.com linking to the
+story elsewhere (`?src=longreads`). As a plain feed the paper would carry the teaser, not the story.
+Handle it generally, not per site: a feed item with little text of its own whose main link points to
+another site is a pointer, so the edition fetches the linked page (and credits both). Strip the
+`src=` tracking so a story Arts & Letters Daily also picked isn't delivered twice. Longreads' own
+reading lists and interviews are full text and stay as they are.
 
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.

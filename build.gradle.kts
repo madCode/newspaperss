@@ -10,3 +10,15 @@ dependencies {
     kover(project(":app"))
     kover(project(":core"))
 }
+
+// A floor, not a target: coverage was 92.5% of lines when it was set, so this only fails a
+// change that lets it slide.
+kover {
+    reports {
+        verify {
+            rule {
+                minBound(90)
+            }
+        }
+    }
+}

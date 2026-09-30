@@ -58,7 +58,11 @@ fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: St
         val pages = withContext(Dispatchers.IO) { loadFile()?.let(::EpubPages) }
         try {
             val xhtml = pages?.let { withContext(Dispatchers.IO) { it.article(position) } }
-            value = if (pages != null && xhtml != null) Preview.Ready(pages, xhtml) else Preview.Missing
+            // Set on the main thread: under a test's unconfined dispatcher the code after
+            // withContext(IO) can resume on the IO thread, and the new state then touches views.
+            withContext(Dispatchers.Main.immediate) {
+                value = if (pages != null && xhtml != null) Preview.Ready(pages, xhtml) else Preview.Missing
+            }
             awaitCancellation()
         } finally {
             pages?.close()
