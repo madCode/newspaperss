@@ -213,6 +213,7 @@ class EditionBuilder(
                 },
             )
             db.articles().setState(arranged.map { it.first.id }, ArticleState.IN_EDITION)
+            db.articles().unlinkFromStory(arranged.filter { it.second.notTheStory }.map { it.first.id })
             db.editions().update(
                 db.editions().byId(editionId)!!.copy(
                     status = EditionStatus.READY, fileName = fileName,

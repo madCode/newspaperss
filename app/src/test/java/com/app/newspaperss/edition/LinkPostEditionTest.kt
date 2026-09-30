@@ -4,7 +4,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.data.ArticleEntity
+import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionRepository
+import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.testutil.DbRule
@@ -141,6 +145,41 @@ class LinkPostEditionTest {
         assertTrue("pitch150" in book)
         assertFalse("story2500" in book)
         assertTrue("Read the original at <a href=\"https://blog.example/2026/09/leaving/\">" in book)
+    }
+
+    /**
+     * Delivering a commentary post that went in as itself delivers the post's page, not the page
+     * it linked to: copies of that page waiting elsewhere stay waiting, and tt-rss isn't told
+     * they're read.
+     */
+    @Test
+    fun deliveringACommentaryPostLeavesCopiesOfItsLinkedPageWaiting() = runTest {
+        val blog = addFeed(
+            "blog",
+            item("blog", "leaving", "Why I finally deleted my accounts", "<p>$pitchWords</p><p>As <a href=\"$story?ref=blog.example\">this</a> says.</p>"),
+        )
+        storyPage()
+        sync.syncAll()
+        val other = sources.addFeed("https://other.example/feed", "Other")
+        val ttrss = db.sources().insert(SourceEntity(kind = SourceKind.TTRSS, url = "https://rss.example/api/", title = "tt-rss"))
+        db.articles().insertNew(
+            listOf(
+                ArticleEntity(sourceId = other, guid = "o1", url = story, title = "Dusklands"),
+                ArticleEntity(sourceId = ttrss, guid = "ttrss:1", url = story, title = "Dusklands"),
+            ),
+        )
+        // Only the post can go in this time.
+        sources.setPaused(other, true)
+        sources.setPaused(ttrss, true)
+
+        val built = builder.build(EditionSettings(minutes = 60)) as BuildResult.Built
+        editions.markDelivered(built.editionId)
+
+        val copies = listOf(other, ttrss).map { db.articles().allForSource(it).single() }
+        assertEquals(listOf(ArticleState.NEW, ArticleState.NEW), copies.map { it.state })
+        assertTrue("no tt-rss copy is marked read", db.articles().ttrssInEdition(built.editionId).isEmpty())
+        assertEquals(listOf("https://blog.example/2026/09/leaving/"), db.articles().deliveredAmong(listOf(story, "https://blog.example/2026/09/leaving/")))
+        assertEquals("https://blog.example/2026/09/leaving/", db.articles().allForSource(blog).single().url)
     }
 
     /** A story two sources picked, one tagging the link with its name and one with analytics tags, goes out once. */

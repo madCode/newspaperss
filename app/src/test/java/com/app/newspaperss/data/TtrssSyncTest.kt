@@ -280,6 +280,23 @@ class TtrssSyncTest {
         assertEquals(listOf(40L), server.markedRead)
     }
 
+    /** Marking read runs later, in a worker: a used-up copy the reader has starred since is going out again, so it stays unread. */
+    @Test
+    fun aTtrssCopyStarredSinceDeliveryIsntMarkedRead() = runTest {
+        val source = connect()
+        server.add(41, "Shared story", feedId = 1, feedTitle = "News")
+        sync.syncAll()
+        val feed = sources.addFeed("https://other.example/feed", "Other")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = feed, guid = "o41", url = "https://news.example/41", title = "Shared story")))
+        val editionId = editionWith(feed, "o41")
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionId)
+
+        assertTrue(db.articles().setStarred(db.articles().allForSource(source.id).single().id, true, now))
+        assertTrue(ttrss.markRead(editionId))
+
+        assertTrue(server.markedRead.isEmpty())
+    }
+
     /** Marking read in the app reaches tt-rss at the next sync, so an Undo before then never has to. */
     @Test
     fun articlesMarkedReadInTheAppAreMarkedReadInTtrssAtTheNextSync() = runTest {

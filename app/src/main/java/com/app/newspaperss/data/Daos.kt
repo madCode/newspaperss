@@ -217,6 +217,14 @@ interface ArticleDao {
     @Query("UPDATE articles SET state = :state WHERE id IN (:ids)")
     suspend fun setState(ids: List<Long>, state: ArticleState)
 
+    /**
+     * Link posts whose page turned out not to be their story become the post itself, at its own
+     * page: delivering one must remember and use up that page, not the one it linked to, which the
+     * edition didn't carry.
+     */
+    @Query("UPDATE articles SET url = viaUrl, viaUrl = NULL WHERE id IN (:ids) AND viaUrl IS NOT NULL")
+    suspend fun unlinkFromStory(ids: List<Long>)
+
     @Query("UPDATE articles SET state = 'DELIVERED', starredAt = NULL WHERE id IN (:ids)")
     suspend fun setDelivered(ids: List<Long>)
 
@@ -308,13 +316,14 @@ interface ArticleDao {
     /**
      * The edition's tt-rss articles to mark read on the server, and tt-rss copies of its links (a
      * story that went out from another source is read too): none from an account set to leave
-     * them unread.
+     * them unread. A copy only while it's still used up: this runs when the marking worker does,
+     * possibly hours later, and a copy starred since is going out again.
      */
     @Query(
         """SELECT articles.* FROM articles JOIN sources ON sources.id = articles.sourceId
            WHERE sources.kind = 'TTRSS' AND sources.markReadOnServer = 1
            AND (articles.id IN (SELECT articleId FROM edition_articles WHERE editionId = :editionId)
-                OR (articles.url != '' AND articles.url IN (
+                OR (articles.state = 'DELIVERED' AND articles.starredAt IS NULL AND articles.url != '' AND articles.url IN (
                     SELECT a.url FROM edition_articles ea JOIN articles a ON a.id = ea.articleId
                     WHERE ea.editionId = :editionId AND a.url != '')))""",
     )
