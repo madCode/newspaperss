@@ -17,7 +17,8 @@ caught, and what got in the way. Newest first. Times are Pacific.
 ### Cycle 58: Arts & Letters Daily picks get their titles (07:40–, this PR)
 - **From you:** the source's page listed its picks as nplusonemag.com, wsj.com, english.elpais.com.
 - **Cause:** the list gives a teaser and a link, no headline, so picks were stored untitled; the page's title was only read when an edition fetched it.
-- **Shipped:** after each sync, a curated list's untitled picks go to the same background lookup saved links use, which reads each page's title (and length, for reading time).
+- **Shipped:** after each sync, a curated list's untitled picks go to the same background lookup saved links use, which reads each page's title.
+- **Review caught:** a bot-check page's title ("Client Challenge") would have stuck as the headline, and the edition prefers a stored title; picks that never get a title (a paywall, a PDF) would have been fetched every sync (now for two days); a failure to schedule the lookup could have marked a good sync as failed.
 
 ## Night 2 · Tue 29 Sep, 20:30 PT – Wed 30 Sep, 05:45 PT
 

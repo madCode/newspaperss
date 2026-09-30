@@ -13,7 +13,7 @@ class TestApp : NewspaperssApp() {
     val http = FakeHttp()
     /** Editions [com.app.newspaperss.data.EditionRepository] asked to mark read in tt-rss. */
     val markedTtrssRead = mutableListOf<Long>()
-    /** Reading-list articles whose titles the app asked to look up in the background. */
+    /** Saved links and curated-list picks whose titles the app asked to look up in the background. */
     val titlesRequested = mutableListOf<Long>()
     /** Delivered editions whose notes the app asked to save in the background. */
     val notesRequested = mutableListOf<Long>()

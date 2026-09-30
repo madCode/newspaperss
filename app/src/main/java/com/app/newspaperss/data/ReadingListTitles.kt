@@ -1,5 +1,6 @@
 package com.app.newspaperss.data
 
+import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.PageTitle
 import com.app.newspaperss.core.extract.PageWords
 import com.app.newspaperss.core.net.HttpClient
@@ -9,7 +10,7 @@ import java.io.IOException
  * Looks up saved links' pages before they reach an edition: the title of one
  * that arrived without one, so the reading list shows a headline instead of a
  * bare domain, and every one's length, for its reading time. Curated lists'
- * untitled links are looked up the same way.
+ * untitled links go through here too, for their titles.
  */
 class ReadingListTitles(private val db: AppDatabase, private val http: HttpClient) {
     /** Returns false if a page couldn't be reached, so the lookup is worth trying again later. */
@@ -25,6 +26,8 @@ class ReadingListTitles(private val db: AppDatabase, private val http: HttpClien
                 continue
             }
             if (!page.isSuccessful || page.contentType?.contains("html", ignoreCase = true) == false) continue
+            // Its title ("Client Challenge") would stick as the headline, and the edition prefers a stored title.
+            if (ArticleExtractor.isBotCheck(page.body)) continue
             // One page the extractor can't handle mustn't fail the batch: the worker's failure
             // would cancel the batches queued behind it.
             val measured = try {

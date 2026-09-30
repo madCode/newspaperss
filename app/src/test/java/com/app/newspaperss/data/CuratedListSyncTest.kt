@@ -159,5 +159,11 @@ class CuratedListSyncTest {
         untitled.clear()
         sync.syncAll()
         assertEquals("a lookup that failed is asked for again; a titled pick isn't", listOf(picks.drop(1).toSet()), untitled.map { it.toSet() })
+
+        // A pick that never gives a title (a paywall, a PDF) stops being fetched after a couple of days.
+        now = now.plus(Duration.ofDays(3))
+        untitled.clear()
+        sync.syncAll()
+        assertTrue(untitled.isEmpty())
     }
 }

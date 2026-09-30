@@ -37,6 +37,15 @@ class ReadingListTitlesTest {
     }
 
     @Test
+    fun aBotCheckPagesTitleIsNeverTaken() = runTest {
+        // It would stick as the headline: the edition prefers a stored title to the page's.
+        http.page("https://lemonde.example/story", "<html><head><title>Client Challenge</title></head><body><script src=\"/_fs-ch-1/x.js\"></script></body></html>")
+        list.save("https://lemonde.example/story")
+        titles.fetch(untitled)
+        assertEquals("", titleOf("https://lemonde.example/story"))
+    }
+
+    @Test
     fun everySavedLinkIsMeasuredForItsReadingTime() = runTest {
         val words = "word ".repeat(476)
         http.page("https://a.example/long", "<html><head><title>A long read</title></head><body><article><p>$words</p></article></body></html>")
