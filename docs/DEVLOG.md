@@ -8,9 +8,26 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** nothing; Day 2 is wrapped up. Its [report](https://claude.ai/artifact/MEiSg7nZzZLhubU3v5r6Bj) and [cycle retro](https://claude.ai/artifact/Piy8RvgmffBE3CSC1ByaP3) are published (private to your account).
-- **Next:** the rest of the accessibility audit (a TalkBack walk-through on a device first); language-aware page cleanup; unreadable saved links shown in the reading list; "no feed found" in onboarding.
-- **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
+- **In flight:** Night 2, focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. Stars (put an article in the next paper) are being built from the design passes; EPUB design round 2 and a walk-through as that reader are under way.
+- **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
+
+## Night 2 · Tue 29 Sep, 20:30 PT –
+
+### Cycle 38: a daily live check of the curated lists (21:41–21:48, [#51](https://github.com/madCode/newspaperss/pull/51))
+- **Why:** the unit tests read pages saved on the day each parser was written, so they couldn't see Arts & Letters Daily change. Coverage wouldn't have helped either: the parser was covered.
+- **Shipped:** a scheduled CI job reads each curated list's real page every morning and fails, emailing the owner, when a parser no longer finds its three links. Ordinary builds skip it.
+
+### Cycle 37: Arts & Letters Daily's nested paragraph (21:20–21:41, [#50](https://github.com/madCode/newspaperss/pull/50))
+- **From device testing:** the source said "This page has changed its layout… took none".
+- **Cause:** the live page nested a `<p>` in a teaser; the HTML parser splits that, leaving the "more »" link outside any paragraph.
+- **Shipped:** the newest entry is read from the column header up to its "more »" link, still stopping at a divider or a second paragraph so an older pick is never taken.
+- **Review caught:** the first version's test never ran the new path (a plain space where the saved page has a non-breaking one); without a divider, a first entry that lost its link fell through to yesterday's pick; a teaser link starting with "more" could be taken for the more link; ad text could leak into the teaser. All fixed, with tests.
+
+### Cycle 36: MIT license, and the article row decided (21:08–21:18, [#49](https://github.com/madCode/newspaperss/pull/49))
+- **Shipped:** the MIT license. In the backlog, the design decided with you: tapping an article opens it; `☆` puts it in the next paper; "Mark as read" keeps it out; stars count toward each source's cap and the paper stays capped.
+
+### Cycle 35: backlog decisions (20:48–20:54, [#48](https://github.com/madCode/newspaperss/pull/48))
+- **Shipped:** generated summaries decided against (the paper gives whole articles); the iOS app and local news parked; translation by people, not a machine, with what that needs first.
 
 ## Day 2 · Tue 29 Sep, 11:47–19:30 PT
 
