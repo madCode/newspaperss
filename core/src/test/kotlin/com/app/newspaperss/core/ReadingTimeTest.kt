@@ -31,4 +31,23 @@ class ReadingTimeTest {
         assertEquals("2 articles", plural(2, "article"))
         assertEquals("3 stories", plural(3, "story", "stories"))
     }
+
+    @Test
+    fun englishCountsWordsBetweenSpaces() {
+        assertEquals(9, ReadingTime.words("The council voted on Tuesday to extend the lanes."))
+    }
+
+    @Test
+    fun chineseAndJapaneseCountByCharacterSoAParagraphIsntOneWord() {
+        // 350 characters take about as long as 238 English words.
+        assertEquals(238, ReadingTime.words("市".repeat(350)))
+        assertEquals(238, ReadingTime.words("あ".repeat(175) + "東".repeat(175)))
+        // Mixed with Latin words and spaces: each part counts its own way.
+        assertEquals(2 + 34, ReadingTime.words("Nintendo Switch " + "発".repeat(50)))
+    }
+
+    @Test
+    fun koreanUsesSpacesSoCountsByWord() {
+        assertEquals(4, ReadingTime.words("시의회는 화요일 자전거 도로를"))
+    }
 }

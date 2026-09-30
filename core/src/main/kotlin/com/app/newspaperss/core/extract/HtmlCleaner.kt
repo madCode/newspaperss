@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.extract
 
+import com.app.newspaperss.core.ReadingTime
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Comment
 import org.jsoup.nodes.Document
@@ -74,7 +75,7 @@ object HtmlCleaner {
         .filter { it.isNotEmpty() }
         .joinToString("") { "<p>${Entities.escape(it)}</p>" }
 
-    internal fun countWords(element: Element): Int = element.text().split(WHITESPACE).count { it.isNotEmpty() }
+    internal fun countWords(element: Element): Int = ReadingTime.words(element.text())
 
     internal fun countWords(html: String): Int = countWords(Jsoup.parse(html).body())
 

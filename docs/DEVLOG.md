@@ -8,13 +8,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** lighter extraction of large pages ([#40](https://github.com/madCode/newspaperss/pull/40)); the backlog regrouped by part of the app, and the persona research written up.
-- **Next:** the rest of the accessibility audit; reading time for Chinese and Japanese; the Le Monde script wall.
+- **In flight:** lighter extraction and the docs regrouping ([#40](https://github.com/madCode/newspaperss/pull/40)); Chinese and Japanese reading time.
+- **Next:** the Le Monde script wall; the rest of the accessibility audit; saying why there's no edition.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 25: where things are tracked (17:15–)
+### Cycle 26: Chinese and Japanese reading time (17:20–)
+- **From the language work:** Chinese and Japanese have no spaces between words, so a whole NHK paragraph counted as one word: no reading time, and the full-text check would take a long Japanese feed for a teaser and fetch pages it didn't need.
+- **Shipped:** one word count everywhere, which counts each Chinese or Japanese character as about 2/3 of a word (people read about 350 characters a minute, against 238 English words). Korean uses spaces and is counted by word.
+- **Checks:** a live edition with BBC Chinese gives 3–7 minute articles instead of seconds, and passes epubcheck.
+
+### Cycle 25: where things are tracked (17:15–17:20, in [#40](https://github.com/madCode/newspaperss/pull/40))
 - **From your question:** onboarding items and the research were hard to find. The backlog was sorted by where each item came from, and the persona audits only existed as backlog bullets.
 - **Shipped:** the backlog is grouped by part of the app (onboarding, sources, the book, delivery, reading list, accessibility, performance), each item tagged with its origin. The two persona audits are written up in [research/personas.md](research/personas.md), with each finding's status. The README has a short documentation index.
 

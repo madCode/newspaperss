@@ -27,7 +27,6 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 
 ### The book
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
-- [ ] Reading time for Chinese and Japanese, which aren't space-separated (an NHK article counted as "1 word") *(live)*
 
 ### Delivery and schedule
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; waiting on an app key ([#18](https://github.com/madCode/newspaperss/issues/18)) *(personas)*
@@ -109,11 +108,10 @@ What to do with non-English sources and readers. Today:
 - reading time assumes English words per minute.
 
 Done: each article is tagged with its own language (`xml:lang`, and `dir="rtl"` for Arabic,
-Hebrew, Persian), so e-readers hyphenate and lay it out correctly.
+Hebrew, Persian), so e-readers hyphenate and lay it out correctly; Chinese and Japanese reading
+time is counted by character.
 
 Questions:
-- reading time for languages that aren't space-separated (Chinese, Japanese), which is roughly
-  characters per minute. A live NHK article counted as "1 word";
 - the book's `dc:language` when a whole edition is in one language other than English (Kindle
   picks its dictionary from it);
 - whether the app UI and the book's own text should be translated;
@@ -136,6 +134,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Reading time for Chinese and Japanese counts characters (about 350 a minute), so a paragraph isn't one word; the full-text check no longer takes a long Japanese feed for a teaser
 - [x] Extraction drops scripts, styles and SVGs before Readability copies the page (a 2.6 MB script-heavy page: 36 MB allocated before, 16 MB after, twice as fast); pages over 5 MB aren't parsed and use the feed's text
 - [x] Documentation pass: DESIGN.md describes the app as it is (no SMTP, profiles or reading-speed setting; today's changes in), README and CLAUDE.md updated, fresh screenshots; documentation passes are now part of the cycles
 - [x] TalkBack: the build's stage is announced (not every count), onboarding's progress says "Step 2 of 3", earlier editions say "See what's inside"; Add and Save sit below their fields so large fonts leave room to type

@@ -298,4 +298,17 @@ class ArticleExtractorTest {
         assertEquals(PageFailure.PERMANENT, article.pageFailure)
         assertNull(FullTextCheck.evidence(article))
     }
+
+    @Test
+    fun aLongJapaneseFeedItemIsTheFullArticleNotATeaser() = runTest {
+        // Japanese has no spaces: counted by them, 1,500 characters would be "a few words", a
+        // teaser, and the page would be fetched even though the feed has the whole article.
+        val japanese = "<p>" + "市議会は火曜日、川沿いの自転車専用レーンを延長することを決めた。".repeat(50) + "</p>"
+        val http = FakeHttp(emptyMap())
+        val article = ArticleExtractor(http).extract(input(japanese, feedTitle = "自転車専用レーン"))
+
+        assertTrue(article.usedFeedContent)
+        assertTrue(http.requested.isEmpty())
+        assertTrue("${article.minutes}", article.minutes > 3)
+    }
 }
