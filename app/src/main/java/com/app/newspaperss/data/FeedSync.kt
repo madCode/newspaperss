@@ -258,7 +258,6 @@ class FeedSync(
         /** A read or whole-call timeout; OkHttp reports a connect timeout as one too, told apart by its message. */
         fun tooSlow(e: IOException): Boolean =
             e is InterruptedIOException && e.message?.contains("connect", ignoreCase = true) != true
-        }
     }
 }
 
