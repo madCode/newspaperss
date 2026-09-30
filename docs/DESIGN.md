@@ -153,6 +153,8 @@ module so it's all unit-tested without Android.
   - a unique title ("… Sep 29", then "… (2)"), because Send to Kindle
     silently drops a title it has seen before. The file is named after it,
     since Send to Kindle's form titles the book after the file's name.
+    Sharing also tells apps the title's name, so editions stored before
+    this, as `edition-<id>.epub`, arrive titled too.
 - **One build at a time.** Builds are unique WorkManager work, so a timed
   build and "Make an edition now" can't race.
 
