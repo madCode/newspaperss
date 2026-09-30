@@ -69,7 +69,7 @@ class EditionDetailViewModel(
 
     fun notesShared() { _notesFile.value = null }
 
-    /** An edition is being made: see [com.app.newspaperss.ui.components.ArticleButtons]. */
+    /** An edition is being made: unstarring waits (see [com.app.newspaperss.data.BUILD_HOLD]). */
     val building: StateFlow<Boolean> = editions.observeBuilding().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun setStarred(articleId: Long, starred: Boolean) {

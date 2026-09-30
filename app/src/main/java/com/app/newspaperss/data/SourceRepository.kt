@@ -17,6 +17,18 @@ import java.time.LocalDate
 /** What "Mark as read" changed, so Undo can put it back. */
 data class MarkedRead(val articleId: Long, val starredAt: Instant?)
 
+/**
+ * What a batch "Mark as read" did. [heldBack] counts waiting articles left alone because an
+ * edition is being made.
+ */
+data class MarkReadBatch(val marked: List<MarkedRead>, val heldBack: Int)
+
+/**
+ * What a batch star or unstar changed: each article's star from before, so Undo can put it back.
+ * [heldBack] counts articles that would have changed but were held by a build.
+ */
+data class StarBatch(val starred: Boolean, val changed: List<MarkedRead>, val heldBack: Int)
+
 class SourceRepository(private val db: AppDatabase, private val clock: Clock = Clock.systemUTC()) {
     private val sources = db.sources()
 
@@ -80,18 +92,49 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     fun observeBuilding(): Flow<Boolean> = db.editions().observeBuilding(clock)
 
     /**
-     * Marks a waiting article as read: it never goes in an edition, and a tt-rss source marks it
-     * read on the server at its next sync, so Undo never has to reach the server. Returns what
-     * [undoMarkRead] needs, or null if the article wasn't waiting (it may have just gone into an
-     * edition) or an edition is being made.
+     * Marks waiting articles as read: they never go in an edition, and a tt-rss source marks them
+     * read on the server at its next sync, so Undo never has to reach the server. All or none: a
+     * build holds every waiting one or none. Articles that aren't waiting (one may have just gone
+     * into an edition) are passed over and not counted as held back.
      */
-    suspend fun markRead(articleId: Long): MarkedRead? = db.withTransaction {
-        val article = db.articles().byId(articleId) ?: return@withTransaction null
-        if (db.articles().markRead(articleId, clock.instant().minus(BUILD_HOLD)) == 0) null else MarkedRead(articleId, article.starredAt)
+    suspend fun markRead(articleIds: Collection<Long>): MarkReadBatch = db.withTransaction {
+        val waiting = db.articles().byIds(articleIds).filter { it.state == ArticleState.NEW }
+        if (waiting.isEmpty()) return@withTransaction MarkReadBatch(emptyList(), 0)
+        val changed = db.articles().markReadAll(waiting.map { it.id }, clock.instant().minus(BUILD_HOLD))
+        if (changed == 0) MarkReadBatch(emptyList(), waiting.size) else MarkReadBatch(waiting.map { MarkedRead(it.id, it.starredAt) }, 0)
     }
 
     /** Puts a marked-read article back to waiting, with its star, unless something has moved it on since. */
     suspend fun undoMarkRead(marked: MarkedRead): Boolean = db.articles().undoMarkRead(marked.articleId, marked.starredAt) > 0
+
+    /** Undoes a whole [markRead] batch. Returns how many came back. */
+    suspend fun undoMarkRead(marked: List<MarkedRead>): Int = db.withTransaction { marked.count { undoMarkRead(it) } }
+
+    /**
+     * Stars or unstars several articles, skipping those already so and those in an unsent edition.
+     * Unstarring waits for a build, as [setStarred] does.
+     */
+    suspend fun setStarred(articleIds: Collection<Long>, starred: Boolean): StarBatch = db.withTransaction {
+        val now = clock.instant()
+        val toChange = db.articles().byIds(articleIds).filter { it.state != ArticleState.IN_EDITION && (it.starredAt == null) == starred }
+        if (toChange.isEmpty()) return@withTransaction StarBatch(starred, emptyList(), 0)
+        val ids = toChange.map { it.id }
+        val changed = if (starred) db.articles().starAll(ids, now) else db.articles().unstarAll(ids, now.minus(BUILD_HOLD))
+        if (changed == 0) StarBatch(starred, emptyList(), toChange.size) else StarBatch(starred, toChange.map { MarkedRead(it.id, it.starredAt) }, 0)
+    }
+
+    /**
+     * Puts each star in a [setStarred] batch back as it was. Taking stars back off waits for a
+     * build like any unstarring. Returns how many couldn't be put back.
+     */
+    suspend fun undoStars(batch: StarBatch): Int = db.withTransaction {
+        val ids = batch.changed.map { it.articleId }
+        if (batch.starred) {
+            ids.size - db.articles().unstarAll(ids, clock.instant().minus(BUILD_HOLD))
+        } else {
+            batch.changed.count { it.starredAt == null || db.articles().star(it.articleId, it.starredAt) == 0 }
+        }
+    }
 
     /**
      * Sets how a source's articles get their text. [ContentMode.AUTO] hands the choice back to

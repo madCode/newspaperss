@@ -204,9 +204,10 @@ articles go back, keeping their stars, before the new one is planned.
   source removes them.
 - **Mark as read.** A waiting article you've read elsewhere, or don't want,
   is marked `SKIPPED` and never goes in an edition. Undo puts back its state
-  and star.
+  and star, for a whole batch at once.
 - **While an edition is being made** you can star articles but not unstar
   them or mark them read: the build may already have put them in the book.
+  A batch is held whole, never half done.
 - **Everything else expires.** Unplanned articles older than the source's
   keep window (7 days for news feeds, never for the reading list) quietly
   go. Curated lists keep only their newest 12 unread links.
@@ -250,15 +251,25 @@ articles go back, keeping their stars, before the new one is planned.
   (date, edition, sources, a tag) for Obsidian, a few reflection prompts at the
   top, then per article its source, author, date, link, a citation and room for notes.
   **Delete**. An article that went in because it was starred says
-  "Starred". On delivered editions each article has **☆ Next edition** to
-  bring it back.
+  "Starred". On delivered editions each article has a trailing **☆** to
+  bring it back ("Didn't get to one? Tap ☆ to bring it back.").
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). A source's page
   shows its recent articles, its cap, pause and the article-text setting.
-  Tapping an article opens the original; under it, **☆ Next edition**
-  stars it (**★** on a filled pill once starred) and, on waiting ones,
-  **Mark as read** (with Undo). A marked-read row stays in place with `○`,
-  so the list doesn't reflow on e-ink.
+  Each row is a status mark (`●` waiting, `✓` delivered, `○` not used),
+  the title, a details line and a trailing **☆**; tapping the row opens
+  the original. The star (a 48dp target) puts the article in the next
+  edition and turns into **★** on an outlined disc. A row already in an
+  unsent edition has no star, but keeps the slot so titles line up.
+  - **Select** (or pressing and holding a row) enters selection mode:
+    checkboxes take the status marks' place, the top bar says "N
+    selected", and a bar at the bottom has **☆ Next edition** and
+    **Mark N as read** (counting only waiting articles). One Undo covers
+    the whole batch. Back or ✕ leaves without changing anything.
+  - With TalkBack, each waiting row has a "Mark as read" action.
+  - Nothing moves: a marked-read row stays in place with `○`, and
+    entering or leaving selection doesn't shift the list, so e-ink
+    doesn't redraw it.
   Add a source, import or export OPML, or add a tt-rss account.
 - **Reading list:** links you shared into the app, each with its title,
   site and reading time (looked up in the background). They go into the

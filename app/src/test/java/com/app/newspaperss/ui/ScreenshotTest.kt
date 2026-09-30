@@ -6,6 +6,15 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -73,9 +82,12 @@ class ScreenshotTest {
 
     @After fun close() = db.close()
 
-    private fun shoot(name: String, ready: () -> Boolean = { true }, content: @Composable () -> Unit) {
+    /** [act] runs once [ready], before the capture, e.g. to enter a mode through the UI. */
+    private fun shoot(name: String, ready: () -> Boolean = { true }, act: () -> Unit = {}, content: @Composable () -> Unit) {
         compose.setContent { NewspaperssTheme(content) }
         idleUntil(condition = ready)
+        compose.waitForIdle()
+        act()
         compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         File(out, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -164,24 +176,81 @@ class ScreenshotTest {
         shoot("06-sources", ready = { vm.rows.value?.isNotEmpty() == true }) { SourcesScreen(vm) }
     }
 
-    @Test
-    fun sourceDetail() {
+    /** A source with a row in each state the design shows: waiting, starred, marked read, in an unsent edition, delivered, got old. */
+    private fun sourceWithArticles(): SourceDetailViewModel {
         val repo = SourceRepository(db)
         val id = runBlocking {
             val id = repo.addFeed("https://www.theguardian.com/world/rss", "The Guardian: World")
-            val titles = listOf("Talks resume after a week of storms", "The town that voted to keep its library open", "What the census says about who moves where", "A short history of the night train")
-            db.articles().insertNew(titles.mapIndexed { i, t -> ArticleEntity(sourceId = id, guid = "$i", url = "https://www.theguardian.com/$i", title = t, discoveredAt = Instant.now().minusSeconds(86_400L * i)) })
+            val titles = listOf(
+                "Talks resume after a week of storms",
+                "The town that voted to keep its library open",
+                "What the census says about who moves where",
+                "A short history of the night train",
+                "Why city trees are planted in pairs",
+                "The quiet return of the paperback",
+            )
+            db.articles().insertNew(titles.mapIndexed { i, t -> ArticleEntity(sourceId = id, guid = "$i", url = "https://www.theguardian.com/$i", title = t, discoveredAt = Instant.now().minusSeconds(3_600L * (i + 1))) })
             val ids = db.articles().candidates().sortedBy { it.guid }.map { it.id }
-            repo.setStarred(ids[0], true)
-            db.articles().setState(ids.drop(1).take(1), ArticleState.SKIPPED)
-            db.articles().setState(ids.drop(2).take(1), ArticleState.DELIVERED)
-            db.articles().setState(ids.drop(3), ArticleState.EXPIRED)
+            repo.setStarred(ids[1], true)
+            db.articles().setState(listOf(ids[2]), ArticleState.SKIPPED)
+            db.articles().setState(listOf(ids[3]), ArticleState.IN_EDITION)
+            db.articles().setState(listOf(ids[4]), ArticleState.DELIVERED)
+            db.articles().setState(listOf(ids[5]), ArticleState.EXPIRED)
             db.sources().recordSuccess(id, Instant.now(), null, "https://www.theguardian.com", "")
             db.sources().setFullText(id, ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3, null)
             id
         }
-        val vm = SourceDetailViewModel(repo, id, flowOf(1))
-        shoot("06b-source-detail", ready = { vm.detail.value?.articles?.isNotEmpty() == true }) { SourceDetailScreen(vm, onBack = {}) }
+        return SourceDetailViewModel(repo, id, flowOf(1))
+    }
+
+    /** Scrolled to the articles, which sit below the source's settings. */
+    private fun scrollToArticles() {
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Recent articles", substring = true))
+    }
+
+    @Test
+    fun sourceDetail() {
+        val vm = sourceWithArticles()
+        shoot("06b-source-detail", ready = { vm.detail.value?.articles?.isNotEmpty() == true }, act = ::scrollToArticles) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    fun sourceDetailSelecting() {
+        val vm = sourceWithArticles()
+        shoot(
+            "06c-source-detail-selecting",
+            ready = { vm.detail.value?.articles?.isNotEmpty() == true },
+            act = {
+                scrollToArticles()
+                compose.onNode(hasText("Talks resume after a week of storms") and hasClickAction()).performTouchInput { longClick() }
+                compose.onNode(hasText("The town that voted to keep its library open") and hasClickAction()).performClick()
+                compose.onNode(hasText("A short history of the night train") and hasClickAction()).performClick()
+            },
+        ) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    @Config(fontScale = 2f)
+    fun sourceDetailAtTwiceTheFontSize() {
+        val vm = sourceWithArticles()
+        shoot("06d-source-detail-200", ready = { vm.detail.value?.articles?.isNotEmpty() == true }, act = ::scrollToArticles) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    @Config(fontScale = 2f)
+    fun sourceDetailSelectingAtTwiceTheFontSize() {
+        val vm = sourceWithArticles()
+        shoot(
+            "06e-source-detail-selecting-200",
+            ready = { vm.detail.value?.articles?.isNotEmpty() == true },
+            act = {
+                compose.onNodeWithText("Select").performScrollTo().performClick()
+                val first = hasText("Talks resume after a week of storms") and hasClickAction()
+                compose.onNode(hasScrollAction()).performScrollToNode(first)
+                compose.onNode(first).performClick()
+                compose.onNode(hasText("The town that voted to keep its library open") and hasClickAction()).performClick()
+            },
+        ) { SourceDetailScreen(vm, onBack = {}) }
     }
 
     @Test

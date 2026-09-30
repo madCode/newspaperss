@@ -80,7 +80,7 @@ class EditionBuilder(
         // transaction, so a failed edition leaves them all for the next one.
         return try {
             // Read only once the edition is BUILDING, which holds off "Mark as read" and unstarring
-            // (see ArticleDao.markRead): the articles picked here are written into the book, so a
+            // (see ArticleDao.markReadAll): the articles picked here are written into the book, so a
             // change made afterwards would be silently undone when they're marked IN_EDITION.
             // The same link from two sources goes in once, and a starred copy is the one kept.
             val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
