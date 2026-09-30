@@ -277,8 +277,9 @@ allowed to read that edition's file until the phone restarts.
   network). **Notes** exports a Markdown file for a notes app: front matter
   (date, edition, sources, a tag) for Obsidian, the closing page's question and
   a few reflection prompts at the top, then per article its source, author, date, link, a citation and room for notes.
-  **Delete**. An article that went in because it was starred says
-  "Starred". On delivered editions each article has a trailing **☆** to
+  **Delete edition** is in the ⋮ menu, and asks by name, saying what happens
+  to the articles (an unsent edition's go back for the next one). An article that went in because it was starred says
+  "You starred it". On delivered editions each article has a trailing **☆** to
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). A source's page

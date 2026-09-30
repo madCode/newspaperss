@@ -1,5 +1,11 @@
 package com.app.newspaperss.ui
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -63,6 +69,27 @@ class SettingsScreenTest {
         idleUntil { rescheduled.isNotEmpty() }
         waitFor("Mon")
         assertEquals(true, rescheduled.last().scheduleEnabled)
+    }
+
+    @Test
+    fun theOrderAndScheduleRowsAreFullSizeTargets() {
+        listOf("Take turns between sources", "Source by source, in list order", "Shuffle", "Make an edition automatically").forEach {
+            compose.onNodeWithText(it).performScrollTo().assertHeightIsAtLeast(48.dp)
+        }
+    }
+
+    @Test
+    fun screenReadersHearWhatTheStepperChangesAndTheNewNumber() {
+        compose.onNodeWithContentDescription("More from each site").performScrollTo().performClick()
+        idleUntil { runBlocking { store.current().edition.maxPerSource } == 2 }
+        compose.onNode(hasText("2 articles from each site", substring = true) and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
+        compose.onNodeWithContentDescription("Fewer from each site").assertIsEnabled()
+    }
+
+    @Test
+    fun theSizeSliderSaysMinutesAndSectionsAreHeadings() {
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "30 minutes")).assertExists()
+        compose.onNode(hasText("Your edition") and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertExists()
     }
 
     @Test

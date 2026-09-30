@@ -51,6 +51,21 @@ class EditionSentTest {
     }
 
     @Test
+    fun sendingAnEditionTakesDownItsReadyNotification() {
+        val ready = edition(EditionStatus.READY)
+        val file = File(app.filesDir, "editions/e.epub").apply { parentFile!!.mkdirs(); writeText("epub") }
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        app.container.notifier.createChannels()
+        app.container.notifier.editionReady(runBlocking { db.editions().byId(ready)!! }, file, openInstead = false)
+        val shown = shadowOf(app.getSystemService(android.app.NotificationManager::class.java))
+        assertEquals(1, shown.allNotifications.size)
+
+        runBlocking { app.container.editions.markSent(ready) }
+
+        assertEquals("its Send would offer an edition already sent", 0, shown.allNotifications.size)
+    }
+
+    @Test
     fun anEditionAlreadyReleasedIsNotMarkedDeliveredBySendingItLate() {
         // Its articles went back into a newer edition; delivering this one would use them up there too.
         val released = edition(EditionStatus.FAILED)
