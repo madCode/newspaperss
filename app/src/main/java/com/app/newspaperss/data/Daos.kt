@@ -120,15 +120,22 @@ interface ArticleDao {
     /**
      * Inserts articles not already known for their source; returns how many were new. One whose
      * link was already delivered (see [DeliveredUrlEntity]) is left out: stored, it would count as
-     * new activity on the Sources screen. A link post's own page counts too: a pick that went out
-     * as that page (saved to the reading list, say) isn't sent again as its story.
+     * new activity on the Sources screen.
+     */
+    suspend fun insertNew(articles: List<ArticleEntity>): Int = insertFetched(articles.map { it to it.url })
+
+    /**
+     * [insertNew], each article with the link it was fetched with. That link, and a link post's own
+     * page, count as delivered too: stored links have tracking removed and link posts point to
+     * their story, while delivered_urls may hold the link as it went out before, or as a page
+     * saved to the reading list.
      */
     @Transaction
-    suspend fun insertNew(articles: List<ArticleEntity>): Int {
+    suspend fun insertFetched(articles: List<Pair<ArticleEntity, String>>): Int {
+        fun linksOf(fetched: Pair<ArticleEntity, String>) = listOfNotNull(fetched.first.url, fetched.first.viaUrl, fetched.second).filter { it.isNotBlank() }
         // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
-        val delivered = articles.flatMap { listOfNotNull(it.url, it.viaUrl) }.filter { it.isNotBlank() }.distinct()
-            .chunked(500).flatMap { deliveredAmong(it) }.toSet()
-        return articles.filter { it.url !in delivered && it.viaUrl !in delivered }.count { insertIgnoring(it) != -1L }
+        val delivered = articles.flatMap(::linksOf).distinct().chunked(500).flatMap { deliveredAmong(it) }.toSet()
+        return articles.filter { fetched -> linksOf(fetched).none { it in delivered } }.count { insertIgnoring(it.first) != -1L }
     }
 
     @Query("SELECT url FROM delivered_urls WHERE url IN (:urls)")
@@ -138,14 +145,13 @@ interface ArticleDao {
     suspend fun rememberDelivered(ids: List<Long>, at: Instant)
 
     /**
-     * Uses up other waiting copies of the articles' links, from a second feed or the reading
-     * list, so they aren't delivered again. tt-rss copies stay: marking them read on the
-     * server is how they leave tt-rss, and that only happens for articles in an edition.
+     * Uses up other waiting copies of the articles' links, from a second feed, tt-rss or the
+     * reading list, so they aren't delivered again. A tt-rss copy is marked read on the server
+     * with the edition's own articles (see [ttrssInEdition]).
      */
     @Query(
         """UPDATE articles SET state = 'DELIVERED' WHERE state = 'NEW'
-           AND url IN (SELECT url FROM articles WHERE id IN (:ids) AND url != '')
-           AND sourceId NOT IN (SELECT id FROM sources WHERE kind = 'TTRSS')""",
+           AND url IN (SELECT url FROM articles WHERE id IN (:ids) AND url != '')""",
     )
     suspend fun deliverCopies(ids: List<Long>)
 
@@ -299,12 +305,18 @@ interface ArticleDao {
     )
     suspend fun keepNewest(sourceId: Long, keep: Int): Int
 
-    /** The edition's tt-rss articles to mark read on the server: none from an account set to leave them unread. */
+    /**
+     * The edition's tt-rss articles to mark read on the server, and tt-rss copies of its links (a
+     * story that went out from another source is read too): none from an account set to leave
+     * them unread.
+     */
     @Query(
-        """SELECT articles.* FROM articles
-           JOIN edition_articles ON edition_articles.articleId = articles.id
-           JOIN sources ON sources.id = articles.sourceId
-           WHERE edition_articles.editionId = :editionId AND sources.kind = 'TTRSS' AND sources.markReadOnServer = 1""",
+        """SELECT articles.* FROM articles JOIN sources ON sources.id = articles.sourceId
+           WHERE sources.kind = 'TTRSS' AND sources.markReadOnServer = 1
+           AND (articles.id IN (SELECT articleId FROM edition_articles WHERE editionId = :editionId)
+                OR (articles.url != '' AND articles.url IN (
+                    SELECT a.url FROM edition_articles ea JOIN articles a ON a.id = ea.articleId
+                    WHERE ea.editionId = :editionId AND a.url != '')))""",
     )
     suspend fun ttrssInEdition(editionId: Long): List<ArticleEntity>
 }

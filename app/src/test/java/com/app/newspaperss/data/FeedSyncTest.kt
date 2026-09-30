@@ -206,6 +206,21 @@ class FeedSyncTest {
         assertEquals("<p>recent</p>", byGuid.getValue("recent").feedHtml)
     }
 
+    /** A link remembered as delivered with its tracking tags still counts once stored links lose them, so re-adding its feed doesn't send it again. */
+    @Test
+    fun aLinkDeliveredWithItsTrackingTagsIsntStoredAgainWhenItsFeedIsAddedBack() = runTest {
+        db.openHelper.writableDatabase.execSQL("INSERT INTO delivered_urls (url, deliveredAt) VALUES ('https://example.com/1?utm_source=rss', 0)")
+        repo.addFeed(url, "Example")
+        http.page(
+            url,
+            """<rss version="2.0"><channel><title>Example</title>
+               <item><title>One</title><link>https://example.com/1?utm_source=rss</link><guid>1</guid><description>Sent before.</description></item>
+               </channel></rss>""",
+        )
+
+        assertEquals(0, sync.syncAll().newArticles)
+    }
+
     /**
      * A link post is stored as the story it points to, so every check on links (delivered, copies
      * in other sources, stars) sees the story; its guid stays the feed's, which is how the feed's

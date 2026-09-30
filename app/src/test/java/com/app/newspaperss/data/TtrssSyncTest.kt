@@ -244,6 +244,42 @@ class TtrssSyncTest {
         assertEquals(listOf(21L), server.markedRead)
     }
 
+    /**
+     * A link remembered as delivered with its tracking tags (as it went out) is still recognised
+     * once stored links lose them: tt-rss is told it's read, and it isn't stored to go out again.
+     */
+    @Test
+    fun aLinkDeliveredWithItsTrackingTagsIsMarkedReadAndNotStoredAgain() = runTest {
+        val source = connect()
+        db.openHelper.writableDatabase.execSQL("INSERT INTO delivered_urls (url, deliveredAt) VALUES ('https://news.example/30?utm_source=rss', 0)")
+        server.unread += FakeTtrss.Item(30, "Sent before", feedId = 1, feedTitle = "News", link = "https://news.example/30?utm_source=rss")
+
+        assertEquals(0, sync.syncAll().newArticles)
+
+        assertEquals(listOf(30L), server.markedRead)
+        assertTrue(db.articles().allForSource(source.id).isEmpty())
+    }
+
+    /**
+     * A tt-rss copy of a story that went out from another source isn't offered again, and is
+     * marked read on the server along with the edition's own tt-rss articles.
+     */
+    @Test
+    fun aTtrssCopyOfALinkDeliveredFromAFeedIsUsedUpAndMarkedRead() = runTest {
+        val source = connect()
+        server.add(40, "Shared story", feedId = 1, feedTitle = "News")
+        sync.syncAll()
+        val feed = sources.addFeed("https://other.example/feed", "Other")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = feed, guid = "o40", url = "https://news.example/40", title = "Shared story")))
+        val editionId = editionWith(feed, "o40")
+
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionId)
+
+        assertTrue("not offered again", db.articles().candidates().none { it.sourceId == source.id })
+        assertTrue(ttrss.markRead(editionId))
+        assertEquals(listOf(40L), server.markedRead)
+    }
+
     /** Marking read in the app reaches tt-rss at the next sync, so an Undo before then never has to. */
     @Test
     fun articlesMarkedReadInTheAppAreMarkedReadInTtrssAtTheNextSync() = runTest {

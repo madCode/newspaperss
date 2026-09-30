@@ -61,12 +61,12 @@ class FeedSync(
             val response = http.get(source.url)
             if (response.isSuccessful) {
                 val feed = FeedParser.parse(response.body, response.finalUrl)
-                val added = db.articles().insertNew(
+                val added = db.articles().insertFetched(
                     feed.items.map {
                         ArticleEntity(
                             sourceId = source.id, guid = it.guid, url = it.url, title = it.title,
                             author = it.author, published = it.published, feedHtml = it.contentHtml, discoveredAt = now,
-                        ).linkedToStory(feed.siteUrl ?: source.siteUrl)
+                        ).linkedToStory(feed.siteUrl ?: source.siteUrl) to it.url
                     },
                 )
                 // A title that is still the host-name placeholder gives way to the feed's own.
@@ -158,7 +158,7 @@ class FeedSync(
                     )
                     if (markedRead.isNotEmpty()) db.articles().setReportedRead(source.id, markedRead)
                 }
-                val added = db.articles().insertNew(articles.map { it.second })
+                val added = db.articles().insertFetched(articles.map { (h, a) -> a to h.link })
                 // tt-rss answers a deleted (or another user's) category with no articles and no error.
                 if (headlines.isEmpty() && category != null && client.categories().none { it.id == category }) {
                     CATEGORY_GONE
@@ -195,14 +195,14 @@ class FeedSync(
                 if (response.isSuccessful) {
                     val links = list.links(response.body, response.finalUrl)
                     val added = db.withTransaction {
-                        db.articles().insertNew(
+                        db.articles().insertFetched(
                             links.map {
                                 ArticleEntity(
                                     sourceId = source.id, guid = it.url, url = withoutTracking(it.url, LinkPosts.siteNames(list.pageUrl)),
                                     title = it.title.orEmpty(),
                                     // The teaser is what the edition shows if the page can't be fetched.
                                     feedHtml = it.summary?.let { s -> "<p>${Entities.escape(s)}</p>" }, discoveredAt = now,
-                                )
+                                ) to it.url
                             },
                         ).also { db.articles().keepNewest(source.id, listKeep) }
                     }
