@@ -165,9 +165,9 @@ private fun AddLink(viewModel: ReadingListViewModel) {
 @Composable
 private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
     val status = if (article.starredAt != null && article.state != ArticleState.IN_EDITION) "Starred for your next edition" else when (article.state) {
-        ArticleState.NEW -> "Waiting for your next edition"
+        ArticleState.NEW -> "Waiting for an edition"
         ArticleState.IN_EDITION -> "In an edition you haven't sent yet"
-        ArticleState.DELIVERED -> "Delivered"
+        ArticleState.DELIVERED -> "In an edition you sent"
         ArticleState.SKIPPED, ArticleState.EXPIRED -> "Skipped"
     }
     val context = LocalContext.current

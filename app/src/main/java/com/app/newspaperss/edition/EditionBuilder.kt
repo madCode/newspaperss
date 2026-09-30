@@ -309,7 +309,7 @@ class EditionBuilder(
          */
         private fun fileNameOf(title: String) = FolderDelivery.fileName(title)
         private const val TAG = "EditionBuilder"
-        const val NOT_SENT = "Not sent; its articles went back for the next edition."
+        const val NOT_SENT = "You didn't send this one, so its articles went back for your next edition."
         const val INTERRUPTED = "Interrupted; its articles will be in the next edition."
         const val STOPPED = "Stopped before it was finished; its articles will be in the next edition."
         const val UNEXPECTED = "Something went wrong making this edition. Your articles are safe and will be in the next one."
