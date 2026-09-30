@@ -30,6 +30,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.zip.ZipFile
@@ -301,6 +302,14 @@ class EditionBuilderTest {
         assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
         assertEquals(0, db.editions().count())
         assertFalse(editions.observeBuilding().first())
+    }
+
+    @Test
+    fun aBuildLeftBehindByACrashStopsHoldingTheButtonsAfterTwoHours() = runTest {
+        db.editions().insert(EditionEntity(title = "Crashed", createdAt = clock.instant().minus(Duration.ofHours(3))))
+        assertFalse(editions.observeBuilding().first())
+        db.editions().insert(EditionEntity(title = "Running", createdAt = clock.instant().minusSeconds(60)))
+        assertTrue(editions.observeBuilding().first())
     }
 
     @Test

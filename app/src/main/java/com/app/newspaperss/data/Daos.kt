@@ -11,6 +11,8 @@ import androidx.room.Update
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.transformLatest
 import java.time.Duration
 import java.time.Instant
 
@@ -92,6 +94,22 @@ interface SourceDao {
  * build, which mustn't lock the buttons until then.
  */
 internal val BUILD_HOLD: Duration = Duration.ofHours(2)
+
+/**
+ * Whether an edition is being made, counting one started more than [BUILD_HOLD] ago as a crashed
+ * build. It turns false by itself when the hold runs out, since nothing in the database changes
+ * then.
+ */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+internal fun EditionDao.observeBuilding(clock: java.time.Clock): Flow<Boolean> =
+    observeBuildingSince().transformLatest { started ->
+        val left = started?.let { Duration.between(clock.instant(), it.plus(BUILD_HOLD)) }
+        if (left != null && !left.isNegative && !left.isZero) {
+            emit(true)
+            kotlinx.coroutines.delay(left.toMillis())
+        }
+        emit(false)
+    }.distinctUntilChanged()
 
 data class SourceActivity(val sourceId: Long, val lastNew: Instant?)
 
@@ -319,9 +337,9 @@ interface EditionDao {
     @Query("SELECT COUNT(*) FROM editions")
     suspend fun count(): Int
 
-    /** Whether an edition started after [since] is being made. */
-    @Query("SELECT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :since)")
-    fun observeBuilding(since: Instant): Flow<Boolean>
+    /** When the newest edition being made was started, or null if none is. */
+    @Query("SELECT MAX(createdAt) FROM editions WHERE status = 'BUILDING'")
+    fun observeBuildingSince(): Flow<Instant?>
 
     /** Only for an edition that turned out to have nothing in it, before anything refers to it. */
     @Query("DELETE FROM editions WHERE id = :id")

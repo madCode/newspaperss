@@ -68,7 +68,7 @@ class EditionRepository(
     suspend fun setStarred(articleId: Long, starred: Boolean): Boolean = db.articles().setStarred(articleId, starred, clock.instant())
 
     /** While an edition is being made, articles can be starred but not unstarred or marked read. */
-    fun observeBuilding(): Flow<Boolean> = db.editions().observeBuilding(clock.instant().minus(BUILD_HOLD))
+    fun observeBuilding(): Flow<Boolean> = db.editions().observeBuilding(clock)
 
     /** Starred articles waiting for an edition, from sources that aren't paused. */
     fun observeStarredWaiting(): Flow<Int> = db.articles().observeStarredWaiting()

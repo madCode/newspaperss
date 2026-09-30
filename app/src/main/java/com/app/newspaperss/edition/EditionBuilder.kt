@@ -75,23 +75,23 @@ class EditionBuilder(
         val title = EditionTitles.title(now, db.editions().titlesSince(since))
         val rotation = db.editions().count()
         val editionId = db.editions().insert(EditionEntity(title = title, createdAt = clock.instant()))
-        // Read only once the edition is BUILDING, which holds off "Mark as read" and unstarring
-        // (see ArticleDao.markRead): the articles picked here are written into the book, so a
-        // change made afterwards would be silently undone when they're marked IN_EDITION.
-        // The same link from two sources goes in once, and a starred copy is the one kept.
-        val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
-            .sortedBy { it.starredAt == null }
-            .distinctBy { it.url.ifBlank { "#${it.id}" } }
-        if (articles.isEmpty()) {
-            db.editions().deleteEmpty(editionId)
-            return BuildResult.NothingNew
-        }
-
         // Whatever goes wrong from here, the edition must not stay BUILDING: the Today screen
         // would show it as being made forever. Its articles only change state in the final
         // transaction, so a failed edition leaves them all for the next one.
         return try {
-            fill(editionId, title, now, sources, articles, rotation, settings, onProgress)
+            // Read only once the edition is BUILDING, which holds off "Mark as read" and unstarring
+            // (see ArticleDao.markRead): the articles picked here are written into the book, so a
+            // change made afterwards would be silently undone when they're marked IN_EDITION.
+            // The same link from two sources goes in once, and a starred copy is the one kept.
+            val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
+                .sortedBy { it.starredAt == null }
+                .distinctBy { it.url.ifBlank { "#${it.id}" } }
+            if (articles.isEmpty()) {
+                db.editions().deleteEmpty(editionId)
+                BuildResult.NothingNew
+            } else {
+                fill(editionId, title, now, sources, articles, rotation, settings, onProgress)
+            }
         } catch (e: CancellationException) {
             withContext(NonCancellable) { fail(editionId, STOPPED) }
             throw e

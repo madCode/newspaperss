@@ -77,7 +77,7 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     suspend fun setStarred(articleId: Long, starred: Boolean): Boolean = db.articles().setStarred(articleId, starred, clock.instant())
 
     /** See [EditionRepository.observeBuilding]. */
-    fun observeBuilding(): Flow<Boolean> = db.editions().observeBuilding(clock.instant().minus(BUILD_HOLD))
+    fun observeBuilding(): Flow<Boolean> = db.editions().observeBuilding(clock)
 
     /**
      * Marks a waiting article as read: it never goes in an edition, and a tt-rss source marks it
