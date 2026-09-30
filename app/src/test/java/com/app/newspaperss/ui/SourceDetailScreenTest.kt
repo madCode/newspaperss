@@ -277,7 +277,8 @@ class SourceDetailScreenTest {
     fun atLargeTextThePerSiteButtonsGetTheirOwnLine() {
         // Beside the words, they squeezed them to a few words a line.
         val (id, _) = sourceWithArticles()
-        compose.setContent { SourceDetailScreen(SourceDetailViewModel(repo, id, flowOf(1)), onBack = {}) }
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
         idleUntil { visible("from this site") }
         val words = compose.onNodeWithText("from this site", substring = true).fetchSemanticsNode().boundsInRoot
         val more = compose.onNodeWithContentDescription("More articles from this site").fetchSemanticsNode().boundsInRoot
