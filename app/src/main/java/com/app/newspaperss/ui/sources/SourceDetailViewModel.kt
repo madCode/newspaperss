@@ -110,6 +110,25 @@ class SourceDetailViewModel(
         viewModelScope.launch { repo.setMarkRead(id, markRead) }
     }
 
+    private val _startingFresh = MutableStateFlow(false)
+    /** tt-rss is being asked to mark its backlog read. */
+    val startingFresh: StateFlow<Boolean> = _startingFresh.asStateFlow()
+
+    fun startFresh() {
+        val repo = ttrss ?: return
+        if (_startingFresh.value) return
+        _startingFresh.value = true
+        viewModelScope.launch {
+            try {
+                val problem = repo.startFresh(id)
+                _notice.value = problem ?: "Done. tt-rss has only the last two weeks unread now."
+                if (problem == null) onSourceChanged()
+            } finally {
+                _startingFresh.value = false
+            }
+        }
+    }
+
     fun setStarred(articleId: Long, starred: Boolean) {
         viewModelScope.launch { repository.setStarred(articleId, starred) }
     }

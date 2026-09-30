@@ -296,6 +296,10 @@ interface ArticleDao {
     @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL")
     suspend fun expireWaiting(sourceId: Long)
 
+    /** Expires a source's unpicked articles published before [before]; stars and undated ones stay. */
+    @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL AND published < :before")
+    suspend fun expireWaitingPublishedBefore(sourceId: Long, before: Instant)
+
     /** Expires unpicked articles discovered before [before], except reading-list items and stars. */
     @Query(
         """UPDATE articles SET state = 'EXPIRED' WHERE state = 'NEW' AND starredAt IS NULL AND discoveredAt < :before

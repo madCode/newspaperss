@@ -37,6 +37,9 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     val ops = mutableListOf<String>()
     /** An HTTP status to answer every request with, instead of the API's reply. */
     var failWith: Int? = null
+    var apiLevel = 18
+    /** catchupFeed calls: feed or category id, whether it's a category, and the mode. */
+    val caughtUp = mutableListOf<Triple<Int, Boolean, String>>()
     private var sessions = 0
     private val live = mutableSetOf<String>()
 
@@ -58,7 +61,7 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
             if (str("user") != user || str("password") != password) return error("LOGIN_ERROR")
             val sid = "sid-${++sessions}"
             live += sid
-            return ok(buildJsonObject { put("session_id", sid); put("api_level", 18) })
+            return ok(buildJsonObject { put("session_id", sid); put("api_level", apiLevel) })
         }
         if (str("sid") !in live) return error("NOT_LOGGED_IN")
         return when (op) {
@@ -120,6 +123,10 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                 markedRead += ids
                 unread.removeAll { it.id in ids }
                 ok(buildJsonObject { put("status", "OK"); put("updated", ids.size) })
+            }
+            "catchupFeed" -> {
+                caughtUp += Triple(str("feed_id")!!.toInt(), str("is_cat") == "true", str("mode") ?: "all")
+                ok(buildJsonObject { put("status", "OK") })
             }
             "logout" -> {
                 live -= str("sid")!!

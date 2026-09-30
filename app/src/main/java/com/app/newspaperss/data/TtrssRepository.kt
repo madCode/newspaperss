@@ -7,6 +7,8 @@ import com.app.newspaperss.core.ttrss.TtrssClient
 import com.app.newspaperss.core.ttrss.TtrssException
 import kotlinx.coroutines.CancellationException
 import java.io.IOException
+import java.time.Clock
+import java.time.Duration
 
 /** Connecting a tt-rss account, forgetting it, and telling tt-rss what was delivered. */
 class TtrssRepository(
@@ -14,6 +16,7 @@ class TtrssRepository(
     private val http: HttpClient,
     private val accounts: TtrssAccountStore,
     private val sources: SourceRepository,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     sealed interface Check {
         data class Failed(val message: String) : Check
@@ -113,6 +116,37 @@ class TtrssRepository(
         if (category != null) db.articles().expireWaiting(sourceId)
     }
 
+    /**
+     * For a reader coming back to a big backlog: marks everything that reached tt-rss more than two
+     * weeks ago read there, in the source's category if it has one, and lets the same stale
+     * articles waiting here go. Null when done, else why not.
+     */
+    suspend fun startFresh(sourceId: Long): String? {
+        val source = db.sources().byId(sourceId) ?: return null
+        val account = try {
+            (accounts.load() as? StoredAccount.Ready)?.account
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } ?: return FeedSync.SIGN_IN_AGAIN
+        val client = account.client(http)
+        try {
+            val category = source.ttrssCategoryId
+            if (category != null) client.markReadOlderThanTwoWeeks(category, isCategory = true) else client.markReadOlderThanTwoWeeks()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TtrssException) {
+            return e.message ?: "tt-rss reported an error."
+        } catch (e: IOException) {
+            return "Couldn't reach tt-rss."
+        } finally {
+            logOut(client)
+        }
+        db.articles().expireWaitingPublishedBefore(sourceId, clock.instant().minus(Duration.ofDays(START_FRESH_DAYS)))
+        return null
+    }
+
     suspend fun setMarkRead(sourceId: Long, markRead: Boolean) = db.sources().setMarkReadOnServer(sourceId, markRead)
 
     /** Removes the account's source and its saved login. */
@@ -151,5 +185,10 @@ class TtrssRepository(
         }
         sourceIds.forEach { db.sources().setServerNote(it, "Delivered articles weren't marked read in tt-rss. $problem") }
         return !retry
+    }
+
+    private companion object {
+        /** tt-rss's "2week" catch-up: articles it received before then. */
+        const val START_FRESH_DAYS = 14L
     }
 }

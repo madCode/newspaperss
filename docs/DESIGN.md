@@ -220,6 +220,12 @@ articles go back, keeping their stars, before the new one is planned.
   take one category instead of all unread; adding the account asks which,
   before the first sync. tt-rss's own stars aren't synced: there a star
   usually means "keep this", not "for tomorrow".
+  - **Start fresh** ("Back after a break?" on the source's page), after a
+    confirmation, marks everything that reached tt-rss more than two weeks
+    ago read there (in the source's category, if it has one), and lets
+    waiting articles published before then go here too; stars stay. It
+    needs tt-rss API level 15 (2020) or later: older servers ignore the two
+    weeks and would mark everything read, so the app refuses and says so.
 - **Housekeeping.** Only the newest 14 editions keep their EPUB on the
   phone (ready ones always do). An article's feed text is dropped a month
   after it's delivered or expires; its row stays, so it's never re-offered.

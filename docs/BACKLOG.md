@@ -35,7 +35,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Per-feed control on the tt-rss source page: leave a feed out, or cap it
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] The source page dates articles by when they were fetched; show when they were published
-- [ ] Articles that expire in the app stay unread in tt-rss: an opt-in "mark read when they expire here", and a one-off "start fresh"
+- [ ] Articles that expire in the app stay unread in tt-rss: an opt-in "mark read when they expire here"
 - [ ] Delay tt-rss mark-read a little after sharing, so a quick "Send again" or "Not sent" can still undo it
 
 ### Reading list
@@ -200,6 +200,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] tt-rss "Start fresh" for a reader back after a break: marks everything older than two weeks read on the server, after asking, and refuses on servers too old to limit it *(personas)*
 - [x] A question to think about on each edition's closing page, from a short list that suits any paper, and shown in its notes *(personas)*
 - [x] Reading notes saved to a folder of your choice (an Obsidian vault) for every delivered edition, whether it was shared, saved to a folder or opened *(personas)*
 - [x] Link posts (Longreads' picks): a short item whose link to another site carries a referral tag naming its own site is stored as that story, fetched and credited "Equator via Longreads", with its pitch as the fallback; tracking tags come off stored links, so a story two sources picked goes out once *(you asked)*

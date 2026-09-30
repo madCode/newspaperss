@@ -36,7 +36,7 @@ class TtrssSyncTest {
     private val now = Instant.parse("2026-09-29T06:00:00Z")
     private val accounts by lazy { TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher()) }
     private val sources = SourceRepository(db)
-    private val ttrss by lazy { TtrssRepository(db, http, accounts, sources) }
+    private val ttrss by lazy { TtrssRepository(db, http, accounts, sources, Clock.fixed(now, ZoneOffset.UTC)) }
     private val sync by lazy { FeedSync(db, http, Clock.fixed(now, ZoneOffset.UTC), Duration.ofDays(7), accounts) }
 
     private suspend fun connect(): SourceEntity {
@@ -447,5 +447,63 @@ class TtrssSyncTest {
         val articles = db.articles().allForSource(sourceId).filter { it.guid in guids }
         db.editions().insertArticles(articles.mapIndexed { i, a -> EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = a.title, sourceTitle = "x", minutes = 1.0) })
         return editionId
+    }
+
+    private suspend fun waiting(source: SourceEntity, guid: String, published: Instant?, starred: Boolean = false) {
+        db.articles().insertNew(
+            listOf(
+                ArticleEntity(
+                    sourceId = source.id, guid = guid, url = "https://news.example/$guid", title = guid,
+                    published = published, starredAt = if (starred) now else null,
+                ),
+            ),
+        )
+    }
+
+    private suspend fun stateOf(guid: String) = db.articles().allForSource(db.sources().ofKind(SourceKind.TTRSS).single().id).single { it.guid == guid }.state
+
+    @Test
+    fun startingFreshCatchesUpTtrssAndLetsTheSameStaleArticlesGoHere() = runTest {
+        val source = connect()
+        waiting(source, "ttrss:old", now.minus(Duration.ofDays(20)))
+        waiting(source, "ttrss:old-starred", now.minus(Duration.ofDays(20)), starred = true)
+        waiting(source, "ttrss:recent", now.minus(Duration.ofDays(3)))
+        waiting(source, "ttrss:undated", null)
+
+        assertNull(ttrss.startFresh(source.id))
+
+        assertEquals(listOf(Triple(-4, false, "2week")), server.caughtUp)
+        assertEquals(ArticleState.EXPIRED, stateOf("ttrss:old"))
+        assertEquals("her stars are hers", ArticleState.NEW, stateOf("ttrss:old-starred"))
+        assertEquals(ArticleState.NEW, stateOf("ttrss:recent"))
+        assertEquals(ArticleState.NEW, stateOf("ttrss:undated"))
+        assertEquals(listOf("login", "catchupFeed", "logout"), server.ops.takeLast(3))
+    }
+
+    @Test
+    fun startingFreshKeepsToTheChosenCategory() = runTest {
+        val source = connect()
+        ttrss.chooseCategory(source.id, TtrssCategory(7, "Ideas"))
+        assertNull(ttrss.startFresh(source.id))
+        assertEquals(listOf(Triple(7, true, "2week")), server.caughtUp)
+    }
+
+    @Test
+    fun anOldServerIsNotAskedAndNothingGoesHere() = runTest {
+        val source = connect()
+        waiting(source, "ttrss:old", now.minus(Duration.ofDays(20)))
+        server.apiLevel = 14
+
+        assertEquals("Your tt-rss is too old for this. Update it, or use Mark as read in tt-rss itself.", ttrss.startFresh(source.id))
+
+        assertTrue(server.caughtUp.isEmpty())
+        assertEquals(ArticleState.NEW, stateOf("ttrss:old"))
+    }
+
+    @Test
+    fun startingFreshWithTtrssUnreachableSaysSo() = runTest {
+        val source = connect()
+        http.unreachable += server.apiUrl
+        assertEquals("Couldn't reach tt-rss.", ttrss.startFresh(source.id))
     }
 }
