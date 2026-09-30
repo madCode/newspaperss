@@ -8,12 +8,13 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** Night 2, focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. Shipped so far: stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync and a category choice, fair turns across many feeds, Obsidian-friendly notes saved to your vault, a question at the end of each paper, a dark preview.
+- **Last night:** Night 2 focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. It shipped stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync, a category choice, fair turns across many feeds, Start fresh and leaving feeds out, Obsidian-friendly notes saved to your vault, a question at the end of each paper, and a dark preview.
+- **Watching:** a settings test that failed once on a DataStore file rename (#66); not reproduced since.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
-## Night 2 · Tue 29 Sep, 20:30 PT –
+## Night 2 · Tue 29 Sep, 20:30 PT – Wed 30 Sep, 05:45 PT
 
-### Cycle 57: a slow tt-rss server says so (02:37–, this PR)
+### Cycle 57: a slow tt-rss server says so (02:37–02:49, [#73](https://github.com/madCode/newspaperss/pull/73))
 - **From the persona audit:** a home server on a slow line timed out and the app said "Couldn't reach tt-rss", sending you to check a connection that works.
 - **Shipped:** a slow answer now says tt-rss took too long: on the source (with "it'll be tried again at the next sync", which is true there), when signing in, choosing a category and marking read. Start fresh says the server may still be working through it.
 - **Review caught:** the retry promise shown where nothing retries (start fresh, categories, the mark-read note); a connect timeout, which means an unreachable server (a VPN off, a wrong address), taken for slowness.
