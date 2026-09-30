@@ -6,21 +6,15 @@ import org.junit.Test
 import java.time.LocalDate
 
 class NotesWriterTest {
-    private val prompts = """
-        ### Reflection
-
-        **What's the main claim?**
-
-        **What evidence supports it?**
-
-        **What do I agree or disagree with?**
-
-        **How does this connect to other things I've read?**
-
-        **What do I want to remember in six months?**
-
-        ### Notes and quotes
-    """.trimIndent()
+    private val top = """
+        |# Tuesday Morning Edition
+        |
+        |Pick one piece that stayed with you. Some questions to start:
+        |
+        |- What's the main claim, and do I agree?
+        |- How does it connect to other things I've read?
+        |- What do I want to remember in six months?
+    """.trimMargin()
 
     private fun edition(vararg articles: NotesArticle) =
         NotesEdition("Tuesday Morning Edition", LocalDate.of(2026, 9, 29), articles.toList())
@@ -36,10 +30,17 @@ class NotesWriterTest {
 
         assertEquals(
             """
-            |# Tuesday Morning Edition
+            |---
+            |date: 2026-09-29
+            |edition: "Tuesday Morning Edition"
+            |sources:
+            |  - "Example News"
+            |  - "Field Notes"
+            |tags:
+            |  - newspaperss
+            |---
             |
-            |Date: 2026-09-29
-            |Articles: 2
+            |$top
             |
             |## The quiet city
             |
@@ -50,7 +51,7 @@ class NotesWriterTest {
             |- Read in: Tuesday Morning Edition, 2026-09-29
             |- Citation: Jane Doe. "The quiet city." *Example News*, 2026-09-28. https://example.com/quiet
             |
-            |$prompts
+            |### Notes
             |
             |## Why rivers bend?
             |
@@ -61,7 +62,7 @@ class NotesWriterTest {
             |- Read in: Tuesday Morning Edition, 2026-09-29
             |- Citation: A. Writer. "Why rivers bend?" *Field Notes*, 2026-09-27. https://example.org/rivers
             |
-            |$prompts
+            |### Notes
             |
             """.trimMargin(),
             notes,
@@ -74,10 +75,16 @@ class NotesWriterTest {
 
         assertEquals(
             """
-            |# Tuesday Morning Edition
+            |---
+            |date: 2026-09-29
+            |edition: "Tuesday Morning Edition"
+            |sources:
+            |  - "Blog"
+            |tags:
+            |  - newspaperss
+            |---
             |
-            |Date: 2026-09-29
-            |Articles: 1
+            |$top
             |
             |## A story
             |
@@ -85,7 +92,7 @@ class NotesWriterTest {
             |- Read in: Tuesday Morning Edition, 2026-09-29
             |- Citation: "A story." *Blog*.
             |
-            |$prompts
+            |### Notes
             |
             """.trimMargin(),
             notes,
@@ -103,7 +110,7 @@ class NotesWriterTest {
         )
 
         val lines = notes.lines()
-        assertEquals("# \\#1 \\[Weekend\\] \\*Edition\\*", lines[0])
+        assertTrue("# \\#1 \\[Weekend\\] \\*Edition\\*" in lines)
         assertTrue(
             "## C\\# tips: \\[draft\\] \\*new\\*\\_ish\\_ \\`code\\` \\<b\\> \\| \\$5 \\~ok\\~" in lines,
         )
@@ -123,5 +130,29 @@ class NotesWriterTest {
         val notes = NotesWriter.write(edition(NotesArticle(" \n ", "Blog", "https://example.com/a")))
 
         assertTrue("## Untitled" in notes.lines())
+    }
+
+    @Test
+    fun quotesAndBackslashesInTheFrontMatterStayInsideTheirStrings() {
+        val notes = NotesWriter.write(
+            NotesEdition("The \"Big\" \\ Edition", LocalDate.of(2026, 9, 29), listOf(NotesArticle("A", "Says \"hi\"\nthere", null))),
+        )
+        val front = notes.lines().takeWhile { it != "tags:" }
+        assertTrue("edition: \"The \\\"Big\\\" \\\\ Edition\"" in front)
+        assertTrue("  - \"Says \\\"hi\\\" there\"" in front)
+    }
+
+    @Test
+    fun controlCharactersAreDroppedFromTheFrontMatterAndSourcesListedOnce() {
+        val notes = NotesWriter.write(
+            NotesEdition(
+                "Bell\u0007 Edition",
+                LocalDate.of(2026, 9, 29),
+                listOf(NotesArticle("A", "Blog\u007F", null), NotesArticle("B", "Blog", null)),
+            ),
+        )
+        val front = notes.lines().takeWhile { it != "tags:" }
+        assertTrue("edition: \"Bell Edition\"" in front)
+        assertEquals(listOf("  - \"Blog\""), front.filter { it.startsWith("  - ") })
     }
 }

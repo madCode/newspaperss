@@ -18,24 +18,33 @@ data class NotesArticle(
 )
 
 /**
- * A Markdown notes file for an edition, for Obsidian, Logseq or any
- * Markdown editor: per article its details, a citation, reflection prompts
- * and an empty place for notes and quotes.
+ * A Markdown notes file for an edition, for Obsidian, Logseq or any Markdown editor: YAML front
+ * matter (so Obsidian's properties, tags and Dataview see the date and sources), a few reflection
+ * prompts once at the top, then per article its details, a citation and an empty place for notes.
  */
 object NotesWriter {
+    // Once for the edition rather than under every article: forty prompts read as homework.
     val PROMPTS = listOf(
-        "What's the main claim?",
-        "What evidence supports it?",
-        "What do I agree or disagree with?",
-        "How does this connect to other things I've read?",
+        "What's the main claim, and do I agree?",
+        "How does it connect to other things I've read?",
         "What do I want to remember in six months?",
     )
 
     fun write(edition: NotesEdition): String = buildString {
         val editionTitle = text(edition.title)
+        append("---\n")
+        append("date: ").append(edition.date).append('\n')
+        append("edition: ").append(yaml(edition.title)).append('\n')
+        val sources = edition.articles.map { it.sourceTitle.replace(whitespace, " ").replace(controls, "").trim() }.filter { it.isNotEmpty() }.distinct()
+        if (sources.isNotEmpty()) {
+            append("sources:\n")
+            sources.forEach { append("  - ").append(yaml(it)).append('\n') }
+        }
+        append("tags:\n  - newspaperss\n")
+        append("---\n\n")
         append("# ").append(editionTitle).append("\n\n")
-        append("Date: ").append(edition.date).append('\n')
-        append("Articles: ").append(edition.articles.size).append('\n')
+        append("Pick one piece that stayed with you. Some questions to start:\n\n")
+        PROMPTS.forEach { append("- ").append(it).append('\n') }
         for (article in edition.articles) {
             val title = text(article.title)
             val source = text(article.sourceTitle)
@@ -47,11 +56,19 @@ object NotesWriter {
             article.url?.let { append("- Link: ").append(it).append('\n') }
             append("- Read in: ").append(editionTitle).append(", ").append(edition.date).append('\n')
             append("- Citation: ").append(citation(title, source, author, article)).append('\n')
-            append("\n### Reflection\n")
-            PROMPTS.forEach { append("\n**").append(it).append("**\n") }
-            append("\n### Notes and quotes\n")
+            append("\n### Notes\n")
         }
     }
+
+    /**
+     * A double-quoted YAML string. Control characters go: titles can carry a stray one (a decoded
+     * `&#7;`), and strict parsers reject the whole front matter over it.
+     */
+    private fun yaml(value: String): String =
+        "\"" + value.replace(whitespace, " ").replace(controls, "").trim()
+            .replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+    private val controls = Regex("""[\u0000-\u001F\u007F-\u009F]""")
 
     /** A simple MLA-like line: Author. "Title." *Source*, date. link */
     private fun citation(title: String, source: String, author: String?, article: NotesArticle): String =

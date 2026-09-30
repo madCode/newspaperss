@@ -42,8 +42,9 @@ who'd rather not set up Python, a server and a scheduler.
   Boox. Articles are used up only once the edition is delivered: saved to
   your folder, sent through an app you pick, or opened on a Boox.
 - **Didn't finish?** Bring articles back into tomorrow's edition.
-- **Take notes.** Export a Markdown notes file per edition, with a citation
-  and reflection prompts for each article, for Obsidian, Logseq or any notes app.
+- **Take notes.** Export a Markdown notes file per edition for Obsidian, Logseq or
+  any notes app: properties Obsidian understands, a few reflection prompts, and a
+  citation and room for notes under each article.
 - **Calm by design.** No unread counts, no infinite timeline, no
   animations to smear on an e-ink screen.
 

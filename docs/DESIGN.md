@@ -181,8 +181,9 @@ articles go into the new one.
   (**Send again** once delivered). Earlier editions are listed below.
 - **Edition:** its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
-  network). **Notes** exports a Markdown file for a notes app (per article:
-  source, author, date, link, a citation and reflection prompts).
+  network). **Notes** exports a Markdown file for a notes app: front matter
+  (date, edition, sources, a tag) for Obsidian, a few reflection prompts at the
+  top, then per article its source, author, date, link, a citation and room for notes.
   **Delete**, and on delivered editions, **bring back**.
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). A source's page
