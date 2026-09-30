@@ -143,7 +143,7 @@ module so it's all unit-tested without Android.
     the body, an end mark, "Read the original at site", and a "Next" link
     with its source and time; then "That's all for today" with the day's
     totals and a question to think about, one of a short list of open
-    questions that suit any paper ("What surprised you?"). It changes from
+    questions that suit any paper ("What surprised you?"). It usually differs from
     one edition to the next, and the notes file shows the same one;
   - styles Kindle's conversion keeps: plain class selectors, relative
     sizes, no side margins, headings aligned explicitly;
