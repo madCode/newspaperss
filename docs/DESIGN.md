@@ -296,7 +296,7 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 ├─ feed/     parsing, feed discovery,    ├─ data/      Room database, repositories
 │            OPML, starter packs         ├─ settings/  DataStore settings
 ├─ edition/  planner, titles, schedule   ├─ edition/   EditionBuilder, EditionRun, cover, notes
-├─ extract/  page and article            ├─ work/      background workers, the scheduler     
+├─ extract/  page and article            ├─ work/      background workers, the scheduler
 │            extraction, language        ├─ delivery/  share, folder, the sent callback
 ├─ images/   image rules and budget      ├─ notify/    the "ready" notification
 ├─ epub/     the EPUB writer             ├─ ui/        Compose screens and ViewModels
