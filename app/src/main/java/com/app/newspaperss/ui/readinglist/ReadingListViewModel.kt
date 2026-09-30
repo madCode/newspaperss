@@ -10,6 +10,8 @@ import com.app.newspaperss.data.ReadingListRepository
 import android.content.ContentResolver
 import android.net.Uri
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -17,11 +19,27 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class ReadingListViewModel(private val list: ReadingListRepository) : ViewModel() {
-    val items: StateFlow<List<ArticleEntity>?> = list.observe().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+/**
+ * @param outlive runs a removal still waiting on its Undo when the screen goes away, which
+ *   [viewModelScope] can't, being cancelled by then.
+ */
+class ReadingListViewModel(
+    private val list: ReadingListRepository,
+    private val outlive: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+) : ViewModel() {
+    private val _removed = MutableStateFlow<ArticleEntity?>(null)
+    /**
+     * The link just removed, hidden but not yet deleted while Undo is offered: undoing then only
+     * shows it again, with nothing to put back (its state, star and place in editions untouched).
+     */
+    val removed: StateFlow<ArticleEntity?> = _removed.asStateFlow()
+
+    val items: StateFlow<List<ArticleEntity>?> = combine(list.observe(), _removed) { all, gone -> all.filter { it.id != gone?.id } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _message = MutableStateFlow<String?>(null)
     /** A one-line result to show the reader, e.g. after an import. */
@@ -36,20 +54,25 @@ class ReadingListViewModel(private val list: ReadingListRepository) : ViewModel(
         return true
     }
 
-    private val _removed = MutableStateFlow<ReadingListRepository.Removed?>(null)
-    /** The link just removed, offered back until the reader moves on. */
-    val removed: StateFlow<ReadingListRepository.Removed?> = _removed.asStateFlow()
-
     fun remove(article: ArticleEntity) {
-        viewModelScope.launch { _removed.value = list.remove(article) }
+        // One removal waits at a time: a second one settles the first.
+        _removed.value?.let(::delete)
+        _removed.value = article
     }
 
-    fun undoRemove(removed: ReadingListRepository.Removed) {
-        viewModelScope.launch { list.restore(removed) }
+    fun undoRemove() { _removed.value = null }
+
+    /** Undo wasn't taken: the removal happens now. */
+    fun commitRemove() {
+        _removed.value?.let(::delete)
         _removed.value = null
     }
 
-    fun dismissRemoved() { _removed.value = null }
+    private fun delete(article: ArticleEntity) {
+        outlive.launch { list.remove(article) }
+    }
+
+    override fun onCleared() = commitRemove()
 
     // Files come from the system picker, often a cloud provider: reads and writes can be slow or fail.
     fun import(resolver: ContentResolver, uri: Uri) {

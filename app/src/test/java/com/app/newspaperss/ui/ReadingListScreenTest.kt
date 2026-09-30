@@ -8,10 +8,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.app.newspaperss.data.ArticleState
-import com.app.newspaperss.data.EditionArticleEntity
-import com.app.newspaperss.data.EditionEntity
-import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.ui.readinglist.ReadingListScreen
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
@@ -56,7 +52,7 @@ class ReadingListScreenTest {
     }
 
     @Test
-    fun aRemovedLinkCanBeUndoneAndComesBackAsItWas() {
+    fun aRemovedLinkCanBeUndoneAndIsUntouched() {
         val list = app.container.readingList
         runBlocking { list.save("https://b.example/long-read", "A long read") }
         val before = runBlocking { app.container.db.articles().allForSource(list.sourceId()).single() }
@@ -67,27 +63,26 @@ class ReadingListScreenTest {
         // Named, so TalkBack doesn't read "Remove" on every row alike.
         compose.onNodeWithContentDescription("Remove A long read").performClick()
         waitFor("Removed “A long read”")
+        compose.onNodeWithText("A long read").assertDoesNotExist()
         compose.onNodeWithText("Undo").performClick()
 
-        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) } == listOf(before) }
+        waitFor("A long read")
+        assertEquals(listOf(before), runBlocking { app.container.db.articles().allForSource(list.sourceId()) })
     }
 
     @Test
-    fun undoingPutsALinkBackInTheEditionThatHeldIt() = runBlocking {
-        // Otherwise that edition would neither deliver nor release it, and it would go out twice.
-        val db = app.container.db
+    fun aRemovalIsKeptOnceUndoIsGoneEvenIfTheScreenIsLeft() {
         val list = app.container.readingList
-        list.save("https://b.example/long-read", "A long read")
-        val article = db.articles().allForSource(list.sourceId()).single()
-        db.articles().setState(listOf(article.id), ArticleState.IN_EDITION)
-        val edition = db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.READY))
-        db.editions().insertArticles(listOf(EditionArticleEntity(editionId = edition, articleId = article.id, position = 0, title = "A long read", sourceTitle = "Saved", minutes = 4.0)))
-        val removed = list.remove(db.articles().byId(article.id)!!)
-        assertEquals(emptyList<Long>(), db.editions().articleIds(edition))
+        runBlocking { list.save("https://a.example/one", "One"); list.save("https://b.example/two", "Two") }
+        val vm = ReadingListViewModel(list, outlive = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined))
+        compose.setContent { ReadingListScreen(vm, onBack = {}) }
+        waitFor("One")
 
-        list.restore(removed)
-
-        assertEquals(listOf(article.id), db.editions().articleIds(edition))
-        assertEquals(ArticleState.IN_EDITION, db.articles().byId(article.id)!!.state)
+        compose.onNodeWithContentDescription("Remove One").performClick()
+        // A second removal settles the first; leaving settles the second.
+        compose.onNodeWithContentDescription("Remove Two").performClick()
+        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.map { it.title } == listOf("Two") }
+        vm.commitRemove()
+        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.isEmpty() }
     }
 }

@@ -81,8 +81,8 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
     val removed by viewModel.removed.collectAsState()
     LaunchedEffect(removed) {
         val gone = removed ?: return@LaunchedEffect
-        val result = snackbar.showSnackbar("Removed “${titleOf(gone.article)}”", actionLabel = "Undo", duration = SnackbarDuration.Long)
-        if (result == SnackbarResult.ActionPerformed) viewModel.undoRemove(gone) else viewModel.dismissRemoved()
+        val result = snackbar.showSnackbar("Removed “${titleOf(gone)}”", actionLabel = "Undo", duration = SnackbarDuration.Long)
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoRemove() else viewModel.commitRemove()
     }
 
     Scaffold(

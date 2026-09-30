@@ -56,30 +56,7 @@ class ReadingListRepository(
         return true
     }
 
-    /** A removed link, with what's needed to put it back as it was. */
-    data class Removed(val article: ArticleEntity, val entries: List<Long>)
-
-    suspend fun remove(article: ArticleEntity): Removed = db.withTransaction {
-        // Deleting unlinks the article from editions' contents; remembered so Undo can relink it.
-        val entries = db.editions().entriesFor(article.id)
-        db.articles().delete(article.id)
-        Removed(article, entries)
-    }
-
-    /**
-     * Puts back a link just removed, as it was, in the editions that held it: an unsent one still
-     * delivers or releases it, and a sent one keeps its star to bring it back.
-     */
-    suspend fun restore(removed: Removed) {
-        val article = removed.article
-        val restored = db.withTransaction {
-            if (db.articles().insertIgnoring(article) == -1L) return@withTransaction false
-            if (removed.entries.isNotEmpty()) db.editions().relink(removed.entries, article.id)
-            true
-        }
-        // Its title lookup may have run, and found nothing, while it was gone.
-        if (restored && article.state == ArticleState.NEW && (article.title.isBlank() || article.pageWords == null)) onUntitled(listOf(article.id))
-    }
+    suspend fun remove(article: ArticleEntity) = db.articles().delete(article.id)
 
     /** @property unread how many of the [added] links are waiting for an edition (archived ones aren't). */
     data class Imported(val format: ReadingListFile.Format, val added: Int, val unread: Int = added)
