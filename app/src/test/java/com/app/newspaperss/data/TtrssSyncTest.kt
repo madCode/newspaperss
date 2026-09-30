@@ -225,6 +225,78 @@ class TtrssSyncTest {
         assertEquals(listOf(10L), server.markedRead)
     }
 
+    /** A pick read through tt-rss is the story it points to, like one from the feed itself, so a story already delivered isn't sent again. */
+    @Test
+    fun aTtrssLinkPostIsItsStoryAndIsMarkedReadIfTheStoryWasDelivered() = runTest {
+        val source = connect()
+        val feed = sources.addFeed("https://other.example/feed", "Other")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = feed, guid = "o1", url = "https://story.example/delivered", title = "Delivered")))
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionWith(feed, "o1"))
+        fun pitchFor(link: String) = "<p>A short pitch.</p><p><a href=\"$link\">Read the story</a></p>"
+        server.unread += FakeTtrss.Item(20, "Pick", feedId = 1, feedTitle = "News", content = pitchFor("https://story.example/new?src=news"))
+        server.unread += FakeTtrss.Item(21, "Old pick", feedId = 1, feedTitle = "News", content = pitchFor("https://story.example/delivered?src=news"))
+
+        assertEquals(1, sync.syncAll().newArticles)
+
+        val pick = db.articles().allForSource(source.id).single()
+        assertEquals("https://story.example/new", pick.url)
+        assertEquals("https://news.example/20", pick.viaUrl)
+        assertEquals(listOf(21L), server.markedRead)
+    }
+
+    /**
+     * A link remembered as delivered with its tracking tags (as it went out) is still recognised
+     * once stored links lose them: tt-rss is told it's read, and it isn't stored to go out again.
+     */
+    @Test
+    fun aLinkDeliveredWithItsTrackingTagsIsMarkedReadAndNotStoredAgain() = runTest {
+        val source = connect()
+        db.openHelper.writableDatabase.execSQL("INSERT INTO delivered_urls (url, deliveredAt) VALUES ('https://news.example/30?utm_source=rss', 0)")
+        server.unread += FakeTtrss.Item(30, "Sent before", feedId = 1, feedTitle = "News", link = "https://news.example/30?utm_source=rss")
+
+        assertEquals(0, sync.syncAll().newArticles)
+
+        assertEquals(listOf(30L), server.markedRead)
+        assertTrue(db.articles().allForSource(source.id).isEmpty())
+    }
+
+    /**
+     * A tt-rss copy of a story that went out from another source isn't offered again, and is
+     * marked read on the server along with the edition's own tt-rss articles.
+     */
+    @Test
+    fun aTtrssCopyOfALinkDeliveredFromAFeedIsUsedUpAndMarkedRead() = runTest {
+        val source = connect()
+        server.add(40, "Shared story", feedId = 1, feedTitle = "News")
+        sync.syncAll()
+        val feed = sources.addFeed("https://other.example/feed", "Other")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = feed, guid = "o40", url = "https://news.example/40", title = "Shared story")))
+        val editionId = editionWith(feed, "o40")
+
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionId)
+
+        assertTrue("not offered again", db.articles().candidates().none { it.sourceId == source.id })
+        assertTrue(ttrss.markRead(editionId))
+        assertEquals(listOf(40L), server.markedRead)
+    }
+
+    /** Marking read runs later, in a worker: a used-up copy the reader has starred since is going out again, so it stays unread. */
+    @Test
+    fun aTtrssCopyStarredSinceDeliveryIsntMarkedRead() = runTest {
+        val source = connect()
+        server.add(41, "Shared story", feedId = 1, feedTitle = "News")
+        sync.syncAll()
+        val feed = sources.addFeed("https://other.example/feed", "Other")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = feed, guid = "o41", url = "https://news.example/41", title = "Shared story")))
+        val editionId = editionWith(feed, "o41")
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionId)
+
+        assertTrue(db.articles().setStarred(db.articles().allForSource(source.id).single().id, true, now))
+        assertTrue(ttrss.markRead(editionId))
+
+        assertTrue(server.markedRead.isEmpty())
+    }
+
     /** Marking read in the app reaches tt-rss at the next sync, so an Undo before then never has to. */
     @Test
     fun articlesMarkedReadInTheAppAreMarkedReadInTtrssAtTheNextSync() = runTest {

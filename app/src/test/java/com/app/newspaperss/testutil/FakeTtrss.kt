@@ -20,7 +20,7 @@ fun testCipher() = AesGcmCipher { SecretKeySpec(ByteArray(32) { it.toByte() }, "
  * articles read as the real API does.
  */
 class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt-rss/api/") {
-    data class Item(val id: Long, val title: String, val feedId: Int, val feedTitle: String, val content: String = "<p>Text of $title.</p>", val categoryId: Int = 0)
+    data class Item(val id: Long, val title: String, val feedId: Int, val feedTitle: String, val content: String = "<p>Text of $title.</p>", val categoryId: Int = 0, val link: String = "https://news.example/$id")
 
     var user = "reader"
     var password = "secret"
@@ -95,7 +95,7 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                             buildJsonObject {
                                 put("id", item.id)
                                 put("title", item.title)
-                                put("link", "https://news.example/${item.id}")
+                                put("link", item.link)
                                 put("content", item.content)
                                 put("author", "")
                                 put("updated", 1_759_125_600L)

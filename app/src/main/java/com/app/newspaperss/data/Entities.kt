@@ -107,6 +107,11 @@ data class ArticleEntity(
     val pageWords: Int? = null,
     /** tt-rss only: marked read on the server after the reader marked it read here, so it isn't sent again. */
     @ColumnInfo(defaultValue = "0") val reportedRead: Boolean = false,
+    /**
+     * A link post's own page, when [url] is the story it points to (see
+     * [com.app.newspaperss.core.feed.LinkPosts]); null for an ordinary article.
+     */
+    val viaUrl: String? = null,
 ) {
     /**
      * When it was published, for showing: a date more than a day after it was fetched is a
