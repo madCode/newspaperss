@@ -39,6 +39,34 @@ class ArtsAndLettersDailyTest {
     }
 
     @Test
+    fun aTeaserWithAParagraphNestedInsideItIsStillRead() {
+        // As on the live page on 2026-09-30: the parser closes the outer <p> at the inner one,
+        // leaving the "more »" link outside any paragraph.
+        val teaser = "<p>Perverseness drove <strong>Edgar Allan Poe</strong> to ruin, or the brink of it, again and again. It was also the source of his inspiration...\u00A0<a"
+        check(teaser in page)
+        val html = page.replace(teaser, "<p><p>Perverseness drove <strong>Edgar Allan Poe</strong> to ruin. It was also the source of his inspiration</p>... <a")
+        val link = ArtsAndLettersDaily.links(html, base)[1]
+        assertEquals("https://newrepublic.com/article/214970/edgar-allan-poe-mined-misery-emily-ogden", link.url)
+        assertEquals("Perverseness drove Edgar Allan Poe to ruin. It was also the source of his inspiration ...", link.summary)
+    }
+
+    @Test
+    fun aNewestEntryWithoutItsLinkOrADividerIsNotReplacedByAnOlderOne() {
+        val column = "<div class=\"col\"><h2 class=\"column_headers\">Articles of Note</h2>" +
+            "<p>Today's pick, link lost</p><p>Yesterday's pick <a href=\"https://example.com/old\">more »</a></p></div>"
+        val others = listOf("New Books", "Essays & Opinions").joinToString("") {
+            "<div><h2 class=\"column_headers\">$it</h2><p>Pick <a href=\"https://example.com/$it\">more »</a></p></div>"
+        }
+        assertEquals("the newest entry in \"Articles of Note\" has no link", layoutChanged("<html><body>$column$others</body></html>"))
+    }
+
+    @Test
+    fun aLinkInTheTeaserIsNotTakenForTheMoreLink() {
+        val html = page.replace("It was also the source of his inspiration", "It was <a href=\"https://example.com/inline\">more than</a> his inspiration")
+        assertEquals("https://newrepublic.com/article/214970/edgar-allan-poe-mined-misery-emily-ogden", ArtsAndLettersDaily.links(html, base)[1].url)
+    }
+
+    @Test
     fun aMissingColumnMeansTheLayoutChanged() {
         assertEquals("no \"New Books\" column", layoutChanged(page.replace(">New Books</a></h2>", ">Books</a></h2>")))
         layoutChanged("<html><body><p>We've redesigned! <a href=\"https://example.com/\">more »</a></p></body></html>")
