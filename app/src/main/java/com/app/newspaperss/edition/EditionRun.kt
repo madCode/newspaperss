@@ -11,7 +11,6 @@ import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.time.Instant
@@ -24,7 +23,6 @@ class EditionRun(
     private val editions: EditionRepository,
     private val folder: FolderWriter,
     private val notifier: EditionNotifier,
-    private val notes: EditionNotes,
     private val now: () -> Instant = Instant::now,
 ) {
     /**
@@ -79,16 +77,6 @@ class EditionRun(
                 // Deleted while its file was being copied: no news about an edition that's gone.
                 if (editions.byId(editionId)?.status != EditionStatus.DELIVERED) return
                 notifier.editionDelivered(edition, s.folderName ?: "your folder")
-                if (s.notesWithEdition) {
-                    // Only after the edition is saved: notes that fail mustn't hold back the book.
-                    val notesError = try {
-                        notes.write(editionId)?.let { folder.deliver(it, folderUri, it.name, EditionNotes.MIME) }
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                        "Couldn't write the notes (${e.message ?: e.javaClass.simpleName})."
-                    }
-                    notesError?.let { notifier.problem("Notes for ${edition.title} weren't saved", it) }
-                }
             } else {
                 // Left READY: the reader can still send it by hand, and nothing is used up.
                 notifier.problem("${edition.title} wasn't delivered", error)

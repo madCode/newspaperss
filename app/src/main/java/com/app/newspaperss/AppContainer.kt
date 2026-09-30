@@ -21,10 +21,12 @@ import com.app.newspaperss.edition.CoverRenderer
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.edition.EditionRun
+import com.app.newspaperss.edition.NotesSaver
 import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
+import com.app.newspaperss.work.NotesWorker
 import com.app.newspaperss.work.ReadingListTitleWorker
 import com.app.newspaperss.work.TtrssMarkReadWorker
 import java.io.File
@@ -41,6 +43,7 @@ class AppContainer(
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
     fetchReadingListTitles: (articleIds: List<Long>) -> Unit = { ReadingListTitleWorker.enqueue(context, it) },
+    saveNotes: (editionId: Long) -> Unit = { NotesWorker.enqueue(context, it) },
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -48,7 +51,7 @@ class AppContainer(
     val sources = SourceRepository(db)
     val readingList = ReadingListRepository(db, onUntitled = fetchReadingListTitles)
     val readingListTitles = ReadingListTitles(db, http)
-    val editions = EditionRepository(db, editionsDir, onTtrssDelivered = markTtrssRead)
+    val editions = EditionRepository(db, editionsDir, onDelivered = saveNotes, onTtrssDelivered = markTtrssRead)
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)
@@ -57,5 +60,7 @@ class AppContainer(
     val settings = SettingsStore(context)
     val notifier = Notifier(context)
     val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))
-    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, FolderDelivery(context.contentResolver), notifier, editionNotes)
+    private val folderDelivery = FolderDelivery(context.contentResolver)
+    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier)
+    val notesSaver = NotesSaver(settings, editions, editionNotes, folderDelivery, notifier)
 }

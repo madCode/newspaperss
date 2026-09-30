@@ -73,6 +73,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             DeliverySection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            NotesSection(s, viewModel)
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
             ReaderSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             val context = LocalContext.current
@@ -209,12 +211,8 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
     val context = LocalContext.current
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            context.contentResolver.takePersistableUriPermission(uri, flags)
-            // Grants are capped per app; let go of the folder this one replaces.
-            s.folderUri?.takeIf { it != uri.toString() }?.let { old ->
-                runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(old), flags) }
-            }
+            context.contentResolver.takePersistableUriPermission(uri, FOLDER_GRANT)
+            release(context, s.folderUri, keep = setOf(uri.toString(), s.notesFolderUri))
             vm.useFolder(uri.toString(), FolderDelivery.displayName(context.contentResolver, uri))
         }
     }
@@ -234,22 +232,55 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
     )
     if (s.delivery == DeliveryMethod.FOLDER) {
         OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = 48.dp)) { Text("Choose another folder") }
-        Row(
-            Modifier.fillMaxWidth().toggleable(s.notesWithEdition, role = Role.Switch, onValueChange = vm::setNotesWithEdition)
-                .padding(start = 48.dp, top = 8.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Also save notes with each edition", style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    "A Markdown file for Obsidian, Logseq or any notes app, with each article's details and prompts for your thoughts.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(checked = s.notesWithEdition, onCheckedChange = null)
+    }
+}
+
+private const val FOLDER_GRANT = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+
+/**
+ * Lets go of a folder no setting uses any more: grants are capped per app. The delivery and
+ * notes folders can be the same one, so neither lets go of a folder the other still holds.
+ */
+private fun release(context: android.content.Context, old: String?, keep: Set<String?>) {
+    if (old == null || old in keep) return
+    runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(old), FOLDER_GRANT) }
+}
+
+@Composable
+private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
+    val context = LocalContext.current
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(uri, FOLDER_GRANT)
+            release(context, s.notesFolderUri, keep = setOf(uri.toString(), s.folderUri))
+            vm.setNotesFolder(uri.toString(), FolderDelivery.displayName(context.contentResolver, uri))
         }
     }
+    val saving = s.notesFolderUri != null
+    Heading("Reading notes")
+    Row(
+        Modifier.fillMaxWidth().toggleable(saving, role = Role.Switch) { on ->
+            if (on) {
+                pickFolder.launch(null)
+            } else {
+                release(context, s.notesFolderUri, keep = setOf(s.folderUri))
+                vm.setNotesFolder(null, null)
+            }
+        }.padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Save notes for each edition", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                s.notesFolderName?.let { "Saved to $it when an edition is delivered." }
+                    ?: "A Markdown file for Obsidian, Logseq or any notes app: each article's details, and a few questions to think about. Pick your vault or notes folder.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = saving, onCheckedChange = null)
+    }
+    if (saving) OutlinedButton(onClick = { pickFolder.launch(null) }) { Text("Choose another folder") }
 }
 
 @Composable

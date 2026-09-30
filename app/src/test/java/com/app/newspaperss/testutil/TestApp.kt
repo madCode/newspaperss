@@ -15,6 +15,8 @@ class TestApp : NewspaperssApp() {
     val markedTtrssRead = mutableListOf<Long>()
     /** Reading-list articles whose titles the app asked to look up in the background. */
     val titlesRequested = mutableListOf<Long>()
+    /** Delivered editions whose notes the app asked to save in the background. */
+    val notesRequested = mutableListOf<Long>()
 
     override fun createContainer() = AppContainer(
         this,
@@ -23,6 +25,7 @@ class TestApp : NewspaperssApp() {
         cipher = testCipher(),
         markTtrssRead = { markedTtrssRead += it },
         fetchReadingListTitles = { titlesRequested += it },
+        saveNotes = { notesRequested += it },
     )
 
     override fun scheduleWork() {}

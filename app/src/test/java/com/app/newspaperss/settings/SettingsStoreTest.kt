@@ -1,6 +1,9 @@
 package com.app.newspaperss.settings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.app.newspaperss.core.edition.Ordering
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -14,7 +17,8 @@ import java.time.LocalTime
 class SettingsStoreTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    private val store by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
+    private val dataStore by lazy { PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") } }
+    private val store by lazy { SettingsStore(dataStore) }
 
     @Test
     fun everyFieldSurvivesARoundTrip() = runTest {
@@ -26,7 +30,8 @@ class SettingsStoreTest {
                 delivery = DeliveryMethod.FOLDER,
                 folderUri = "content://tree/x",
                 folderName = "Books",
-                notesWithEdition = true,
+                notesFolderUri = "content://tree/vault",
+                notesFolderName = "Vault",
             )
         }
         val s = store.current()
@@ -40,7 +45,33 @@ class SettingsStoreTest {
         assertEquals(DeliveryMethod.FOLDER, s.delivery)
         assertEquals("content://tree/x", s.folderUri)
         assertEquals("Books", s.folderName)
-        assertEquals(true, s.notesWithEdition)
+        assertEquals("content://tree/vault", s.notesFolderUri)
+        assertEquals("Vault", s.notesFolderName)
+    }
+
+    @Test
+    fun notesSavedBesideFolderEditionsCarryOverAsTheNotesFolder() = runTest {
+        legacy(DeliveryMethod.FOLDER)
+        assertEquals("content://tree/x", store.current().notesFolderUri)
+        assertEquals("Books", store.current().notesFolderName)
+
+        store.update { it.copy(notesFolderUri = null, notesFolderName = null) }
+        assertNull("turning notes off sticks, rather than the old switch turning them back on", store.current().notesFolderUri)
+    }
+
+    @Test
+    fun theOldNotesSwitchMeantNothingWithoutFolderDelivery() = runTest {
+        legacy(DeliveryMethod.SHARE)
+        assertNull(store.current().notesFolderUri)
+    }
+
+    private suspend fun legacy(delivery: DeliveryMethod) {
+        dataStore.edit {
+            it[stringPreferencesKey("delivery_method")] = delivery.name
+            it[stringPreferencesKey("delivery_folder_uri")] = "content://tree/x"
+            it[stringPreferencesKey("delivery_folder_name")] = "Books"
+            it[booleanPreferencesKey("delivery_notes_with_edition")] = true
+        }
     }
 
     @Test

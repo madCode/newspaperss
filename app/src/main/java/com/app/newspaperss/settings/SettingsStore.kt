@@ -48,8 +48,9 @@ data class Settings(
     /** A persisted SAF tree URI, for [DeliveryMethod.FOLDER]. */
     val folderUri: String? = null,
     val folderName: String? = null,
-    /** With [DeliveryMethod.FOLDER], also save each edition's Markdown reading notes beside it. */
-    val notesWithEdition: Boolean = false,
+    /** A persisted SAF tree URI where each delivered edition's Markdown reading notes are saved, whatever [delivery] is. */
+    val notesFolderUri: String? = null,
+    val notesFolderName: String? = null,
 )
 
 // A corrupt settings file resets to defaults rather than crashing every launch.
@@ -74,7 +75,10 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val delivery = stringPreferencesKey("delivery_method")
         val folderUri = stringPreferencesKey("delivery_folder_uri")
         val folderName = stringPreferencesKey("delivery_folder_name")
-        val notesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
+        val notesFolderUri = stringPreferencesKey("notes_folder_uri")
+        val notesFolderName = stringPreferencesKey("notes_folder_name")
+        /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
+        val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
 
     val settings: Flow<Settings> = store.data.map(::read)
@@ -96,12 +100,17 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             prefs[Keys.delivery] = s.delivery.name
             if (s.folderUri != null) prefs[Keys.folderUri] = s.folderUri else prefs.remove(Keys.folderUri)
             if (s.folderName != null) prefs[Keys.folderName] = s.folderName else prefs.remove(Keys.folderName)
-            prefs[Keys.notesWithEdition] = s.notesWithEdition
+            if (s.notesFolderUri != null) prefs[Keys.notesFolderUri] = s.notesFolderUri else prefs.remove(Keys.notesFolderUri)
+            if (s.notesFolderName != null) prefs[Keys.notesFolderName] = s.notesFolderName else prefs.remove(Keys.notesFolderName)
+            prefs.remove(Keys.legacyNotesWithEdition)
         }
     }
 
     private fun read(p: Preferences): Settings {
         val d = Settings()
+        val delivery = p[Keys.delivery]?.let { runCatching { DeliveryMethod.valueOf(it) }.getOrNull() } ?: d.delivery
+        // Only a folder that was being delivered to had notes saved in it.
+        val legacyNotes = p[Keys.legacyNotesWithEdition] == true && delivery == DeliveryMethod.FOLDER
         return Settings(
             onboarded = p[Keys.onboarded] ?: false,
             device = p[Keys.device]?.let { runCatching { Device.valueOf(it) }.getOrNull() },
@@ -116,10 +125,11 @@ class SettingsStore(private val store: DataStore<Preferences>) {
                 time = p[Keys.scheduleTime]?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: d.schedule.time,
                 days = p[Keys.scheduleDays]?.mapNotNull { runCatching { DayOfWeek.valueOf(it) }.getOrNull() }?.toSet() ?: d.schedule.days,
             ),
-            delivery = p[Keys.delivery]?.let { runCatching { DeliveryMethod.valueOf(it) }.getOrNull() } ?: d.delivery,
+            delivery = delivery,
             folderUri = p[Keys.folderUri],
             folderName = p[Keys.folderName],
-            notesWithEdition = p[Keys.notesWithEdition] ?: d.notesWithEdition,
+            notesFolderUri = p[Keys.notesFolderUri] ?: p[Keys.folderUri]?.takeIf { legacyNotes },
+            notesFolderName = p[Keys.notesFolderName] ?: p[Keys.folderName]?.takeIf { legacyNotes },
         )
     }
 }

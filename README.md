@@ -44,9 +44,10 @@ who'd rather not set up Python, a server and a scheduler.
 - **Star what you want next.** Star an article in a source's list, or one
   from an edition you didn't finish, and it goes first into the next
   edition. Mark the rest as read (for tt-rss too).
-- **Take notes.** Export a Markdown notes file per edition for Obsidian, Logseq or
+- **Take notes.** A Markdown notes file per edition for Obsidian, Logseq or
   any notes app: properties Obsidian understands, a few reflection prompts, and a
-  citation and room for notes under each article.
+  citation and room for notes under each article. Pick a folder (your vault) and
+  each delivered edition's notes are saved there, however you send the edition.
 - **Calm by design.** No unread counts, no infinite timeline, no
   animations to smear on an e-ink screen.
 

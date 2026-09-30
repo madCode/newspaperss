@@ -277,8 +277,14 @@ articles go back, keeping their stars, before the new one is planned.
   checklist (compatible with the library); Pocket and Instapaper exports
   import too.
 - **Settings:** the edition (size, per-source cap, order), the schedule
-  (time and days), your e-reader, delivery (share or folder, optionally the notes file
-  beside each edition), and the app's version.
+  (time and days), your e-reader, delivery (share or folder), reading notes, and the
+  app's version.
+  - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
+    vault, say). Each edition's notes file is saved there once the edition is
+    delivered, by share, folder or Open, in the background so a slow cloud folder
+    doesn't hold up delivery. A folder that refuses the file gets a notification;
+    **Notes** on the edition still shares them. It can be the delivery folder too;
+    changing one folder never drops the app's access to the other.
 
 The look: a newspaper feel (serif headlines, a masthead with the date), but
 calm, with no badges, counts or endless animations, which smear on e-ink.

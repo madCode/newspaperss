@@ -46,6 +46,8 @@ class EditionSentTest {
         callback.sendIntent(app, 0, null, null, null)
 
         idleUntil { statusOf(ready) == EditionStatus.DELIVERED }
+        // A shared edition's notes are saved too, not only a folder-delivered one's.
+        idleUntil { app.notesRequested == listOf(ready) }
     }
 
     @Test
@@ -59,6 +61,7 @@ class EditionSentTest {
 
         idleUntil { statusOf(ready) == EditionStatus.DELIVERED }
         assertEquals(EditionStatus.FAILED, statusOf(released))
+        idleUntil { app.notesRequested == listOf(ready) }
     }
 
     @Test
