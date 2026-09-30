@@ -27,6 +27,9 @@ data class TtrssHeadline(
     val feedId: String,
 )
 
+/** One of the reader's feeds with unread articles, as getFeeds reports it. */
+data class TtrssFeed(val id: Int, val title: String, val unread: Int)
+
 /** A category of the reader's own feeds, as getCategories reports it. */
 data class TtrssCategory(val id: Int, val title: String)
 
@@ -92,6 +95,31 @@ class TtrssClient(
         }
         val items = content as? JsonArray ?: throw TtrssException.NotTtrss()
         return items.mapNotNull { (it as? JsonObject)?.let(::headline) }
+    }
+
+    /**
+     * The reader's feeds that have unread articles.
+     *
+     * @param categoryId a category, its subcategories included, or null for every feed.
+     */
+    suspend fun unreadFeeds(categoryId: Int? = null): List<TtrssFeed> {
+        val content = withSession { sid ->
+            post(buildJsonObject {
+                put("sid", sid)
+                put("op", "getFeeds")
+                put("cat_id", categoryId ?: ALL_FEEDS)
+                put("unread_only", true)
+                if (categoryId != null) put("include_nested", true)
+            })
+        }
+        val items = content as? JsonArray ?: throw TtrssException.NotTtrss()
+        return items.mapNotNull { item ->
+            val o = item as? JsonObject ?: return@mapNotNull null
+            // Ints, or strings in older versions. Negative ids are tt-rss's own virtual feeds.
+            val id = (o["id"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()?.takeIf { it > 0 } ?: return@mapNotNull null
+            val unread = (o["unread"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
+            TtrssFeed(id, (o["title"] as? JsonPrimitive)?.contentOrNull ?: "", unread)
+        }
     }
 
     /**
@@ -193,6 +221,8 @@ class TtrssClient(
 
     companion object {
         const val ALL_ARTICLES = -4
+        /** getFeeds' "every feed, without tt-rss's virtual ones". */
+        private const val ALL_FEEDS = -3
         const val MAX_LIMIT = 200
         private const val FIELD_UNREAD = 2
 

@@ -101,6 +101,23 @@ class TtrssSyncTest {
     }
 
     @Test
+    fun aQuietFeedIsntCrowdedOutByABusyOne() = runTest {
+        val source = connect()
+        server.add(1, "A monthly essay", feedId = 7, feedTitle = "Quarterly Review")
+        (2L..301L).forEach { server.add(it, "Headline $it", feedId = 111, feedTitle = "Busy News") }
+
+        sync.syncAll()
+
+        val articles = db.articles().allForSource(source.id)
+        assertTrue(articles.any { it.title == "A monthly essay" })
+        assertEquals(
+            "the busy feed's newest few",
+            (297L..301L).map { "ttrss:$it" }.toSet(),
+            articles.filter { it.originId == "111" }.map { it.guid }.toSet(),
+        )
+    }
+
+    @Test
     fun problemsShowOnTheSourceAndClearOnSuccess() = runTest {
         val source = connect()
         server.password = "changed"

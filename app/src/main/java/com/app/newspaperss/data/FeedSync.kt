@@ -96,7 +96,10 @@ class FeedSync(
             val client = account.client(http)
             try {
                 val category = source.ttrssCategoryId
-                val headlines = client.unreadHeadlines(feedId = category ?: TtrssClient.ALL_ARTICLES, isCategory = category != null)
+                // A few from each feed rather than the newest 200 overall: busy news feeds would
+                // fill those 200, and a feed that posts monthly would never reach the paper.
+                val headlines = client.unreadFeeds(category).filter { it.unread > 0 }
+                    .flatMap { client.unreadHeadlines(feedId = it.id, limit = TTRSS_PER_FEED) }
                 // A link already delivered (from a feed, or before the account was reconnected) is
                 // skipped like any other, and tt-rss is told it's read unless the reader said not to:
                 // otherwise it would sit unread there for good.
@@ -191,6 +194,8 @@ class FeedSync(
 
         /** tt-rss articles are stored with this guid prefix followed by their tt-rss id. */
         const val TTRSS_GUID_PREFIX = "ttrss:"
+        /** Unread articles taken from each tt-rss feed per sync; a paper takes one or two per feed. */
+        const val TTRSS_PER_FEED = 5
         const val CATEGORY_GONE = "Your chosen tt-rss category isn't there any more. Choose another on this source's page."
         const val SIGN_IN_AGAIN = "Sign in to tt-rss again: tap the menu at the top of Sources."
     }

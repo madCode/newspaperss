@@ -120,6 +120,20 @@ class TtrssClientTest {
     }
 
     @Test
+    fun unreadFeedsAskForEveryRealFeedOrOneCategoryWithItsSubcategories() = runTest {
+        server.reply(ok("""{"session_id":"sid-1"}"""))
+        server.reply(ok("""[{"id":7,"title":"A Blog","unread":3},{"id":"12","title":"Old","unread":"1"},{"id":-4,"title":"All articles","unread":9}]"""))
+        server.reply(ok("[]"))
+        val client = client()
+
+        assertEquals(listOf(TtrssFeed(7, "A Blog", 3), TtrssFeed(12, "Old", 1)), client.unreadFeeds())
+        client.unreadFeeds(categoryId = 5)
+
+        assertEquals("""{"sid":"sid-1","op":"getFeeds","cat_id":-3,"unread_only":true}""", server.sent[1].toString())
+        assertEquals("""{"sid":"sid-1","op":"getFeeds","cat_id":5,"unread_only":true,"include_nested":true}""", server.sent[2].toString())
+    }
+
+    @Test
     fun categoriesLeaveOutTtrssOwnGroups() = runTest {
         server.reply(loggedIn)
         server.reply(ok("""[{"id":"2","title":"News","unread":4},{"id":-1,"title":"Special"},{"id":-2,"title":"Labels"},{"id":0,"title":"Uncategorized"}]"""))

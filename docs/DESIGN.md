@@ -149,7 +149,9 @@ articles go into the new one.
 - **Everything else expires.** Unplanned articles older than the source's
   keep window (7 days for news feeds, never for the reading list) quietly
   go. Curated lists keep only their newest 12 unread links.
-- **tt-rss:** articles are marked read on the server once delivered. A
+- **tt-rss:** each sync takes up to five unread articles from every feed, so a
+  feed that posts monthly isn't crowded out by busy ones. Articles are marked read
+  on the server once delivered. A
   source can turn that off, or take one category instead of all unread.
 - **Housekeeping.** Only the newest 14 editions keep their EPUB on the
   phone (ready ones always do). An article's feed text is dropped a month

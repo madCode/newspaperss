@@ -58,10 +58,29 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
         }
         if (str("sid") !in live) return error("NOT_LOGGED_IN")
         return when (op) {
+            "getFeeds" -> ok(
+                buildJsonArray {
+                    val category = str("cat_id")!!.toInt().takeIf { it >= 0 }
+                    unread.filter { category == null || it.categoryId == category }.groupBy { it.feedId }.forEach { (id, items) ->
+                        add(buildJsonObject { put("id", id); put("title", items.first().feedTitle); put("unread", items.size); put("cat_id", items.first().categoryId) })
+                    }
+                    // A virtual feed, which isn't one of the reader's.
+                    add(buildJsonObject { put("id", -4); put("title", "All articles"); put("unread", unread.size) })
+                },
+            )
             "getHeadlines" -> ok(
                 buildJsonArray {
-                    val category = str("feed_id")?.toInt()?.takeIf { str("is_cat") == "true" }
-                    unread.filter { category == null || it.categoryId == category }.forEach { item ->
+                    val feed = str("feed_id")!!.toInt()
+                    val isCategory = str("is_cat") == "true"
+                    val limit = str("limit")?.toInt() ?: 200
+                    // Newest first, as tt-rss sorts them; a higher id is newer here.
+                    unread.filter {
+                        when {
+                            isCategory -> it.categoryId == feed
+                            feed > 0 -> it.feedId == feed
+                            else -> true
+                        }
+                    }.sortedByDescending { it.id }.take(limit).forEach { item ->
                         add(
                             buildJsonObject {
                                 put("id", item.id)
