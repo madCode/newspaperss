@@ -8,10 +8,45 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** Night 2, focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. Stars (put an article in the next paper) are being built from the design passes; EPUB design round 2 and a walk-through as that reader are under way.
+- **In flight:** Night 2, focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. Shipped so far: stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync and a category choice, fair turns across many feeds, Obsidian-friendly notes, a dark preview.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Night 2 · Tue 29 Sep, 20:30 PT –
+
+### Cycle 45: the preview in dark mode (23:05–23:20, [#59](https://github.com/madCode/newspaperss/pull/59))
+- **From device testing:** with the app in dark mode, the article preview stayed black on white.
+- **Shipped:** the preview gives each page the app theme's colours (the book leaves colours to the e-reader), and starts dark so it doesn't flash white.
+- **Review caught:** a page reached by "Next" came unstyled, black on near-black; the style now goes on every book page the preview serves, after the book's stylesheet.
+
+### Cycle 44: every source gets its turn (22:45–23:12, [#58](https://github.com/madCode/newspaperss/pull/58))
+- **From the persona audit:** the take-turns start slid by one feed per edition, so with 60 tt-rss feeds and room for 8, seven of yesterday's eight came back, and a quiet feed's article expired before its turn.
+- **Shipped:** turns start with the source featured longest ago; delivered editions break ties; starred articles and editions never sent don't count as a turn.
+- **Review caught:** without the tie-breaker, when most sources fit, the same few went in every edition (20 appearances against 10); a star used up its source's turn; no test covered tt-rss feeds or unsent editions.
+
+### Cycle 43: stars and Mark as read (21:42–22:57, [#57](https://github.com/madCode/newspaperss/pull/57))
+- **Decided with you:** tap opens the original; `☆ Next edition` puts an article in the next paper; "Mark as read" keeps it out, with Undo. Three design passes first (light, dark, e-ink, 200% font).
+- **Shipped:** stars replace bring back as one flag and go first across *all* sources (bring back only jumped its own source's queue, a persona-audit bug); delivery clears stars on every copy of a link; an unsent edition gives articles back their exact earlier state; Mark as read reaches tt-rss from the database at the next sync; database version 3.
+- **Review caught:** Mark as read during a build was silently undone (now held while an edition is being made); marked articles outside tt-rss's five-per-feed window never reached the server; a re-saved link could be dropped on release; a link could go out twice through a starred copy; a stale Undo could come back; the Today count double-counted. A second look caught a build that could stay stuck "being made" and a hold that never expired on an open screen.
+
+### Cycle 42: tt-rss asks which articles (22:37–22:47, [#56](https://github.com/madCode/newspaperss/pull/56))
+- **From the persona audit:** a returning reader's first paper came from all unread, mostly news; the category choice was only on the source's page.
+- **Shipped:** after signing in, "Which articles?" (all unread, or one category); the account is saved only on Add.
+- **Review caught:** the first version saved the account at sign-in, so backing out or a sync during the question could leave it half-set or lose articles for good. Redesigned to save nothing until Add.
+
+### Cycle 41: the EPUB, Kindle first (21:41–22:28, [#55](https://github.com/madCode/newspaperss/pull/55))
+- **Found by the design passes:** Kindle drops `body >` rules, which held nearly all the book's styling; headlines came out justified with wide gaps.
+- **Shipped:** styles by class; left-aligned headings; a cover whose date you can read in the library; the book opens at the contents; contents entries point at articles (an epubcheck warning); a closing page; no "0 min" for comics.
+- **Review caught:** the in-app preview lost its margins; a comics-only section said "0 min"; `text-align: start` might justify on Kindle; right-to-left captions and quotes fought the new rules.
+
+### Cycle 40: notes for Obsidian (22:05–22:20, [#54](https://github.com/madCode/newspaperss/pull/54))
+- **From the persona audit:** five prompts under every article read as homework, and Obsidian's properties got nothing.
+- **Shipped:** front matter (date, edition, sources, a tag) and three prompts once at the top.
+- **Review caught:** a stray control character in a title broke the front matter in strict YAML parsers.
+
+### Cycle 39: tt-rss, a few from every feed (21:50–22:05, [#53](https://github.com/madCode/newspaperss/pull/53))
+- **From the persona audit:** one call for the newest 200 unread let busy news feeds crowd out monthly essays.
+- **Shipped:** up to five unread from each feed, newest first.
+- **Review caught:** subcategories came back as items and were fetched as unrelated feeds; one failing feed failed the whole sync; "newest five" were really the highest-scored.
 
 ### Cycle 38: a daily live check of the curated lists (21:41–21:48, [#51](https://github.com/madCode/newspaperss/pull/51))
 - **Why:** the unit tests read pages saved on the day each parser was written, so they couldn't see Arts & Letters Daily change. Coverage wouldn't have helped either: the parser was covered.
