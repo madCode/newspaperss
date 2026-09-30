@@ -13,7 +13,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Night 2 · Tue 29 Sep, 20:30 PT –
 
-### Cycle 55: no Open for a Kindle (02:05–, this PR)
+### Cycle 55: no Open for Kindle and Kobo (02:05–, this PR)
 - **From the persona audit:** Today and the edition page offered Open to a Kindle owner, which opens the book on the phone, the one thing the app tells her not to do.
 - **Shipped:** Kindle and Kobo readers see Send (and Send again) without Open. Boox readers still get Open first; everyone else keeps both.
 

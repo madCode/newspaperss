@@ -40,7 +40,7 @@ enum class Device(val label: String) {
 
 /**
  * Whether Open is any use: it opens the book on this phone, and a Kindle or Kobo reader gets it
- * there by sending it. Unknown (settings not loaded yet) keeps Open.
+ * onto their e-reader by sending it. Unknown (settings not loaded yet) keeps Open.
  */
 val Device?.offersOpen: Boolean get() = this != Device.KINDLE && this != Device.KOBO
 
