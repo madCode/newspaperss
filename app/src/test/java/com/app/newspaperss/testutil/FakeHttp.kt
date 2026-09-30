@@ -9,6 +9,8 @@ class FakeHttp : HttpClient {
     /** url -> (status, body); a missing url is a 404. */
     val pages = mutableMapOf<String, Pair<Int, String>>()
     val unreachable = mutableSetOf<String>()
+    /** Urls whose POSTs time out, as OkHttp reports a slow server. */
+    val timingOut = mutableSetOf<String>()
     /** Runs after the request is "sent" and before the response returns, to simulate edits made meanwhile. */
     var beforeResponse: suspend (url: String) -> Unit = {}
 
@@ -24,6 +26,7 @@ class FakeHttp : HttpClient {
 
     override suspend fun postJson(url: String, body: String): HttpResponse {
         if (url in unreachable) throw IOException("unreachable")
+        if (url in timingOut) throw java.net.SocketTimeoutException("timeout")
         val (code, reply) = onPost(url, body)
         return HttpResponse(code, url, "application/json", reply)
     }

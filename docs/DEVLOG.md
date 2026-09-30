@@ -13,7 +13,12 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Night 2 · Tue 29 Sep, 20:30 PT –
 
-### Cycle 56: leave a tt-rss feed out (02:15–, this PR)
+### Cycle 57: a slow tt-rss server says so (02:37–, this PR)
+- **From the persona audit:** a home server on a slow line timed out and the app said "Couldn't reach tt-rss", sending you to check a connection that works.
+- **Shipped:** a slow answer now says tt-rss took too long: on the source (with "it'll be tried again at the next sync", which is true there), when signing in, choosing a category and marking read. Start fresh says the server may still be working through it.
+- **Review caught:** the retry promise shown where nothing retries (start fresh, categories, the mark-read note); a connect timeout, which means an unreachable server (a VPN off, a wrong address), taken for slowness.
+
+### Cycle 56: leave a tt-rss feed out (02:15–02:37, [#72](https://github.com/madCode/newspaperss/pull/72))
 - **From the persona audit:** a noisy feed (a live blog, press releases) kept taking a slot, and the only fix was on the server.
 - **Shipped:** "Feeds in your paper" on the tt-rss source's page: a checkbox per feed. A left-out feed isn't fetched and its waiting articles go, except starred ones. Database version 5.
 - **Review caught:** a choice carried over to another tt-rss user on the same server; left-out articles still shown as waiting; feeds from outside the chosen category listed for ever, under their alphabetically last name instead of their latest; a promise that a star would still bring one in, when nothing new is fetched to star.

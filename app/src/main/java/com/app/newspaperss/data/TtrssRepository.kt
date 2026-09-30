@@ -37,7 +37,10 @@ class TtrssRepository(
         } catch (e: TtrssException) {
             return Check.Failed(e.message ?: "tt-rss reported an error.")
         } catch (e: IOException) {
-            return Check.Failed("Couldn't reach ${address.trim()}. Check the address and your connection.")
+            return Check.Failed(
+                if (FeedSync.tooSlow(e)) "${address.trim()} took too long to answer. Try again in a moment."
+                else "Couldn't reach ${address.trim()}. Check the address and your connection.",
+            )
         } finally {
             logOut(client)
         }
@@ -103,7 +106,7 @@ class TtrssRepository(
         } catch (e: TtrssException) {
             Categories.Failed(e.message ?: "tt-rss reported an error.")
         } catch (e: IOException) {
-            Categories.Failed("Couldn't reach tt-rss.")
+            Categories.Failed(FeedSync.ttrssUnreachable(e))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -150,7 +153,8 @@ class TtrssRepository(
         } catch (e: TtrssException) {
             return e.message ?: "tt-rss reported an error."
         } catch (e: IOException) {
-            return "Couldn't reach tt-rss."
+            // The catch-up may still be running on the server after the app stops waiting.
+            return if (FeedSync.tooSlow(e)) "tt-rss took too long to answer. It may still be working through it: check in tt-rss before trying again." else FeedSync.ttrssUnreachable(e)
         } finally {
             logOut(client)
         }
@@ -189,7 +193,7 @@ class TtrssRepository(
         } catch (e: TtrssException) {
             e.message to (e is TtrssException.HttpError)
         } catch (e: IOException) {
-            "Couldn't reach tt-rss." to true
+            FeedSync.ttrssUnreachable(e) to true
         } finally {
             logOut(client)
         }

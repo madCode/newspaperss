@@ -64,6 +64,9 @@ class TtrssSyncTest {
             "Couldn't reach rss.example.com/tt-rss. Check the address and your connection.",
             ttrss.connect("rss.example.com/tt-rss", "reader", "secret"),
         )
+        http.unreachable.clear()
+        http.timingOut += server.apiUrl
+        assertEquals("rss.example.com/tt-rss took too long to answer. Try again in a moment.", ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
         assertEquals(StoredAccount.None, accounts.load())
         assertTrue(db.sources().all().isEmpty())
     }
@@ -208,7 +211,13 @@ class TtrssSyncTest {
         sync.syncAll()
         assertEquals("Couldn't reach tt-rss.", db.sources().byId(source.id)!!.lastError)
 
+        // A slow home server isn't a connection problem, and shouldn't send the reader to check one.
         http.unreachable.clear()
+        http.timingOut += server.apiUrl
+        sync.syncAll()
+        assertEquals("tt-rss took too long to answer. It'll be tried again at the next sync.", db.sources().byId(source.id)!!.lastError)
+
+        http.timingOut.clear()
         sync.syncAll()
         assertNull(db.sources().byId(source.id)!!.lastError)
     }
@@ -529,6 +538,20 @@ class TtrssSyncTest {
         server.apiLevel = 14
         assertEquals("Your tt-rss is too old for this. Update it, or use Mark as read in tt-rss itself.", ttrss.startFresh(source.id))
         assertTrue(server.caughtUp.isEmpty())
+    }
+
+    @Test
+    fun aConnectTimeoutIsAConnectionProblemNotASlowServer() = runTest {
+        // A switched-off VPN or a wrong address behind a firewall times out connecting.
+        assertEquals("Couldn't reach tt-rss.", FeedSync.ttrssUnreachable(java.net.SocketTimeoutException("connect timed out")))
+        assertEquals("tt-rss took too long to answer.", FeedSync.ttrssUnreachable(java.net.SocketTimeoutException("timeout")))
+    }
+
+    @Test
+    fun startingFreshThatTimesOutDoesntPromiseARetry() = runTest {
+        val source = connect()
+        http.timingOut += server.apiUrl
+        assertEquals("tt-rss took too long to answer. It may still be working through it: check in tt-rss before trying again.", ttrss.startFresh(source.id))
     }
 
     @Test
