@@ -43,6 +43,7 @@ import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.testutil.TestApp
+import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.clearFileProviderCache
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.EditionDetailScreen
@@ -79,8 +80,9 @@ import java.time.ZoneOffset
 // Tall enough that every row of these short editions is composed without scrolling.
 @Config(application = TestApp::class, qualifiers = "w411dp-h891dp")
 class EditionDetailScreenTest {
-    @get:Rule val compose = createComposeRule()
-    @get:Rule val tmp = TemporaryFolder()
+    @get:Rule(order = 0) val closeDb = closeAfter { db.close() }
+    @get:Rule(order = 1) val tmp = TemporaryFolder()
+    @get:Rule(order = 2) val compose = createComposeRule()
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
@@ -91,8 +93,6 @@ class EditionDetailScreenTest {
     private val notes by lazy {
         EditionNotes(db, File(ApplicationProvider.getApplicationContext<Application>().filesDir, "notes")) { ZoneOffset.UTC }
     }
-
-    @After fun close() = db.close()
 
     @Before @After fun freshFileProvider() = clearFileProviderCache()
 
