@@ -133,7 +133,20 @@ phone. What's missing:
   library's Markdown checklist, settings), for people without Google services or moving to another
   reader, and a matching import.
 
-### An iOS app
+### From the competitor research ([docs/research/competitors.md](research/competitors.md))
+- **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
+  has no folder trees, so this needs the Drive API (an OAuth client, like Dropbox's app key).
+- **Close the loop from the device:** finished on the e-reader means archived; KOReader highlights feed the notes export.
+- **More importers:** Matter, Readwise, Raindrop and Omnivore exports, for people leaving shut-down apps.
+- **An OPDS catalog served from the phone,** for KOReader and jailbroken Kindles.
+
+## Parked and decided against
+
+- **Generated summaries:** not doing. The paper gives whole articles; AI-shortened digests are what
+  the competitors do, not what this app is for.
+
+### An iOS app (parked)
+Parked: Android comes first. Kept here for the notes.
 Possible, but a second app rather than a port:
 - `:core` is plain Kotlin, but leans on JVM libraries (jsoup, Readability4J, OkHttp). Kotlin
   Multiplatform would need replacements (Ksoup, Ktor, a Readability port), then Compose
@@ -144,13 +157,6 @@ Possible, but a second app rather than a port:
   KOReader users are mostly on Android anyway.
 - It needs a Mac to build and an Apple developer account ($99 a year) to ship.
 A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps the logic shared.
-
-### From the competitor research ([docs/research/competitors.md](research/competitors.md))
-- **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
-  has no folder trees, so this needs the Drive API (an OAuth client, like Dropbox's app key).
-- **Close the loop from the device:** finished on the e-reader means archived; KOReader highlights feed the notes export.
-- **More importers:** Matter, Readwise, Raindrop and Omnivore exports, for people leaving shut-down apps.
-- **An OPDS catalog served from the phone,** for KOReader and jailbroken Kindles.
 
 ## Done
 
