@@ -10,6 +10,8 @@ import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.data.MarkedRead
+import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.TestApp
@@ -40,7 +42,7 @@ class EditionBuilderTest {
     @get:Rule val dbRule = DbRule()
     private val db = dbRule.db
     private val clock = Clock.fixed(Instant.parse("2026-09-29T06:30:00Z"), ZoneOffset.UTC)
-    private val sources = SourceRepository(db)
+    private val sources = SourceRepository(db, clock)
     private val unreadable = mutableSetOf<String>()
     private val broken = mutableSetOf<String>()
     private val content = ArticleContentProvider { a, _, _ ->
@@ -254,18 +256,93 @@ class EditionBuilderTest {
     }
 
     @Test
-    fun unstarringACopyWhoseLinkWentOutFromAnotherSourceRetiresIt() = runTest {
+    fun starringAnotherSourcesCopyOfALinkInAnUnsentEditionDoesntSendItTwice() = runTest {
+        source("a", null, "a1")
+        val b = sources.addFeed("https://b.example/feed", "b")
+        val unsent = builder.build(EditionSettings()) as BuildResult.Built
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
+        editions.setStarred(idOf("b-copy"), true)
+
+        editions.markDelivered(unsent.editionId)
+
+        assertEquals(ArticleState.DELIVERED, stateOf("b-copy"))
+        assertEquals(null, starredAt("b-copy"))
+        assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
+    }
+
+    @Test
+    fun marksAndUnstarsDuringABuildWaitSoTheBookAndTheArticlesAgree() = runTest {
+        source("a", null, "a1")
+        source("b", null, "b1")
+        editions.setStarred(idOf("b1"), true)
+        var markedDuringBuild: MarkedRead? = null
+        var unstarredDuringBuild: Boolean? = null
+        val meddling = ArticleContentProvider { a, _, _ ->
+            if (a.guid == "a1") {
+                markedDuringBuild = sources.markRead(a.id)
+                unstarredDuringBuild = sources.setStarred(idOf("b1"), false)
+            }
+            ArticleContent(a.title, null, "<p>${a.title}</p>", wordCount = 200)
+        }
+        val built = EditionBuilder(db, meddling, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+
+        assertEquals(null, markedDuringBuild)
+        assertEquals(false, unstarredDuringBuild)
+        assertEquals(2, db.editions().articleIds(built.editionId).size)
+        assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
+        assertTrue("still starred, as the edition says", starredAt("b1") != null)
+
+        editions.delete(built.editionId)
+        assertTrue("allowed again once the build is over", sources.markRead(idOf("a1")) != null)
+    }
+
+    @Test
+    fun aBuildWithNothingToPickLeavesNoEditionBehindToHoldTheButtons() = runTest {
+        assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
+        assertEquals(0, db.editions().count())
+        assertFalse(editions.observeBuilding().first())
+    }
+
+    @Test
+    fun aReSavedLinkThatWasDeliveredBeforeGoesBackToWaitingIfItsEditionIsNeverSent() = runTest {
+        val list = ReadingListRepository(db)
+        list.save("https://saved.example/1")
+        editions.markDelivered((builder.build(EditionSettings()) as BuildResult.Built).editionId)
+        // Saved again after going out, as a new row (the old one removed from the list).
+        db.articles().delete(idOf("https://saved.example/1"))
+        list.save("https://saved.example/1")
+
+        val unsent = builder.build(EditionSettings()) as BuildResult.Built
+        editions.delete(unsent.editionId)
+
+        assertEquals(ArticleState.NEW, stateOf("https://saved.example/1"))
+    }
+
+    @Test
+    fun aStarredArticleThatWasMarkedReadIsStillMarkedReadIfItsEditionIsNeverSentAndItsUnstarred() = runTest {
+        source("a", null, "a1")
+        sources.markRead(idOf("a1"))
+        editions.setStarred(idOf("a1"), true)
+        val unsent = builder.build(EditionSettings()) as BuildResult.Built
+
+        editions.delete(unsent.editionId)
+        assertEquals(ArticleState.SKIPPED, stateOf("a1"))
+        assertTrue(starredAt("a1") != null)
+        editions.setStarred(idOf("a1"), false)
+
+        assertEquals(ArticleState.SKIPPED, stateOf("a1"))
+        assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
+    }
+
+    @Test
+    fun aLinkStarredInTwoSourcesCountsOnceOnToday() = runTest {
         source("a", null, "a1")
         val b = sources.addFeed("https://b.example/feed", "b")
         db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
+        editions.setStarred(idOf("a1"), true)
         editions.setStarred(idOf("b-copy"), true)
-        sources.setPaused(b, true)
-        editions.markDelivered((builder.build(EditionSettings()) as BuildResult.Built).editionId)
-        assertEquals("a starred copy isn't used up by delivery elsewhere", ArticleState.NEW, stateOf("b-copy"))
 
-        editions.setStarred(idOf("b-copy"), false)
-
-        assertEquals(ArticleState.DELIVERED, stateOf("b-copy"))
+        assertEquals(1, editions.observeStarredWaiting().first())
     }
 
     @Test

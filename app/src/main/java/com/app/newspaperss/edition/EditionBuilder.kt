@@ -66,11 +66,6 @@ class EditionBuilder(
         releaseUndelivered()
         val sources = db.sources().all().filter { !it.paused }
         val sourcesById = sources.associateBy { it.id }
-        // The same link from two sources goes in once, and a starred copy is the one kept.
-        val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
-            .sortedBy { it.starredAt == null }
-            .distinctBy { it.url.ifBlank { "#${it.id}" } }
-        if (articles.isEmpty()) return BuildResult.NothingNew
 
         // A timed edition is built ahead of its time; it's titled and dated for when it's due.
         val now = LocalDateTime.ofInstant(dueAt ?: clock.instant(), zone)
@@ -80,6 +75,17 @@ class EditionBuilder(
         val title = EditionTitles.title(now, db.editions().titlesSince(since))
         val rotation = db.editions().count()
         val editionId = db.editions().insert(EditionEntity(title = title, createdAt = clock.instant()))
+        // Read only once the edition is BUILDING, which holds off "Mark as read" and unstarring
+        // (see ArticleDao.markRead): the articles picked here are written into the book, so a
+        // change made afterwards would be silently undone when they're marked IN_EDITION.
+        // The same link from two sources goes in once, and a starred copy is the one kept.
+        val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
+            .sortedBy { it.starredAt == null }
+            .distinctBy { it.url.ifBlank { "#${it.id}" } }
+        if (articles.isEmpty()) {
+            db.editions().deleteEmpty(editionId)
+            return BuildResult.NothingNew
+        }
 
         // Whatever goes wrong from here, the edition must not stay BUILDING: the Today screen
         // would show it as being made forever. Its articles only change state in the final
@@ -201,7 +207,7 @@ class EditionBuilder(
         db.withTransaction {
             db.editions().insertArticles(
                 arranged.mapIndexed { i, (a, c) ->
-                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = bylineOf(a, sourcesById.getValue(a.sourceId)), minutes = minutesOf(c), starred = a.starredAt != null)
+                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = bylineOf(a, sourcesById.getValue(a.sourceId)), minutes = minutesOf(c), starred = a.starredAt != null, stateBefore = a.state)
                 },
             )
             db.articles().setState(arranged.map { it.first.id }, ArticleState.IN_EDITION)
@@ -225,7 +231,7 @@ class EditionBuilder(
             db.withTransaction {
                 // Read again inside the transaction: it may have been sent since it was listed.
                 val edition = editions.byId(listed.id)?.takeIf { it.status == EditionStatus.READY } ?: return@withTransaction
-                db.articles().release(editions.articleIds(edition.id))
+                db.articles().release(edition.id)
                 editions.update(edition.copy(status = EditionStatus.FAILED, error = NOT_SENT))
             }
         }

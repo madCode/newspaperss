@@ -47,6 +47,7 @@ class EditionRepository(
             db.articles().setDelivered(articleIds)
             db.articles().rememberDelivered(articleIds, clock.instant())
             db.articles().deliverCopies(articleIds)
+            db.articles().unstarCopies(articleIds)
             db.editions().update(edition.copy(status = EditionStatus.DELIVERED, deliveredAt = clock.instant(), error = null))
             true
         }
@@ -61,10 +62,13 @@ class EditionRepository(
 
     /**
      * Stars an article for the next edition, or unstars it. Starring a delivered article is how
-     * it's brought back. Returns false if it's in an unsent edition, which can't change.
+     * it's brought back. Returns false if it's in an unsent edition, which can't change, or if
+     * unstarring while an edition is being made (see [observeBuilding]).
      */
-    suspend fun setStarred(articleId: Long, starred: Boolean): Boolean =
-        (if (starred) db.articles().star(articleId, clock.instant()) else db.articles().unstar(articleId)) > 0
+    suspend fun setStarred(articleId: Long, starred: Boolean): Boolean = db.articles().setStarred(articleId, starred, clock.instant())
+
+    /** While an edition is being made, articles can be starred but not unstarred or marked read. */
+    fun observeBuilding(): Flow<Boolean> = db.editions().observeBuilding(clock.instant().minus(BUILD_HOLD))
 
     /** Starred articles waiting for an edition, from sources that aren't paused. */
     fun observeStarredWaiting(): Flow<Int> = db.articles().observeStarredWaiting()
@@ -80,7 +84,7 @@ class EditionRepository(
         val deleted = db.withTransaction {
             val edition = db.editions().byId(id)
                 ?.takeIf { it.status != EditionStatus.BUILDING && it.status != EditionStatus.DELETED } ?: return@withTransaction null
-            if (edition.status == EditionStatus.READY) db.articles().release(db.editions().articleIds(id))
+            if (edition.status == EditionStatus.READY) db.articles().release(id)
             db.editions().deleteArticles(id)
             db.editions().update(edition.copy(status = EditionStatus.DELETED, fileName = null, articleCount = 0, minutes = 0.0, error = null))
             edition

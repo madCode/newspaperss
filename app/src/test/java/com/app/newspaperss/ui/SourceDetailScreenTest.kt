@@ -1,5 +1,15 @@
 package com.app.newspaperss.ui
 
+import org.junit.Assert.assertFalse
+import com.app.newspaperss.ui.components.BUILDING_NOTE
+import com.app.newspaperss.data.MarkedRead
+import com.app.newspaperss.data.EditionEntity
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import org.robolectric.Shadows.shadowOf
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertIsOn
@@ -270,6 +280,46 @@ class SourceDetailScreenTest {
         idleUntil { compose.waitForIdle(); runBlocking { db.articles().byId(waiting)!!.state } == ArticleState.NEW }
         assertEquals(starredAt, runBlocking { db.articles().byId(waiting)!!.starredAt })
         idleUntil { compose.waitForIdle(); visible("Starred for your next edition") }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun whileAnEditionIsBeingMadeMarkAsReadAndUnstarringWaitAndSaySo() {
+        val (id, ids) = sourceWithArticles()
+        runBlocking {
+            repo.setStarred(ids.getValue("delivered"), true)
+            db.editions().insert(EditionEntity(title = "Being made", createdAt = Instant.now()))
+        }
+        show(id)
+
+        idleUntil { compose.waitForIdle(); visible(BUILDING_NOTE) }
+        compose.onNodeWithContentDescription("Mark Article waiting as read").assertIsNotEnabled()
+        star("Article delivered").assertIsNotEnabled()
+        star("Article waiting").assertIsEnabled().performClick()
+        idleUntil { runBlocking { db.articles().byId(ids.getValue("waiting"))!!.starredAt } != null }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun anUndoOfferEndsWithTheScreenAndMarkingTheSameArticleAgainOffersItAgain() {
+        val (id, ids) = sourceWithArticles()
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        var shown by mutableStateOf(true)
+        compose.setContent { if (shown) SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { visible("Article waiting") }
+
+        compose.onNodeWithContentDescription("Mark Article waiting as read").performClick()
+        idleUntil { compose.waitForIdle(); visible("Undo") }
+        shown = false
+        idleUntil { compose.waitForIdle(); vm.undoOffer.value == null }
+
+        shown = true
+        compose.waitForIdle()
+        assertFalse("no stale Undo when coming back", visible("Undo"))
+        runBlocking { repo.undoMarkRead(MarkedRead(ids.getValue("waiting"), null)) }
+        idleUntil { compose.waitForIdle(); compose.onAllNodes(hasContentDescription("Mark Article waiting as read")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Mark Article waiting as read").performClick()
+        idleUntil { compose.waitForIdle(); visible("Undo") }
     }
 
     @Test

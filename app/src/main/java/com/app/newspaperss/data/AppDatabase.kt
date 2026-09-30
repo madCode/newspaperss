@@ -47,7 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE TABLE articles_new (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, " +
                         "`guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, " +
                         "`feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `starredAt` INTEGER, " +
-                        "`originId` TEXT, `originTitle` TEXT, `pageWords` INTEGER, " +
+                        "`originId` TEXT, `originTitle` TEXT, `pageWords` INTEGER, `reportedRead` INTEGER NOT NULL DEFAULT 0, " +
                         "FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
                 )
                 db.execSQL(
@@ -66,6 +66,19 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL("DROP TABLE edition_article_links")
                 db.execSQL("ALTER TABLE edition_articles ADD COLUMN `starred` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE edition_articles ADD COLUMN `stateBefore` TEXT")
+                // An article in an unsent edition whose link was already delivered was brought back
+                // (version 2 cleared the flag once it went in). It stays starred, so if the edition is
+                // never sent it keeps its place and returns to delivered rather than being lost.
+                db.execSQL(
+                    "UPDATE articles SET starredAt = discoveredAt WHERE state = 'IN_EDITION' AND url != '' " +
+                        "AND url IN (SELECT url FROM delivered_urls)",
+                )
+                db.execSQL(
+                    "UPDATE edition_articles SET starred = 1, stateBefore = 'DELIVERED' " +
+                        "WHERE editionId IN (SELECT id FROM editions WHERE status = 'READY') " +
+                        "AND articleId IN (SELECT id FROM articles WHERE state = 'IN_EDITION' AND starredAt IS NOT NULL)",
+                )
             }
         }
 

@@ -245,6 +245,21 @@ class TtrssSyncTest {
     }
 
     @Test
+    fun anArticleMarkedReadReachesTtrssEvenOncePushedOutOfItsFeedsFewNewestAndOnlyOnce() = runTest {
+        val source = connect()
+        server.add(10, "Read it", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        sources.markRead(db.articles().allForSource(source.id).single().id)
+        (11L..16L).forEach { server.add(it, "Newer $it", feedId = 1, feedTitle = "Example News") }
+
+        sync.syncAll()
+        assertEquals(listOf(10L), server.markedRead)
+
+        sync.syncAll()
+        assertEquals("not sent again", listOf(10L), server.markedRead)
+    }
+
+    @Test
     fun anAccountSetToLeaveArticlesUnreadIsntToldWhatWasMarkedRead() = runTest {
         val source = connect()
         ttrss.setMarkRead(source.id, false)

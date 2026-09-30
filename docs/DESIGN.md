@@ -156,13 +156,16 @@ articles go back, keeping their stars, before the new one is planned.
   the same story in two sources, isn't delivered twice.
 - **Stars.** Starring an article puts it in the next edition, whatever its
   state: waiting, delivered (this is how you bring one back), marked as
-  read or expired. Stars never expire. Delivery clears them; an edition
-  that's never sent gives its articles back with their stars, and one whose
-  link was already delivered goes back to delivered. A paused source holds
-  its stars; removing a source removes them.
+  read or expired. Stars never expire. Delivery clears them, on every copy
+  of the link; an edition that's never sent gives its articles back with
+  their stars, each in the state it had before (a starred delivered article
+  goes back to delivered). A paused source holds its stars; removing a
+  source removes them.
 - **Mark as read.** A waiting article you've read elsewhere, or don't want,
   is marked `SKIPPED` and never goes in an edition. Undo puts back its state
   and star.
+- **While an edition is being made** you can star articles but not unstar
+  them or mark them read: the build may already have put them in the book.
 - **Everything else expires.** Unplanned articles older than the source's
   keep window (7 days for news feeds, never for the reading list) quietly
   go. Curated lists keep only their newest 12 unread links.

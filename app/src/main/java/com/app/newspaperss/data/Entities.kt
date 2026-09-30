@@ -104,6 +104,8 @@ data class ArticleEntity(
     val originTitle: String? = null,
     /** Words in a saved link's article, counted when its page is first looked up: the reading list's time estimate. */
     val pageWords: Int? = null,
+    /** tt-rss only: marked read on the server after the reader marked it read here, so it isn't sent again. */
+    @ColumnInfo(defaultValue = "0") val reportedRead: Boolean = false,
 )
 
 /**
@@ -162,4 +164,9 @@ data class EditionArticleEntity(
     val minutes: Double,
     /** It went in because it was starred. */
     @ColumnInfo(defaultValue = "0") val starred: Boolean = false,
+    /**
+     * The article's state before it went in, which it gets back if the edition is never sent: a
+     * starred article that was delivered, marked read or expired stays so once unstarred.
+     */
+    val stateBefore: ArticleState? = null,
 )

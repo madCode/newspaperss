@@ -74,18 +74,20 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     suspend fun remove(source: SourceEntity) = sources.delete(source)
 
     /** See [EditionRepository.setStarred]. */
-    suspend fun setStarred(articleId: Long, starred: Boolean): Boolean =
-        (if (starred) db.articles().star(articleId, clock.instant()) else db.articles().unstar(articleId)) > 0
+    suspend fun setStarred(articleId: Long, starred: Boolean): Boolean = db.articles().setStarred(articleId, starred, clock.instant())
+
+    /** See [EditionRepository.observeBuilding]. */
+    fun observeBuilding(): Flow<Boolean> = db.editions().observeBuilding(clock.instant().minus(BUILD_HOLD))
 
     /**
      * Marks a waiting article as read: it never goes in an edition, and a tt-rss source marks it
      * read on the server at its next sync, so Undo never has to reach the server. Returns what
      * [undoMarkRead] needs, or null if the article wasn't waiting (it may have just gone into an
-     * edition).
+     * edition) or an edition is being made.
      */
     suspend fun markRead(articleId: Long): MarkedRead? = db.withTransaction {
         val article = db.articles().byId(articleId) ?: return@withTransaction null
-        if (db.articles().markRead(articleId) == 0) null else MarkedRead(articleId, article.starredAt)
+        if (db.articles().markRead(articleId, clock.instant().minus(BUILD_HOLD)) == 0) null else MarkedRead(articleId, article.starredAt)
     }
 
     /** Puts a marked-read article back to waiting, with its star, unless something has moved it on since. */

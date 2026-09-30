@@ -69,6 +69,9 @@ class EditionDetailViewModel(
 
     fun notesShared() { _notesFile.value = null }
 
+    /** An edition is being made: see [com.app.newspaperss.ui.components.ArticleButtons]. */
+    val building: StateFlow<Boolean> = editions.observeBuilding().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     fun setStarred(articleId: Long, starred: Boolean) {
         viewModelScope.launch { editions.setStarred(articleId, starred) }
     }

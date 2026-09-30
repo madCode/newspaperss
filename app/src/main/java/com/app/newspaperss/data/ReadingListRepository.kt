@@ -44,8 +44,8 @@ class ReadingListRepository(
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun observe(): Flow<List<ArticleEntity>> = flow { emit(sourceId()) }.flatMapLatest { db.articles().observeAllForSource(it) }
 
-    /** How many saved links are still waiting for an edition: read or archived ones aren't. */
-    fun observeWaiting(): Flow<Int> = observe().map { list -> list.count { it.state == ArticleState.NEW } }
+    /** How many saved links are still waiting for an edition: read or archived ones aren't, unless starred. */
+    fun observeWaiting(): Flow<Int> = observe().map { list -> list.count(::isWaiting) }
 
     /** Returns false if the link was already on the list. */
     suspend fun save(url: String, title: String? = null): Boolean {
@@ -87,10 +87,14 @@ class ReadingListRepository(
         return Imported(file.format, added.size, added.count { it.state == ArticleState.NEW })
     }
 
-    /** The list as an rss-to-e-reader checklist: anything no longer waiting is ticked. */
+    /** The list as an rss-to-e-reader checklist: anything no longer waiting or in an unsent edition is ticked. */
     suspend fun exportMarkdown(): String = MarkdownChecklist.write(
-        db.articles().allForSource(sourceId()).map { ChecklistItem(it.url, done = it.state != ArticleState.NEW && it.state != ArticleState.IN_EDITION) },
+        db.articles().allForSource(sourceId()).map { ChecklistItem(it.url, done = !isWaiting(it) && it.state != ArticleState.IN_EDITION) },
     )
+
+    /** A star brings a delivered link back, so it's waiting again. */
+    private fun isWaiting(article: ArticleEntity) =
+        article.state == ArticleState.NEW || (article.starredAt != null && article.state != ArticleState.IN_EDITION)
 
     companion object {
         /** Not a web address, so it can never collide with a real feed's. */

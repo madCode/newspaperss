@@ -11,6 +11,7 @@ import androidx.room.Update
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import kotlinx.coroutines.flow.Flow
+import java.time.Duration
 import java.time.Instant
 
 @Dao
@@ -85,6 +86,13 @@ interface SourceDao {
     suspend fun delete(source: SourceEntity)
 }
 
+/**
+ * How long a BUILDING edition holds off "Mark as read" and unstarring. A build takes minutes;
+ * one older than this was cut off by the process dying and is only marked failed by the next
+ * build, which mustn't lock the buttons until then.
+ */
+internal val BUILD_HOLD: Duration = Duration.ofHours(2)
+
 data class SourceActivity(val sourceId: Long, val lastNew: Instant?)
 
 @Dao
@@ -109,16 +117,25 @@ interface ArticleDao {
 
     /**
      * Uses up other waiting copies of the articles' links, from a second feed or the reading
-     * list, so they aren't delivered again. Starred copies stay: the reader asked for them (and
-     * [unstar] retires one whose link has gone out). tt-rss copies stay: marking them read on
-     * the server is how they leave tt-rss, and that only happens for articles in an edition.
+     * list, so they aren't delivered again. tt-rss copies stay: marking them read on the
+     * server is how they leave tt-rss, and that only happens for articles in an edition.
      */
     @Query(
-        """UPDATE articles SET state = 'DELIVERED' WHERE state = 'NEW' AND starredAt IS NULL
+        """UPDATE articles SET state = 'DELIVERED' WHERE state = 'NEW'
            AND url IN (SELECT url FROM articles WHERE id IN (:ids) AND url != '')
            AND sourceId NOT IN (SELECT id FROM sources WHERE kind = 'TTRSS')""",
     )
     suspend fun deliverCopies(ids: List<Long>)
+
+    /**
+     * Clears the stars of other copies of the articles' links, in any source: the link has just
+     * gone out, which is what the star asked for, and a star left on a copy would send it again.
+     */
+    @Query(
+        """UPDATE articles SET starredAt = NULL WHERE starredAt IS NOT NULL AND state != 'IN_EDITION'
+           AND url IN (SELECT url FROM articles WHERE id IN (:ids) AND url != '')""",
+    )
+    suspend fun unstarCopies(ids: List<Long>)
 
     /** Feeds drop items long before this, so a link this old won't be offered again. */
     @Query("DELETE FROM delivered_urls WHERE deliveredAt < :before")
@@ -131,9 +148,10 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE state = 'NEW' OR (starredAt IS NOT NULL AND state != 'IN_EDITION')")
     suspend fun candidates(): List<ArticleEntity>
 
-    /** Starred articles not yet in an edition, from sources that aren't paused. */
+    /** Starred links not yet in an edition, from sources that aren't paused; a link starred in two sources counts once. */
     @Query(
-        """SELECT COUNT(*) FROM articles JOIN sources ON sources.id = articles.sourceId
+        """SELECT COUNT(DISTINCT CASE WHEN articles.url != '' THEN articles.url ELSE '#' || articles.id END)
+           FROM articles JOIN sources ON sources.id = articles.sourceId
            WHERE articles.starredAt IS NOT NULL AND articles.state != 'IN_EDITION' AND sources.paused = 0""",
     )
     fun observeStarredWaiting(): Flow<Int>
@@ -170,39 +188,54 @@ interface ArticleDao {
     suspend fun setDelivered(ids: List<Long>)
 
     /**
-     * Gives back the articles of an edition that won't be sent. They keep their stars; one whose
-     * link has been delivered (starred again after it went out) goes back to delivered, not to
-     * waiting.
+     * Gives back the articles of an edition that won't be sent, in the state each had before it
+     * went in (waiting, unless it was starred from delivered, marked read or expired). They keep
+     * their stars.
      */
     @Query(
-        """UPDATE articles SET state = CASE WHEN url != '' AND url IN (SELECT url FROM delivered_urls) THEN 'DELIVERED' ELSE 'NEW' END
-           WHERE id IN (:ids) AND state = 'IN_EDITION'""",
+        """UPDATE articles SET state = COALESCE(
+               (SELECT stateBefore FROM edition_articles WHERE editionId = :editionId AND articleId = articles.id), 'NEW')
+           WHERE state = 'IN_EDITION' AND id IN (SELECT articleId FROM edition_articles WHERE editionId = :editionId)""",
     )
-    suspend fun release(ids: List<Long>)
+    suspend fun release(editionId: Long)
 
     /** Keeps the first star's time, so repeated taps don't move it back in line. Not while it's in an unsent edition. */
     @Query("UPDATE articles SET starredAt = COALESCE(starredAt, :at) WHERE id = :id AND state != 'IN_EDITION'")
     suspend fun star(id: Long, at: Instant): Int
 
-    /** A waiting copy whose link has been delivered meanwhile goes to delivered, not back to waiting. */
+    /**
+     * Refused while an edition started after [buildingSince] is being made: it has taken the
+     * article as a candidate and may already have written it into the book.
+     */
     @Query(
-        """UPDATE articles SET starredAt = NULL,
-           state = CASE WHEN state = 'NEW' AND url != '' AND url IN (SELECT url FROM delivered_urls) THEN 'DELIVERED' ELSE state END
-           WHERE id = :id AND state != 'IN_EDITION'""",
+        """UPDATE articles SET starredAt = NULL WHERE id = :id AND state != 'IN_EDITION'
+           AND NOT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :buildingSince)""",
     )
-    suspend fun unstar(id: Long): Int
+    suspend fun unstar(id: Long, buildingSince: Instant): Int
 
-    /** Only a waiting article; a star goes with it. */
-    @Query("UPDATE articles SET state = 'SKIPPED', starredAt = NULL WHERE id = :id AND state = 'NEW'")
-    suspend fun markRead(id: Long): Int
+    suspend fun setStarred(id: Long, starred: Boolean, now: Instant): Boolean =
+        (if (starred) star(id, now) else unstar(id, now.minus(BUILD_HOLD))) > 0
+
+    /** Only a waiting article, and a star goes with it. Refused during a build, as for [unstar]. */
+    @Query(
+        """UPDATE articles SET state = 'SKIPPED', starredAt = NULL WHERE id = :id AND state = 'NEW'
+           AND NOT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :buildingSince)""",
+    )
+    suspend fun markRead(id: Long, buildingSince: Instant): Int
 
     /** Keeps a star given since it was marked read. */
     @Query("UPDATE articles SET state = 'NEW', starredAt = COALESCE(starredAt, :starredAt) WHERE id = :id AND state = 'SKIPPED'")
     suspend fun undoMarkRead(id: Long, starredAt: Instant?): Int
 
-    /** The [guids] of a source's articles the reader marked read and hasn't starred since. */
-    @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND state = 'SKIPPED' AND starredAt IS NULL AND guid IN (:guids)")
-    suspend fun markedReadAmong(sourceId: Long, guids: List<String>): List<String>
+    /** Guids of a source's articles the reader marked read (and hasn't starred since) that the server hasn't been told of. */
+    @Query(
+        """SELECT guid FROM articles WHERE sourceId = :sourceId AND state = 'SKIPPED' AND starredAt IS NULL
+           AND reportedRead = 0 ORDER BY id LIMIT :limit""",
+    )
+    suspend fun unreportedRead(sourceId: Long, limit: Int): List<String>
+
+    @Query("UPDATE articles SET reportedRead = 1 WHERE sourceId = :sourceId AND guid IN (:guids)")
+    suspend fun setReportedRead(sourceId: Long, guids: List<String>)
 
     /** Expires a source's unpicked articles; starred ones are the reader's and stay. */
     @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL")
@@ -285,6 +318,14 @@ interface EditionDao {
 
     @Query("SELECT COUNT(*) FROM editions")
     suspend fun count(): Int
+
+    /** Whether an edition started after [since] is being made. */
+    @Query("SELECT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :since)")
+    fun observeBuilding(since: Instant): Flow<Boolean>
+
+    /** Only for an edition that turned out to have nothing in it, before anything refers to it. */
+    @Query("DELETE FROM editions WHERE id = :id")
+    suspend fun deleteEmpty(id: Long)
 
     @Insert
     suspend fun insert(edition: EditionEntity): Long

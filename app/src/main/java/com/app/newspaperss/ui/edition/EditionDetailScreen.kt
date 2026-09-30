@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.data.EditionContent
 import com.app.newspaperss.ui.components.ArticleButtons
+import com.app.newspaperss.ui.components.BUILDING_NOTE
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.delivery.EditionIntents
@@ -57,6 +58,7 @@ import kotlin.math.roundToInt
 fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, onReadArticle: (position: Int) -> Unit = {}, preferOpen: Boolean = false) {
     val detail by viewModel.detail.collectAsState()
     val message by viewModel.message.collectAsState()
+    val building by viewModel.building.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     fun launch(intent: Intent): Boolean = try {
@@ -143,6 +145,9 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                         )
+                        if (building) {
+                            Text(BUILDING_NOTE, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                        }
                     }
                 }
             }
@@ -153,6 +158,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                     canStar = current.canStar(content),
                     starred = current.isStarred(content),
                     onStar = { if (articleId != null) viewModel.setStarred(articleId, it) },
+                    building = building,
                     onOpen = if (current.file != null) { { onReadArticle(content.entry.position) } } else null,
                 )
                 HorizontalDivider()
@@ -209,6 +215,7 @@ private fun ContentRow(
     canStar: Boolean,
     starred: Boolean,
     onStar: (Boolean) -> Unit,
+    building: Boolean,
     onOpen: (() -> Unit)?,
 ) {
     val entry = content.entry
@@ -228,7 +235,7 @@ private fun ContentRow(
             },
         )
         if (canStar) {
-            ArticleButtons(entry.title, starred, onStar, Modifier.padding(start = 4.dp, end = 16.dp, bottom = 4.dp))
+            ArticleButtons(entry.title, starred, onStar, Modifier.padding(start = 4.dp, end = 16.dp, bottom = 4.dp), building = building)
         }
     }
 }

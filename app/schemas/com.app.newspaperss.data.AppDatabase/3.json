@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "a583ef264444b198bd00e56dae1a7e05",
+    "identityHash": "7cf8c9395700e6cdb2b3a0833c37a1af",
     "entities": [
       {
         "tableName": "sources",
@@ -150,7 +150,7 @@
       },
       {
         "tableName": "articles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, `feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `starredAt` INTEGER, `originId` TEXT, `originTitle` TEXT, `pageWords` INTEGER, FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, `feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `starredAt` INTEGER, `originId` TEXT, `originTitle` TEXT, `pageWords` INTEGER, `reportedRead` INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -228,6 +228,13 @@
             "fieldPath": "pageWords",
             "columnName": "pageWords",
             "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "reportedRead",
+            "columnName": "reportedRead",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -345,7 +352,7 @@
       },
       {
         "tableName": "edition_articles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `editionId` INTEGER NOT NULL, `articleId` INTEGER, `position` INTEGER NOT NULL, `title` TEXT NOT NULL, `sourceTitle` TEXT NOT NULL, `minutes` REAL NOT NULL, `starred` INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(`editionId`) REFERENCES `editions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`articleId`) REFERENCES `articles`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `editionId` INTEGER NOT NULL, `articleId` INTEGER, `position` INTEGER NOT NULL, `title` TEXT NOT NULL, `sourceTitle` TEXT NOT NULL, `minutes` REAL NOT NULL, `starred` INTEGER NOT NULL DEFAULT 0, `stateBefore` TEXT, FOREIGN KEY(`editionId`) REFERENCES `editions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`articleId`) REFERENCES `articles`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -394,6 +401,11 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
+          },
+          {
+            "fieldPath": "stateBefore",
+            "columnName": "stateBefore",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -474,7 +486,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a583ef264444b198bd00e56dae1a7e05')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7cf8c9395700e6cdb2b3a0833c37a1af')"
     ]
   }
 }

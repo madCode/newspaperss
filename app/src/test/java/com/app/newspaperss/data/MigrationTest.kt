@@ -3,7 +3,12 @@ package com.app.newspaperss.data
 import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.runBlocking
+import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -73,6 +78,44 @@ class MigrationTest {
                 assertEquals(3L, c.getLong(0))
                 assertEquals(0, c.getInt(1))
             }
+        }
+    }
+
+    /**
+     * Version 2 cleared an article's bring-back once it went into an edition. One brought back
+     * and waiting in an unsent edition has to keep it, or it'd come back as merely waiting.
+     */
+    @Test
+    fun anArticleBroughtBackIntoAnUnsentEditionStaysStarredAndReturnsToDelivered() {
+        helper.createDatabase(DB, 2).use { db ->
+            seedVersion2(db)
+            db.execSQL("INSERT INTO delivered_urls (url, deliveredAt) VALUES ('https://a.example/4', 100)")
+            db.execSQL(
+                "INSERT INTO articles (id, sourceId, guid, url, title, discoveredAt, state, broughtBack) VALUES " +
+                    "(4, 1, 'g4', 'https://a.example/4', 'Brought back, in the paper', 7000, 'IN_EDITION', 0), " +
+                    "(5, 1, 'g5', 'https://a.example/5', 'New, in the paper', 8000, 'IN_EDITION', 0)",
+            )
+            db.execSQL("INSERT INTO editions (id, title, createdAt, status, articleCount, minutes) VALUES (2, 'Tuesday', 0, 'READY', 2, 6.0)")
+            db.execSQL(
+                "INSERT INTO edition_articles (id, editionId, articleId, position, title, sourceTitle, minutes) VALUES " +
+                    "(2, 2, 4, 0, 'Brought back, in the paper', 'A', 3.0), (3, 2, 5, 1, 'New, in the paper', 'A', 3.0)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
+        val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
+        try {
+            runBlocking {
+                assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
+                assertNull(room.articles().byId(5)!!.starredAt)
+                assertTrue(EditionRepository(room, File("unused")).delete(2))
+                assertEquals(ArticleState.DELIVERED, room.articles().byId(4)!!.state)
+                assertEquals(ArticleState.NEW, room.articles().byId(5)!!.state)
+                assertTrue("still first in line", room.articles().candidates().any { it.id == 4L && it.starredAt != null })
+            }
+        } finally {
+            room.close()
         }
     }
 

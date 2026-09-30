@@ -12,6 +12,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import com.app.newspaperss.ui.components.ArticleButtons
+import com.app.newspaperss.ui.components.BUILDING_NOTE
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,12 +97,19 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     val gone = detail != null && source == null
     LaunchedEffect(gone) { if (gone) onGone() }
     val snackbar = remember { SnackbarHostState() }
-    val markedRead by viewModel.markedRead.collectAsState()
-    LaunchedEffect(markedRead) {
-        val marked = markedRead ?: return@LaunchedEffect
-        // Long: on e-ink the reader may not see it straight away. Missed, starring still brings it back.
-        val result = snackbar.showSnackbar("Marked as read", actionLabel = "Undo", duration = SnackbarDuration.Long)
-        if (result == SnackbarResult.ActionPerformed) viewModel.undoMarkRead(marked) else viewModel.markedReadDismissed(marked)
+    val undoOffer by viewModel.undoOffer.collectAsState()
+    val building by viewModel.building.collectAsState()
+    LaunchedEffect(undoOffer) {
+        val offer = undoOffer ?: return@LaunchedEffect
+        // Ended however the snackbar goes, including the screen leaving or rotating, so a stale
+        // Undo never comes back. Missed, starring still brings the article back.
+        try {
+            // Long: on e-ink the reader may not see it straight away.
+            val result = snackbar.showSnackbar("Marked as read", actionLabel = "Undo", duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed) viewModel.undoMarkRead(offer)
+        } finally {
+            viewModel.undoOfferEnded(offer)
+        }
     }
     Scaffold(
         topBar = {
@@ -141,9 +149,12 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     },
                 )
                 if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
+                if (building && articles.isNotEmpty()) {
+                    Text(BUILDING_NOTE, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                }
             }
             items(articles, key = { it.id }) { article ->
-                RecentArticle(article, locale, onStar = { viewModel.setStarred(article.id, it) }, onMarkRead = { viewModel.markRead(article.id) })
+                RecentArticle(article, locale, building, onStar = { viewModel.setStarred(article.id, it) }, onMarkRead = { viewModel.markRead(article.id) })
                 // Inset: full-width rules chopped the list into boxes to track across.
                 HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
@@ -267,7 +278,7 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
  * refresh on e-ink) and the reader keeps her place.
  */
 @Composable
-private fun RecentArticle(article: ArticleEntity, locale: Locale, onStar: (Boolean) -> Unit, onMarkRead: () -> Unit) {
+private fun RecentArticle(article: ArticleEntity, locale: Locale, building: Boolean, onStar: (Boolean) -> Unit, onMarkRead: () -> Unit) {
     val context = LocalContext.current
     val status = articleStatus(article)
     val details = buildAnnotatedString {
@@ -295,6 +306,7 @@ private fun RecentArticle(article: ArticleEntity, locale: Locale, onStar: (Boole
                 starred = article.starredAt != null,
                 onStar = onStar,
                 onMarkRead = onMarkRead.takeIf { article.state == ArticleState.NEW },
+                building = building,
                 // Lines the button text up with the title, past the buttons' own padding.
                 modifier = Modifier.padding(start = 44.dp, end = 16.dp, bottom = 4.dp),
             )
