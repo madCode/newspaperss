@@ -11,7 +11,9 @@ import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import com.app.newspaperss.ui.edition.EpubPages
-import com.app.newspaperss.ui.edition.withPreviewMargins
+import com.app.newspaperss.ui.edition.forPreview
+import com.app.newspaperss.ui.edition.bookResponse
+import com.app.newspaperss.ui.edition.BOOK_ORIGIN
 import org.junit.Assert.assertTrue
 import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
@@ -60,14 +62,23 @@ class ArticlePreviewScreenTest {
     }
 
     @Test
-    fun thePreviewGivesTheBookSideMarginsTheEReaderWouldAdd() {
+    fun everyPageThePreviewShowsGetsTheMarginsAndColoursTheEReaderWouldAdd() {
         val file = tmp.newFile("m.epub")
-        val article = EditionArticle(title = "A story", sourceTitle = "S", url = "https://a.example/", bodyHtml = "<p>x</p>", minutes = 1.0)
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
+        val articles = listOf("One", "Two").map {
+            EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 1.0)
         }
-        val page = EpubPages(file).use { it.article(0)!! }
-        val head = withPreviewMargins(page).substringBefore("</head>")
-        assertTrue(head.contains("body { margin: 0 5%; }"))
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
+        }
+        val style = "body { margin: 0 5%; background: #1C1B1F; color: #E6E1E5; }"
+        val dark = 0xFF1C1B1F.toInt() to 0xFFE6E1E5.toInt()
+        EpubPages(file).use { pages ->
+            val opened = forPreview(pages.article(0)!!, dark.first, dark.second)
+            // After the book's stylesheet, so it wins over the book's own body rule.
+            assertTrue(opened.indexOf("stylesheet") in 0 until opened.indexOf(style))
+            // The second article is reached by the first one's "Next" link, served page by page.
+            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, dark.first, dark.second).second.toString(Charsets.UTF_8)
+            assertTrue(next.contains(style))
+        }
     }
 }
