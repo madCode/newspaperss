@@ -206,6 +206,8 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     }
                     if (source.kind == SourceKind.TTRSS) {
                         TtrssOptions(source, viewModel::openCategories, viewModel::setMarkReadOnServer)
+                        val startingFresh by viewModel.startingFresh.collectAsState()
+                        StartFresh(source, startingFresh, viewModel::startFresh)
                     } else {
                         ArticleCap(source.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
                     }
@@ -297,6 +299,37 @@ private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onM
             )
         }
         Switch(checked = source.markReadOnServer, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun StartFresh(source: SourceEntity, working: Boolean, onConfirm: () -> Unit) {
+    var confirming by rememberSaveable { mutableStateOf(false) }
+    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Back after a break?")
+            Text(
+                "Mark everything older than two weeks as read in tt-rss, and start from what's recent.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = { confirming = true }, enabled = !working) { Text(if (working) "Marking…" else "Start fresh") }
+    }
+    if (confirming) {
+        val scope = source.ttrssCategoryTitle?.let { " in $it" } ?: ""
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Start fresh?") },
+            text = {
+                Text(
+                    "Every unread article that reached tt-rss more than two weeks ago$scope will be marked read there. " +
+                        "Starred ones too: they stay starred, but read. newspapeRSS can't undo this.",
+                )
+            },
+            confirmButton = { TextButton(onClick = { confirming = false; onConfirm() }) { Text("Mark as read") } },
+            dismissButton = { TextButton(onClick = { confirming = false }) { Text("Cancel") } },
+        )
     }
 }
 

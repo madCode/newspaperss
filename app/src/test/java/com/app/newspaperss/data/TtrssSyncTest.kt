@@ -448,4 +448,49 @@ class TtrssSyncTest {
         db.editions().insertArticles(articles.mapIndexed { i, a -> EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = a.title, sourceTitle = "x", minutes = 1.0) })
         return editionId
     }
+
+    @Test
+    fun startingFreshCatchesUpTtrssAndLeavesWhatsWaitingHere() = runTest {
+        val source = connect()
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = source.id, guid = "ttrss:1", url = "https://news.example/1", title = "Waiting")))
+
+        assertNull(ttrss.startFresh(source.id))
+
+        assertEquals(listOf(Triple(-4, false, "2week")), server.caughtUp)
+        assertEquals(listOf("login", "catchupFeed", "logout"), server.ops.takeLast(3))
+        assertEquals(ArticleState.NEW, db.articles().allForSource(source.id).single().state)
+    }
+
+    @Test
+    fun startingFreshNeverReachesAServerTheSourceIsntFrom() = runTest {
+        // The saved login moved to another server but this source stayed: its category id, or
+        // "everything", would mean someone else's articles there.
+        val source = connect()
+        accounts.save(TtrssAccount("https://other.example/api/", "reader", "secret"))
+        assertEquals(FeedSync.SIGN_IN_AGAIN, ttrss.startFresh(source.id))
+        assertTrue(server.caughtUp.isEmpty())
+    }
+
+    @Test
+    fun startingFreshKeepsToTheChosenCategory() = runTest {
+        val source = connect()
+        ttrss.chooseCategory(source.id, TtrssCategory(7, "Ideas"))
+        assertNull(ttrss.startFresh(source.id))
+        assertEquals(listOf(Triple(7, true, "2week")), server.caughtUp)
+    }
+
+    @Test
+    fun anOldServerIsNotAsked() = runTest {
+        val source = connect()
+        server.apiLevel = 14
+        assertEquals("Your tt-rss is too old for this. Update it, or use Mark as read in tt-rss itself.", ttrss.startFresh(source.id))
+        assertTrue(server.caughtUp.isEmpty())
+    }
+
+    @Test
+    fun startingFreshWithTtrssUnreachableSaysSo() = runTest {
+        val source = connect()
+        http.unreachable += server.apiUrl
+        assertEquals("Couldn't reach tt-rss.", ttrss.startFresh(source.id))
+    }
 }

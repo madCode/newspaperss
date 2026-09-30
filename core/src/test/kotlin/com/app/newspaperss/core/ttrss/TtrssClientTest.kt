@@ -264,4 +264,54 @@ class TtrssClientTest {
         } catch (e: TtrssException.NotTtrss) {
         }
     }
+
+    @Test
+    fun startingFreshMarksOnlyArticlesOlderThanTwoWeeksRead() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""{"status":"OK"}"""))
+        client().markReadOlderThanTwoWeeks(feedId = 42, isCategory = true)
+        assertEquals(
+            Json.parseToJsonElement("""{"sid":"sid-1","op":"catchupFeed","feed_id":42,"is_cat":true,"mode":"2week"}"""),
+            server.sent.last(),
+        )
+    }
+
+    @Test
+    fun aServerThatWouldIgnoreTheTwoWeeksIsNeverAskedToCatchUp() = runTest {
+        // Before API level 15 catchupFeed has no mode: it would mark every unread article read.
+        server.reply(ok("""{"session_id":"sid-1","api_level":14}"""))
+        try {
+            client().markReadOlderThanTwoWeeks()
+            fail("expected TooOld")
+        } catch (e: TtrssException.TooOld) {
+            assertEquals(listOf("login"), server.sent.map { it["op"]!!.toString().trim('"') })
+        }
+    }
+
+    @Test
+    fun aServerThatDoesntSayItsLevelIsTreatedAsTooOld() = runTest {
+        server.reply(ok("""{"session_id":"sid-1"}"""))
+        try {
+            client().markReadOlderThanTwoWeeks()
+            fail("expected TooOld")
+        } catch (e: TtrssException.TooOld) {
+            assertEquals(1, server.sent.size)
+        }
+    }
+
+    @Test
+    fun theLevelIsCheckedAgainAfterLoggingInAgain() = runTest {
+        // tt-rss dropped the session and the server behind the address is now an older one.
+        val client = client()
+        server.reply(loggedIn)
+        client.login()
+        server.reply(error("NOT_LOGGED_IN"))
+        server.reply(ok("""{"session_id":"sid-2","api_level":14}"""))
+        try {
+            client.markReadOlderThanTwoWeeks()
+            fail("expected TooOld")
+        } catch (e: TtrssException.TooOld) {
+            assertEquals(listOf("login", "catchupFeed", "login"), server.sent.map { it["op"]!!.toString().trim('"') })
+        }
+    }
 }

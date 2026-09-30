@@ -41,6 +41,7 @@ sealed class TtrssException(message: String) : Exception(message) {
     class Redirected(val to: String) : TtrssException("The server sent us to $to. Try that address instead.")
     class NotTtrss : TtrssException("That address doesn't look like a tt-rss server.")
     class ApiError(val code: String) : TtrssException("tt-rss reported an error ($code).")
+    class TooOld : TtrssException("Your tt-rss is too old for this. Update it, or use Mark as read in tt-rss itself.")
 }
 
 /**
@@ -59,6 +60,8 @@ class TtrssClient(
     private val password: String,
 ) {
     private var sessionId: String? = null
+    /** Reported at login; null before it or from a server too old to say. */
+    private var apiLevel: Int? = null
 
     /** Logs in and returns the session id. */
     suspend fun login(): String {
@@ -69,6 +72,7 @@ class TtrssClient(
         }) as? JsonObject
         val sid = content?.get("session_id")?.jsonPrimitive?.contentOrNull ?: throw TtrssException.NotTtrss()
         sessionId = sid
+        apiLevel = (content["api_level"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
         return sid
     }
 
@@ -173,6 +177,26 @@ class TtrssClient(
         }
     }
 
+    /**
+     * Marks unread articles that reached tt-rss more than two weeks ago as read.
+     *
+     * @param feedId [ALL_ARTICLES], or a category id with [isCategory].
+     * @throws TtrssException.TooOld before API level 15, which ignores the two weeks and would
+     *   mark everything read.
+     */
+    suspend fun markReadOlderThanTwoWeeks(feedId: Int = ALL_ARTICLES, isCategory: Boolean = false) {
+        withSession { sid ->
+            if ((apiLevel ?: 0) < CATCHUP_MODE_LEVEL) throw TtrssException.TooOld()
+            post(buildJsonObject {
+                put("sid", sid)
+                put("op", "catchupFeed")
+                put("feed_id", feedId)
+                put("is_cat", isCategory)
+                put("mode", "2week")
+            })
+        }
+    }
+
     /** Ends the session, if there is one. */
     suspend fun logout() {
         val sid = sessionId ?: return
@@ -241,6 +265,8 @@ class TtrssClient(
         private const val ALL_FEEDS = -3
         const val MAX_LIMIT = 200
         private const val FIELD_UNREAD = 2
+        /** catchupFeed takes a `mode` from here on; before, it marks everything read. */
+        const val CATCHUP_MODE_LEVEL = 15
 
         /**
          * The API endpoint for an address the reader typed: "rss.example.com/tt-rss" becomes

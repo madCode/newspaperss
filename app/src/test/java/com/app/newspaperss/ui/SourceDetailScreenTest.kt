@@ -212,6 +212,35 @@ class SourceDetailScreenTest {
         assertEquals(false, runBlocking { db.sources().byId(id)!!.markReadOnServer })
     }
 
+    @Test
+    fun startingFreshAsksFirstThenCatchesUpTtrss() {
+        val http = FakeHttp()
+        val server = FakeTtrss(http)
+        val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
+        val ttrss = TtrssRepository(db, http, accounts, repo)
+        val id = runBlocking {
+            assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
+            db.sources().ofKind(SourceKind.TTRSS).single().id
+        }
+        var syncs = 0
+        val vm = SourceDetailViewModel(repo, id, flowOf(1), ttrss) { syncs++ }
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { visible("Back after a break?") }
+
+        compose.onNodeWithText("Start fresh").performClick()
+        idleUntil { compose.waitForIdle(); visible("newspapeRSS can't undo this") }
+        compose.onNodeWithText("Cancel").performClick()
+        compose.waitForIdle()
+        assertTrue("backing out asks nothing of tt-rss", server.caughtUp.isEmpty())
+
+        compose.onNodeWithText("Start fresh").performClick()
+        idleUntil { compose.waitForIdle(); visible("newspapeRSS can't undo this") }
+        compose.onNodeWithText("Mark as read").performClick()
+        idleUntil { compose.waitForIdle(); visible("only the last two weeks unread") }
+        assertEquals(1, server.caughtUp.size)
+        assertEquals("the next sync takes what's still unread", 1, syncs)
+    }
+
     /**
      * Waiting, delivered and in an unsent edition, plus [moreWaiting] more waiting ones ("Article
      * more1"…), newest first. Returns the source and article ids by guid.

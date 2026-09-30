@@ -113,6 +113,41 @@ class TtrssRepository(
         if (category != null) db.articles().expireWaiting(sourceId)
     }
 
+    /**
+     * For a reader coming back to a big backlog: marks everything that reached tt-rss more than two
+     * weeks ago read there, in the source's category if it has one. Null when done, else why not.
+     *
+     * Articles already waiting here are left to expire as usual: tt-rss dates this by when it
+     * received each article, which isn't kept here, and matching by publication date instead
+     * would drop backdated articles tt-rss still has unread, where nothing would ever pick them up.
+     */
+    suspend fun startFresh(sourceId: Long): String? {
+        val source = db.sources().byId(sourceId) ?: return "This source has been removed."
+        val account = try {
+            (accounts.load() as? StoredAccount.Ready)?.account
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } ?: return FeedSync.SIGN_IN_AGAIN
+        // A category id means nothing on another server, and "everything" would be someone else's.
+        if (account.apiUrl != source.url) return FeedSync.SIGN_IN_AGAIN
+        val client = account.client(http)
+        try {
+            val category = source.ttrssCategoryId
+            if (category != null) client.markReadOlderThanTwoWeeks(category, isCategory = true) else client.markReadOlderThanTwoWeeks()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TtrssException) {
+            return e.message ?: "tt-rss reported an error."
+        } catch (e: IOException) {
+            return "Couldn't reach tt-rss."
+        } finally {
+            logOut(client)
+        }
+        return null
+    }
+
     suspend fun setMarkRead(sourceId: Long, markRead: Boolean) = db.sources().setMarkReadOnServer(sourceId, markRead)
 
     /** Removes the account's source and its saved login. */
