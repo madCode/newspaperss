@@ -14,7 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
-### Cycle 59: Send to Kindle gets the edition's title (08:30–, this PR)
+### Cycle 60: the author in Send to Kindle (09:10–, this PR)
+- **From you:** the author should be newspapeRSS. The book already says so, but the Kindle app's form fills in the Amazon account's name, and nothing an app sends changes it (Amazon reads the book's author only for emailed documents).
+- **Shipped:** the Kindle tip, in onboarding and Settings, says to change Author to newspapeRSS in the form, so editions sit together in the library.
+
+### Cycle 59: Send to Kindle gets the edition's title (08:30–08:45, [#77](https://github.com/madCode/newspaperss/pull/77))
 - **From you:** Send to Kindle's form said "edition-3" as the title.
 - **Cause:** the Kindle app titles a document after the shared file's name, and editions were stored as `edition-<id>.epub`.
 - **Shipped:** new editions are stored under their title ("Wednesday Morning Edition, Sep 30.epub"), so that's what the Kindle library shows. Editions made before the update keep their old name.
