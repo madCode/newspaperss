@@ -38,6 +38,8 @@ import com.app.newspaperss.testutil.rss
 import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
 import com.app.newspaperss.ui.onboarding.Step
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -87,6 +89,32 @@ class OnboardingTest {
         val urls = runBlocking { db.sources().all() }.map { it.url }.toSet()
         assertEquals(science.feeds.map { it.url }.toSet(), urls)
         assertEquals("starter feeds keep their names", "Quanta Magazine", runBlocking { db.sources().byUrl(science.feeds.first().url)!!.title })
+    }
+
+    @Test
+    fun someoneLeavingPocketCanStartWithTheirSavedLinksAlone() {
+        val pocketVm = OnboardingViewModel(store, SourceRepository(db), FeedFinder(http), savedLinks = flowOf(2)) { finished = it }
+        val readingVm = com.app.newspaperss.ui.readinglist.ReadingListViewModel(com.app.newspaperss.data.ReadingListRepository(db))
+        compose.setContent { OnboardingScreen(pocketVm, readingList = readingVm) }
+        click("Get started")
+        scrollAndClick("Kobo")
+        click("Next")
+
+        compose.onNodeWithText("2 saved links waiting", substring = true).performScrollTo().assertExists()
+        click("Next")
+        click("Make my first edition")
+
+        idleUntil { finished != null }
+        assertEquals(true, finished!!.onboarded)
+        assertEquals("no feeds needed", emptyList<String>(), runBlocking { db.sources().all() }.map { it.url })
+    }
+
+    @Test
+    fun withNeitherSitesNorSavedLinksTheresNothingToMakeAPaperFrom() {
+        vm.chooseDevice(Device.KOBO)
+        vm.next(); vm.next()
+        assertEquals(Step.SOURCES, vm.state.value.step)
+        assertFalse(vm.state.value.canContinue)
     }
 
     @Test

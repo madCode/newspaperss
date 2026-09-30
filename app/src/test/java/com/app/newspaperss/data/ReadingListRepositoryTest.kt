@@ -57,6 +57,7 @@ class ReadingListRepositoryTest {
         assertEquals("Tides, explained", byUrl("https://a.example/tides").title)
         assertEquals(ArticleState.DELIVERED, byUrl("https://a.example/old").state)
         assertEquals(setOf("https://a.example/tides", "https://a.example/untitled"), db.articles().candidates().map { it.url }.toSet())
+        assertEquals("only unread ones are waiting (enough to start onboarding with)", 2, list.observeWaiting().first())
         // Read ones won't be in an edition, so there's no point fetching their pages.
         assertEquals(listOf(byUrl("https://a.example/untitled").id), untitled)
     }

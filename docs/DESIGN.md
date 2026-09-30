@@ -165,8 +165,9 @@ articles go into the new one.
    "just the file". This picks the delivery method; KOReader asks for its
    folder.
 3. **Pick your sources:** starter packs of well-known public feeds; paste
-   any website (the app finds its feed); import an OPML file; or connect a
-   tt-rss account.
+   any website (the app finds its feed); import an OPML file; connect a
+   tt-rss account; or import saved links from Pocket or Instapaper, which
+   alone are enough to start.
 4. **How much, and when?** A 10–90 minute slider, "A new edition every
    day", and a "Ready by" time.
 5. **The first edition** builds right away, with its progress on Today.

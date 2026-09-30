@@ -9,6 +9,7 @@ import com.app.newspaperss.core.feed.ReadingListFile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import java.time.Clock
 
 /**
@@ -42,6 +43,9 @@ class ReadingListRepository(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun observe(): Flow<List<ArticleEntity>> = flow { emit(sourceId()) }.flatMapLatest { db.articles().observeAllForSource(it) }
+
+    /** How many saved links are still waiting for an edition: read or archived ones aren't. */
+    fun observeWaiting(): Flow<Int> = observe().map { list -> list.count { it.state == ArticleState.NEW } }
 
     /** Returns false if the link was already on the list. */
     suspend fun save(url: String, title: String? = null): Boolean {

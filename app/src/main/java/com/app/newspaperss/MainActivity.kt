@@ -84,13 +84,17 @@ class MainActivity : ComponentActivity() {
                     false -> {
                         val context = LocalContext.current.applicationContext
                         val vm = viewModel {
-                            OnboardingViewModel(container.settings, container.sources, container.feedFinder, createSavedStateHandle()) { saved ->
+                            OnboardingViewModel(
+                                container.settings, container.sources, container.feedFinder, createSavedStateHandle(),
+                                savedLinks = container.readingList.observeWaiting(),
+                            ) { saved ->
                                 container.appScope.launch { EditionScheduler.reschedule(context, saved) }
                                 EditionWorker.buildNow(context)
                             }
                         }
                         val sources = viewModel { SourcesViewModel(container.sources, container.feedFinder, container.ttrss) { SyncWorker.syncNow(context) } }
-                        OnboardingScreen(vm, sources)
+                        val readingList = viewModel { ReadingListViewModel(container.readingList) }
+                        OnboardingScreen(vm, sources, readingList)
                     }
                     true -> App(container, preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX)
                 }
