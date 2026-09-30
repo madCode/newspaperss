@@ -40,7 +40,7 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             throw e
         } catch (e: Exception) {
             // The run also delivers, so the edition may already exist; don't claim it wasn't made.
-            return Result.failure(workDataOf(ERROR to "Something went wrong. If an edition was made, it's below."))
+            return Result.failure(workDataOf(ERROR to "Something went wrong. If an edition was made, it's on this screen."))
         }
         return when (result) {
             is BuildResult.Built -> Result.success(workDataOf(EDITION_ID to result.editionId))

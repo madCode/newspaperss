@@ -200,8 +200,8 @@ class EditionDetailScreenTest {
 
         runBlocking { articles.forEach { repo.setStarred(it, true) } }
 
-        idleUntil { compose.onAllNodes(hasContentDescription("2 starred articles will go in your next edition")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("2 starred articles will go in your next edition").assertIsDisplayed()
+        idleUntil { compose.onAllNodes(hasContentDescription("2 starred articles are waiting for your next edition")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("2 starred articles are waiting for your next edition").assertIsDisplayed()
     }
 
     @Test
@@ -418,14 +418,31 @@ class EditionDetailScreenTest {
 
     @Test
     fun aFailedEditionOffersOneWayToTryAgain() {
+        // The build that made it failed too, with the same reason.
         runBlocking { db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.FAILED, error = EditionBuilder.UNEXPECTED)) }
-        val vm = TodayViewModel(repo, flowOf(null)) {}
+        val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to EditionBuilder.UNEXPECTED))
+        val vm = TodayViewModel(repo, flowOf(failed)) {}
         compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
-        idleUntil { vm.state.value.editions?.size == 1 }
+        idleUntil { vm.state.value.editions?.size == 1 && vm.state.value.build is BuildState.Failed }
+
+        assertEquals("said once", 1, compose.onAllNodes(hasText(EditionBuilder.UNEXPECTED)).fetchSemanticsNodes().size)
 
         assertEquals(1, compose.onAllNodes(hasText("Try again") and hasClickAction()).fetchSemanticsNodes().size)
         compose.onNodeWithText("Make another edition").assertDoesNotExist()
         compose.onNodeWithText("Make an edition now").assertDoesNotExist()
+    }
+
+    @Test
+    fun aReadyEditionsSendComesBeforeARetry() {
+        // A run can fail after making an edition; sending that one comes first.
+        edition(EditionStatus.READY, listOf("A story"))
+        val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Something went wrong."))
+        val vm = TodayViewModel(repo, flowOf(failed)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.build is BuildState.Failed && vm.state.value.editions?.size == 1 }
+
+        compose.onNodeWithText("Try again").assertDoesNotExist()
+        compose.onNodeWithText("Make another edition").assertExists()
     }
 
     @Test

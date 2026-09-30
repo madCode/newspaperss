@@ -67,7 +67,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
             item(key = "starred") {
                 // Right after a build, these are exactly the stars that didn't fit. The glyph is
                 // decoration, so TalkBack reads only the words.
-                val words = if (state.starredWaiting == 1) "1 starred article will go in your next edition" else "${state.starredWaiting} starred articles will go in your next edition"
+                val words = if (state.starredWaiting == 1) "1 starred article is waiting for your next edition" else "${state.starredWaiting} starred articles are waiting for your next edition"
                 Text(
                     "★ $words",
                     style = MaterialTheme.typography.bodyMedium,
@@ -87,16 +87,19 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         }
         // A ready edition waiting to be sent comes first; making another is secondary.
         val readyWaiting = latest?.status == EditionStatus.READY
-        // A filled button only when there's no edition yet: once one is made, another is optional, and
-        // a failed edition's card has its own Try again.
+        // A filled button only when there's no edition yet: once one is made, another is optional.
+        // A failed edition's card has its own Try again, and a ready one's Send comes before a retry.
         val make = when {
             latest == null -> MakeButton.PRIMARY
-            state.build is BuildState.Failed -> MakeButton.RETRY
             latest.status == EditionStatus.FAILED -> MakeButton.NONE
+            readyWaiting -> MakeButton.ANOTHER
+            state.build is BuildState.Failed -> MakeButton.RETRY
             else -> MakeButton.ANOTHER
         }
+        // A build that failed making an edition leaves the reason on the edition's card too.
+        val build = state.build.let { if (it is BuildState.Failed && latest?.status == EditionStatus.FAILED && it.reason == latest.error) BuildState.Idle else it }
         // The same key in both places: only one exists at a time, and it moves rather than restarts.
-        if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
+        if (!readyWaiting) item(key = "build") { BuildPanel(build, announcer, make, onMake = viewModel::makeOneNow) }
         if (latest != null) {
             item(key = "latest") {
                 LatestEdition(
@@ -118,7 +121,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 )
             }
         }
-        if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
+        if (readyWaiting) item(key = "build") { BuildPanel(build, announcer, make, onMake = viewModel::makeOneNow) }
         if (editions.size > 1) {
             item(key = "earlier") {
                 Text(
