@@ -58,7 +58,8 @@ class ReadingListRepository(
 
     suspend fun remove(article: ArticleEntity) = db.articles().delete(article.id)
 
-    data class Imported(val format: ReadingListFile.Format, val added: Int)
+    /** @property unread how many of the [added] links are waiting for an edition (archived ones aren't). */
+    data class Imported(val format: ReadingListFile.Format, val added: Int, val unread: Int = added)
 
     /**
      * Adds the links from a markdown checklist or a Pocket or Instapaper export.
@@ -83,7 +84,7 @@ class ReadingListRepository(
         if (readElsewhere.isNotEmpty()) db.articles().setState(readElsewhere.map { it.id }, ArticleState.DELIVERED)
         val untitled = added.filter { it.title.isEmpty() && it.state == ArticleState.NEW }.map { it.id }
         if (untitled.isNotEmpty()) onUntitled(untitled)
-        return Imported(file.format, added.size)
+        return Imported(file.format, added.size, added.count { it.state == ArticleState.NEW })
     }
 
     /** The list as an rss-to-e-reader checklist: anything no longer waiting is ticked. */

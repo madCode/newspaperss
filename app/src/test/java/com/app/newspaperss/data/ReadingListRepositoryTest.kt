@@ -53,7 +53,7 @@ class ReadingListRepositoryTest {
             "Old news,https://a.example/old,1600000000,,archive\n" +
             ",https://a.example/old-untitled,1600000000,,archive\n"
         val result = list.import(csv)
-        assertEquals(ReadingListRepository.Imported(ReadingListFile.Format.POCKET_CSV, added = 4), result)
+        assertEquals(ReadingListRepository.Imported(ReadingListFile.Format.POCKET_CSV, added = 4, unread = 2), result)
         assertEquals("Tides, explained", byUrl("https://a.example/tides").title)
         assertEquals(ArticleState.DELIVERED, byUrl("https://a.example/old").state)
         assertEquals(setOf("https://a.example/tides", "https://a.example/untitled"), db.articles().candidates().map { it.url }.toSet())
