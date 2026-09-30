@@ -282,7 +282,9 @@ private fun RecentArticle(article: ArticleEntity, locale: Locale, building: Bool
     val context = LocalContext.current
     val status = articleStatus(article)
     val details = buildAnnotatedString {
-        append(listOfNotNull(article.originTitle, shortDate(article.discoveredAt, locale)).joinToString(" · "))
+        // When it was published: a tt-rss backlog arrives all at once, and every row would show
+        // the day it was fetched.
+        append(listOfNotNull(article.originTitle, shortDate(article.shownDate, locale)).joinToString(" · "))
         append(" · ")
         if (isStarred(article)) withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(status) } else append(status)
     }
@@ -365,5 +367,9 @@ internal fun lastCheckedLine(at: Instant?, locale: Locale, is24Hour: Boolean, no
     }
 }
 
-private fun shortDate(at: Instant, locale: Locale, zone: ZoneId = ZoneId.systemDefault()): String =
-    DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "MMMd"), locale).format(at.atZone(zone))
+/** Month and day, and the year too when it isn't this one. */
+private fun shortDate(at: Instant, locale: Locale, zone: ZoneId = ZoneId.systemDefault()): String {
+    val date = at.atZone(zone)
+    val skeleton = if (date.year == java.time.LocalDate.now(zone).year) "MMMd" else "yMMMd"
+    return DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)
+}

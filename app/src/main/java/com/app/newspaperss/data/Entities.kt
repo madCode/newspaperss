@@ -7,6 +7,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
+import java.time.Duration
 import java.time.Instant
 
 enum class SourceKind {
@@ -106,7 +107,13 @@ data class ArticleEntity(
     val pageWords: Int? = null,
     /** tt-rss only: marked read on the server after the reader marked it read here, so it isn't sent again. */
     @ColumnInfo(defaultValue = "0") val reportedRead: Boolean = false,
-)
+) {
+    /**
+     * When it was published, for showing: a date more than a day after it was fetched is a
+     * feed's mistake (scheduled posts, wrong zones, two-digit years), so the fetch date stands in.
+     */
+    val shownDate: Instant get() = published?.takeUnless { it.isAfter(discoveredAt.plus(Duration.ofDays(1))) } ?: discoveredAt
+}
 
 /**
  * A link that went out in a delivered edition. Kept apart from articles, which go when their

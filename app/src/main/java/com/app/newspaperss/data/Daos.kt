@@ -182,7 +182,12 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt DESC, id DESC")
     fun observeAllForSource(sourceId: Long): Flow<List<ArticleEntity>>
 
-    @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt DESC, id DESC LIMIT :limit")
+    /** Newest first by the date a source's page shows ([ArticleEntity.shownDate]). */
+    @Query(
+        """SELECT * FROM articles WHERE sourceId = :sourceId
+           ORDER BY CASE WHEN published IS NULL OR published > discoveredAt + 86400000 THEN discoveredAt ELSE published END DESC, id DESC
+           LIMIT :limit""",
+    )
     fun observeRecentForSource(sourceId: Long, limit: Int): Flow<List<ArticleEntity>>
 
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt, id")
