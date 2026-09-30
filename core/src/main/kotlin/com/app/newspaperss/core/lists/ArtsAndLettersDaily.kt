@@ -27,14 +27,21 @@ object ArtsAndLettersDaily : CuratedList {
     /**
      * The newest entry runs from the column's header to its "more »" link. It's read as a run of
      * nodes rather than one `<p>` because the site sometimes nests a `<p>` in the teaser, which
-     * the HTML parser splits into several siblings. The run also stops at an `<hr>`: an entry
-     * that ends without its link means the column changed shape, and carrying on would take the
-     * next entry down, an older pick.
+     * the HTML parser splits into an empty `<p>`, the teaser, then the link on its own. The run
+     * stops at an `<hr>` or a second paragraph with text: either means the first entry ended
+     * without its link, and carrying on would take the next entry down, an older pick. Blocks
+     * (ads, boxes) are left out of the teaser.
      */
     private fun newestIn(header: Element, name: String): ListLink {
         val entry = Element("div").also { it.setBaseUri(header.baseUri()) }
+        var paragraphs = 0
         var node = header.nextSibling()
-        while (node != null && !(node is Element && node.tagName() == "hr")) {
+        while (node != null) {
+            if (node is Element) {
+                if (node.tagName() == "hr") break
+                if (node.tagName() == "div") { node = node.nextSibling(); continue }
+                if (node.tagName() == "p" && node.hasText() && ++paragraphs > 1) break
+            }
             entry.appendChild(node.clone())
             if (moreLink(entry) != null) break
             node = node.nextSibling()
@@ -48,5 +55,6 @@ object ArtsAndLettersDaily : CuratedList {
         return ListLink(url, title = null, summary = teaser.ifEmpty { null })
     }
 
-    private fun moreLink(entry: Element): Element? = entry.select("a[href]").firstOrNull { it.text().startsWith("more") }
+    /** The entry's last link, if it's the "more »" one: a link in the teaser can start with "more" too. */
+    private fun moreLink(entry: Element): Element? = entry.select("a[href]").lastOrNull()?.takeIf { it.text().startsWith("more") }
 }
