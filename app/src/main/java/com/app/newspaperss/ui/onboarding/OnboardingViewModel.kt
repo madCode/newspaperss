@@ -64,7 +64,7 @@ class OnboardingViewModel(
     /** Survives process death: the folder picker or the Play Store can get the app killed mid-flow. */
     private val saved: SavedStateHandle = SavedStateHandle(),
     /** How many links wait in the reading list; any is enough to start with. */
-    savedLinks: Flow<Int> = flowOf(0),
+    private val savedLinks: Flow<Int> = flowOf(0),
     /** Schedules the timer and starts the first edition once onboarding is saved. */
     private val onFinished: (Settings) -> Unit,
 ) : ViewModel() {
@@ -121,7 +121,8 @@ class OnboardingViewModel(
         viewModelScope.launch {
             // The database, not state.added, which the screen may not have reported yet.
             val hasFeeds = sources.observe().first().any { it.kind != SourceKind.READING_LIST }
-            if (s.chosen.isEmpty() && !hasFeeds && state.value.savedLinks == 0) {
+            // The flow, not state.savedLinks: after process death it may not have arrived yet.
+            if (s.chosen.isEmpty() && !hasFeeds && savedLinks.first() == 0) {
                 _state.update { it.copy(finishing = false) }
                 return@launch
             }

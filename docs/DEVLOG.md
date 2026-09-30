@@ -17,6 +17,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
 ### Cycle 33: saved links in onboarding (18:15–)
 - **From the persona audit:** someone leaving Pocket couldn't finish onboarding with saved links alone: Next wanted a feed, and the Pocket import was three screens deep in Sources.
 - **Shipped:** the sources step has "Leaving Pocket or Instapaper? Import your saved links", and links waiting in the reading list are enough to go on.
+- **Review caught:** after process death, finishing could read the saved-link count before it had loaded and do nothing; it now reads it from the source. The import's message hid "That's enough to start"; both show now. The "unread only" count moved into the reading list, tested with a Pocket export that mixes archived and unread links.
 
 ### Cycle 32: wrap-up (18:06–19:30, [#44](https://github.com/madCode/newspaperss/pull/44))
 - **Shipped:** a 30-minute timeout on CI (a hung test would otherwise hold a PR for six hours), and the Day 2 report and retro pages.

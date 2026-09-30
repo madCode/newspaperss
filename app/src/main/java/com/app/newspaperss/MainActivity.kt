@@ -43,7 +43,6 @@ import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.theme.NewspaperssTheme
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
-import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.work.Connectivity
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.work.EditionScheduler
@@ -87,7 +86,7 @@ class MainActivity : ComponentActivity() {
                         val vm = viewModel {
                             OnboardingViewModel(
                                 container.settings, container.sources, container.feedFinder, createSavedStateHandle(),
-                                savedLinks = container.readingList.observe().map { list -> list.count { it.state == ArticleState.NEW } },
+                                savedLinks = container.readingList.observeWaiting(),
                             ) { saved ->
                                 container.appScope.launch { EditionScheduler.reschedule(context, saved) }
                                 EditionWorker.buildNow(context)

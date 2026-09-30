@@ -256,7 +256,9 @@ private fun SavedLinks(saved: Int, readingList: ReadingListViewModel) {
     }
     Text("Leaving Pocket or Instapaper?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
     OutlinedButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Import your saved links") }
-    (message ?: if (saved > 0) "${plural(saved, "saved link")} waiting. That's enough to start; add sites too if you like." else null)?.let {
+    // Both lines: the import's result, and whether that's enough to go on (archived links aren't).
+    val waiting = if (saved > 0) "${plural(saved, "saved link")} waiting. That's enough to start; add sites too if you like." else null
+    listOfNotNull(message, waiting).joinToString("\n").ifEmpty { null }?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp).semantics { liveRegion = LiveRegionMode.Polite })
     }
 }
