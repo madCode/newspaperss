@@ -259,9 +259,12 @@ articles go back, keeping their stars, before the new one is planned.
 ## 9. Screens
 
 - **Today** (home): when the next edition is due, how many starred articles
-  are waiting (only when some are), **Make an edition now**, and the latest
-  edition with **Send**, **Open** and **I've sent it** (**Send again** once
-  delivered). Earlier editions are listed below. Kindle and Kobo readers
+  will go in the next one (only when some will), and the latest edition with
+  **Send**, **Open** and **I've sent it** (**Send again** once delivered).
+  **Make an edition now** is the main button only before the first edition;
+  after that it's a quiet **Make another edition**, since today's paper is
+  done. A failed build or edition offers **Try again** after saying what
+  went wrong. Earlier editions are listed below. Kindle and Kobo readers
   aren't offered **Open**, here or on an edition's page: it opens the book
   on the phone, and they get it by sending it.
 - **Edition:** its contents; tap an article to preview it as the e-reader
