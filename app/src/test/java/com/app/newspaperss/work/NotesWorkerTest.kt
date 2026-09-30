@@ -19,6 +19,7 @@ class NotesWorkerTest {
 
     @Test
     fun anEditionThatIsGoneIsNotRetried() = runTest {
+        app.container.settings.update { it.copy(notesFolderUri = "content://vault", notesFolderName = "Vault") }
         val result = TestListenableWorkerBuilder<NotesWorker>(app)
             .setInputData(workDataOf(NotesWorker.EDITION_ID to 42L))
             .build()

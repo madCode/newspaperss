@@ -44,7 +44,9 @@ class EditionRepository(
             val edition = db.editions().byId(id) ?: return@withTransaction false
             // Checked inside the transaction: a build may be releasing unsent editions at the same
             // time, and the reader may have deleted this one while a folder copy was finishing.
-            if (edition.status == EditionStatus.DELETED) return@withTransaction false
+            // Already delivered (the reader tapped Sent while a folder copy was finishing): the
+            // work that follows delivery, like saving notes, mustn't run twice.
+            if (edition.status == EditionStatus.DELETED || edition.status == EditionStatus.DELIVERED) return@withTransaction false
             if (onlyIfReady && edition.status != EditionStatus.READY) return@withTransaction false
             val articleIds = db.editions().articleIds(id)
             db.articles().setDelivered(articleIds)

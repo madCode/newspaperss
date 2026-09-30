@@ -6,6 +6,7 @@ import com.app.newspaperss.delivery.FolderWriter
 import com.app.newspaperss.notify.EditionNotifier
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.CancellationException
+import java.io.File
 
 /** Saves a delivered edition's reading notes to the notes folder, if the reader chose one. */
 class NotesSaver(
@@ -19,7 +20,8 @@ class NotesSaver(
         val folderUri = settings.current().notesFolderUri ?: return
         val edition = editions.byId(editionId)?.takeIf { it.status == EditionStatus.DELIVERED } ?: return
         val error = try {
-            notes.write(editionId)?.let { folder.deliver(it, folderUri, it.name, EditionNotes.MIME) }
+            // Not the Notes button's copy: sharing that one rewrites it, maybe mid-copy.
+            notes.write(editionId, File(notes.notesDir, "saved"))?.let { folder.deliver(it, folderUri, it.name, EditionNotes.MIME) }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             "Couldn't write the notes (${e.message ?: e.javaClass.simpleName})."

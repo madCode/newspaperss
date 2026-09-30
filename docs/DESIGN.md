@@ -296,7 +296,7 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 ├─ feed/     parsing, feed discovery,    ├─ data/      Room database, repositories
 │            OPML, starter packs         ├─ settings/  DataStore settings
 ├─ edition/  planner, titles, schedule   ├─ edition/   EditionBuilder, EditionRun, cover, notes
-├─ extract/  page and article            ├─ work/      edition, sync and title workers, the scheduler
+├─ extract/  page and article            ├─ work/      background workers, the scheduler     
 │            extraction, language        ├─ delivery/  share, folder, the sent callback
 ├─ images/   image rules and budget      ├─ notify/    the "ready" notification
 ├─ epub/     the EPUB writer             ├─ ui/        Compose screens and ViewModels
@@ -312,7 +312,8 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 - **One activity, Jetpack Compose, ViewModels with StateFlow.**
 - **Room** holds sources, articles and editions, with exported schemas
   (`app/schemas`) and tested migrations. **DataStore** holds settings.
-- **WorkManager** runs the sync, the build and the timers.
+- **WorkManager** runs the sync, the build, the timers, and what follows
+  delivery (marking tt-rss read, saving notes).
 - **Manual dependency injection** (`AppContainer`): the app is small enough
   that Hilt isn't worth its machinery.
 - **Permissive dependencies only** (Apache/MIT): Readability4J, jsoup,

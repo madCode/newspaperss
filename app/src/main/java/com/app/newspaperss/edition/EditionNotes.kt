@@ -19,8 +19,13 @@ class EditionNotes(
     val notesDir: File,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
 ) {
-    /** Null if the edition doesn't exist or has no articles. */
-    suspend fun write(editionId: Long): File? {
+    /**
+     * Null if the edition doesn't exist or has no articles.
+     *
+     * @param dir where to write it. Two writers of one edition's notes need different folders:
+     *   rewriting a file truncates it under a copy that's still reading it.
+     */
+    suspend fun write(editionId: Long, dir: File = notesDir): File? {
         val edition = db.editions().byId(editionId) ?: return null
         val rows = db.editions().notesRows(editionId).takeIf { it.isNotEmpty() } ?: return null
         val zone = zone()
@@ -34,8 +39,8 @@ class EditionNotes(
             ),
         )
         return withContext(Dispatchers.IO) {
-            notesDir.mkdirs()
-            File(notesDir, fileName(edition.title)).apply { writeText(markdown) }
+            dir.mkdirs()
+            File(dir, fileName(edition.title)).apply { writeText(markdown) }
         }
     }
 

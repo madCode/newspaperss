@@ -25,7 +25,7 @@ class NotesWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
         fun enqueue(context: Context, editionId: Long) {
             val request = OneTimeWorkRequestBuilder<NotesWorker>().setInputData(workDataOf(EDITION_ID to editionId)).build()
-            // One notes file per edition, even if it's confirmed as delivered twice.
+            // Two deliveries of one edition can't race to save two copies.
             WorkManager.getInstance(context).enqueueUniqueWork("notes-$editionId", ExistingWorkPolicy.KEEP, request)
         }
     }

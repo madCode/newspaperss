@@ -67,8 +67,16 @@ class NotesSaverTest {
         saver.save(id)
 
         assertEquals(listOf("content://vault/$title notes.md (text/markdown)"), saved)
-        assertTrue(File(notes.notesDir, "$title notes.md").readText().contains("## One"))
+        assertTrue(File(notes.notesDir, "saved/$title notes.md").readText().contains("## One"))
         assertEquals(emptyList<String>(), problems)
+    }
+
+    @Test
+    fun anEditionDeliveredTwiceSavesItsNotesOnce() = runTest {
+        // Tapped Sent while its folder copy was finishing, which then reports it delivered too.
+        val (id, _) = sentEdition()
+        editions.markDelivered(id)
+        assertEquals(listOf(id), delivered)
     }
 
     @Test
