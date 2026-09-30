@@ -36,19 +36,16 @@ class ReadingListViewModel(private val list: ReadingListRepository) : ViewModel(
         return true
     }
 
-    private val _removed = MutableStateFlow<ArticleEntity?>(null)
+    private val _removed = MutableStateFlow<ReadingListRepository.Removed?>(null)
     /** The link just removed, offered back until the reader moves on. */
-    val removed: StateFlow<ArticleEntity?> = _removed.asStateFlow()
+    val removed: StateFlow<ReadingListRepository.Removed?> = _removed.asStateFlow()
 
     fun remove(article: ArticleEntity) {
-        viewModelScope.launch {
-            list.remove(article)
-            _removed.value = article
-        }
+        viewModelScope.launch { _removed.value = list.remove(article) }
     }
 
-    fun undoRemove(article: ArticleEntity) {
-        viewModelScope.launch { list.restore(article) }
+    fun undoRemove(removed: ReadingListRepository.Removed) {
+        viewModelScope.launch { list.restore(removed) }
         _removed.value = null
     }
 

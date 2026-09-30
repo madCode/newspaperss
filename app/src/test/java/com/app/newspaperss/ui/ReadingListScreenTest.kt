@@ -9,6 +9,9 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.data.ArticleState
+import com.app.newspaperss.data.EditionArticleEntity
+import com.app.newspaperss.data.EditionEntity
+import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.ui.readinglist.ReadingListScreen
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
@@ -70,15 +73,21 @@ class ReadingListScreenTest {
     }
 
     @Test
-    fun aLinkRemovedFromAnUnsentEditionComesBackWaiting() = runBlocking {
-        // Removing it unlinked it from that edition, which would never deliver or release it.
+    fun undoingPutsALinkBackInTheEditionThatHeldIt() = runBlocking {
+        // Otherwise that edition would neither deliver nor release it, and it would go out twice.
+        val db = app.container.db
         val list = app.container.readingList
         list.save("https://b.example/long-read", "A long read")
-        val article = app.container.db.articles().allForSource(list.sourceId()).single().copy(state = ArticleState.IN_EDITION)
-        list.remove(article)
+        val article = db.articles().allForSource(list.sourceId()).single()
+        db.articles().setState(listOf(article.id), ArticleState.IN_EDITION)
+        val edition = db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.READY))
+        db.editions().insertArticles(listOf(EditionArticleEntity(editionId = edition, articleId = article.id, position = 0, title = "A long read", sourceTitle = "Saved", minutes = 4.0)))
+        val removed = list.remove(db.articles().byId(article.id)!!)
+        assertEquals(emptyList<Long>(), db.editions().articleIds(edition))
 
-        list.restore(article)
+        list.restore(removed)
 
-        assertEquals(ArticleState.NEW, app.container.db.articles().allForSource(list.sourceId()).single().state)
+        assertEquals(listOf(article.id), db.editions().articleIds(edition))
+        assertEquals(ArticleState.IN_EDITION, db.articles().byId(article.id)!!.state)
     }
 }

@@ -473,4 +473,11 @@ interface EditionDao {
 
     @Query("SELECT articleId FROM edition_articles WHERE editionId = :editionId AND articleId IS NOT NULL ORDER BY position")
     suspend fun articleIds(editionId: Long): List<Long>
+
+    /** The contents entries that point at [articleId], in any edition. */
+    @Query("SELECT id FROM edition_articles WHERE articleId = :articleId")
+    suspend fun entriesFor(articleId: Long): List<Long>
+
+    @Query("UPDATE edition_articles SET articleId = :articleId WHERE id IN (:entryIds)")
+    suspend fun relink(entryIds: List<Long>, articleId: Long)
 }

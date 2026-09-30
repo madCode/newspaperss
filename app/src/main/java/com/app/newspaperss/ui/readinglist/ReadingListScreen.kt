@@ -80,9 +80,9 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
     // Removing is one tap and routine, so it's undone rather than confirmed.
     val removed by viewModel.removed.collectAsState()
     LaunchedEffect(removed) {
-        val article = removed ?: return@LaunchedEffect
-        val result = snackbar.showSnackbar("Removed “${titleOf(article)}”", actionLabel = "Undo", duration = SnackbarDuration.Long)
-        if (result == SnackbarResult.ActionPerformed) viewModel.undoRemove(article) else viewModel.dismissRemoved()
+        val gone = removed ?: return@LaunchedEffect
+        val result = snackbar.showSnackbar("Removed “${titleOf(gone.article)}”", actionLabel = "Undo", duration = SnackbarDuration.Long)
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoRemove(gone) else viewModel.dismissRemoved()
     }
 
     Scaffold(
