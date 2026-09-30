@@ -1,5 +1,6 @@
 package com.app.newspaperss.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -65,7 +66,7 @@ enum class ArticleState {
     /** In an edition that hasn't been delivered yet; goes back to NEW if it never is. */
     IN_EDITION,
     DELIVERED,
-    /** The reader dismissed it. */
+    /** The reader marked it as read: never in an edition, and read in tt-rss at the next sync. */
     SKIPPED,
     /** Never picked and older than the keep window. */
     EXPIRED,
@@ -88,7 +89,12 @@ data class ArticleEntity(
     val feedHtml: String? = null,
     val discoveredAt: Instant = Instant.now(),
     val state: ArticleState = ArticleState.NEW,
-    val broughtBack: Boolean = false,
+    /**
+     * When the reader starred it for the next edition, or null. A flag beside [state], not a
+     * state of its own, so unstarring leaves the article as it was. Stars never expire and are
+     * cleared on delivery.
+     */
+    val starredAt: Instant? = null,
     /**
      * The publication an aggregator source (tt-rss) got the article from: its feed id there,
      * so the per-source cap applies per publication, and its title, for the byline. Null for
@@ -154,4 +160,6 @@ data class EditionArticleEntity(
     val title: String,
     val sourceTitle: String,
     val minutes: Double,
+    /** It went in because it was starred. */
+    @ColumnInfo(defaultValue = "0") val starred: Boolean = false,
 )

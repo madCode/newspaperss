@@ -86,13 +86,12 @@ class CuratedListSyncTest {
     }
 
     @Test
-    fun aBroughtBackLinkIsNotExpired() = runTest {
+    fun aStarredLinkIsNotExpired() = runTest {
         val id = repo.addList(ArtsAndLettersDaily)
         publishDay(1)
         sync.syncAll()
         val first = db.articles().allForSource(id).first()
-        db.articles().setState(listOf(first.id), ArticleState.DELIVERED)
-        db.articles().bringBack(listOf(first.id))
+        repo.setStarred(first.id, true)
 
         now = now.plus(Duration.ofDays(1))
         publishDay(2)

@@ -7,8 +7,8 @@ import java.time.Instant
 import kotlin.random.Random
 
 class EditionPlannerTest {
-    private fun c(id: String, source: String, day: Int, back: Boolean = false) =
-        Candidate(id, source, Instant.parse("2026-09-%02dT00:00:00Z".format(day)), back)
+    private fun c(id: String, source: String, day: Int, starredDay: Int? = null) =
+        Candidate(id, source, Instant.parse("2026-09-%02dT00:00:00Z".format(day)), starredDay?.let { Instant.parse("2026-09-%02dT12:00:00Z".format(it)) })
 
     private val pool = listOf(
         c("a1", "a", 1), c("a2", "a", 2), c("a3", "a", 3),
@@ -26,9 +26,58 @@ class EditionPlannerTest {
     }
 
     @Test
-    fun broughtBackArticlesGoFirstInTheirSource() {
-        val withBack = pool + c("a0", "a", 1, back = true)
-        assertEquals("a0", EditionPlanner.order(withBack, abc, Ordering.TAKE_TURNS).first().id)
+    fun starsGoFirstTakingTurnsAcrossSourcesOldestStarFirst() {
+        // An old article starred late still comes after one starred earlier: the reader's own
+        // order of starring, not the feed's.
+        val withStars = pool + c("a0", "a", 1, starredDay = 20) + c("a9", "a", 9, starredDay = 10) + c("c0", "c", 1, starredDay = 15)
+        assertEquals(
+            listOf("a9", "c0", "a0", "a3", "b1", "c2", "a2", "c1", "a1"),
+            ids(EditionPlanner.order(withStars, abc, Ordering.TAKE_TURNS)),
+        )
+    }
+
+    @Test
+    fun inOrderAndShufflePutStarsFirstToo() {
+        val withStars = pool + c("c0", "c", 1, starredDay = 15)
+        assertEquals(listOf("c0", "a3", "a2", "a1", "b1", "c2", "c1"), ids(EditionPlanner.order(withStars, abc, Ordering.IN_ORDER)))
+        assertEquals("c0", EditionPlanner.order(withStars, abc, Ordering.SHUFFLE, random = Random(3)).first().id)
+    }
+
+    @Test
+    fun aStarTakesItsSourcesSlotAndExtraStarsAreHeldBackAheadOfUnstarred() = runTest {
+        val withStars = pool + c("a0", "a", 1, starredDay = 10) + c("a8", "a", 8, starredDay = 11)
+        val ordered = EditionPlanner.order(withStars, abc, Ordering.TAKE_TURNS)
+        assertEquals(
+            "a's slot goes to its first star, then its second star beats its unstarred articles once the cap gives way",
+            listOf("a0", "b1", "c2", "a8", "a3"),
+            EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(5), maxPerSource = 1), { 1.0 }) { it.id },
+        )
+    }
+
+    @Test
+    fun aStarBeyondASourcesOwnCapWaits() = runTest {
+        val withStars = pool + c("a0", "a", 1, starredDay = 10) + c("a8", "a", 8, starredDay = 11)
+        val ordered = EditionPlanner.order(withStars, abc, Ordering.TAKE_TURNS)
+        val result = EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(10), maxPerSource = 1, sourceCaps = mapOf("a" to 1)), { 1.0 }) { it.id }
+        assertEquals(listOf("a0", "b1", "c2", "c1"), result)
+    }
+
+    @Test
+    fun starsThatDontFitTheBudgetWait() = runTest {
+        val stars = listOf(c("s1", "b", 1, starredDay = 1), c("s2", "c", 2, starredDay = 2), c("s3", "a", 3, starredDay = 3), c("s4", "b", 4, starredDay = 4))
+        val ordered = EditionPlanner.order(pool + stars, abc, Ordering.TAKE_TURNS)
+        val result = EditionPlanner.fill<String>(ordered, PlanRules(Budget.Minutes(20.0), maxPerSource = null), { 10.0 }) { it.id }
+        assertEquals(listOf("s3", "s1"), result)
+    }
+
+    @Test
+    fun aStarFromTheLastSourceInLineStillMakesTheNextEdition() = runTest {
+        // Ten sources, room for three: the star mustn't wait for its source's turn to come round.
+        val sources = (0 until 10).map { "src$it" }
+        val candidates = sources.flatMap { s -> (1..3).map { day -> c("$s-$day", s, day) } } + c("src8-star", "src8", 1, starredDay = 5)
+        val ordered = EditionPlanner.order(candidates, sources, Ordering.TAKE_TURNS, rotation = 0)
+        val result = EditionPlanner.fill<String>(ordered, PlanRules(Budget.Articles(3), maxPerSource = 1), { 1.0 }) { it.id }
+        assertEquals(listOf("src8-star", "src0-3", "src1-3"), result)
     }
 
     @Test

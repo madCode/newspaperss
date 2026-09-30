@@ -109,11 +109,12 @@ interface ArticleDao {
 
     /**
      * Uses up other waiting copies of the articles' links, from a second feed or the reading
-     * list, so they aren't delivered again. tt-rss copies stay: marking them read on the
-     * server is how they leave tt-rss, and that only happens for articles in an edition.
+     * list, so they aren't delivered again. Starred copies stay: the reader asked for them (and
+     * [unstar] retires one whose link has gone out). tt-rss copies stay: marking them read on
+     * the server is how they leave tt-rss, and that only happens for articles in an edition.
      */
     @Query(
-        """UPDATE articles SET state = 'DELIVERED' WHERE state = 'NEW' AND broughtBack = 0
+        """UPDATE articles SET state = 'DELIVERED' WHERE state = 'NEW' AND starredAt IS NULL
            AND url IN (SELECT url FROM articles WHERE id IN (:ids) AND url != '')
            AND sourceId NOT IN (SELECT id FROM sources WHERE kind = 'TTRSS')""",
     )
@@ -126,8 +127,16 @@ interface ArticleDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIgnoring(article: ArticleEntity): Long
 
-    @Query("SELECT * FROM articles WHERE state = 'NEW'")
+    /** Waiting articles, and starred ones in any state but already in an unsent edition. */
+    @Query("SELECT * FROM articles WHERE state = 'NEW' OR (starredAt IS NOT NULL AND state != 'IN_EDITION')")
     suspend fun candidates(): List<ArticleEntity>
+
+    /** Starred articles not yet in an edition, from sources that aren't paused. */
+    @Query(
+        """SELECT COUNT(*) FROM articles JOIN sources ON sources.id = articles.sourceId
+           WHERE articles.starredAt IS NOT NULL AND articles.state != 'IN_EDITION' AND sources.paused = 0""",
+    )
+    fun observeStarredWaiting(): Flow<Int>
 
     @Query("SELECT * FROM articles WHERE id = :id")
     suspend fun byId(id: Long): ArticleEntity?
@@ -154,23 +163,54 @@ interface ArticleDao {
     @Query("SELECT sourceId, MAX(discoveredAt) AS lastNew FROM articles GROUP BY sourceId")
     fun observeActivity(): Flow<List<SourceActivity>>
 
-    @Query("UPDATE articles SET state = :state, broughtBack = 0 WHERE id IN (:ids)")
+    @Query("UPDATE articles SET state = :state WHERE id IN (:ids)")
     suspend fun setState(ids: List<Long>, state: ArticleState)
 
-    @Query("UPDATE articles SET state = 'NEW', broughtBack = 1 WHERE id IN (:ids)")
-    suspend fun bringBack(ids: List<Long>)
+    @Query("UPDATE articles SET state = 'DELIVERED', starredAt = NULL WHERE id IN (:ids)")
+    suspend fun setDelivered(ids: List<Long>)
 
-    /** Only articles still marked delivered: one already back in the pool or in a newer edition stays put. */
-    @Query("UPDATE articles SET state = 'NEW', broughtBack = 1 WHERE id IN (:ids) AND state = 'DELIVERED'")
-    suspend fun bringBackDelivered(ids: List<Long>): Int
+    /**
+     * Gives back the articles of an edition that won't be sent. They keep their stars; one whose
+     * link has been delivered (starred again after it went out) goes back to delivered, not to
+     * waiting.
+     */
+    @Query(
+        """UPDATE articles SET state = CASE WHEN url != '' AND url IN (SELECT url FROM delivered_urls) THEN 'DELIVERED' ELSE 'NEW' END
+           WHERE id IN (:ids) AND state = 'IN_EDITION'""",
+    )
+    suspend fun release(ids: List<Long>)
 
-    /** Expires a source's unpicked articles; brought-back ones are the reader's and stay. */
-    @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0")
+    /** Keeps the first star's time, so repeated taps don't move it back in line. Not while it's in an unsent edition. */
+    @Query("UPDATE articles SET starredAt = COALESCE(starredAt, :at) WHERE id = :id AND state != 'IN_EDITION'")
+    suspend fun star(id: Long, at: Instant): Int
+
+    /** A waiting copy whose link has been delivered meanwhile goes to delivered, not back to waiting. */
+    @Query(
+        """UPDATE articles SET starredAt = NULL,
+           state = CASE WHEN state = 'NEW' AND url != '' AND url IN (SELECT url FROM delivered_urls) THEN 'DELIVERED' ELSE state END
+           WHERE id = :id AND state != 'IN_EDITION'""",
+    )
+    suspend fun unstar(id: Long): Int
+
+    /** Only a waiting article; a star goes with it. */
+    @Query("UPDATE articles SET state = 'SKIPPED', starredAt = NULL WHERE id = :id AND state = 'NEW'")
+    suspend fun markRead(id: Long): Int
+
+    /** Keeps a star given since it was marked read. */
+    @Query("UPDATE articles SET state = 'NEW', starredAt = COALESCE(starredAt, :starredAt) WHERE id = :id AND state = 'SKIPPED'")
+    suspend fun undoMarkRead(id: Long, starredAt: Instant?): Int
+
+    /** The [guids] of a source's articles the reader marked read and hasn't starred since. */
+    @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND state = 'SKIPPED' AND starredAt IS NULL AND guid IN (:guids)")
+    suspend fun markedReadAmong(sourceId: Long, guids: List<String>): List<String>
+
+    /** Expires a source's unpicked articles; starred ones are the reader's and stay. */
+    @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL")
     suspend fun expireWaiting(sourceId: Long)
 
-    /** Expires unpicked articles discovered before [before], except reading-list items. */
+    /** Expires unpicked articles discovered before [before], except reading-list items and stars. */
     @Query(
-        """UPDATE articles SET state = 'EXPIRED' WHERE state = 'NEW' AND broughtBack = 0 AND discoveredAt < :before
+        """UPDATE articles SET state = 'EXPIRED' WHERE state = 'NEW' AND starredAt IS NULL AND discoveredAt < :before
            AND sourceId IN (SELECT id FROM sources WHERE kind != 'READING_LIST')""",
     )
     suspend fun expireOlderThan(before: Instant): Int
@@ -179,10 +219,10 @@ interface ArticleDao {
      * Old articles keep their row, whose guid stops a feed offering them again, but not the
      * feed's copy of their text, which would otherwise grow the database without end. Counted
      * from delivery where there was one: a link saved long ago and sent today can still be
-     * brought back with its text.
+     * brought back with its text. A starred article keeps it, since it's going out again.
      */
     @Query(
-        """UPDATE articles SET feedHtml = NULL WHERE feedHtml IS NOT NULL
+        """UPDATE articles SET feedHtml = NULL WHERE feedHtml IS NOT NULL AND starredAt IS NULL
            AND state IN ('DELIVERED', 'EXPIRED', 'SKIPPED') AND discoveredAt < :before
            AND url NOT IN (SELECT url FROM delivered_urls WHERE deliveredAt >= :before)""",
     )
@@ -190,11 +230,11 @@ interface ArticleDao {
 
     /**
      * Expires all but the newest [keep] unpicked articles of a source, so a list that grows
-     * faster than it's read stays bounded. Brought-back articles are the reader's and stay.
+     * faster than it's read stays bounded. Starred articles are the reader's and stay.
      */
     @Query(
-        """UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0
-           AND id NOT IN (SELECT id FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND broughtBack = 0
+        """UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL
+           AND id NOT IN (SELECT id FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL
                           ORDER BY discoveredAt DESC, id DESC LIMIT :keep)""",
     )
     suspend fun keepNewest(sourceId: Long, keep: Int): Int
@@ -213,6 +253,8 @@ data class EditionContent(
     @Embedded val entry: EditionArticleEntity,
     /** The article's current state; null once its source has been removed. */
     val state: ArticleState?,
+    /** The article's current star, as against [EditionArticleEntity.starred], its star when the edition was made. */
+    val starredAt: Instant? = null,
 )
 
 /** An edition article with what its notes need; the article's own fields are null once its source is removed. */
@@ -266,7 +308,7 @@ interface EditionDao {
     fun observeArticles(editionId: Long): Flow<List<EditionArticleEntity>>
 
     @Query(
-        """SELECT edition_articles.*, articles.state AS state FROM edition_articles
+        """SELECT edition_articles.*, articles.state AS state, articles.starredAt AS starredAt FROM edition_articles
            LEFT JOIN articles ON articles.id = edition_articles.articleId
            WHERE editionId = :editionId ORDER BY position""",
     )

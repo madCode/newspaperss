@@ -89,12 +89,12 @@ class FeedSyncTest {
     }
 
     @Test
-    fun oldUnpickedFeedArticlesExpireButBroughtBackOnesStay() = runTest {
+    fun oldUnpickedFeedArticlesExpireButStarredOnesStay() = runTest {
         repo.addFeed(url, "Blog")
         http.page(url, rss("Blog", "old" to "Old", "kept" to "Kept"))
         sync.syncAll()
         val kept = db.articles().candidates().first { it.guid == "kept" }
-        db.articles().bringBack(listOf(kept.id))
+        repo.setStarred(kept.id, true)
 
         now = now.plus(Duration.ofDays(8))
         http.page(url, rss("Blog", "new" to "New"))

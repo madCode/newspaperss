@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
+import com.app.newspaperss.data.MarkedRead
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
@@ -105,6 +106,28 @@ class SourceDetailViewModel(
     fun setMarkReadOnServer(markRead: Boolean) {
         val repo = ttrss ?: return
         viewModelScope.launch { repo.setMarkRead(id, markRead) }
+    }
+
+    fun setStarred(articleId: Long, starred: Boolean) {
+        viewModelScope.launch { repository.setStarred(articleId, starred) }
+    }
+
+    private val _markedRead = MutableStateFlow<MarkedRead?>(null)
+    /** The article just marked as read, while its "Undo" is on offer. */
+    val markedRead: StateFlow<MarkedRead?> = _markedRead.asStateFlow()
+
+    fun markRead(articleId: Long) {
+        viewModelScope.launch { repository.markRead(articleId)?.let { _markedRead.value = it } }
+    }
+
+    fun undoMarkRead(marked: MarkedRead) {
+        _markedRead.compareAndSet(marked, null)
+        viewModelScope.launch { repository.undoMarkRead(marked) }
+    }
+
+    /** The "Undo" for [marked] is no longer on offer. */
+    fun markedReadDismissed(marked: MarkedRead) {
+        _markedRead.compareAndSet(marked, null)
     }
 
     /** The screen leaves by itself once [detail] shows the source gone. */

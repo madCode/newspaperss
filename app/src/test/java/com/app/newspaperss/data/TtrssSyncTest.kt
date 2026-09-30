@@ -225,6 +225,38 @@ class TtrssSyncTest {
         assertEquals(listOf(10L), server.markedRead)
     }
 
+    /** Marking read in the app reaches tt-rss at the next sync, so an Undo before then never has to. */
+    @Test
+    fun articlesMarkedReadInTheAppAreMarkedReadInTtrssAtTheNextSync() = runTest {
+        val source = connect()
+        server.add(10, "Read it", feedId = 1, feedTitle = "Example News")
+        server.add(11, "Undone", feedId = 1, feedTitle = "Example News")
+        server.add(12, "Still waiting", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        val byGuid = db.articles().allForSource(source.id).associateBy { it.guid }
+        sources.markRead(byGuid.getValue("ttrss:10").id)
+        sources.undoMarkRead(sources.markRead(byGuid.getValue("ttrss:11").id)!!)
+        assertTrue("nothing is sent when marked", server.markedRead.isEmpty())
+
+        sync.syncAll()
+
+        assertEquals(listOf(10L), server.markedRead)
+        assertEquals(ArticleState.SKIPPED, db.articles().byId(byGuid.getValue("ttrss:10").id)!!.state)
+    }
+
+    @Test
+    fun anAccountSetToLeaveArticlesUnreadIsntToldWhatWasMarkedRead() = runTest {
+        val source = connect()
+        ttrss.setMarkRead(source.id, false)
+        server.add(10, "Read it", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        sources.markRead(db.articles().allForSource(source.id).single().id)
+
+        sync.syncAll()
+
+        assertTrue(server.markedRead.isEmpty())
+    }
+
     @Test
     fun aSourceSetToACategoryTakesOnlyItsArticles() = runTest {
         val source = connect()
@@ -245,14 +277,14 @@ class TtrssSyncTest {
         val source = connect()
         server.add(11, "Recipe", feedId = 2, feedTitle = "Food")
         sync.syncAll()
-        val broughtBack = db.articles().allForSource(source.id).single()
+        val starred = db.articles().allForSource(source.id).single()
         server.add(12, "Soup", feedId = 2, feedTitle = "Food")
         sync.syncAll()
-        db.articles().bringBack(listOf(broughtBack.id))
+        sources.setStarred(starred.id, true)
 
         ttrss.chooseCategory(source.id, TtrssCategory(5, "Tech"))
 
-        assertEquals("the reader's own bring-back stays", listOf("Recipe"), db.articles().candidates().map { it.title })
+        assertEquals("the reader's own star stays", listOf("Recipe"), db.articles().candidates().map { it.title })
     }
 
     /** tt-rss answers a missing category with an empty list, which must not look like a quiet day. */

@@ -5,7 +5,11 @@ import android.content.Intent
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
@@ -132,30 +136,66 @@ class EditionDetailScreenTest {
     }
 
     @Test
-    fun broughtBackArticlesAreWaitingForTheNextEdition() {
-        val (id, articles) = edition(EditionStatus.DELIVERED, listOf("Read it", "Missed one", "Missed two"))
+    fun theStarOnADeliveredEditionBringsAnArticleBackAndUnstarringUndoesIt() {
+        val (id, articles) = edition(EditionStatus.DELIVERED, listOf("Read it", "Missed one"))
         show(id)
+        compose.onNodeWithText("Didn't get to one? Tap Next edition to bring it back.").assertIsDisplayed()
 
-        compose.onNodeWithContentDescription("Bring back Missed one").performClick()
-        compose.onNodeWithContentDescription("Bring back Missed two").performClick()
-        compose.onNodeWithText("Bring back 2").performClick()
+        compose.onNodeWithContentDescription("Put Missed one in your next edition").assertIsOff().performClick()
 
-        waitFor("2 articles will be in your next edition")
-        val candidates = runBlocking { db.articles().candidates() }
-        assertEquals(articles.drop(1).toSet(), candidates.map { it.id }.toSet())
-        assertTrue(candidates.all { it.broughtBack })
-        assertEquals(ArticleState.DELIVERED, runBlocking { db.articles().byId(articles[0]) }?.state)
-        waitFor("Brought back for your next edition")
+        waitFor("Starred for your next edition")
+        compose.onNodeWithContentDescription("Put Missed one in your next edition").assertIsOn()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Starred"))
+        assertEquals(listOf(articles[1]), runBlocking { db.articles().candidates() }.map { it.id })
+
+        compose.onNodeWithContentDescription("Put Missed one in your next edition").performClick()
+        idleUntil { runBlocking { db.articles().candidates() }.isEmpty() }
+        assertEquals("unstarred, it's delivered as before", ArticleState.DELIVERED, runBlocking { db.articles().byId(articles[1]) }?.state)
     }
 
     @Test
-    fun onlyDeliveredEditionsOfferToBringArticlesBack() {
+    fun articlesThatWentInStarredSaySoInWords() {
+        val (id, _) = edition(EditionStatus.READY, listOf("Starred story", "Plain story"))
+        db.openHelper.writableDatabase.execSQL("UPDATE edition_articles SET starred = 1 WHERE title = 'Starred story'")
+        show(id)
+
+        waitFor("Example News · 4 min · Starred")
+        compose.onNodeWithText("Example News · 4 min").assertIsDisplayed()
+    }
+
+    @Test
+    fun aReadyEditionHasNoStarToggles() {
         val (id, _) = edition(EditionStatus.READY, listOf("Unsent story"))
         show(id)
 
         compose.onNodeWithText("Unsent story").performClick()
         compose.waitForIdle()
-        assertEquals(0, compose.onAllNodes(hasText("Bring back", substring = true)).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodes(hasText("Next edition", substring = true)).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodes(hasContentDescription("in your next edition", substring = true)).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun anArticleWhoseSourceWasRemovedHasNoStar() {
+        val (id, _) = edition(EditionStatus.DELIVERED, listOf("Gone story"))
+        runBlocking { db.sources().delete(db.sources().all().single()) }
+        show(id)
+
+        compose.waitForIdle()
+        assertEquals(0, compose.onAllNodes(hasContentDescription("in your next edition", substring = true)).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun todaySaysHowManyStarredArticlesAreWaitingOnlyWhenThereAreSome() {
+        val (_, articles) = edition(EditionStatus.DELIVERED, listOf("One", "Two"))
+        val vm = TodayViewModel(repo, flowOf(null)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.editions != null }
+        assertEquals(0, compose.onAllNodes(hasContentDescription("starred", substring = true)).fetchSemanticsNodes().size)
+
+        runBlocking { articles.forEach { repo.setStarred(it, true) } }
+
+        idleUntil { compose.onAllNodes(hasContentDescription("2 starred articles are waiting")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("2 starred articles are waiting").assertIsDisplayed()
     }
 
     @Test

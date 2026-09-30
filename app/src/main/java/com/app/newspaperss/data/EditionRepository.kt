@@ -44,7 +44,7 @@ class EditionRepository(
             if (edition.status == EditionStatus.DELETED) return@withTransaction false
             if (onlyIfReady && edition.status != EditionStatus.READY) return@withTransaction false
             val articleIds = db.editions().articleIds(id)
-            db.articles().setState(articleIds, ArticleState.DELIVERED)
+            db.articles().setDelivered(articleIds)
             db.articles().rememberDelivered(articleIds, clock.instant())
             db.articles().deliverCopies(articleIds)
             db.editions().update(edition.copy(status = EditionStatus.DELIVERED, deliveredAt = clock.instant(), error = null))
@@ -60,14 +60,18 @@ class EditionRepository(
     }
 
     /**
-     * Puts delivered articles the reader didn't get to back in the pool, ahead of newer ones.
-     * Returns how many actually went back.
+     * Stars an article for the next edition, or unstars it. Starring a delivered article is how
+     * it's brought back. Returns false if it's in an unsent edition, which can't change.
      */
-    suspend fun bringBack(articleIds: List<Long>): Int = db.articles().bringBackDelivered(articleIds)
+    suspend fun setStarred(articleId: Long, starred: Boolean): Boolean =
+        (if (starred) db.articles().star(articleId, clock.instant()) else db.articles().unstar(articleId)) > 0
+
+    /** Starred articles waiting for an edition, from sources that aren't paused. */
+    fun observeStarredWaiting(): Flow<Int> = db.articles().observeStarredWaiting()
 
     /**
      * Deletes an edition's contents and EPUB. One that was never sent gives its articles back to
-     * the next edition first; a delivered one's stay used. An edition still being made is left
+     * the pool, keeping their stars; a delivered one's stay used. An edition still being made is left
      * alone. The row stays as [EditionStatus.DELETED], keeping its title taken.
      *
      * @return false if there was nothing to delete.
@@ -76,7 +80,7 @@ class EditionRepository(
         val deleted = db.withTransaction {
             val edition = db.editions().byId(id)
                 ?.takeIf { it.status != EditionStatus.BUILDING && it.status != EditionStatus.DELETED } ?: return@withTransaction null
-            if (edition.status == EditionStatus.READY) db.articles().bringBack(db.editions().articleIds(id))
+            if (edition.status == EditionStatus.READY) db.articles().release(db.editions().articleIds(id))
             db.editions().deleteArticles(id)
             db.editions().update(edition.copy(status = EditionStatus.DELETED, fileName = null, articleCount = 0, minutes = 0.0, error = null))
             edition

@@ -48,7 +48,8 @@ This document describes how the app works today. What's planned is in
 | **Section** | A heading in the edition's contents. Sections come from OPML folders, and the reading list is "Saved for later". |
 | **Edition settings** | One recipe: size (minutes), per-source cap, order (take turns / in order / shuffle), and the time and days it should be ready. |
 | **Edition** | One built issue: a dated title ("Tuesday Morning Edition, Sep 29"), its articles, the EPUB and its status: building, ready, delivered, failed or deleted. |
-| **Article state** | `NEW`, then `IN_EDITION`, then `DELIVERED`; or `SKIPPED`, or `EXPIRED` (older than the source keeps articles). |
+| **Article state** | `NEW`, then `IN_EDITION`, then `DELIVERED`; or `SKIPPED` (you marked it as read), or `EXPIRED` (older than the source keeps articles). |
+| **Star** | "Put this in my next edition." A flag beside the state, not a state: unstarring leaves the article as it was. |
 
 ## 4. Making an edition
 
@@ -59,8 +60,13 @@ Sync feeds ─► Plan ─► Extract ─► Write the EPUB ─► Deliver ─�
 The pipeline follows the Python library's shape, in the pure-JVM `:core`
 module so it's all unit-tested without Android.
 
-- **Plan.** Take turns between sources, at most one article each by default,
-  until the reading-time budget is reached. Articles are fetched in plan
+- **Plan.** Starred articles go first, taking turns between the sources
+  that have them (oldest star first within a source). Then everything
+  else: take turns between sources, at most one article each by default,
+  until the reading-time budget is reached. A star uses one of its
+  source's slots, ahead of unstarred articles; a source's own cap still
+  holds, and stars that don't fit wait for the next edition. When the same
+  link waits in two sources, the starred copy goes in. Articles are fetched in plan
   order, so an edition goes over by at most one article. If a turn-taking
   pass leaves time unfilled, a second pass adds more from sources whose own
   cap allows it.
@@ -141,22 +147,31 @@ in the share sheet (Android reports the choice back, from the notification
 too); or opening it on a Boox. **I've sent it** covers any other route, and
 **Send again** is there if a send didn't arrive. An edition still "ready"
 when the next one is built was never sent: it's marked not sent and its
-articles go into the new one.
+articles go back, keeping their stars, before the new one is planned.
 
 ## 7. What happens to articles you didn't read
 
 - **Delivered means done.** An article appears in one edition. Delivered
   links are remembered for a year, so a source removed and added again, or
   the same story in two sources, isn't delivered twice.
-- **Bring it back.** On a delivered edition, tick the articles you didn't
-  get to and they go into the next one.
+- **Stars.** Starring an article puts it in the next edition, whatever its
+  state: waiting, delivered (this is how you bring one back), marked as
+  read or expired. Stars never expire. Delivery clears them; an edition
+  that's never sent gives its articles back with their stars, and one whose
+  link was already delivered goes back to delivered. A paused source holds
+  its stars; removing a source removes them.
+- **Mark as read.** A waiting article you've read elsewhere, or don't want,
+  is marked `SKIPPED` and never goes in an edition. Undo puts back its state
+  and star.
 - **Everything else expires.** Unplanned articles older than the source's
   keep window (7 days for news feeds, never for the reading list) quietly
   go. Curated lists keep only their newest 12 unread links.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
-  feed that posts monthly isn't crowded out by busy ones. Articles are marked read
-  on the server once delivered. A
-  source can turn that off, or take one category instead of all unread.
+  feed that posts monthly isn't crowded out by busy ones. Articles are marked
+  read on the server once delivered, and ones you marked as read at the next
+  sync (so Undo never has to reach the server). A source can turn that off, or
+  take one category instead of all unread. tt-rss's own stars aren't synced:
+  there a star usually means "keep this", not "for tomorrow".
 - **Housekeeping.** Only the newest 14 editions keep their EPUB on the
   phone (ready ones always do). An article's feed text is dropped a month
   after it's delivered or expires; its row stays, so it's never re-offered.
@@ -180,18 +195,25 @@ articles go into the new one.
 
 ## 9. Screens
 
-- **Today** (home): when the next edition is due, **Make an edition now**,
-  and the latest edition with **Send**, **Open** and **I've sent it**
-  (**Send again** once delivered). Earlier editions are listed below.
+- **Today** (home): when the next edition is due, how many starred articles
+  are waiting (only when some are), **Make an edition now**, and the latest
+  edition with **Send**, **Open** and **I've sent it** (**Send again** once
+  delivered). Earlier editions are listed below.
 - **Edition:** its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
   network). **Notes** exports a Markdown file for a notes app: front matter
   (date, edition, sources, a tag) for Obsidian, a few reflection prompts at the
   top, then per article its source, author, date, link, a citation and room for notes.
-  **Delete**, and on delivered editions, **bring back**.
+  **Delete**. An article that went in because it was starred says
+  "Starred". On delivered editions each article has **☆ Next edition** to
+  bring it back.
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). A source's page
   shows its recent articles, its cap, pause and the article-text setting.
+  Tapping an article opens the original; under it, **☆ Next edition**
+  stars it (**★** on a filled pill once starred) and, on waiting ones,
+  **Mark as read** (with Undo). A marked-read row stays in place with `○`,
+  so the list doesn't reflow on e-ink.
   Add a source, import or export OPML, or add a tt-rss account.
 - **Reading list:** links you shared into the app, each with its title,
   site and reading time (looked up in the background). They go into the
