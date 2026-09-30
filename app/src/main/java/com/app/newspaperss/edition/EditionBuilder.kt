@@ -73,7 +73,6 @@ class EditionBuilder(
         // Titles carry their date, so yesterday's can't clash.
         val since = now.toLocalDate().minusDays(1).atStartOfDay(zone).toInstant()
         val title = EditionTitles.title(now, db.editions().titlesSince(since))
-        val rotation = db.editions().count()
         val editionId = db.editions().insert(EditionEntity(title = title, createdAt = clock.instant()))
         // Whatever goes wrong from here, the edition must not stay BUILDING: the Today screen
         // would show it as being made forever. Its articles only change state in the final
@@ -90,7 +89,7 @@ class EditionBuilder(
                 db.editions().deleteEmpty(editionId)
                 BuildResult.NothingNew
             } else {
-                fill(editionId, title, now, sources, articles, rotation, settings, onProgress)
+                fill(editionId, title, now, sources, articles, settings, onProgress)
             }
         } catch (e: CancellationException) {
             withContext(NonCancellable) { fail(editionId, STOPPED) }
@@ -109,7 +108,6 @@ class EditionBuilder(
         now: LocalDateTime,
         sources: List<SourceEntity>,
         articles: List<ArticleEntity>,
-        rotation: Int,
         settings: EditionSettings,
         onProgress: (done: Int) -> Unit,
     ): BuildResult {
@@ -125,7 +123,10 @@ class EditionBuilder(
             candidates = articles.map { Candidate(it.id.toString(), publicationOf(it), it.published ?: it.discoveredAt, it.starredAt) },
             sourceOrder = publicationOrder,
             ordering = settings.ordering,
-            rotation = rotation,
+            lastFeatured = db.editions().lastFeatured().associate { publicationOf(it.sourceId, it.originId) to it.createdAt },
+            // Delivered ones only: an edition that's never sent gives its articles back, and
+            // mustn't move its sources' turns along either.
+            rotation = db.editions().countDelivered(),
         )
         var fetched = 0
         val allowance = ImageAllowance(imageBudgetBytes)
@@ -281,7 +282,9 @@ class EditionBuilder(
     )
 
     /** The planner's source for [a]: the publication it came from within an aggregator, else its source. */
-    private fun publicationOf(a: ArticleEntity) = a.originId?.let { "${a.sourceId}/$it" } ?: a.sourceId.toString()
+    private fun publicationOf(a: ArticleEntity) = publicationOf(a.sourceId, a.originId)
+
+    private fun publicationOf(sourceId: Long, originId: String?) = originId?.let { "$sourceId/$it" } ?: sourceId.toString()
 
     private fun bylineOf(a: ArticleEntity, source: SourceEntity) = a.originTitle ?: source.title
 

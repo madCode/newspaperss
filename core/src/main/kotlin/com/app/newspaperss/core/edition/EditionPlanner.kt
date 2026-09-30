@@ -56,30 +56,36 @@ object EditionPlanner {
      * ----------
      * candidates: in any order.
      * sourceOrder: source ids in the reader's order; sources not listed go last.
-     * rotation: shifts which source goes first, so the same source doesn't
-     *   always get the first slot (pass the edition number).
+     * lastFeatured: when each source last had an article in an edition. Sources go in turn from
+     *   the one featured longest ago (never first), so with more sources than fit, the next
+     *   edition picks up the ones the last one left out.
+     * rotation: breaks ties between sources featured at the same time (pass the edition count).
+     *   All of one edition's sources tie, and without it the first of them in the reader's order
+     *   would go in every time whenever most sources fit.
      */
     fun order(
         candidates: List<Candidate>,
         sourceOrder: List<String>,
         ordering: Ordering,
+        lastFeatured: Map<String, Instant> = emptyMap(),
         rotation: Int = 0,
         random: Random = Random.Default,
     ): List<Candidate> {
         val (starred, rest) = candidates.partition { it.starredAt != null }
-        val sources = sourcesInTurn(candidates, sourceOrder, rotation)
+        val sources = sourcesInTurn(candidates, sourceOrder, lastFeatured, rotation)
         val oldestStarFirst = compareBy<Candidate> { it.starredAt }
         val newestFirst = compareByDescending<Candidate> { it.published ?: Instant.MIN }
         return arrange(starred, sources, oldestStarFirst, ordering, random) + arrange(rest, sources, newestFirst, ordering, random)
     }
 
-    private fun sourcesInTurn(candidates: List<Candidate>, sourceOrder: List<String>, rotation: Int): List<String> {
+    private fun sourcesInTurn(candidates: List<Candidate>, sourceOrder: List<String>, lastFeatured: Map<String, Instant>, rotation: Int): List<String> {
         val present = candidates.map { it.sourceId }.toSet()
         val known = sourceOrder.filter { it in present }
         val sources = known + (present - known.toSet()).sorted()
         if (sources.isEmpty()) return sources
         val shift = Math.floorMod(rotation, sources.size)
-        return sources.drop(shift) + sources.take(shift)
+        // A stable sort, so sources featured at the same time keep the rotated order.
+        return (sources.drop(shift) + sources.take(shift)).sortedBy { lastFeatured[it] ?: Instant.MIN }
     }
 
     private fun arrange(
