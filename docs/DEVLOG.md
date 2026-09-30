@@ -9,23 +9,29 @@ caught, and what got in the way. Newest first. Times are Pacific.
 ## Status
 
 - **Last night:** Night 2 focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. It shipped stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync, a category choice, fair turns across many feeds, Start fresh and leaving feeds out, Obsidian-friendly notes saved to your vault, a question at the end of each paper, and a dark preview.
-- **Watching:** a settings test that failed on a DataStore file rename (#66, #81). Its store now stops before the test's folder is deleted; watching whether that was it.
+- **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 3 · Wed 30 Sep
 
-### UX pass (afternoon)
-Four hours of UX design only, no new features. The patterns audited, the research behind each and what was decided are in the session's UX report page.
+### UX pass (13:00–15:00, afternoon)
+UX design only, no new features. Twelve patterns listed, four research sweeps (onboarding, delivery and hand-off, lists and destructive actions, settings with accessibility and e-ink), then one PR per fix, each reviewed. The options considered and what was decided for every pattern are in the session's UX report page. Pattern by pattern:
+- **Today** ([#81](https://github.com/madCode/newspaperss/pull/81)): once an edition exists, "Make another edition" is a quiet link, not the filled button; a failure reads before its Try again, and there's one retry per failure; "N starred articles are waiting for your next edition". Review caught two retry buttons in the most common failure, a retry beside Send, and a first fix that would have told TalkBack "Your edition is ready." for a failure.
+- **Edition page** ([#83](https://github.com/madCode/newspaperss/pull/83)): Delete edition moved into a ⋮ menu, away from Notes; the dialog names the edition and answers Delete edition / Keep; "You starred it" instead of a bare "Starred" beside an empty ☆.
+- **Settings** ([#84](https://github.com/madCode/newspaperss/pull/84)): rows at least 48dp, headings, the size slider says minutes in 5-minute stops, − and + say what they change.
+- **Sources** ([#85](https://github.com/madCode/newspaperss/pull/85), [#89](https://github.com/madCode/newspaperss/pull/89)): Remove source in the ⋮ menu on a source's page too, and the dialog answers Remove source / Keep. A note explaining "Mark 2 as read" with 3 chosen was tried and dropped after review.
+- **Notifications** ([#86](https://github.com/madCode/newspaperss/pull/86)): a sent edition's Ready notification comes down.
+- **Adding a source** ([#87](https://github.com/madCode/newspaperss/pull/87)): errors say what the answer means and what to try, and the dialog scrolls.
+- **Reading list** ([#88](https://github.com/madCode/newspaperss/pull/88)): ✕ offers Undo, and says which link. Reviews sank a delete-and-restore design; the link is now hidden while Undo is offered and deleted after.
+- **Article preview** ([#90](https://github.com/madCode/newspaperss/pull/90)): "Opening…" instead of an animated bar, and long titles end in an ellipsis.
+- **Onboarding:** no change. An "Add all" button for starter packs was tried and dropped: at large text it broke pack names mid-word and lost TalkBack's checked state.
+- **Round two** ([#91](https://github.com/madCode/newspaperss/pull/91)–[#94](https://github.com/madCode/newspaperss/pull/94)): a fresh visual audit of every screen after round one found twelve more. Fixed: outlined buttons you can see on e-ink (they were a 1.2:1 line on Today's card), a filled Add a source, "sent" for editions and "Delivered" for articles, one waiting phrase, "Ready by" in Settings, a calm message for an edition that wasn't marked sent, "nothing new since your last edition", Make another edition always below the latest, and the per-site buttons on their own line at large text. Left, with reasons in the report: the disabled − and Add, the "Mark 2 as read" count, the Settings gutter, heading styles.
+- **Also:** two flaky tests fixed at the root (a settings store outliving its folder, #82; screen tests closing their database under a live screen, #89), and the pass now uses a branch per PR, so PRs no longer queue behind each other.
 
-### Cycle 63: Send to Kindle can read the book (14:25–, this PR)
-- **From you:** the first Send to the Kindle app errors; the second gets through the form, but nothing arrives, in the library or in Content and Devices, and no email.
-- **Likely cause:** a share lets only the receiving screen read the file. Send to Kindle reads it for the form, then uploads after the form closes, when it can't any more, and fails without a word. The first-tap error fits too, if the app changes screens while starting.
-- **Shipped:** the Kindle app is allowed to read the edition before the share sheet opens, and whichever app is picked is allowed to read it until the phone restarts.
-
-### Cycle 62: Today puts the finished paper first (13:30–14:20, [#81](https://github.com/madCode/newspaperss/pull/81))
-- **Audit:** once today's edition was sent, a filled "Make an edition now" sat above it, the loudest thing on the screen, inviting a second paper; a failed build's reason sat under the button that answers it; a failed edition said "Not sent" twice and offered two retry buttons.
-- **Shipped:** the filled button only before the first edition, then a quiet "Make another edition"; a failure reads first, then "Try again"; one retry per failure; "2 starred articles will go in your next edition" says what the count means; "3 articles so far" while making (not "read", which sounded like you'd read them).
-- **Kept:** Send filled with Open outlined, and the "I've sent it" explanation.
+### Cycle 63: Send to Kindle can read the book (14:25–14:45, [#82](https://github.com/madCode/newspaperss/pull/82))
+- **From you:** the first Send to the Kindle app errors (not when Kindle is already open); the second gets through the form and bounces back, but nothing arrives, in the library or in Content and Devices, and no email.
+- **Likely cause:** a share lets only the receiving screen read the file. Send to Kindle reads it for the form, then uploads after the form closes, when it can't any more, and fails without a word.
+- **Shipped:** the Kindle app may read the edition before the share sheet opens, and the app picked may read it until the phone restarts. **Confirmed by you:** the edition now reaches the Kindle.
 
 ### Cycle 61: older editions under their title (09:40–10:05, [#79](https://github.com/madCode/newspaperss/pull/79), reverted in [#80](https://github.com/madCode/newspaperss/pull/80))
 - Shared editions made before cycle 59 under their title too. You'd rather make the day's edition again than carry code for a handful of old files, so it's reverted.

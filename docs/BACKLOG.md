@@ -8,7 +8,7 @@ ideas, not commitments.
 
 Grouped by part of the app. The tag says where each item came from: *device* (your testing),
 *personas* ([docs/research/personas.md](research/personas.md)), *resources* (the resource audit),
-*live* (building real editions), *a11y* (the accessibility audit).
+*live* (building real editions), *a11y* (the accessibility audit), *ux* (the Day 3 UX pass).
 
 ### Onboarding and setup
 - [ ] A short Kindle how-to: same Amazon account, pick the device in Send to Kindle, Library › Docs *(personas)*
@@ -42,6 +42,12 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
   - Offline: queue the change and send it at the next sync, as Mark as read does, so Undo never has to reach the server.
 - [ ] Articles that expire in the app stay unread in tt-rss: an opt-in "mark read when they expire here"
 - [ ] Delay tt-rss mark-read a little after sharing, so a quick "Send again" or "Not sent" can still undo it
+- [ ] Read/unread control that reaches tt-rss *(you asked)*. Today the app only ever marks articles read there (on delivery, or Mark as read), never unread: Undo after Mark as read, and starring a delivered article to bring it back, change the app only. Things to settle: whether Undo and bringing an article back mark it unread in tt-rss, whether a "Mark unread" is offered on delivered articles, and what happens when tt-rss has marked it read since (the last change wins, as for Mark as read)
+
+### From the UX pass *(ux)*
+- [ ] Sync errors on a source's page still read "The site answered with error 403"; give them the plain words the add dialog now uses ("turned newspapeRSS away… try again later")
+- [ ] An edition released because another was made by hand keeps its Ready notification (with Send) until the next timed one replaces it
+- [ ] Boox: consider turning off ripples on e-ink (they cause partial refreshes); Boox's own refresh modes may make it moot
 
 ### Reading list
 - [ ] Saved links that can never be read (a PDF, a video, a page over 5 MB, a 410) wait silently forever. Show them in the reading list as unreadable, with the reason and a way to open or remove them. Not as "couldn't fetch" pages in the edition: they cost no reading time, so a backlog of them could fill one
