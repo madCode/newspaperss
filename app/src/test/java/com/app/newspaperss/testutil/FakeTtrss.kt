@@ -26,6 +26,10 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     var password = "secret"
     var apiEnabled = true
     val unread = mutableListOf<Item>()
+    /** Subcategories, child id to parent id. */
+    val subcategories = mutableMapOf<Int, Int>()
+    /** A feed whose getHeadlines answers with an HTTP 500. */
+    var brokenFeed: Int? = null
     /** The reader's categories by id; 0 is tt-rss's Uncategorized. */
     val categories = mutableMapOf(0 to "Uncategorized")
     /** Ids passed to updateArticle to clear the unread flag. */
@@ -58,10 +62,35 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
         }
         if (str("sid") !in live) return error("NOT_LOGGED_IN")
         return when (op) {
-            "getHeadlines" -> ok(
+            "getFeeds" -> ok(
                 buildJsonArray {
-                    val category = str("feed_id")?.toInt()?.takeIf { str("is_cat") == "true" }
-                    unread.filter { category == null || it.categoryId == category }.forEach { item ->
+                    val category = str("cat_id")!!.toInt().takeIf { it >= 0 }
+                    unread.filter { category == null || it.categoryId == category }.groupBy { it.feedId }.forEach { (id, items) ->
+                        add(buildJsonObject { put("id", id); put("title", items.first().feedTitle); put("unread", items.size); put("cat_id", items.first().categoryId) })
+                    }
+                    // As tt-rss does with include_nested: direct subcategories as items of their own.
+                    if (category != null && str("include_nested") == "true") {
+                        subcategories.filterValues { it == category }.keys.forEach { child ->
+                            add(buildJsonObject { put("id", child); put("title", "Sub $child"); put("unread", 1); put("is_cat", true) })
+                        }
+                    }
+                    // A virtual feed, which isn't one of the reader's.
+                    add(buildJsonObject { put("id", -4); put("title", "All articles"); put("unread", unread.size) })
+                },
+            )
+            "getHeadlines" -> if (brokenFeed != null && str("feed_id")?.toInt() == brokenFeed) 500 to "<html>Internal error</html>" else ok(
+                buildJsonArray {
+                    val feed = str("feed_id")!!.toInt()
+                    val isCategory = str("is_cat") == "true"
+                    val limit = str("limit")?.toInt() ?: 200
+                    // Newest first, as tt-rss sorts them; a higher id is newer here.
+                    unread.filter {
+                        when {
+                            isCategory -> it.categoryId == feed
+                            feed > 0 -> it.feedId == feed
+                            else -> true
+                        }
+                    }.sortedByDescending { it.id }.take(limit).forEach { item ->
                         add(
                             buildJsonObject {
                                 put("id", item.id)

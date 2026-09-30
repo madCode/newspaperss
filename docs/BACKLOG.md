@@ -55,7 +55,6 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] Tooling: Compose accessibility checks in the Robolectric tests, Accessibility Scanner on a device, Ace by DAISY on a live edition
 
 ### Performance *(resources)*
-- [ ] tt-rss: pass sinceId, so each sync doesn't re-download the same 200 unread items. Careful: a since-id cursor changes what "unread" returns; rss-to-e-reader's #28 hit a similar trap
 - [ ] Load build candidates without feedHtml; fetch it per article
 - [ ] EPUB zip: buffered output, JPEGs stored uncompressed
 
@@ -180,6 +179,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] tt-rss sync takes up to five unread articles from each feed instead of the newest 200 overall, so busy feeds can't crowd out quiet ones *(personas)*
 - [x] A daily live check of each curated list's page in CI (`live-check.yml`), after Arts & Letters Daily's markup changed under the app
 - [x] Saved links in onboarding: import a Pocket or Instapaper export there, and start with saved links alone
 - [x] "No feed found" in Sources offers to save the page to the reading list instead of a dead end

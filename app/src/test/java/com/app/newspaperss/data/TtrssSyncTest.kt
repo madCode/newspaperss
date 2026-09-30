@@ -101,6 +101,53 @@ class TtrssSyncTest {
     }
 
     @Test
+    fun aQuietFeedIsntCrowdedOutByABusyOne() = runTest {
+        val source = connect()
+        server.add(1, "A monthly essay", feedId = 7, feedTitle = "Quarterly Review")
+        (2L..301L).forEach { server.add(it, "Headline $it", feedId = 111, feedTitle = "Busy News") }
+
+        sync.syncAll()
+
+        val articles = db.articles().allForSource(source.id)
+        assertTrue(articles.any { it.title == "A monthly essay" })
+        assertEquals(
+            "the busy feed's newest few",
+            (297L..301L).map { "ttrss:$it" }.toSet(),
+            articles.filter { it.originId == "111" }.map { it.guid }.toSet(),
+        )
+    }
+
+    @Test
+    fun oneFeedTtrssCantServeDoesntCostTheOthers() = runTest {
+        val source = connect()
+        server.add(1, "Fine", feedId = 7, feedTitle = "A Blog")
+        server.add(2, "Broken", feedId = 8, feedTitle = "Bad Feed")
+        server.brokenFeed = 8
+
+        sync.syncAll()
+
+        assertEquals(listOf("Fine"), db.articles().allForSource(source.id).map { it.title })
+        assertNull(db.sources().byId(source.id)!!.lastError)
+    }
+
+    @Test
+    fun aCategorysSubcategoryFeedsArriveButNotAFeedSharingItsId() = runTest {
+        val source = connect()
+        server.categories[1] = "Ideas"
+        server.categories[3] = "Essays"
+        server.subcategories[3] = 1
+        server.add(1, "In Ideas", feedId = 20, feedTitle = "Ideas Feed", categoryId = 1)
+        server.add(2, "In Essays", feedId = 50, feedTitle = "Essays Feed", categoryId = 3)
+        // Feed ids and category ids are separate sequences: this feed shares the subcategory's id.
+        server.add(3, "Unrelated", feedId = 3, feedTitle = "Elsewhere", categoryId = 0)
+        ttrss.chooseCategory(source.id, TtrssCategory(1, "Ideas"))
+
+        sync.syncAll()
+
+        assertEquals(setOf("In Ideas", "In Essays"), db.articles().allForSource(source.id).map { it.title }.toSet())
+    }
+
+    @Test
     fun problemsShowOnTheSourceAndClearOnSuccess() = runTest {
         val source = connect()
         server.password = "changed"

@@ -27,6 +27,9 @@ data class TtrssHeadline(
     val feedId: String,
 )
 
+/** One of the reader's feeds with unread articles, as getFeeds reports it. */
+data class TtrssFeed(val id: Int, val title: String, val unread: Int)
+
 /** A category of the reader's own feeds, as getCategories reports it. */
 data class TtrssCategory(val id: Int, val title: String)
 
@@ -70,14 +73,21 @@ class TtrssClient(
     }
 
     /**
-     * Unread articles, newest first as tt-rss sorts them.
+     * Unread articles, in tt-rss's order: by score, then newest first.
      *
      * @param feedId -4 for all feeds, or a feed or category id.
      * @param isCategory true when [feedId] is a category.
      * @param limit tt-rss caps this at 200 itself.
      * @param sinceId only articles with a larger id.
+     * @param newestFirst by date alone; otherwise tt-rss puts higher-scored articles first.
      */
-    suspend fun unreadHeadlines(feedId: Int = ALL_ARTICLES, isCategory: Boolean = false, limit: Int = MAX_LIMIT, sinceId: Long? = null): List<TtrssHeadline> {
+    suspend fun unreadHeadlines(
+        feedId: Int = ALL_ARTICLES,
+        isCategory: Boolean = false,
+        limit: Int = MAX_LIMIT,
+        sinceId: Long? = null,
+        newestFirst: Boolean = false,
+    ): List<TtrssHeadline> {
         val content = withSession { sid ->
             post(buildJsonObject {
                 put("sid", sid)
@@ -88,10 +98,44 @@ class TtrssClient(
                 put("show_content", true)
                 put("limit", limit)
                 if (sinceId != null) put("since_id", sinceId)
+                if (newestFirst) put("order_by", "feed_dates")
             })
         }
         val items = content as? JsonArray ?: throw TtrssException.NotTtrss()
         return items.mapNotNull { (it as? JsonObject)?.let(::headline) }
+    }
+
+    /**
+     * The reader's feeds that have unread articles.
+     *
+     * @param categoryId a category, its subcategories included, or null for every feed.
+     */
+    suspend fun unreadFeeds(categoryId: Int? = null): List<TtrssFeed> = unreadFeeds(categoryId, mutableSetOf())
+
+    private suspend fun unreadFeeds(categoryId: Int?, seen: MutableSet<Int>): List<TtrssFeed> {
+        if (categoryId != null && !seen.add(categoryId)) return emptyList()
+        val content = withSession { sid ->
+            post(buildJsonObject {
+                put("sid", sid)
+                put("op", "getFeeds")
+                put("cat_id", categoryId ?: ALL_FEEDS)
+                put("unread_only", true)
+                if (categoryId != null) put("include_nested", true)
+            })
+        }
+        val items = content as? JsonArray ?: throw TtrssException.NotTtrss()
+        return items.flatMap { item ->
+            val o = item as? JsonObject ?: return@flatMap emptyList()
+            // Ints, or strings in older versions. Negative ids are tt-rss's own virtual feeds.
+            val id = (o["id"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()?.takeIf { it > 0 } ?: return@flatMap emptyList()
+            // include_nested lists a subcategory as an item of its own, with an id from the
+            // category sequence: fetched as a feed, it would be some unrelated feed.
+            if ((o["is_cat"] as? JsonPrimitive)?.contentOrNull == "true") {
+                return@flatMap if (categoryId != null) unreadFeeds(id, seen) else emptyList()
+            }
+            val unread = (o["unread"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
+            listOf(TtrssFeed(id, (o["title"] as? JsonPrimitive)?.contentOrNull ?: "", unread))
+        }
     }
 
     /**
@@ -193,6 +237,8 @@ class TtrssClient(
 
     companion object {
         const val ALL_ARTICLES = -4
+        /** getFeeds' "every feed, without tt-rss's virtual ones". */
+        private const val ALL_FEEDS = -3
         const val MAX_LIMIT = 200
         private const val FIELD_UNREAD = 2
 
