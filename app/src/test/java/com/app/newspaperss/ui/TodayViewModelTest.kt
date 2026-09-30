@@ -36,6 +36,16 @@ class TodayViewModelTest {
     }
 
     @Test
+    fun aQueuedBuildWithNoConnectionIsWaitingForOneNotCheckingSources() {
+        assertEquals(BuildState.WaitingForNetwork, TodayViewModel.buildStateOf(info(WorkInfo.State.ENQUEUED), online = false))
+        // Waiting to retry, nothing is checking anything.
+        val retrying = WorkInfo(UUID.randomUUID(), WorkInfo.State.ENQUEUED, emptySet(), runAttemptCount = 1, nextScheduleTimeMillis = 1_000L)
+        assertEquals(BuildState.Retrying(1_000L), TodayViewModel.buildStateOf(retrying))
+        // Once running it has the connection it needed.
+        assertEquals(BuildState.Syncing, TodayViewModel.buildStateOf(info(WorkInfo.State.RUNNING), online = false))
+    }
+
+    @Test
     fun nextEditionReadsLikeASentence() {
         val now = java.time.ZonedDateTime.of(2026, 9, 29, 7, 0, 0, 0, java.time.ZoneOffset.UTC)
         val on = com.app.newspaperss.settings.Settings(scheduleEnabled = true)

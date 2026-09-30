@@ -41,6 +41,8 @@ class EditionDetailViewModel(
     private val editions: EditionRepository,
     private val id: Long,
     private val notes: EditionNotes,
+    /** Takes down this edition's notification once it's deleted. */
+    private val dismissNotification: (Long) -> Unit,
 ) : ViewModel() {
     val detail: StateFlow<EditionDetail?> = combine(editions.observe(id), editions.observeContents(id)) { edition, contents ->
         EditionDetail(edition, contents, edition?.let(editions::fileOf))
@@ -78,7 +80,12 @@ class EditionDetailViewModel(
 
     /** Deletes this edition, then [onDeleted] (to leave the screen) if it was deleted. */
     fun delete(onDeleted: () -> Unit) {
-        viewModelScope.launch { if (editions.delete(id)) onDeleted() }
+        viewModelScope.launch {
+            if (editions.delete(id)) {
+                dismissNotification(id)
+                onDeleted()
+            }
+        }
     }
 
     fun markSent() {

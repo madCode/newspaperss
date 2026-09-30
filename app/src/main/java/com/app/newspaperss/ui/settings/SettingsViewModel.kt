@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.settings.DeliveryMethod
+import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +40,7 @@ class SettingsViewModel(
     fun useShare() = update { it.copy(delivery = DeliveryMethod.SHARE) }
     fun useFolder(uri: String, name: String) = update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = uri, folderName = name) }
     fun setNotesWithEdition(enabled: Boolean) = update { it.copy(notesWithEdition = enabled) }
+    fun setDevice(device: Device) = update { it.copy(device = device) }
 
     companion object {
         const val MIN_MINUTES = 5

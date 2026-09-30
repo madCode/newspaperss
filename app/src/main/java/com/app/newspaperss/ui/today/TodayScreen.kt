@@ -135,7 +135,7 @@ private class BuildAnnouncer {
     var finished = false
 
     fun update(build: BuildState) {
-        val running = build == BuildState.Syncing || build is BuildState.Fetching
+        val running = build == BuildState.Syncing || build == BuildState.WaitingForNetwork || build is BuildState.Retrying || build is BuildState.Fetching
         if (running) finished = false
         else if (sawRunning && build == BuildState.Idle) finished = true
         if (running) sawRunning = true
@@ -144,7 +144,7 @@ private class BuildAnnouncer {
 
 @Composable
 private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, primary: Boolean, onMake: () -> Unit) {
-    val running = build == BuildState.Syncing || build is BuildState.Fetching
+    val running = build == BuildState.Syncing || build == BuildState.WaitingForNetwork || build is BuildState.Retrying || build is BuildState.Fetching
     // Announced only once a build has run while this screen was up: a failure WorkManager still
     // remembers from earlier would otherwise be read out every time Today opens.
     announcer.update(build)
@@ -158,6 +158,8 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, primary: Bo
         Text(
             when (build) {
                 BuildState.Syncing -> "Checking your sources for new articles…"
+                BuildState.WaitingForNetwork -> "Waiting for an internet connection…"
+                is BuildState.Retrying -> "Couldn't read your sources. Trying again at ${timeOf(build.atMillis)}."
                 is BuildState.Fetching -> "Making your edition"
                 BuildState.NothingNew -> "Nothing new to read yet. Add sources, or check back later."
                 is BuildState.Failed -> build.reason
@@ -266,3 +268,7 @@ internal fun summary(edition: EditionEntity): String {
     val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"
     return "$articles · about ${edition.minutes.roundToInt().coerceAtLeast(1)} min · $status"
 }
+
+private fun timeOf(epochMillis: Long): String =
+    java.time.Instant.ofEpochMilli(epochMillis).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+        .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))

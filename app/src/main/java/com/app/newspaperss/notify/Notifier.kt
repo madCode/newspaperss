@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
+import androidx.core.os.bundleOf
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.app.newspaperss.MainActivity
@@ -24,6 +25,10 @@ interface EditionNotifier {
     fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean = false)
     fun editionDelivered(edition: EditionEntity, where: String)
     fun problem(title: String, reason: String)
+    /** Takes down the notification about [editionId], if it's the one showing (the edition was deleted). */
+    fun dismissFor(editionId: Long)
+    /** A timed run found nothing new, so no edition was made. @param firstEver there's never been one. */
+    fun nothingNew(firstEver: Boolean)
 }
 
 /**
@@ -66,6 +71,7 @@ class Notifier(private val context: Context) : EditionNotifier {
         )
         notify(
             NotificationCompat.Builder(context, READY)
+                .addExtras(bundleOf(EXTRA_EDITION to edition.id))
                 .setContentTitle("${edition.title} is ready")
                 .setContentText(summary(edition))
                 .addAction(0, if (openInstead) "Open" else "Send", action),
@@ -74,8 +80,23 @@ class Notifier(private val context: Context) : EditionNotifier {
 
     override fun editionDelivered(edition: EditionEntity, where: String) = notify(
         NotificationCompat.Builder(context, EDITIONS)
+            .addExtras(bundleOf(EXTRA_EDITION to edition.id))
             .setContentTitle("${edition.title} delivered")
             .setContentText("${summary(edition)} · saved to $where"),
+    )
+
+    // The slot is shared by every edition's news, so only if it's still about this one: a Send
+    // left up for a deleted edition would share a file that's gone.
+    override fun dismissFor(editionId: Long) {
+        val showing = context.getSystemService(NotificationManager::class.java).activeNotifications
+            .any { it.id == EDITION_ID && it.notification.extras.getLong(EXTRA_EDITION, -1L) == editionId }
+        if (showing) manager.cancel(EDITION_ID)
+    }
+
+    override fun nothingNew(firstEver: Boolean) = notify(
+        NotificationCompat.Builder(context, EDITIONS)
+            .setContentTitle("No new edition")
+            .setContentText(if (firstEver) "Nothing to read yet. Add a few sources to get started." else "Nothing new to read since your last one."),
     )
 
     override fun problem(title: String, reason: String) = notify(
@@ -108,6 +129,7 @@ class Notifier(private val context: Context) : EditionNotifier {
         const val READY = "edition-ready"
         const val EDITIONS = "editions"
         const val PROBLEMS = "problems"
+        private const val EXTRA_EDITION = "com.app.newspaperss.EDITION_ID"
         private const val EDITION_ID = 1
         private const val PROBLEM_ID = 2
     }

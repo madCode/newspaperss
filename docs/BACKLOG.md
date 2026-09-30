@@ -12,12 +12,10 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 
 ### Onboarding and setup
 - [ ] Saved links in onboarding: Pocket/Instapaper import there, and a reading-list-only setup *(personas)*
-- [ ] Change the device in Settings after onboarding *(personas)*
 - [ ] A short Kindle how-to: same Amazon account, pick the device in Send to Kindle, Library › Docs *(personas)*
 - [ ] Explain per device what counts as "delivered" *(personas)*
 
 ### Sources and fetching
-- [ ] Say why there's no edition: nothing new on schedule, all sources failed, waiting for a connection *(personas)*
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
 - [ ] "No feed found": offer to save the page to the reading list instead *(personas)*
 - [ ] Decide what tapping an article in a source's list does: open the original, render it, or offer "add to the next edition" *(device)*
@@ -34,7 +32,6 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Folder delivery: tt-rss marks articles read as soon as the file is saved, before Syncthing has synced; old editions pile up in the folder *(personas)*
 - [ ] Verify folder delivery and the chooser from the notification on a real device
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
-- [ ] Deleting an edition leaves its "ready" notification up; its Send would share a missing file
 
 ### Reading list
 - [ ] Saved links that can never be read (a PDF, a video, a page over 5 MB, a 410) wait silently forever. Show them in the reading list as unreadable, with the reason and a way to open or remove them. Not as "couldn't fetch" pages in the edition: they cost no reading time, so a backlog of them could fill one
@@ -125,6 +122,30 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 - **Later:** export the edition as an audiobook file (M4B with a chapter per article) for podcast and audiobook apps. The EPUB could carry media overlays, but few e-readers play them.
 - **Open questions:** remember the position between sessions? Count listened articles as read for "bring back"?
 
+### Cloud backup
+Android's Auto Backup already copies the database and settings (sources, reading list, edition
+history) to the reader's Google account, within its 25 MB quota. Past EPUBs, the schedule timer and
+the tt-rss password are left out on purpose: the password is sealed by a key that never leaves the
+phone. What's missing:
+- it's invisible: nothing in the app says it's on, when it last ran, or what comes back;
+- a restore has never been tried on a real phone (the timer re-arms, but does a restored tt-rss
+  source ask for its password clearly?);
+- no manual copy: one "Export everything" file (sources as OPML, the reading list as the
+  library's Markdown checklist, settings), for people without Google services or moving to another
+  reader, and a matching import.
+
+### An iOS app
+Possible, but a second app rather than a port:
+- `:core` is plain Kotlin, but leans on JVM libraries (jsoup, Readability4J, OkHttp). Kotlin
+  Multiplatform would need replacements (Ksoup, Ktor, a Readability port), then Compose
+  Multiplatform or SwiftUI for the screens.
+- iOS decides when background work runs (`BGAppRefreshTask`), so "ready by 6:30" can't be
+  promised the way Android's timers allow; a notification to build on opening may be the honest version.
+- Delivery works: the share sheet reaches Send to Kindle, Dropbox (Kobo) and Files; Boox and
+  KOReader users are mostly on Android anyway.
+- It needs a Mac to build and an Apple developer account ($99 a year) to ship.
+A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps the logic shared.
+
 ### From the competitor research ([docs/research/competitors.md](research/competitors.md))
 - **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
   has no folder trees, so this needs the Drive API (an OAuth client, like Dropbox's app key).
@@ -134,6 +155,9 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Change the e-reader in Settings after onboarding (it decides Send or Open, and the tips)
+- [x] Deleting an edition takes down its "ready" or "delivered" notification, whose Send would have shared a missing file
+- [x] Say why there's no edition: a timed run with nothing new sends a quiet "No new edition"; when every source failed it's retried, then a failure that says so, not "nothing new"; a build queued offline shows "Waiting for an internet connection"
 - [x] Fastly's bot challenge (Le Monde's "Client Challenge") is recognised: the feed's text is used with a note, and the source learns the site blocks fetching
 - [x] Reading time for Chinese and Japanese counts characters (about 350 a minute), so a paragraph isn't one word; the full-text check no longer takes a long Japanese feed for a teaser
 - [x] Extraction drops scripts, styles and SVGs before Readability copies the page (a 2.6 MB script-heavy page: 36 MB allocated before, 16 MB after, twice as fast); pages over 5 MB aren't parsed and use the feed's text

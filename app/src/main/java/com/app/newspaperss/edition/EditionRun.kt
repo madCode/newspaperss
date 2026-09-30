@@ -1,6 +1,7 @@
 package com.app.newspaperss.edition
 
 import com.app.newspaperss.data.EditionRepository
+import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.delivery.EditionIntents
 import com.app.newspaperss.delivery.FolderDelivery
@@ -11,6 +12,8 @@ import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
+import java.time.Duration
 import java.time.Instant
 
 /** One edition from start to finish: sync, build, deliver, tell the reader. */
@@ -22,6 +25,7 @@ class EditionRun(
     private val folder: FolderWriter,
     private val notifier: EditionNotifier,
     private val notes: EditionNotes,
+    private val now: () -> Instant = Instant::now,
 ) {
     /**
      * @param scheduled true for the timed run. Only then does a shared edition
@@ -29,18 +33,39 @@ class EditionRun(
      *   already looking at it.
      * @param dueAt when a timed edition is due, which is what it's titled and dated for.
      */
-    suspend fun run(scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}, dueAt: Instant? = null): BuildResult {
+    /**
+     * @param finalAttempt false when the worker will retry an [BuildResult.Unreachable] timed run,
+     *   so the reader isn't told of a failure that a retry minutes later may undo.
+     */
+    suspend fun run(
+        scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}, dueAt: Instant? = null, finalAttempt: Boolean = true,
+    ): BuildResult {
         val s = settings.current()
-        sync.syncAll()
+        val synced = sync.syncAll()
         onSyncDone()
-        val result = builder.build(s.edition, dueAt, onProgress)
+        val built = builder.build(s.edition, dueAt, onProgress)
+        // "Nothing new" when every source failed would hide the failure.
+        val result = if (built == BuildResult.NothingNew && synced.sources > 0 && synced.failedSources == synced.sources) {
+            BuildResult.Unreachable(synced.sources)
+        } else built
         when (result) {
             is BuildResult.Built -> deliver(result.editionId, s, scheduled)
             is BuildResult.Failed -> if (scheduled) notifier.problem("Today's edition couldn't be made", result.reason)
-            BuildResult.NothingNew -> {}
+            is BuildResult.Unreachable -> if (scheduled && finalAttempt) notifier.problem("No new edition", result.reason)
+            // Quiet, but said: otherwise a timed paper that doesn't come looks like the app broke.
+            // Not when one came recently (made by hand just before): that one is the news.
+            BuildResult.NothingNew -> if (scheduled) {
+                val made = editions.observeAll().first().filter { it.status == EditionStatus.READY || it.status == EditionStatus.DELIVERED }
+                val latest = made.firstOrNull()
+                if (latest == null || latest.createdAt.isBefore(now().minus(RECENT))) notifier.nothingNew(firstEver = latest == null)
+            }
         }
         editions.pruneFiles()
         return result
+    }
+
+    private companion object {
+        val RECENT: Duration = Duration.ofHours(12)
     }
 
     private suspend fun deliver(editionId: Long, s: Settings, scheduled: Boolean) {
@@ -51,6 +76,8 @@ class EditionRun(
             val error = folder.deliver(file, folderUri, FolderDelivery.fileName(edition.title), EditionIntents.EPUB_MIME)
             if (error == null) {
                 editions.markDelivered(editionId)
+                // Deleted while its file was being copied: no news about an edition that's gone.
+                if (editions.byId(editionId)?.status != EditionStatus.DELIVERED) return
                 notifier.editionDelivered(edition, s.folderName ?: "your folder")
                 if (s.notesWithEdition) {
                     // Only after the edition is saved: notes that fail mustn't hold back the book.
@@ -66,7 +93,7 @@ class EditionRun(
                 // Left READY: the reader can still send it by hand, and nothing is used up.
                 notifier.problem("${edition.title} wasn't delivered", error)
             }
-        } else if (scheduled) {
+        } else if (scheduled && editions.byId(editionId)?.status == EditionStatus.READY) {
             notifier.editionReady(edition, file, openInstead = s.device == Device.BOOX)
         }
     }

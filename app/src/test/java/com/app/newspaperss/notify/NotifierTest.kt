@@ -65,4 +65,23 @@ class NotifierTest {
         notifier.editionDelivered(EditionEntity(title = "Tuesday Morning Edition", articleCount = 1, minutes = 0.2), "Books")
         assertEquals("1 article · about 1 min · saved to Books", shownText())
     }
+
+    @Test
+    fun deletingAnEditionTakesDownItsNotificationButNotANewerOnes() {
+        val shown = shadowOf(app.getSystemService(NotificationManager::class.java))
+        notifier.editionDelivered(EditionEntity(id = 5, title = "Monday Morning Edition", articleCount = 7, minutes = 30.0), "Books")
+
+        notifier.dismissFor(6)
+        assertEquals(1, shown.allNotifications.size)
+
+        notifier.dismissFor(5)
+        assertEquals(0, shown.allNotifications.size)
+
+        // The one that matters: a Send left up would share the deleted file.
+        clearFileProviderCache()
+        val file = java.io.File(app.filesDir, "editions/e.epub").apply { parentFile!!.mkdirs(); writeText("epub") }
+        notifier.editionReady(EditionEntity(id = 7, title = "Tuesday Morning Edition", articleCount = 7, minutes = 30.0), file)
+        notifier.dismissFor(7)
+        assertEquals(0, shown.allNotifications.size)
+    }
 }

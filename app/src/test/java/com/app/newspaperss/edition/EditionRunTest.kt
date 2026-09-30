@@ -25,6 +25,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.io.File
+import java.time.Instant
 
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
@@ -41,8 +42,11 @@ class EditionRunTest {
         override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean) { notices += if (openInstead) "open ${edition.title}" else "ready ${edition.title}" }
         override fun editionDelivered(edition: EditionEntity, where: String) { notices += "delivered to $where" }
         override fun problem(title: String, reason: String) { notices += "problem: $reason" }
+        override fun dismissFor(editionId: Long) {}
+        override fun nothingNew(firstEver: Boolean) { notices += if (firstEver) "nothing yet" else "nothing new" }
     }
     private val folderErrors = mutableMapOf<String, String>()
+    private var clock = Instant.now()
     private val saved = mutableListOf<String>()
     private val notes by lazy { EditionNotes(db, tmp.newFolder("notes")) }
     private val run by lazy {
@@ -50,6 +54,7 @@ class EditionRunTest {
         EditionRun(
             settings, FeedSync(db, http), EditionBuilder(db, content, editions.editionsDir), editions,
             { file, uri, name, mime -> saved += "$uri/$name ($mime):${file.length() > 0}"; folderErrors[mime] }, notifier, notes,
+            now = { clock },
         )
     }
 
@@ -59,6 +64,59 @@ class EditionRunTest {
     }
 
     private suspend fun status(result: BuildResult) = db.editions().byId((result as BuildResult.Built).editionId)!!.status
+
+    @Test
+    fun whenEverySourceFailsItSaysSoRatherThanNothingNew() = runTest {
+        SourceRepository(db).addFeed("https://example.com/feed", "Blog")  // no page: the fetch fails
+
+        val result = run.run(scheduled = true)
+
+        assertEquals(BuildResult.Unreachable(1), result)
+        assertEquals(listOf("problem: None of your 1 source could be read. Sources shows what went wrong with each."), notices)
+    }
+
+    @Test
+    fun aTimedRunThatWillBeRetriedKeepsQuietAboutUnreadableSources() = runTest {
+        SourceRepository(db).addFeed("https://example.com/feed", "Blog")
+
+        assertEquals(BuildResult.Unreachable(1), run.run(scheduled = true, finalAttempt = false))
+        assertEquals(emptyList<String>(), notices)
+    }
+
+    @Test
+    fun oneSourceFailingIsntAllOfThemFailing() = runTest {
+        oneSource()
+        SourceRepository(db).addFeed("https://example.com/other", "Other")  // fails
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Kobo") }
+        run.run(scheduled = false)
+
+        assertEquals(BuildResult.NothingNew, run.run(scheduled = false))
+    }
+
+    @Test
+    fun withNoSourcesAtAllThereIsNothingToReadNotAFailure() = runTest {
+        assertEquals(BuildResult.NothingNew, run.run(scheduled = true))
+        assertEquals(listOf("nothing yet"), notices)
+    }
+
+    @Test
+    fun aTimedRunWithNothingNewSaysSoQuietly() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Kobo") }
+        run.run(scheduled = true)
+
+        // A timed run just after an edition came (one made by hand minutes before): that one is the news.
+        assertEquals(BuildResult.NothingNew, run.run(scheduled = true))
+        assertEquals(listOf("delivered to Kobo"), notices)
+
+        clock = clock.plus(java.time.Duration.ofDays(1))
+        assertEquals(BuildResult.NothingNew, run.run(scheduled = true))
+        assertEquals(listOf("delivered to Kobo", "nothing new"), notices)
+
+        // Made by hand, the reader is looking at Today already.
+        assertEquals(BuildResult.NothingNew, run.run(scheduled = false))
+        assertEquals(listOf("delivered to Kobo", "nothing new"), notices)
+    }
 
     @Test
     fun folderDeliveryMarksTheEditionDelivered() = runTest {

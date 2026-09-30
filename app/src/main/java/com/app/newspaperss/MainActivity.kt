@@ -43,6 +43,7 @@ import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.theme.NewspaperssTheme
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
+import com.app.newspaperss.work.Connectivity
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.ui.onboarding.OnboardingScreen
@@ -136,12 +137,12 @@ private fun App(container: AppContainer, preferOpen: Boolean) {
         ) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, lastDue = { EditionScheduler.lastDue(context) }) { EditionWorker.buildNow(context) } }
+                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }) { EditionWorker.buildNow(context) } }
                 TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes) }
+                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes, container.notifier::dismissFor) }
                 EditionDetailScreen(
                     vm,
                     preferOpen = preferOpen,

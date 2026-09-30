@@ -26,6 +26,10 @@ import java.io.File
 sealed interface BuildState {
     data object Idle : BuildState
     data object Syncing : BuildState
+    /** Queued, but it needs an internet connection to start. */
+    data object WaitingForNetwork : BuildState
+    /** A timed run read no source and tries again at [atMillis] (epoch ms). */
+    data class Retrying(val atMillis: Long) : BuildState
     data class Fetching(val done: Int) : BuildState
     data object NothingNew : BuildState
     data class Failed(val reason: String) : BuildState
@@ -46,14 +50,15 @@ class TodayViewModel(
     private val editions: EditionRepository,
     work: Flow<WorkInfo?>,
     settings: Flow<Settings> = flowOf(Settings()),
+    online: Flow<Boolean> = flowOf(true),
     private val now: () -> ZonedDateTime = { ZonedDateTime.now() },
     private val lastDue: () -> Long = { 0L },
     private val startBuild: () -> Unit,
 ) : ViewModel() {
-    val state: StateFlow<TodayState> = combine(editions.observeAll(), work, settings) { list, info, s ->
+    val state: StateFlow<TodayState> = combine(editions.observeAll(), work, settings, online) { list, info, s, isOnline ->
         TodayState(
             editions = list,
-            build = buildStateOf(info),
+            build = buildStateOf(info, isOnline),
             next = nextEdition(s, now(), lastDue()),
             preferOpen = s.device == Device.BOOX,
             deviceName = when (s.device) {
@@ -89,8 +94,14 @@ class TodayViewModel(
             return "$day at $time \u00b7 about ${s.edition.minutes} min"
         }
 
-        fun buildStateOf(info: WorkInfo?): BuildState = when (info?.state) {
-            WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> BuildState.Syncing
+        /** @param online without a connection, queued work is waiting for one, not checking sources. */
+        fun buildStateOf(info: WorkInfo?, online: Boolean = true): BuildState = when (info?.state) {
+            WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> when {
+                // Not "checking": nothing runs until the retry.
+                info.runAttemptCount > 0 -> BuildState.Retrying(info.nextScheduleTimeMillis)
+                online -> BuildState.Syncing
+                else -> BuildState.WaitingForNetwork
+            }
             WorkInfo.State.RUNNING ->
                 if (info.progress.getString(EditionWorker.STAGE) == EditionWorker.STAGE_FETCHING) {
                     BuildState.Fetching(info.progress.getInt(EditionWorker.FETCHED, 0))

@@ -108,7 +108,7 @@ class EditionDetailScreenTest {
     }
 
     private fun show(editionId: Long, preferOpen: Boolean = false): EditionDetailViewModel {
-        val vm = EditionDetailViewModel(repo, editionId, notes)
+        val vm = EditionDetailViewModel(repo, editionId, notes) {}
         compose.setContent { EditionDetailScreen(vm, onBack = {}, preferOpen = preferOpen) }
         idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
         return vm
@@ -313,6 +313,20 @@ class EditionDetailScreenTest {
     }
 
     @Test
+    fun aBuildQueuedWithoutAConnectionSaysItsWaitingForOne() {
+        val online = MutableStateFlow(false)
+        val vm = TodayViewModel(repo, flowOf(work(WorkInfo.State.ENQUEUED)), online = online) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+
+        idleUntil { vm.state.value.build == BuildState.WaitingForNetwork }
+        compose.onNodeWithText("Waiting for an internet connection…").assertExists()
+
+        online.value = true
+        idleUntil { vm.state.value.build == BuildState.Syncing }
+        compose.onNodeWithText("Checking your sources for new articles…").assertExists()
+    }
+
+    @Test
     fun anOldFailureIsShownButNotAnnouncedEachTimeTodayOpens() {
         val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Couldn't reach any of your sources."))
         val vm = TodayViewModel(repo, flowOf(failed)) {}
@@ -338,9 +352,11 @@ class EditionDetailScreenTest {
         assertEquals(latest, opened)
     }
 
+    private val dismissed = mutableListOf<Long>()
+
     private fun deleteFromTheScreen(id: Long) {
         var left = false
-        val vm = EditionDetailViewModel(repo, id, notes)
+        val vm = EditionDetailViewModel(repo, id, notes) { dismissed += it }
         compose.setContent { EditionDetailScreen(vm, onBack = { left = true }) }
         idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
         compose.onNodeWithText("Delete").performClick()
@@ -359,6 +375,7 @@ class EditionDetailScreenTest {
         assertTrue(isGone(id))
         assertEquals(ArticleState.NEW, runBlocking { db.articles().byId(articles[0]) }?.state)
         assertFalse("its EPUB is gone", editionsDir.resolve("e.epub").exists())
+        assertEquals("its Send notification goes too", listOf(id), dismissed)
     }
 
     @Test
