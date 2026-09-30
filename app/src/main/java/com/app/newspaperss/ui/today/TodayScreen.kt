@@ -3,6 +3,7 @@ package com.app.newspaperss.ui.today
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -230,7 +231,8 @@ private fun LatestEdition(
     onOpen: () -> Unit,
     onSent: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+    // An outline as well as the tint, which is almost white on e-ink.
+    Card(Modifier.fillMaxWidth().padding(top = 16.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(16.dp)) {
             Column(Modifier.fillMaxWidth().clickable(onClickLabel = "See what's inside", onClick = onDetails)) {
                 Text(edition.title, style = MaterialTheme.typography.headlineSmall)
