@@ -20,22 +20,33 @@ object ArtsAndLettersDaily : CuratedList {
         val headers = Jsoup.parse(html, baseUrl).select("h2.column_headers")
         return COLUMNS.map { name ->
             val header = headers.firstOrNull { it.text() == name } ?: throw ListLayoutChangedException("no \"$name\" column")
-            newestIn(header.parent()!!, name)
+            newestIn(header, name)
         }.distinctBy { it.url }
     }
 
     /**
-     * Only the column's first paragraph counts: if it isn't a teaser with a link, the column
-     * changed shape, and the next paragraph down would be an older pick.
+     * The newest entry runs from the column's header to its "more »" link. It's read as a run of
+     * nodes rather than one `<p>` because the site sometimes nests a `<p>` in the teaser, which
+     * the HTML parser splits into several siblings. The run also stops at an `<hr>`: an entry
+     * that ends without its link means the column changed shape, and carrying on would take the
+     * next entry down, an older pick.
      */
-    private fun newestIn(column: Element, name: String): ListLink {
-        val entry = column.children().firstOrNull { it.tagName() == "p" }
-            ?: throw ListLayoutChangedException("no entries in \"$name\"")
-        val link = entry.select("a[href]").lastOrNull()?.takeIf { it.text().startsWith("more") }
+    private fun newestIn(header: Element, name: String): ListLink {
+        val entry = Element("div").also { it.setBaseUri(header.baseUri()) }
+        var node = header.nextSibling()
+        while (node != null && !(node is Element && node.tagName() == "hr")) {
+            entry.appendChild(node.clone())
+            if (moreLink(entry) != null) break
+            node = node.nextSibling()
+        }
+        if (entry.text().isBlank()) throw ListLayoutChangedException("no entries in \"$name\"")
+        val link = moreLink(entry)
         val url = link?.absUrl("href")?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
             ?: throw ListLayoutChangedException("the newest entry in \"$name\" has no link")
-        val teaser = entry.clone().apply { select("a[href]").last()?.remove() }
-            .text().replace(' ', ' ').trim()
+        link.remove()
+        val teaser = entry.text().replace('\u00A0', ' ').trim()
         return ListLink(url, title = null, summary = teaser.ifEmpty { null })
     }
+
+    private fun moreLink(entry: Element): Element? = entry.select("a[href]").firstOrNull { it.text().startsWith("more") }
 }

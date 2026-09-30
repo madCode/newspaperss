@@ -39,6 +39,22 @@ class ArtsAndLettersDailyTest {
     }
 
     @Test
+    fun aTeaserWithAParagraphNestedInsideItIsStillRead() {
+        // As on the live page on 2026-09-30: the parser closes the outer <p> at the inner one,
+        // leaving the "more »" link outside any paragraph.
+        val html = page.replace(
+            "<p>Perverseness drove <strong>Edgar Allan Poe</strong> to ruin, or the brink of it, again and again. It was also the source of his inspiration... <a",
+            "<p><p>Perverseness drove <strong>Edgar Allan Poe</strong> to ruin, or the brink of it, again and again. It was also the source of his inspiration</p>... <a",
+        )
+        val link = ArtsAndLettersDaily.links(html, base)[1]
+        assertEquals("https://newrepublic.com/article/214970/edgar-allan-poe-mined-misery-emily-ogden", link.url)
+        assertEquals(
+            "Perverseness drove Edgar Allan Poe to ruin, or the brink of it, again and again. It was also the source of his inspiration...",
+            link.summary,
+        )
+    }
+
+    @Test
     fun aMissingColumnMeansTheLayoutChanged() {
         assertEquals("no \"New Books\" column", layoutChanged(page.replace(">New Books</a></h2>", ">Books</a></h2>")))
         layoutChanged("<html><body><p>We've redesigned! <a href=\"https://example.com/\">more »</a></p></body></html>")
