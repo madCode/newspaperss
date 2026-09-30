@@ -33,7 +33,6 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Folder delivery: tt-rss marks articles read as soon as the file is saved, before Syncthing has synced; old editions pile up in the folder *(personas)*
 - [ ] Verify folder delivery and the chooser from the notification on a real device
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
-- [ ] Deleting an edition leaves its "ready" notification up; its Send would share a missing file
 
 ### Reading list
 - [ ] Saved links that can never be read (a PDF, a video, a page over 5 MB, a 410) wait silently forever. Show them in the reading list as unreadable, with the reason and a way to open or remove them. Not as "couldn't fetch" pages in the edition: they cost no reading time, so a backlog of them could fill one
@@ -133,6 +132,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 
 ## Done
 
+- [x] Deleting an edition takes down its "ready" or "delivered" notification, whose Send would have shared a missing file
 - [x] Say why there's no edition: a timed run with nothing new sends a quiet "No new edition"; when every source failed it's retried, then a failure that says so, not "nothing new"; a build queued offline shows "Waiting for an internet connection"
 - [x] Fastly's bot challenge (Le Monde's "Client Challenge") is recognised: the feed's text is used with a note, and the source learns the site blocks fetching
 - [x] Reading time for Chinese and Japanese counts characters (about 350 a minute), so a paragraph isn't one word; the full-text check no longer takes a long Japanese feed for a teaser

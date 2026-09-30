@@ -42,6 +42,7 @@ class EditionRunTest {
         override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean) { notices += if (openInstead) "open ${edition.title}" else "ready ${edition.title}" }
         override fun editionDelivered(edition: EditionEntity, where: String) { notices += "delivered to $where" }
         override fun problem(title: String, reason: String) { notices += "problem: $reason" }
+        override fun dismissFor(editionId: Long) {}
         override fun nothingNew(firstEver: Boolean) { notices += if (firstEver) "nothing yet" else "nothing new" }
     }
     private val folderErrors = mutableMapOf<String, String>()

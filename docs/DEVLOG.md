@@ -8,13 +8,17 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** saying why there's no edition.
+- **In flight:** saying why there's no edition ([#42](https://github.com/madCode/newspaperss/pull/42)); a deleted edition's notification.
 - **Next:** the rest of the accessibility audit; language-aware page cleanup; saved links in onboarding.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 28: say why there's no edition (17:40–)
+### Cycle 29: a deleted edition's notification (18:00–)
+- **From the backlog (tech debt):** deleting an edition left its "ready" notification up, and its Send would share a file that no longer exists.
+- **Shipped:** the notification carries its edition's id, and deleting that edition takes it down. Only if it's still about that edition: the slot is shared, and a newer edition's news stays.
+
+### Cycle 28: say why there's no edition (17:40–18:00, [#42](https://github.com/madCode/newspaperss/pull/42))
 - **From the persona audit (every persona):** a timed run that found nothing new sent no notification, so the paper just didn't come; when every source failed, Today said "Nothing new to read yet"; offline, a queued build said "Checking your sources…" indefinitely.
 - **Shipped:** a timed run with nothing new sends a quiet "No new edition: nothing new to read since your last one." When nothing is new because every source failed, it's a failure that says so ("None of your 9 sources could be read. Sources shows what went wrong with each."), loud on a timed run and shown on Today. A build queued without a connection shows "Waiting for an internet connection…".
 - **Review caught:** "check your connection" blamed the wrong thing (a timed run only starts once connected, so it's usually a tt-rss sign-in, a moved feed or a changed list page); the message now points to Sources. A timed run that reads no source is retried twice, five minutes apart, before the reader hears of it. "No new edition" no longer arrives minutes after a paper made by hand, and says "add a few sources" when there's never been one. Today's connection check now wants a working connection, as WorkManager does (a captive portal isn't online), is debounced so a flaky signal doesn't flip the status line, and can't crash on the Android 11 builds whose network callback throws. A second look caught Today saying "Checking your sources…" through the retry wait, with nothing running; it now says "Couldn't read your sources. Trying again at 6:20."

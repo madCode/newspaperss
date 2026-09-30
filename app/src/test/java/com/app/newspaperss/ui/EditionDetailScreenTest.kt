@@ -352,9 +352,11 @@ class EditionDetailScreenTest {
         assertEquals(latest, opened)
     }
 
+    private val dismissed = mutableListOf<Long>()
+
     private fun deleteFromTheScreen(id: Long) {
         var left = false
-        val vm = EditionDetailViewModel(repo, id, notes)
+        val vm = EditionDetailViewModel(repo, id, notes) { dismissed += it }
         compose.setContent { EditionDetailScreen(vm, onBack = { left = true }) }
         idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
         compose.onNodeWithText("Delete").performClick()
@@ -373,6 +375,7 @@ class EditionDetailScreenTest {
         assertTrue(isGone(id))
         assertEquals(ArticleState.NEW, runBlocking { db.articles().byId(articles[0]) }?.state)
         assertFalse("its EPUB is gone", editionsDir.resolve("e.epub").exists())
+        assertEquals("its Send notification goes too", listOf(id), dismissed)
     }
 
     @Test
