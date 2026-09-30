@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.app.newspaperss.ui.components.BUILDING_NOTE
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.ui.today.failureColor
 import com.app.newspaperss.delivery.EditionIntents
 import java.time.Instant
 import java.time.ZoneId
@@ -199,7 +200,7 @@ private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> U
         Text(dateOf(edition.createdAt), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
         Text(statusOf(edition), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
         if (edition.status == EditionStatus.FAILED) {
-            Text(edition.error ?: "This edition couldn't be made.", color = MaterialTheme.colorScheme.error)
+            Text(edition.error ?: "This edition couldn't be made.", color = failureColor(edition.error))
         }
         if (edition.articleCount > 0) {
             val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"

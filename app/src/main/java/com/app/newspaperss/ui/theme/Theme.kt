@@ -29,7 +29,9 @@ private val light = lightColorScheme(
     surfaceContainer = Color(0xFFEFEADD),
     surfaceContainerHigh = Color(0xFFEAE4D5),
     surfaceContainerHighest = Color(0xFFE4DDCC),
-    outline = Color(0xFF8A8477), outlineVariant = Color(0xFFD3CCBC),
+    // Dark enough to see on e-ink: outlined buttons and dividers use it, and at the old #D3CCBC an
+    // outlined button on a card was a 1.2:1 line, so it read as plain text.
+    outline = Color(0xFF8A8477), outlineVariant = Color(0xFF948D80),
 )
 
 private val dark = darkColorScheme(
@@ -45,7 +47,7 @@ private val dark = darkColorScheme(
     surfaceContainer = Color(0xFF211F1D),
     surfaceContainerHigh = Color(0xFF2B2926),
     surfaceContainerHighest = Color(0xFF363330),
-    outline = Color(0xFF948E82), outlineVariant = Color(0xFF4A4740),
+    outline = Color(0xFF948E82), outlineVariant = Color(0xFF7A746A),
 )
 
 // Serif display and titles give the app its newspaper feel; body text stays sans for UI legibility.
