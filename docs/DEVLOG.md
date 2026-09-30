@@ -8,13 +8,17 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** saved links in onboarding. Day 2 otherwise wrapped up. Its [report](https://claude.ai/artifact/MEiSg7nZzZLhubU3v5r6Bj) and [cycle retro](https://claude.ai/artifact/Piy8RvgmffBE3CSC1ByaP3) are published (private to your account).
+- **In flight:** an import that's all already read says so. Its [report](https://claude.ai/artifact/MEiSg7nZzZLhubU3v5r6Bj) and [cycle retro](https://claude.ai/artifact/Piy8RvgmffBE3CSC1ByaP3) are published (private to your account).
 - **Next:** the rest of the accessibility audit (a TalkBack walk-through on a device first); language-aware page cleanup; saved links in onboarding; unreadable saved links shown in the reading list.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, 11:47–19:30 PT
 
-### Cycle 33: saved links in onboarding (18:15–)
+### Cycle 34: "all already read" (18:27–)
+- **From #45's review:** an export of only archived links said "Added 500 links from Pocket." while onboarding still wouldn't go on, with no hint why.
+- **Shipped:** it says "Added 500 links from Pocket, all already read."
+
+### Cycle 33: saved links in onboarding (18:15–18:27, [#45](https://github.com/madCode/newspaperss/pull/45))
 - **From the persona audit:** someone leaving Pocket couldn't finish onboarding with saved links alone: Next wanted a feed, and the Pocket import was three screens deep in Sources.
 - **Shipped:** the sources step has "Leaving Pocket or Instapaper? Import your saved links", and links waiting in the reading list are enough to go on.
 - **Review caught:** after process death, finishing could read the saved-link count before it had loaded and do nothing; it now reads it from the source. The import's message hid "That's enough to start"; both show now. The "unread only" count moved into the reading list, tested with a Pocket export that mixes archived and unread links.
