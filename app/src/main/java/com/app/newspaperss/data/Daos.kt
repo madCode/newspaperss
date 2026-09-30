@@ -255,14 +255,7 @@ interface ArticleDao {
     suspend fun setStarred(id: Long, starred: Boolean, now: Instant): Boolean =
         (if (starred) star(id, now) else unstar(id, now.minus(BUILD_HOLD))) > 0
 
-    /** Only a waiting article, and a star goes with it. Refused during a build, as for [unstar]. */
-    @Query(
-        """UPDATE articles SET state = 'SKIPPED', starredAt = NULL WHERE id = :id AND state = 'NEW'
-           AND NOT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :buildingSince)""",
-    )
-    suspend fun markRead(id: Long, buildingSince: Instant): Int
-
-    /** [markRead] for several articles at once, with the same hold during a build. */
+    /** Only waiting articles, and their stars go with them. Refused during a build, as for [unstar]. */
     @Query(
         """UPDATE articles SET state = 'SKIPPED', starredAt = NULL WHERE id IN (:ids) AND state = 'NEW'
            AND NOT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :buildingSince)""",

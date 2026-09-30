@@ -92,19 +92,10 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     fun observeBuilding(): Flow<Boolean> = db.editions().observeBuilding(clock)
 
     /**
-     * Marks a waiting article as read: it never goes in an edition, and a tt-rss source marks it
-     * read on the server at its next sync, so Undo never has to reach the server. Returns what
-     * [undoMarkRead] needs, or null if the article wasn't waiting (it may have just gone into an
-     * edition) or an edition is being made.
-     */
-    suspend fun markRead(articleId: Long): MarkedRead? = db.withTransaction {
-        val article = db.articles().byId(articleId) ?: return@withTransaction null
-        if (db.articles().markRead(articleId, clock.instant().minus(BUILD_HOLD)) == 0) null else MarkedRead(articleId, article.starredAt)
-    }
-
-    /**
-     * [markRead] for several articles, all or none: a build either holds every waiting one or none.
-     * Articles that aren't waiting are passed over and not counted as held back.
+     * Marks waiting articles as read: they never go in an edition, and a tt-rss source marks them
+     * read on the server at its next sync, so Undo never has to reach the server. All or none: a
+     * build holds every waiting one or none. Articles that aren't waiting (one may have just gone
+     * into an edition) are passed over and not counted as held back.
      */
     suspend fun markRead(articleIds: Collection<Long>): MarkReadBatch = db.withTransaction {
         val waiting = db.articles().byIds(articleIds).filter { it.state == ArticleState.NEW }

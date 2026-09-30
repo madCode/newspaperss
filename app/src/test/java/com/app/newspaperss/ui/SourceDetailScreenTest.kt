@@ -4,12 +4,14 @@ import org.junit.Assert.assertFalse
 import com.app.newspaperss.ui.components.BUILDING_NOTE
 import com.app.newspaperss.data.MarkedRead
 import com.app.newspaperss.data.EditionEntity
+import com.app.newspaperss.data.EditionStatus
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -70,6 +72,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
@@ -329,6 +332,7 @@ class SourceDetailScreenTest {
 
         row("Article waiting").performTouchInput { longClick() }
         settle { visible("1 selected") }
+        compose.onNodeWithText("1 selected").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         assertEquals("entering selection moves nothing", top, compose.onNodeWithText("Article delivered").fetchSemanticsNode().boundsInRoot.top)
         row("Article waiting").assertIsOn()
         row("Article more1").assertIsOff().performClick()
@@ -337,6 +341,11 @@ class SourceDetailScreenTest {
         settle { visible("4 selected") }
         assertNull("tapping selects instead of opening", shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity)
 
+        assertEquals(
+            "side by side at normal size",
+            compose.onNodeWithContentDescription("Put 3 articles in your next edition").fetchSemanticsNode().boundsInRoot.top,
+            compose.onNodeWithText("Mark 2 as read").fetchSemanticsNode().boundsInRoot.top,
+        )
         compose.onNodeWithText("Mark 2 as read").assertIsEnabled().performClick()
 
         settle { visible("Marked 2 as read") }
@@ -478,6 +487,99 @@ class SourceDetailScreenTest {
 
         settle { visible("Your edition is being made, so nothing was changed") }
         assertEquals(ArticleState.NEW, state(ids.getValue("waiting")))
+    }
+
+    /**
+     * At the end of a scrolled list, neither the bar appearing nor it going away after an action
+     * may move the rows: on e-ink that would redraw the whole list.
+     */
+    @Test
+    @Config(qualifiers = "w411dp-h800dp")
+    fun atTheEndOfTheListSelectingAndActingMoveNoRows() {
+        val (id, ids) = sourceWithArticles(moreWaiting = 8)
+        show(id)
+        compose.onNode(hasScrollAction()).performScrollToIndex(11)
+        compose.waitForIdle()
+        fun top() = compose.onNodeWithText("Article more5").fetchSemanticsNode().boundsInRoot.top
+        val before = top()
+
+        row("Article more5").performTouchInput { longClick() }
+        row("Article more6").performClick()
+        settle { visible("Mark 2 as read") }
+        assertEquals("the bar lies over the list", before, top())
+
+        compose.onNodeWithText("Mark 2 as read").performClick()
+        settle { visible("Marked 2 as read") && !visible("selected") }
+        assertEquals("the bar going doesn't scroll the list", before, top())
+        assertEquals(ArticleState.SKIPPED, state(ids.getValue("more5")))
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun takingSeveralOutOfTheNextEditionIsOneUndoAndWaitsForABuild() {
+        val (id, ids) = sourceWithArticles()
+        val starred = runBlocking {
+            repo.setStarred(ids.getValue("waiting"), true)
+            repo.setStarred(ids.getValue("delivered"), true)
+            db.articles().byIds(ids.values).associate { it.id to it.starredAt }
+        }
+        show(id)
+        compose.onNodeWithText("Select").performClick()
+        row("Article waiting").performClick()
+        row("Article delivered").performClick()
+        val takeOut = compose.onNodeWithContentDescription("Take 2 articles out of your next edition")
+        takeOut.assertIsEnabled()
+
+        val build = runBlocking { db.editions().insert(EditionEntity(title = "Being made", createdAt = Instant.now())) }
+        settle { visible(BUILDING_NOTE) }
+        takeOut.assertIsNotEnabled()
+        runBlocking { db.editions().update(db.editions().byId(build)!!.copy(status = EditionStatus.FAILED)) }
+        settle { !visible(BUILDING_NOTE) }
+
+        takeOut.assertIsEnabled().performClick()
+        settle { visible("2 taken out of your next edition") }
+        assertTrue(runBlocking { db.articles().byIds(ids.values) }.all { it.starredAt == null })
+
+        compose.onNodeWithText("Undo").performClick()
+        settle { runBlocking { db.articles().byIds(ids.values) }.associate { it.id to it.starredAt } == starred }
+    }
+
+    /** An Undo that comes too late, once a build holds the change, says so instead of failing quietly. */
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun anUndoThatABuildHoldsBackSaysSo() {
+        val (id, ids) = sourceWithArticles()
+        show(id)
+        compose.onNodeWithText("Select").performClick()
+        row("Article waiting").performClick()
+        row("Article delivered").performClick()
+        compose.onNodeWithContentDescription("Put 2 articles in your next edition").performClick()
+        settle { visible("2 in your next edition") }
+
+        runBlocking { db.editions().insert(EditionEntity(title = "Being made", createdAt = Instant.now())) }
+        compose.onNodeWithText("Undo").performClick()
+
+        settle { visible("2 articles couldn't be changed back") }
+        assertTrue("still starred, as the build may have them", runBlocking { db.articles().byIds(ids.values) }.count { it.starredAt != null } == 2)
+    }
+
+    /** At 200% the two labelled actions stack at full width rather than squeezing their words. */
+    @Test
+    // Native graphics: the default fake text measurement would make any label fit.
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Config(qualifiers = "w360dp-h1600dp", fontScale = 2f)
+    fun atLargeFontSizesTheBarsButtonsStack() {
+        val (id, _) = sourceWithArticles()
+        show(id)
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Article waiting") and hasClickAction())
+        row("Article waiting").performTouchInput { longClick() }
+        row("Article delivered").performClick()
+        settle { visible("Mark 1 as read") }
+
+        val star = compose.onNodeWithContentDescription("Put 2 articles in your next edition").fetchSemanticsNode().boundsInRoot
+        val mark = compose.onNodeWithText("Mark 1 as read").fetchSemanticsNode().boundsInRoot
+        assertTrue("stacked", mark.top >= star.bottom)
+        assertEquals("full width", star.width, mark.width, 1f)
     }
 
     @Test

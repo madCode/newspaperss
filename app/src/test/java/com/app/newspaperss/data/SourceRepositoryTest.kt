@@ -121,6 +121,7 @@ class SourceRepositoryTest {
         assertEquals(setOf(ids["a"], ids["b"]), batch.marked.map { it.articleId }.toSet())
         assertEquals(0, batch.heldBack)
         assertEquals(ArticleState.SKIPPED, article(ids.getValue("b")).state)
+        assertEquals("marking read takes the star with it", null, article(ids.getValue("b")).starredAt)
         assertEquals(ArticleState.DELIVERED, article(ids.getValue("sent")).state)
         assertEquals(ArticleState.IN_EDITION, article(ids.getValue("going")).state)
 

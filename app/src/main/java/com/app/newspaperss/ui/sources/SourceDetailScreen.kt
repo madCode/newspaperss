@@ -32,6 +32,9 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -168,7 +171,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         topBar = {
             if (selecting) {
                 TopAppBar(
-                    title = { Text("${selected.size} selected") },
+                    title = { Text("${selected.size} selected", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) },
                     navigationIcon = { IconButton(onClick = ::stopSelecting) { Icon(Icons.Default.Close, contentDescription = "Stop selecting") } },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                     modifier = Modifier.semantics { paneTitle = "Selecting. Tap articles to choose them." },
@@ -180,57 +183,67 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 )
             }
         },
-        bottomBar = {
-            if (selecting && source != null) {
-                SelectionBar(
-                    chosen = articles.filter { it.id in selected },
-                    building = building,
-                    onStar = { ids, starred -> viewModel.setStarred(ids, starred); stopSelecting() },
-                    onMarkRead = { ids -> viewModel.markRead(ids); stopSelecting() },
-                )
-            }
-        },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (source == null) {
             Box(Modifier.fillMaxSize().padding(padding))
             return@Scaffold
         }
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item {
-                Health(source, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
-                FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
-                    if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(source)}") }
-                    TextButton(onClick = { removing = true }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+        // The selection bar lies over the list instead of being the Scaffold's bottom bar, and the
+        // room reserved for it at the end of the list only ever grows: either change in the
+        // list's bottom padding would scroll a list that's at its end, moving every row (a full
+        // redraw on e-ink) on the way in or out of selection mode.
+        val density = LocalDensity.current
+        var barRoom by remember { mutableStateOf(0.dp) }
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp + barRoom)) {
+                item {
+                    Health(source, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
+                    FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
+                        if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(source)}") }
+                        TextButton(onClick = { removing = true }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                    }
+                    if (source.kind == SourceKind.TTRSS) {
+                        TtrssOptions(source, viewModel::openCategories, viewModel::setMarkReadOnServer)
+                    } else {
+                        ArticleCap(source.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
+                    }
+                    HorizontalDivider(Modifier.padding(top = 16.dp))
+                    ArticlesHeading(articles, selecting, onSelect = { selecting = true })
+                    if (building && articles.isNotEmpty()) {
+                        Text(BUILDING_NOTE, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                    }
                 }
-                if (source.kind == SourceKind.TTRSS) {
-                    TtrssOptions(source, viewModel::openCategories, viewModel::setMarkReadOnServer)
-                } else {
-                    ArticleCap(source.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
-                }
-                HorizontalDivider(Modifier.padding(top = 16.dp))
-                ArticlesHeading(articles, selecting, onSelect = { selecting = true })
-                if (building && articles.isNotEmpty()) {
-                    Text(BUILDING_NOTE, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                items(articles, key = { it.id }) { article ->
+                    RecentArticle(
+                        article,
+                        locale,
+                        building,
+                        selection = if (selecting) article.id in selected else null,
+                        onStar = { viewModel.setStarred(article.id, it) },
+                        onMarkRead = { viewModel.markRead(article.id) },
+                        onSelect = { selected = if (article.id in selected) selected - article.id else selected + article.id },
+                        onStartSelecting = {
+                            selecting = true
+                            selected = selected + article.id
+                        },
+                    )
+                    // Inset: full-width rules chopped the list into boxes to track across.
+                    HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
-            items(articles, key = { it.id }) { article ->
-                RecentArticle(
-                    article,
-                    locale,
-                    building,
-                    selection = if (selecting) article.id in selected else null,
-                    onStar = { viewModel.setStarred(article.id, it) },
-                    onMarkRead = { viewModel.markRead(article.id) },
-                    onSelect = { selected = if (article.id in selected) selected - article.id else selected + article.id },
-                    onStartSelecting = {
-                        selecting = true
-                        selected = selected + article.id
+            if (selecting) {
+                SelectionBar(
+                    chosen = articles.filter { it.id in selected },
+                    building = building,
+                    onStar = { ids, starred -> viewModel.setStarred(ids, starred); stopSelecting() },
+                    onMarkRead = { ids -> viewModel.markRead(ids); stopSelecting() },
+                    modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged {
+                        val height = with(density) { it.height.toDp() }
+                        if (height > barRoom) barRoom = height
                     },
                 )
-                // Inset: full-width rules chopped the list into boxes to track across.
-                HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
     }
@@ -369,17 +382,27 @@ private fun ArticlesHeading(articles: List<ArticleEntity>, selecting: Boolean, o
         }
     }
     if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
-    if (articles.any { it.state != ArticleState.IN_EDITION }) {
-        val markSome = articles.any { it.state == ArticleState.NEW }
-        Text(
-            if (markSome) "Tap ☆ to put one in your next edition. Tap Select to mark some as read." else "Tap ☆ to put one in your next edition.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp).semantics {
-                contentDescription = "Tap the star to put one in your next edition." + if (markSome) " Tap Select to mark some as read." else ""
-            },
-        )
+    if (articles.isNotEmpty()) {
+        // Both wordings are laid out, one of them invisible, so the line keeps the height of the
+        // longer one: a change in its line count would move every row below it.
+        Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp)) {
+            HelperText(STAR_HELP + " Tap Select to mark some as read.", "Tap the star to put one in your next edition. Tap Select to mark some as read.", shown = !selecting)
+            HelperText(STAR_HELP + " Tap articles to choose them.", "Tap the star to put one in your next edition. Tap articles to choose them.", shown = selecting)
+        }
     }
+}
+
+private const val STAR_HELP = "Tap ☆ to put one in your next edition."
+
+/** @param spoken the text for TalkBack, which would read ☆ as "white star". */
+@Composable
+private fun HelperText(text: String, spoken: String, shown: Boolean) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = if (shown) Modifier.semantics { contentDescription = spoken } else Modifier.alpha(0f).clearAndSetSemantics {},
+    )
 }
 
 /**
@@ -388,12 +411,18 @@ private fun ArticlesHeading(articles: List<ArticleEntity>, selecting: Boolean, o
  * applies to them. The buttons stack at large font sizes rather than truncating.
  */
 @Composable
-private fun SelectionBar(chosen: List<ArticleEntity>, building: Boolean, onStar: (List<Long>, Boolean) -> Unit, onMarkRead: (List<Long>) -> Unit) {
+private fun SelectionBar(
+    chosen: List<ArticleEntity>,
+    building: Boolean,
+    onStar: (List<Long>, Boolean) -> Unit,
+    onMarkRead: (List<Long>) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val waiting = chosen.filter { it.state == ArticleState.NEW }.map { it.id }
     val starrable = chosen.filter { it.state != ArticleState.IN_EDITION }
     val takeOut = starrable.isNotEmpty() && starrable.all { it.starredAt != null }
     val toChange = starrable.filter { (it.starredAt != null) == takeOut }.map { it.id }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(modifier, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column {
             // A rule, not a shadow: it still reads on e-ink.
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)

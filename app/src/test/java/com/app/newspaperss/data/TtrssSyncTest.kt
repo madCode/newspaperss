@@ -234,8 +234,8 @@ class TtrssSyncTest {
         server.add(12, "Still waiting", feedId = 1, feedTitle = "Example News")
         sync.syncAll()
         val byGuid = db.articles().allForSource(source.id).associateBy { it.guid }
-        sources.markRead(byGuid.getValue("ttrss:10").id)
-        sources.undoMarkRead(sources.markRead(byGuid.getValue("ttrss:11").id)!!)
+        sources.markRead(listOf(byGuid.getValue("ttrss:10").id))
+        sources.undoMarkRead(sources.markRead(listOf(byGuid.getValue("ttrss:11").id)).marked)
         assertTrue("nothing is sent when marked", server.markedRead.isEmpty())
 
         sync.syncAll()
@@ -249,7 +249,7 @@ class TtrssSyncTest {
         val source = connect()
         server.add(10, "Read it", feedId = 1, feedTitle = "Example News")
         sync.syncAll()
-        sources.markRead(db.articles().allForSource(source.id).single().id)
+        sources.markRead(listOf(db.articles().allForSource(source.id).single().id))
         (11L..16L).forEach { server.add(it, "Newer $it", feedId = 1, feedTitle = "Example News") }
 
         sync.syncAll()
@@ -265,7 +265,7 @@ class TtrssSyncTest {
         ttrss.setMarkRead(source.id, false)
         server.add(10, "Read it", feedId = 1, feedTitle = "Example News")
         sync.syncAll()
-        sources.markRead(db.articles().allForSource(source.id).single().id)
+        sources.markRead(listOf(db.articles().allForSource(source.id).single().id))
 
         sync.syncAll()
 
