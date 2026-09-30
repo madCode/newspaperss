@@ -20,8 +20,9 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Article rows in a source's list *(device; decided with you)*:
   - tap opens the original in the browser and changes nothing;
   - `☆` puts the article in the next paper; tap again to unstar;
-  - `✕` skips it: never in a paper (read or not interested), marked read in tt-rss for tt-rss
-    sources, with a "Skipped · Undo" message;
+  - "Mark as read" (for read or not interested): never in a paper, marked read in tt-rss for
+    tt-rss sources, with a "Marked as read · Undo" message. Not a ✓ icon: the row's status column
+    already uses ✓ for delivered;
   - two labelled 48dp buttons, no menu; the star is a shape, so it reads on e-ink.
 - [ ] Stars in the planner: starred articles first, taking turns across sources, then the rest.
   A star uses up one of its source's slots and takes that slot before unstarred articles; held-back
