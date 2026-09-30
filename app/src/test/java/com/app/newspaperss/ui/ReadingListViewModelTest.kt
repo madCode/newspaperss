@@ -34,8 +34,8 @@ class ReadingListViewModelTest {
         assertEquals("Added 1 link.", import("list.md", "- [ ] https://a.example/4\n"))
         assertEquals(
             "an archive with nothing left to read says so",
-            "Added 1 link from Pocket, all already read.",
-            import("part_000001.csv", "title,url,time_added,tags,status\nOld,https://a.example/5,1,,archive\n"),
+            "Added 2 links from Pocket, all already read.",
+            import("part_000001.csv", "title,url,time_added,tags,status\nOld,https://a.example/5,1,,archive\nOlder,https://a.example/6,1,,archive\n"),
         )
         runBlocking { assertEquals(3, app.container.db.articles().candidates().size) }
     }

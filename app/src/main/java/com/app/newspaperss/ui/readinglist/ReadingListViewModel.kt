@@ -63,7 +63,11 @@ class ReadingListViewModel(private val list: ReadingListRepository) : ViewModel(
         }
         // An export of only archived links adds nothing to read: say so, or it looks like it worked
         // while onboarding still won't go on.
-        val read = if (result.added > 0 && result.unread == 0) ", all already read" else ""
+        val read = when {
+            result.added == 0 || result.unread > 0 -> ""
+            result.added == 1 -> ", already read"
+            else -> ", all already read"
+        }
         return "Added ${plural(result.added, "link")}$from$read."
     }
 
