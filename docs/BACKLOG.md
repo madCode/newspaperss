@@ -31,9 +31,20 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Verify folder delivery and the chooser from the notification on a real device
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
+### tt-rss, for a returning reader *(personas)*
+- [ ] Per-feed control on the tt-rss source page: leave a feed out, or cap it
+- [ ] Several categories, and tt-rss's Starred and Published as choices
+- [ ] The source page dates articles by when they were fetched; show when they were published
+- [ ] Articles that expire in the app stay unread in tt-rss: an opt-in "mark read when they expire here", and a one-off "start fresh"
+- [ ] Delay tt-rss mark-read a little after sharing, so a quick "Send again" or "Not sent" can still undo it
+
 ### Reading list
 - [ ] Saved links that can never be read (a PDF, a video, a page over 5 MB, a 410) wait silently forever. Show them in the reading list as unreadable, with the reason and a way to open or remove them. Not as "couldn't fetch" pages in the edition: they cost no reading time, so a backlog of them could fill one
 - [ ] Links saved before database version 2 with a title never get a reading time (no backfill)
+
+### Reflection *(personas)*
+- [ ] Save reading notes into a folder (an Obsidian vault) whatever the delivery method; today it's tied to folder delivery
+- [ ] Offer the closing page's reflection question (the EPUB supports it; the app doesn't pass one yet)
 
 ### Accessibility *(a11y, you asked for it)*
 A full pass over the app and the book, not just spot fixes:
@@ -42,6 +53,7 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] Tooling: Compose accessibility checks in the Robolectric tests, Accessibility Scanner on a device, Ace by DAISY on a live edition
 
 ### Performance *(resources)*
+- [ ] A floor device: Android 8, 2 GB RAM, slow CPU and storage (a 2018 budget phone or an older Boox). Measure on an emulator with that profile how long a 30-minute edition takes, peak memory, whether timed editions still arrive under Doze, and whether long lists and the preview stay smooth; set budgets from the numbers *(you asked)*
 - [ ] Load build candidates without feedHtml; fetch it per article
 - [ ] EPUB zip: buffered output, JPEGs stored uncompressed
 
@@ -110,6 +122,26 @@ translation, so it goes to volunteers who read the language. What that needs fir
 - a CONTRIBUTING section on how to translate: which file to copy, how to test it, how to send it;
 - optionally a hosted tool such as Weblate (free for open-source projects; the repo is MIT);
 - then a call for translators in the README.
+
+### Newsletters *(you asked)*
+Many of the writers worth reading publish as newsletters. Two routes, from easy to heavy:
+- **Their own feeds, first.** Substack (`/feed`), Ghost (`/rss/`), Buttondown (`/rss`) and beehiiv
+  (when the writer turns RSS on) already work as sources. What to handle, recognised by the
+  platform's own markers (a feed's `<generator>`, a page's `generator` meta) rather than a list of
+  domains, since most use custom domains:
+  - paid posts arrive as a teaser ending in "Subscribe to read" or similar: treat as summary-only
+    and say so on the source, rather than fetching a paywall;
+  - redirect-wrapped and tracking links (`substack.com/redirect/…`, `utm_*`): unwrap for the
+    "Read the original" link and strip before fetching;
+  - "Share", "Subscribe", "Leave a comment" and like buttons: page-cleanup furniture;
+  - podcast episodes in the same feed (an enclosure, little text): skip or note, don't pad the paper.
+- **Newsletters that only arrive by email.** Options: a Kill the Newsletter-style address
+  (email in, Atom feed out; hosted or self-hosted), which needs nothing new in the app; or reading
+  one folder or label over IMAP with an app password (Fastmail, iCloud, most hosts; Gmail needs
+  OAuth, much heavier). Email HTML is table layouts, "View in browser" headers, unsubscribe
+  footers and tracking pixels, so it needs its own cleanup pass.
+- Start with the first route (it's mostly cleanup rules) and a help line pointing email-only
+  newsletters at a Kill the Newsletter address; IMAP only if that proves too fiddly.
 
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
