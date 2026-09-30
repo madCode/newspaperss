@@ -463,7 +463,7 @@ class EditionDetailScreenTest {
 
     @Test
     fun makeAnotherEditionSitsBelowTheLatestWhetherSentOrNot() {
-        // It used to sit above a sent edition and below a ready one.
+        // One place for it, whether the edition is waiting to be sent or already sent.
         val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"))
         val vm = TodayViewModel(repo, flowOf(null)) {}
         compose.setContent { TodayScreen(vm, onOpenEdition = {}) }

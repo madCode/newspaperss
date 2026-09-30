@@ -124,8 +124,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
             }
         }
         if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
-        // Always here, below the latest edition, whatever its state: it used to sit above a sent
-        // edition and below a ready one.
+        // Below the latest edition in every state, so it doesn't jump when the build panel moves.
         if (make == MakeButton.ANOTHER && !isRunning(state.build)) {
             item(key = "another") { TextButton(onClick = viewModel::makeOneNow, modifier = Modifier.padding(top = 8.dp)) { Text("Make another edition") } }
         }
