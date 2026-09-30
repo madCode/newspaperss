@@ -284,7 +284,7 @@ private fun RecentArticle(article: ArticleEntity, locale: Locale, building: Bool
     val details = buildAnnotatedString {
         // When it was published: a tt-rss backlog arrives all at once, and every row would show
         // the day it was fetched.
-        append(listOfNotNull(article.originTitle, shortDate(article.published ?: article.discoveredAt, locale)).joinToString(" · "))
+        append(listOfNotNull(article.originTitle, shortDate(article.shownDate, locale)).joinToString(" · "))
         append(" · ")
         if (isStarred(article)) withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(status) } else append(status)
     }

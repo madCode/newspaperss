@@ -11,6 +11,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import org.robolectric.Shadows.shadowOf
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
@@ -324,7 +325,7 @@ class SourceDetailScreenTest {
 
     @Test
     fun articlesAreDatedByWhenTheyWerePublished() {
-        val (id, _) = sourceWithArticles()
+        val id = runBlocking { repo.addFeed("https://example.com/feed", "Example") }
         runBlocking {
             db.articles().insertNew(
                 listOf(ArticleEntity(sourceId = id, guid = "old", url = "https://example.com/old", title = "An old essay", published = Instant.parse("2023-03-03T12:00:00Z"), discoveredAt = Instant.now())),
@@ -334,6 +335,22 @@ class SourceDetailScreenTest {
         compose.setContent { SourceDetailScreen(vm, onBack = {}) }
         idleUntil { visible("An old essay") }
         assertTrue(visible("Mar 3, 2023"))
+    }
+
+    @Test
+    fun aDateFromTheFutureIsAFeedsMistakeAndRowsGoByTheDateShown() = runBlocking {
+        val id = repo.addFeed("https://example.com/feed", "Example")
+        val now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS)
+        db.articles().insertNew(
+            listOf(
+                // Fetched together; one feed lists them oldest first.
+                ArticleEntity(sourceId = id, guid = "a", url = "https://example.com/a", title = "Older", published = now.minus(Duration.ofDays(9)), discoveredAt = now),
+                ArticleEntity(sourceId = id, guid = "b", url = "https://example.com/b", title = "Newer", published = now.minus(Duration.ofDays(2)), discoveredAt = now),
+                ArticleEntity(sourceId = id, guid = "c", url = "https://example.com/c", title = "Scheduled", published = Instant.parse("2099-12-31T00:00:00Z"), discoveredAt = now.minus(Duration.ofDays(1))),
+            ),
+        )
+        assertEquals(listOf("Scheduled", "Newer", "Older"), repo.observeRecentArticles(id).first().map { it.title })
+        assertEquals(now.minus(Duration.ofDays(1)), repo.observeRecentArticles(id).first().single { it.title == "Scheduled" }.shownDate)
     }
 
     @Test
