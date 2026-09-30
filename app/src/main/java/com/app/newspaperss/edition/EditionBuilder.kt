@@ -124,6 +124,9 @@ class EditionBuilder(
             sourceOrder = publicationOrder,
             ordering = settings.ordering,
             lastFeatured = db.editions().lastFeatured().associate { publicationOf(it.sourceId, it.originId) to it.createdAt },
+            // Delivered ones only: an edition that's never sent gives its articles back, and
+            // mustn't move its sources' turns along either.
+            rotation = db.editions().countDelivered(),
         )
         var fetched = 0
         val allowance = ImageAllowance(imageBudgetBytes)

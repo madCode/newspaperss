@@ -2,6 +2,7 @@ package com.app.newspaperss.core.edition
 
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import kotlin.random.Random
@@ -104,6 +105,22 @@ class EditionPlannerTest {
             picked.forEach { featured[it.sourceId] = day(edition); seen += it.sourceId }
         }
         assertEquals(sources.toSet(), seen)
+    }
+
+    @Test
+    fun whenMostSourcesFitTheOnesLeftOutStillShareEvenly() = runTest {
+        // Ten sources, room for eight: all of an edition's sources tie on when they were featured,
+        // and the reader's order alone would put the same six in every edition.
+        val sources = (0 until 10).map { "src$it" }
+        val featured = mutableMapOf<String, Instant>()
+        val count = sources.associateWith { 0 }.toMutableMap()
+        for (edition in 1..20) {
+            val candidates = sources.map { c("$it-$edition", it, 1) }
+            val ordered = EditionPlanner.order(candidates, sources, Ordering.TAKE_TURNS, lastFeatured = featured, rotation = edition)
+            val picked = EditionPlanner.fill<Candidate>(ordered, PlanRules(Budget.Articles(8), maxPerSource = 1), { 1.0 }) { it }
+            picked.forEach { featured[it.sourceId] = Instant.parse("2026-09-01T00:00:00Z").plusSeconds(edition * 86_400L); count[it.sourceId] = count.getValue(it.sourceId) + 1 }
+        }
+        assertTrue(count.toString(), count.values.max() - count.values.min() <= 1)
     }
 
     @Test

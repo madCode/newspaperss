@@ -339,11 +339,18 @@ interface EditionDao {
     @Query("SELECT COUNT(*) FROM editions")
     suspend fun count(): Int
 
-    /** When each source (and each tt-rss publication) last had an article in a ready or delivered edition. */
+    @Query("SELECT COUNT(*) FROM editions WHERE status = 'DELIVERED'")
+    suspend fun countDelivered(): Int
+
+    /**
+     * When each source (and each tt-rss publication) last had an article in a ready or delivered
+     * edition. Starred articles don't count: they go in whatever the turns, and counting them
+     * would push the source's other articles to the back.
+     */
     @Query(
         """SELECT a.sourceId AS sourceId, a.originId AS originId, MAX(e.createdAt) AS createdAt
            FROM edition_articles ea JOIN articles a ON a.id = ea.articleId JOIN editions e ON e.id = ea.editionId
-           WHERE e.status IN ('READY', 'DELIVERED') GROUP BY a.sourceId, a.originId""",
+           WHERE e.status IN ('READY', 'DELIVERED') AND ea.starred = 0 GROUP BY a.sourceId, a.originId""",
     )
     suspend fun lastFeatured(): List<Featured>
 
