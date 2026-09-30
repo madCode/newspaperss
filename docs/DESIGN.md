@@ -193,6 +193,11 @@ too); or opening it on a Boox. **I've sent it** covers any other route, and
 when the next one is built was never sent: it's marked not sent and its
 articles go back, keeping their stars, before the new one is planned.
 
+**The app you send to can read the book after its screen closes.** A share
+only lets the receiving screen read the file, and Send to Kindle uploads
+after its form closes. So the Kindle app, and whichever app you pick, is
+allowed to read that edition's file until the phone restarts.
+
 ## 7. What happens to articles you didn't read
 
 - **Delivered means done.** An article appears in one edition. Delivered
