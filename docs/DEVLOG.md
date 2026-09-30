@@ -13,6 +13,32 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Night 2 · Tue 29 Sep, 20:30 PT –
 
+### Cycle 51: article rows, a star and Select (23:41–08:02, [#66](https://github.com/madCode/newspaperss/pull/66))
+- **From you:** the labelled buttons under every row felt heavy on such a small row.
+- **Design audit first:** how Gmail, Feedly, Pocket, NetNewsWire, Readwise Reader and e-reader lists do it, and four options checked against five readers (you over breakfast, a Boox, TalkBack, 200% font, a first-timer). A trailing star plus a Select mode won.
+- **Shipped:** one star at the right of each row; "Mark as read" for several at once in Select (long-press or the Select button), with one Undo; a TalkBack action per row; the same star on delivered editions. A 30-row list is about five screens instead of seven, and nothing moves on e-ink when selection starts or ends.
+- **Review caught:** tests covering a path the app no longer used; the list shifting when selection ended at the bottom; untested take-out and notice paths; the helper line changing height; the count not announced; the snackbar covering the bar's buttons.
+- **CI:** a settings test the PR doesn't touch failed once on a DataStore file rename, then passed on re-run. It stays on the watch list: if it fails again, each test's DataStore gets its own scope, closed at teardown.
+
+### Cycle 50: Longreads, the story not the teaser (23:47–00:50, [#65](https://github.com/madCode/newspaperss/pull/65))
+- **From you:** does Longreads work? Its feed does, but most posts are 200-word picks linking to the story elsewhere.
+- **Shipped:** a general rule, not a Longreads one: a short post with exactly one link to another site tagged with the post's own name (`?src=longreads`) points at a story, so the edition fetches the story, bylines its own author and credits "Equator via Longreads". Tracking tags are stripped from stored links, so a story two lists picked goes out once.
+- **Review caught:** the Longreads editor bylined as the author; links delivered before the update coming back; short blog commentary swallowed by the page it links to (now the titles must match); a tt-rss copy of a delivered story delivered again; a rejected post using up, and marking read in tt-rss, the page it linked to.
+
+### Cycle 49: a flaky preview test (00:05–00:12, [#64](https://github.com/madCode/newspaperss/pull/64))
+- **Shipped:** the preview sets its loaded state on the main thread; under the test dispatcher it could resume on an IO thread.
+
+### Cycle 48: backlog notes (23:55–00:00, [#63](https://github.com/madCode/newspaperss/pull/63))
+- **From you:** a Kill the Newsletter inbox the app makes itself; link posts.
+
+### Cycle 47: a coverage floor (23:25–23:52, [#62](https://github.com/madCode/newspaperss/pull/62))
+- **From you:** did coverage get a floor? Now it has: CI fails below 90% of lines (92.5% today).
+
+### Cycle 46: published dates on a source's page (23:28–23:44, [#61](https://github.com/madCode/newspaperss/pull/61))
+- **From the persona audit:** a tt-rss backlog arrives at once, so every row showed the day it was fetched.
+- **Shipped:** rows show and are ordered by when they were published, with the year when it isn't this one.
+- **Review caught:** rows ordered by fetch time looked jumbled once dates showed; feed dates in the future or in 2099 would have shown as they were.
+
 ### Cycle 45: the preview in dark mode (23:05–23:20, [#59](https://github.com/madCode/newspaperss/pull/59))
 - **From device testing:** with the app in dark mode, the article preview stayed black on white.
 - **Shipped:** the preview gives each page the app theme's colours (the book leaves colours to the e-reader), and starts dark so it doesn't flash white.
