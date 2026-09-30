@@ -17,6 +17,8 @@ import java.time.LocalDate
  * @property cover the cover image e-readers show as the library thumbnail, also shown on the cover
  *   page. Its href follows the same rules as article images and must not be one of theirs. Without
  *   it the cover page is text only.
+ * @property reflection a question for the closing page, to think or write about after reading.
+ *   Without it the closing page has none.
  */
 data class EditionDoc(
     val title: String,
@@ -27,6 +29,7 @@ data class EditionDoc(
     val masthead: String = "newspapeRSS",
     val modified: Instant = Instant.now(),
     val cover: EpubImage? = null,
+    val reflection: String? = null,
 ) {
     val articles: List<EditionArticle> get() = sections.flatMap { it.articles }
 }

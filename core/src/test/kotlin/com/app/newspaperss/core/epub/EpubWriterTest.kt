@@ -186,7 +186,7 @@ class EpubWriterTest {
         val spine = epub.spineHrefs()
         assertEquals(6, spine.size)
         assertTrue(epub.text("OEBPS/" + spine[0]).contains("Tuesday Morning Edition"))
-        assertTrue(epub.text("OEBPS/" + spine[1]).contains("<h1>In this edition</h1>"))
+        assertTrue(epub.text("OEBPS/" + spine[1]).contains("In this edition</h1>"))
         val titles = spine.drop(2).dropLast(1).map { epub.xml("OEBPS/$it").elements("h1").single().textContent }
         assertEquals(listOf("W1", "W2", "S1"), titles)
         assertTrue(epub.text("OEBPS/" + spine.last()).contains("That's all for today."))
@@ -194,13 +194,13 @@ class EpubWriterTest {
     }
 
     @Test
-    fun guidePointsAtCoverContentsAndFirstArticle() {
+    fun guidePointsAtCoverAndContentsAndKindleOpensAtTheContents() {
         val epub = write(unsectioned(article(), article()))
         val refs = epub.opf().elements("reference").associate { it.getAttribute("type") to it.getAttribute("href") }
         val spine = epub.spineHrefs()
         assertEquals(spine[0], refs["cover"])
         assertEquals(spine[1], refs["toc"])
-        assertEquals(spine[2], refs["text"])
+        assertEquals(spine[1], refs["text"])
     }
 
     @Test
@@ -215,13 +215,9 @@ class EpubWriterTest {
         val nav = epub.navHrefs()
         assertEquals(nav, epub.ncxHrefs())
         val articleHrefs = epub.articleHrefs()
-        assertEquals(articleHrefs, nav.filter { it in articleHrefs })
-        // Section entries point at existing anchors on the contents page.
-        val contents = epub.xml("OEBPS/contents.xhtml")
-        val contentsIds = contents.elements("h2").map { it.getAttribute("id") }.toSet()
-        val sectionTargets = nav.filter { it.startsWith("contents.xhtml#") }.map { it.substringAfter('#') }
-        assertEquals(2, sectionTargets.size)
-        assertEquals(contentsIds, sectionTargets.toSet())
+        // Every entry after Contents is in reading order: a section opens at its first article.
+        assertEquals(articleHrefs, nav.drop(1).distinct())
+        assertEquals(nav.drop(1), nav.drop(1).sortedBy { articleHrefs.indexOf(it) })
 
         val labels = epub.xml("OEBPS/toc.ncx").elements("text").drop(1).map { it.textContent } // skip docTitle
         assertEquals(listOf("Contents", "Lead story", "World", "W1", "W2", "Science", "S1"), labels)
@@ -246,8 +242,9 @@ class EpubWriterTest {
         val world = ncx.elements("navPoint").single { it.elements("text").first().textContent == "World" }
         assertEquals(listOf("W1", "W2"), world.elements("navPoint").drop(1).map { it.elements("text").first().textContent })
         assertEquals("2", ncx.elements("meta").single { it.getAttribute("name") == "dtb:depth" }.getAttribute("content"))
+        // "World" and W1 open the same page, so they share a playOrder.
         val playOrders = ncx.elements("navPoint").map { it.getAttribute("playOrder").toInt() }
-        assertEquals((1..playOrders.size).toList(), playOrders)
+        assertEquals(listOf(1, 2, 2, 3, 4), playOrders)
     }
 
     @Test
@@ -392,7 +389,7 @@ class EpubWriterTest {
         assertEquals(listOf("Contents", nasty, nasty), epub.xml("OEBPS/toc.ncx").elements("text").drop(1).map { it.textContent })
         assertTrue(epub.xml("OEBPS/nav.xhtml").elements("a").any { it.textContent == nasty })
         assertTrue(epub.xml("OEBPS/cover.xhtml").documentElement.textContent.contains(nasty))
-        assertTrue(epub.xml("OEBPS/contents.xhtml").elements("h2").single().textContent == nasty)
+        assertTrue(epub.xml("OEBPS/contents.xhtml").elements("h2").single().textContent.startsWith(nasty))
     }
 
     @Test
@@ -654,7 +651,70 @@ class EpubWriterTest {
         // The page's own text (source, byline, "Read the original") stays English.
         assertEquals("en", pages[0].documentElement.getAttribute("lang"))
         // Headlines are tagged wherever they appear, so an Arabic one lays out right in the contents too.
-        val contents = epub.xml("OEBPS/contents.xhtml").documentElement.elements("a")
-        assertEquals("rtl", contents.single { it.getAttribute("href") == epub.articleHrefs()[1] }.getAttribute("dir"))
+        // On the whole entry, so it's right-aligned as one.
+        val entries = epub.xml("OEBPS/contents.xhtml").documentElement.elements("li")
+        assertEquals("rtl", entries.single { li -> li.elements("a").single().getAttribute("href") == epub.articleHrefs()[1] }.getAttribute("dir"))
+    }
+    @Test
+    fun anArticleWithoutWordsShowsNoReadingTime() {
+        val epub = write(unsectioned(article(title = "Comic", source = "xkcd", minutes = 0.0), article(minutes = 2.0)))
+        val (comic, _) = epub.articleHrefs()
+        assertNull(epub.xml("OEBPS/$comic").elements("p").firstOrNull { it.getAttribute("class") == "byline" })
+        assertEquals("xkcd", epub.xml("OEBPS/contents.xhtml").elements("span").first().textContent)
+    }
+
+    @Test
+    fun aSectionOrEditionOfOnlyComicsShowsNoZeroMinutes() {
+        val epub = write(doc(EditionSection("Fun", listOf(article(title = "Comic", source = "xkcd", minutes = 0.0)))))
+        val contents = epub.xml("OEBPS/contents.xhtml")
+        assertEquals("Fun", contents.elements("h2").single().textContent.trim())
+        assertEquals("1 article", contents.elements("p").single { it.getAttribute("class") == "totals" }.textContent)
+    }
+
+    @Test
+    fun theKickerNamesTheSectionAndTheNextLinkTheSourceAndTime() {
+        val epub = write(
+            doc(
+                EditionSection("Long reads", listOf(article(source = "Aeon"), article(title = "Second", source = "Quanta", minutes = 9.0))),
+                EditionSection(null, listOf(article(source = "Loose"))),
+            ),
+        )
+        val pages = epub.articleHrefs().map { epub.xml("OEBPS/$it").elements("p").associateBy { p -> p.getAttribute("class") } }
+        assertEquals("Long reads · Aeon", pages[0].getValue("kicker").textContent)
+        assertEquals("Loose", pages[2].getValue("kicker").textContent)
+        assertEquals("Next: Second · Quanta · 9 min", pages[0].getValue("article-nav").textContent)
+        assertEquals("Second", pages[0].getValue("article-nav").elements("a").single().textContent)
+    }
+
+    @Test
+    fun theClosingPageSumsUpAndAsksTheReflectionOnlyWhenGiven() {
+        val articles = listOf("A", "B", "C", "D", "E").map { article(source = it, minutes = 2.0) }
+        val plain = write(doc(EditionSection(null, articles)))
+        val end = plain.text("OEBPS/end.xhtml")
+        assertTrue(end.contains("5 articles · 10 min, from A, B, C and 2 more"))
+        assertFalse(end.contains("reflection"))
+
+        val asked = write(doc(EditionSection(null, articles.take(2))).copy(reflection = "What stayed with you?"))
+        val text = asked.xml("OEBPS/end.xhtml").documentElement.textContent
+        assertTrue(text.contains("2 articles · 4 min, from A and B"))
+        assertTrue(text.contains("What stayed with you?"))
+    }
+
+    @Test
+    fun anArticlesOwnClassesDoNotReachTheBook() {
+        val epub = write(unsectioned(article(body = "<p class=\"kicker\">Site kicker</p><p class=\"byline\">Site byline</p>")))
+        val page = epub.xml("OEBPS/" + epub.articleHrefs().single())
+        val body = page.documentElement.elements("div").single { it.getAttribute("class") == "article-body" }
+        assertEquals(2, body.elements("p").size)
+        assertTrue(body.elements("p").none { it.hasAttribute("class") })
+    }
+
+    @Test
+    fun theStylesheetUsesOnlySelectorsKindleKeeps() {
+        val css = write(unsectioned(article())).text("OEBPS/style.css")
+        // Kindle's conversion drops a rule whose selector has a child or sibling combinator.
+        val selectors = Regex("([^{}]+)\\{").findAll(css).map { it.groupValues[1] }.toList()
+        assertTrue(selectors.isNotEmpty())
+        assertTrue(selectors.filter { Regex("[>+~]|::?(before|after|first-child)").containsMatchIn(it) }.toString(), selectors.none { Regex("[>+~]|::?(before|after|first-child)").containsMatchIn(it) })
     }
 }
