@@ -173,7 +173,7 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
     if (!s.scheduleEnabled) return
     if (s.delivery == DeliveryMethod.SHARE) NotificationsOffWarning()
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-        Text("At", Modifier.weight(1f))
+        Text("Ready by", Modifier.weight(1f))
         OutlinedButton(onClick = {
             TimePickerDialog(context, { _, h, m -> vm.setTime(LocalTime.of(h, m)) }, s.schedule.time.hour, s.schedule.time.minute, android.text.format.DateFormat.is24HourFormat(context)).show()
         }) { Text(s.schedule.time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))) }

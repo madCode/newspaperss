@@ -3,6 +3,7 @@ package com.app.newspaperss.ui.today
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.delivery.EditionIntents
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -100,7 +102,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         // keeps it, so TalkBack announces it, and the card doesn't say it again.
         val saidAbove = (state.build as? BuildState.Failed)?.reason
         // The same key in both places: only one exists at a time, and it moves rather than restarts.
-        if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
+        if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, hadOne = latest != null, onMake = viewModel::makeOneNow) }
         if (latest != null) {
             item(key = "latest") {
                 LatestEdition(
@@ -123,7 +125,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 )
             }
         }
-        if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
+        if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, hadOne = latest != null, onMake = viewModel::makeOneNow) }
         if (editions.size > 1) {
             item(key = "earlier") {
                 Text(
@@ -173,7 +175,7 @@ private class BuildAnnouncer {
 }
 
 @Composable
-private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeButton, onMake: () -> Unit) {
+private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeButton, hadOne: Boolean, onMake: () -> Unit) {
     val running = build == BuildState.Syncing || build == BuildState.WaitingForNetwork || build is BuildState.Retrying || build is BuildState.Fetching
     // Announced only once a build has run while this screen was up: a failure WorkManager still
     // remembers from earlier would otherwise be read out every time Today opens.
@@ -187,7 +189,8 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeB
                 BuildState.WaitingForNetwork -> "Waiting for an internet connection…"
                 is BuildState.Retrying -> "Couldn't read your sources. Trying again at ${timeOf(build.atMillis)}."
                 is BuildState.Fetching -> "Making your edition"
-                BuildState.NothingNew -> "Nothing new to read yet. Add sources, or check back later."
+                // A finished state once there's been an edition, rather than an empty one.
+                BuildState.NothingNew -> if (hadOne) "Nothing new since your last edition. Check back later." else "Nothing new to read yet. Add sources, or check back later."
                 is BuildState.Failed -> build.reason
                 BuildState.Idle -> if (announcer.finished) "Your edition is ready." else ""
             },
@@ -230,7 +233,8 @@ private fun LatestEdition(
     onOpen: () -> Unit,
     onSent: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+    // An outline as well as the tint, which is almost white on e-ink.
+    Card(Modifier.fillMaxWidth().padding(top = 16.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(16.dp)) {
             Column(Modifier.fillMaxWidth().clickable(onClickLabel = "See what's inside", onClick = onDetails)) {
                 Text(edition.title, style = MaterialTheme.typography.headlineSmall)
@@ -263,8 +267,8 @@ private fun LatestEdition(
                         }
                     }
                     Text(
-                        if (preferOpen) "Opening it here counts as delivered. Read it another way? Tell us so these articles don't come back."
-                        else "Choosing an app to send it with counts as delivered. Sent it another way? Tell us so these articles don't come back.",
+                        if (preferOpen) "Opening it here counts as sent. Read it another way? Tell us so these articles don't come back."
+                        else "Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back.",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 12.dp),
                     )
@@ -276,7 +280,7 @@ private fun LatestEdition(
                 }
                 EditionStatus.FAILED -> {
                     val error = edition.error ?: "This edition couldn't be made."
-                    if (error != saidAbove) Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                    if (error != saidAbove) Text(error, color = failureColor(edition.error), modifier = Modifier.padding(top = 8.dp))
                     OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") }
                 }
                 EditionStatus.BUILDING, EditionStatus.DELETED -> {}
@@ -306,6 +310,11 @@ internal fun summary(edition: EditionEntity): String {
     val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"
     return "$articles · about ${edition.minutes.roundToInt().coerceAtLeast(1)} min · $status"
 }
+
+/** Red for a failure; an edition that simply wasn't sent in time isn't one. */
+@Composable
+internal fun failureColor(error: String?) =
+    if (error == EditionBuilder.NOT_SENT || error == EditionBuilder.OLD_NOT_SENT) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
 
 private fun timeOf(epochMillis: Long): String =
     java.time.Instant.ofEpochMilli(epochMillis).atZone(java.time.ZoneId.systemDefault()).toLocalTime()

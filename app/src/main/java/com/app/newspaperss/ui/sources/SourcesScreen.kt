@@ -120,6 +120,10 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
                 onClick = viewModel::openAdd,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Add a source") },
+                // Filled like the app's other main buttons: the default pale container turns
+                // almost white on e-ink.
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

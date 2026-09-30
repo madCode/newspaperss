@@ -462,6 +462,18 @@ class EditionDetailScreenTest {
     }
 
     @Test
+    fun nothingNewAfterAnEditionSaysSoAsFinished() {
+        edition(EditionStatus.DELIVERED, listOf("A story"))
+        val nothing = work(WorkInfo.State.SUCCEEDED, output = workDataOf(EditionWorker.NOTHING_NEW to true))
+        val vm = TodayViewModel(repo, flowOf(nothing)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.build == BuildState.NothingNew && vm.state.value.editions?.size == 1 }
+
+        // Not "add sources": this reader has an edition, and there's just nothing since.
+        compose.onNodeWithTag(BUILD_STATUS).assertTextEquals("Nothing new since your last edition. Check back later.")
+    }
+
+    @Test
     fun seeWhatsInsideOnTodayOpensTheLatestEdition() {
         val latest = runBlocking {
             db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.READY, articleCount = 5, minutes = 30.0))
