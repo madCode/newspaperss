@@ -22,8 +22,14 @@ import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -38,15 +44,20 @@ class SettingsScreenTest {
     @get:Rule val tmp = TemporaryFolder()
 
     private lateinit var store: SettingsStore
+    // Cancelled before TemporaryFolder deletes the file: a write still running after that fails
+    // its rename, and the error lands in whichever test is running then.
+    private val storeScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val rescheduled = mutableListOf<Settings>()
 
     @Before
     fun show() {
-        store = SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") })
+        store = SettingsStore(PreferenceDataStoreFactory.create(scope = storeScope) { tmp.newFile("s.preferences_pb") })
         val vm = SettingsViewModel(store) { rescheduled += it }
         compose.setContent { SettingsScreen(vm) }
         waitFor("Your edition")
     }
+
+    @After fun stopStore() = runBlocking { storeScope.coroutineContext[Job]!!.cancelAndJoin() }
 
     private fun waitFor(text: String) = idleUntil {
         compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()

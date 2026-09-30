@@ -9,7 +9,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
 ## Status
 
 - **Last night:** Night 2 focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. It shipped stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync, a category choice, fair turns across many feeds, Start fresh and leaving feeds out, Obsidian-friendly notes saved to your vault, a question at the end of each paper, and a dark preview.
-- **Watching:** a settings test that failed once on a DataStore file rename (#66); not reproduced since.
+- **Watching:** a settings test that failed on a DataStore file rename (#66, #81). Its store now stops before the test's folder is deleted; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 3 · Wed 30 Sep
@@ -17,7 +17,12 @@ caught, and what got in the way. Newest first. Times are Pacific.
 ### UX pass (afternoon)
 Four hours of UX design only, no new features. The patterns audited, the research behind each and what was decided are in the session's UX report page.
 
-### Cycle 62: Today puts the finished paper first (13:30–, this PR)
+### Cycle 63: Send to Kindle can read the book (14:25–, this PR)
+- **From you:** the first Send to the Kindle app errors; the second gets through the form, but nothing arrives, in the library or in Content and Devices, and no email.
+- **Likely cause:** a share lets only the receiving screen read the file. Send to Kindle reads it for the form, then uploads after the form closes, when it can't any more, and fails without a word. The first-tap error fits too, if the app changes screens while starting.
+- **Shipped:** the Kindle app is allowed to read the edition before the share sheet opens, and whichever app is picked is allowed to read it until the phone restarts.
+
+### Cycle 62: Today puts the finished paper first (13:30–14:20, [#81](https://github.com/madCode/newspaperss/pull/81))
 - **Audit:** once today's edition was sent, a filled "Make an edition now" sat above it, the loudest thing on the screen, inviting a second paper; a failed build's reason sat under the button that answers it; a failed edition said "Not sent" twice and offered two retry buttons.
 - **Shipped:** the filled button only before the first edition, then a quiet "Make another edition"; a failure reads first, then "Try again"; one retry per failure; "2 starred articles will go in your next edition" says what the count means; "3 articles so far" while making (not "read", which sounded like you'd read them).
 - **Kept:** Send filled with Open outlined, and the "I've sent it" explanation.
