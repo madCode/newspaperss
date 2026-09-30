@@ -13,6 +13,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Night 2 · Tue 29 Sep, 20:30 PT –
 
+### Cycle 54: tt-rss, start fresh (01:43–, this PR)
+- **From the persona audit:** a reader back after a break sees thousands unread in tt-rss, and the paper only ever uses up a few a day.
+- **Shipped:** "Back after a break?" on the tt-rss source's page: after asking, it marks everything that reached tt-rss more than two weeks ago read there (in the chosen category, if there is one). Servers older than API level 15 (2020) would ignore the two weeks and mark everything read, so the app refuses and says so.
+- **Review caught:** clearing the app's waiting articles by publication date didn't match tt-rss's "received" date, so a backdated article could vanish here while staying unread there for good (now left to expire as usual); a login saved for another server could have caught up the wrong account; the notice claimed all of tt-rss when only a category was caught up; "Starred articles stay starred" read as if they were spared.
+
 ### Cycle 53: a question at the end of the paper (01:27–01:42, [#69](https://github.com/madCode/newspaperss/pull/69))
 - **From the persona audit:** the book's closing page could ask a question, but the app never gave it one.
 - **Shipped:** each edition ends with one of twelve open questions ("What surprised you?", "Which piece was hardest to put down?"), and its notes show the same one above the prompts, so what you turned over on the Kindle is waiting in Obsidian.

@@ -324,7 +324,7 @@ private fun StartFresh(source: SourceEntity, working: Boolean, onConfirm: () -> 
             text = {
                 Text(
                     "Every unread article that reached tt-rss more than two weeks ago$scope will be marked read there. " +
-                        "Starred articles stay starred. newspapeRSS can't undo this.",
+                        "Starred ones too: they stay starred, but read. newspapeRSS can't undo this.",
                 )
             },
             confirmButton = { TextButton(onClick = { confirming = false; onConfirm() }) { Text("Mark as read") } },

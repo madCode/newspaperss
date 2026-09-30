@@ -298,4 +298,20 @@ class TtrssClientTest {
             assertEquals(1, server.sent.size)
         }
     }
+
+    @Test
+    fun theLevelIsCheckedAgainAfterLoggingInAgain() = runTest {
+        // tt-rss dropped the session and the server behind the address is now an older one.
+        val client = client()
+        server.reply(loggedIn)
+        client.login()
+        server.reply(error("NOT_LOGGED_IN"))
+        server.reply(ok("""{"session_id":"sid-2","api_level":14}"""))
+        try {
+            client.markReadOlderThanTwoWeeks()
+            fail("expected TooOld")
+        } catch (e: TtrssException.TooOld) {
+            assertEquals(listOf("login", "catchupFeed", "login"), server.sent.map { it["op"]!!.toString().trim('"') })
+        }
+    }
 }

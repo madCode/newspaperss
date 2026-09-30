@@ -7,8 +7,6 @@ import com.app.newspaperss.core.ttrss.TtrssClient
 import com.app.newspaperss.core.ttrss.TtrssException
 import kotlinx.coroutines.CancellationException
 import java.io.IOException
-import java.time.Clock
-import java.time.Duration
 
 /** Connecting a tt-rss account, forgetting it, and telling tt-rss what was delivered. */
 class TtrssRepository(
@@ -16,7 +14,6 @@ class TtrssRepository(
     private val http: HttpClient,
     private val accounts: TtrssAccountStore,
     private val sources: SourceRepository,
-    private val clock: Clock = Clock.systemUTC(),
 ) {
     sealed interface Check {
         data class Failed(val message: String) : Check
@@ -118,11 +115,14 @@ class TtrssRepository(
 
     /**
      * For a reader coming back to a big backlog: marks everything that reached tt-rss more than two
-     * weeks ago read there, in the source's category if it has one, and lets the same stale
-     * articles waiting here go. Null when done, else why not.
+     * weeks ago read there, in the source's category if it has one. Null when done, else why not.
+     *
+     * Articles already waiting here are left to expire as usual: tt-rss dates this by when it
+     * received each article, which isn't kept here, and matching by publication date instead
+     * would drop backdated articles tt-rss still has unread, where nothing would ever pick them up.
      */
     suspend fun startFresh(sourceId: Long): String? {
-        val source = db.sources().byId(sourceId) ?: return null
+        val source = db.sources().byId(sourceId) ?: return "This source has been removed."
         val account = try {
             (accounts.load() as? StoredAccount.Ready)?.account
         } catch (e: CancellationException) {
@@ -130,6 +130,8 @@ class TtrssRepository(
         } catch (e: Exception) {
             null
         } ?: return FeedSync.SIGN_IN_AGAIN
+        // A category id means nothing on another server, and "everything" would be someone else's.
+        if (account.apiUrl != source.url) return FeedSync.SIGN_IN_AGAIN
         val client = account.client(http)
         try {
             val category = source.ttrssCategoryId
@@ -143,7 +145,6 @@ class TtrssRepository(
         } finally {
             logOut(client)
         }
-        db.articles().expireWaitingPublishedBefore(sourceId, clock.instant().minus(Duration.ofDays(START_FRESH_DAYS)))
         return null
     }
 
@@ -185,10 +186,5 @@ class TtrssRepository(
         }
         sourceIds.forEach { db.sources().setServerNote(it, "Delivered articles weren't marked read in tt-rss. $problem") }
         return !retry
-    }
-
-    private companion object {
-        /** tt-rss's "2week" catch-up: articles it received before then. */
-        const val START_FRESH_DAYS = 14L
     }
 }

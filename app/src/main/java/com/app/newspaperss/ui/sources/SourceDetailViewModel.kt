@@ -120,8 +120,13 @@ class SourceDetailViewModel(
         _startingFresh.value = true
         viewModelScope.launch {
             try {
+                val category = detail.value?.source?.ttrssCategoryTitle
                 val problem = repo.startFresh(id)
-                _notice.value = problem ?: "Done. tt-rss has only the last two weeks unread now."
+                _notice.value = problem ?: if (category != null) {
+                    "Done. $category has only the last two weeks unread in tt-rss now."
+                } else {
+                    "Done. tt-rss has only the last two weeks unread now."
+                }
                 if (problem == null) onSourceChanged()
             } finally {
                 _startingFresh.value = false
