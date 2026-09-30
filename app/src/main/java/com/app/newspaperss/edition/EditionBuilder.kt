@@ -1,5 +1,6 @@
 package com.app.newspaperss.edition
 
+import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.edition.Candidate
 import com.app.newspaperss.core.images.ImageAllowance
@@ -186,7 +187,7 @@ class EditionBuilder(
         val fitted = ImageBudget.fit(arranged.map { it.second.images }, articleImageBudget)
         val withImages = arranged.zip(fitted) { (a, c), images -> a to c.copy(images = images) }
 
-        val fileName = fileNameOf(editionId)
+        val fileName = fileNameOf(title)
         val doc = EditionDoc(
             title = title,
             date = now.toLocalDate(),
@@ -270,8 +271,9 @@ class EditionBuilder(
 
     private suspend fun fail(editionId: Long, reason: String): BuildResult {
         // A file written before the failure would otherwise sit in editions/ with nothing pointing at it.
-        File(editionsDir, fileNameOf(editionId)).delete()
-        db.editions().update(db.editions().byId(editionId)!!.copy(status = EditionStatus.FAILED, error = reason))
+        val edition = db.editions().byId(editionId)!!
+        File(editionsDir, fileNameOf(edition.title)).delete()
+        db.editions().update(edition.copy(status = EditionStatus.FAILED, error = reason))
         return BuildResult.Failed(editionId, reason)
     }
 
@@ -300,7 +302,12 @@ class EditionBuilder(
     }
 
     companion object {
-        private fun fileNameOf(editionId: Long) = "edition-$editionId.epub"
+        /**
+         * The edition's title: Send to Kindle takes the shared file's name as the book's title, and
+         * the Kindle library would list "edition-3". Titles are unique among recent editions,
+         * and a dated title ("Wednesday … Sep 30") only comes round again years later.
+         */
+        private fun fileNameOf(title: String) = FolderDelivery.fileName(title)
         private const val TAG = "EditionBuilder"
         const val NOT_SENT = "Not sent; its articles went back for the next edition."
         const val INTERRUPTED = "Interrupted; its articles will be in the next edition."

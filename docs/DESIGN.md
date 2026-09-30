@@ -151,7 +151,8 @@ module so it's all unit-tested without Android.
     to 20 per article. The budget goes to articles in reading order, and an
     image that can't fit isn't downloaded;
   - a unique title ("… Sep 29", then "… (2)"), because Send to Kindle
-    silently drops a title it has seen before.
+    silently drops a title it has seen before. The file is named after it,
+    since Send to Kindle's form titles the book after the file's name.
 - **One build at a time.** Builds are unique WorkManager work, so a timed
   build and "Make an edition now" can't race.
 
