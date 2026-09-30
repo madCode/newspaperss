@@ -103,8 +103,16 @@ time is counted by character.
 Questions:
 - the book's `dc:language` when a whole edition is in one language other than English (Kindle
   picks its dictionary from it);
-- whether the app UI and the book's own text should be translated;
 - whether an edition should mix languages or keep them in sections.
+
+Translation, decided: people translate, not a machine. Nobody on the project can check a machine
+translation, so it goes to volunteers who read the language. What that needs first:
+- the app's text moved out of the code into `strings.xml` (today almost all of it is written
+  inline in the screens), and the book's own words ("Contents", "min read") into a table per language;
+- a CONTRIBUTING section on how to translate: which file to copy, how to test it, how to send it;
+- optionally a hosted tool such as Weblate, whose free plan for open-source projects needs a
+  license on the repo;
+- then a call for translators in the README.
 
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
