@@ -213,6 +213,33 @@ class SourceDetailScreenTest {
     }
 
     @Test
+    fun aTtrssFeedCanBeLeftOutAndBroughtBack() {
+        val id = runBlocking {
+            val account = repo.addTtrss("https://rss.example/api/")
+            db.articles().insertNew(
+                listOf("Quarterly Review" to "7", "Press Office" to "42").map { (title, feed) ->
+                    ArticleEntity(sourceId = account, guid = "ttrss:$feed", url = "https://news.example/$feed", title = "From $title", originId = feed, originTitle = title)
+                },
+            )
+            account
+        }
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { visible("Feeds in your paper") && visible("All 2") }
+
+        compose.onNodeWithText("Choose").performClick()
+        idleUntil { compose.waitForIdle(); visible("Press Office") }
+        compose.onNodeWithText("Press Office").performClick()
+        idleUntil { compose.waitForIdle(); visible("1 of 2: 1 left out") }
+        assertEquals(listOf("42"), runBlocking { db.sources().allLeftOut().map { it.originId } })
+
+        compose.onNodeWithText("Press Office").performClick()
+        idleUntil { compose.waitForIdle(); visible("All 2") }
+        compose.onNodeWithText("Done").performClick()
+        assertTrue(runBlocking { db.sources().allLeftOut().isEmpty() })
+    }
+
+    @Test
     fun startingFreshAsksFirstThenCatchesUpTtrss() {
         val http = FakeHttp()
         val server = FakeTtrss(http)
