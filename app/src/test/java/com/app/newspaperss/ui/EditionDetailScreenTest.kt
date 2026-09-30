@@ -462,6 +462,23 @@ class EditionDetailScreenTest {
     }
 
     @Test
+    fun makeAnotherEditionSitsBelowTheLatestWhetherSentOrNot() {
+        // It used to sit above a sent edition and below a ready one.
+        val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"))
+        val vm = TodayViewModel(repo, flowOf(null)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.editions?.size == 1 }
+        fun below() = compose.onNodeWithText("Make another edition").fetchSemanticsNode().boundsInRoot.top >
+            compose.onNodeWithText("Tuesday Morning Edition").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("below a sent edition", below())
+
+        runBlocking { db.editions().update(db.editions().byId(id)!!.copy(status = EditionStatus.READY)) }
+        idleUntil { vm.state.value.editions?.single()?.status == EditionStatus.READY }
+        compose.waitForIdle()
+        assertTrue("below a ready edition", below())
+    }
+
+    @Test
     fun seeWhatsInsideOnTodayOpensTheLatestEdition() {
         val latest = runBlocking {
             db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.READY, articleCount = 5, minutes = 30.0))
