@@ -9,6 +9,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.transformLatest
 
 object Connectivity {
@@ -47,11 +49,21 @@ object Connectivity {
         }
         awaitClose { manager.unregisterNetworkCallback(callback) }
     }
-        // Going offline counts only once it lasts: a flaky connection would otherwise flip the
-        // status line (and TalkBack, and an e-ink refresh) back and forth.
-        .transformLatest { online ->
-            if (!online) delay(OFFLINE_AFTER_MS)
-            emit(online)
+        .let { raw ->
+            flow {
+                // Going offline counts only once it lasts: a flaky connection would otherwise flip
+                // the status line (and TalkBack, and an e-ink refresh) back and forth. Not the first
+                // value, which Today waits on before showing anything.
+                var first = true
+                emitAll(
+                    raw.transformLatest { online ->
+                        val wasFirst = first
+                        first = false
+                        if (!online && !wasFirst) delay(OFFLINE_AFTER_MS)
+                        emit(online)
+                    },
+                )
+            }
         }
         .distinctUntilChanged()
 

@@ -1,6 +1,7 @@
 package com.app.newspaperss.edition
 
 import com.app.newspaperss.data.EditionRepository
+import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.delivery.EditionIntents
 import com.app.newspaperss.delivery.FolderDelivery
@@ -54,7 +55,8 @@ class EditionRun(
             // Quiet, but said: otherwise a timed paper that doesn't come looks like the app broke.
             // Not when one came recently (made by hand just before): that one is the news.
             BuildResult.NothingNew -> if (scheduled) {
-                val latest = editions.observeAll().first().firstOrNull()
+                val made = editions.observeAll().first().filter { it.status == EditionStatus.READY || it.status == EditionStatus.DELIVERED }
+                val latest = made.firstOrNull()
                 if (latest == null || latest.createdAt.isBefore(now().minus(RECENT))) notifier.nothingNew(firstEver = latest == null)
             }
         }

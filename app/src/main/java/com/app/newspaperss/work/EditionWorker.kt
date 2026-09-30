@@ -70,7 +70,8 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val request = OneTimeWorkRequestBuilder<EditionWorker>()
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setInputData(workDataOf(SCHEDULED to scheduled, DUE_AT to (dueAt ?: 0L)))
-                // Within the 30 minutes a timed edition starts early.
+                // Retries after 5, then 10 more minutes: mostly within the 30 minutes a timed edition
+                // starts early, though Doze can hold them longer. A late paper beats none.
                 .setBackoffCriteria(BackoffPolicy.LINEAR, RETRY_MINUTES, TimeUnit.MINUTES)
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.KEEP, request)

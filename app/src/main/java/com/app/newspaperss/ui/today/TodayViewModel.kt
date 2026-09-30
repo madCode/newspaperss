@@ -28,6 +28,8 @@ sealed interface BuildState {
     data object Syncing : BuildState
     /** Queued, but it needs an internet connection to start. */
     data object WaitingForNetwork : BuildState
+    /** A timed run read no source and tries again at [atMillis] (epoch ms). */
+    data class Retrying(val atMillis: Long) : BuildState
     data class Fetching(val done: Int) : BuildState
     data object NothingNew : BuildState
     data class Failed(val reason: String) : BuildState
@@ -94,7 +96,12 @@ class TodayViewModel(
 
         /** @param online without a connection, queued work is waiting for one, not checking sources. */
         fun buildStateOf(info: WorkInfo?, online: Boolean = true): BuildState = when (info?.state) {
-            WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> if (online) BuildState.Syncing else BuildState.WaitingForNetwork
+            WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> when {
+                // Not "checking": nothing runs until the retry.
+                info.runAttemptCount > 0 -> BuildState.Retrying(info.nextScheduleTimeMillis)
+                online -> BuildState.Syncing
+                else -> BuildState.WaitingForNetwork
+            }
             WorkInfo.State.RUNNING ->
                 if (info.progress.getString(EditionWorker.STAGE) == EditionWorker.STAGE_FETCHING) {
                     BuildState.Fetching(info.progress.getInt(EditionWorker.FETCHED, 0))

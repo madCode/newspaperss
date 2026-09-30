@@ -42,4 +42,14 @@ class EditionWorkerTest {
         assertTrue(last is ListenableWorker.Result.Failure)
         assertTrue(last.outputData.getString(EditionWorker.ERROR)!!.startsWith("None of your 1 source could be read"))
     }
+
+    @Test
+    fun aBuildMadeByHandThatCantReadAnySourceSaysSoAtOnce() = runTest {
+        runBlocking { com.app.newspaperss.data.SourceRepository(app.container.db).addFeed("https://example.com/unreadable", "Gone") }
+
+        // The reader is looking at Today: no silent retries.
+        val result = TestListenableWorkerBuilder<EditionWorker>(app).build().doWork()
+
+        assertTrue(result is ListenableWorker.Result.Failure)
+    }
 }
