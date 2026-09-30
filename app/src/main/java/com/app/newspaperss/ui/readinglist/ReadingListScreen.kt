@@ -4,6 +4,7 @@ import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.ReadingTime
 import androidx.compose.foundation.clickable
 import android.net.Uri
+import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -78,6 +80,11 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
         }
     }
     // Removing is one tap and routine, so it's undone rather than confirmed.
+    // Leaving by another tab keeps this screen's state, so the ViewModel isn't cleared: settle a
+    // waiting removal on the way out too, but not on rotation, which shows the Undo again.
+    DisposableEffect(Unit) {
+        onDispose { if ((context as? Activity)?.isChangingConfigurations != true) viewModel.commitRemove() }
+    }
     val removed by viewModel.removed.collectAsState()
     LaunchedEffect(removed) {
         val gone = removed ?: return@LaunchedEffect

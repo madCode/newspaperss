@@ -1,6 +1,9 @@
 package com.app.newspaperss.ui
 
 import android.content.Intent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -68,6 +71,25 @@ class ReadingListScreenTest {
 
         waitFor("A long read")
         assertEquals(listOf(before), runBlocking { app.container.db.articles().allForSource(list.sourceId()) })
+    }
+
+    @Test
+    fun leavingTheScreenKeepsAWaitingRemoval() {
+        // Another tab keeps this screen's ViewModel alive, so leaving must settle it.
+        val list = app.container.readingList
+        runBlocking { list.save("https://a.example/one", "One") }
+        val vm = ReadingListViewModel(list, outlive = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined))
+        var shown by mutableStateOf(true)
+        compose.setContent { if (shown) ReadingListScreen(vm, onBack = {}) }
+        waitFor("One")
+        compose.onNodeWithContentDescription("Remove One").performClick()
+        waitFor("Removed “One”")
+
+        shown = false
+        compose.waitForIdle()
+        assertEquals("settled on the way out", null, vm.removed.value)
+
+        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.isEmpty() }
     }
 
     @Test
