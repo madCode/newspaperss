@@ -310,7 +310,7 @@ private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit,
                     if (s.kind == SourceKind.FEED) {
                         DropdownMenuItem(text = { Text("Article text") }, onClick = { menu = false; choosingMode = true })
                     }
-                    DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; removing = true })
+                    DropdownMenuItem(text = { Text("Remove source") }, onClick = { menu = false; removing = true })
                 }
             }
         },

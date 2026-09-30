@@ -49,6 +49,7 @@ import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.testutil.TestApp
+import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.sources.SourceDetailScreen
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
@@ -65,7 +66,6 @@ import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.FakeTtrss
 import com.app.newspaperss.testutil.testCipher
 import org.junit.rules.TemporaryFolder
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -81,14 +81,13 @@ import java.util.Locale
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
 class SourceDetailScreenTest {
-    @get:Rule val compose = createComposeRule()
-    @get:Rule val tmp = TemporaryFolder()
+    @get:Rule(order = 0) val closeDb = closeAfter { db.close() }
+    @get:Rule(order = 1) val tmp = TemporaryFolder()
+    @get:Rule(order = 2) val compose = createComposeRule()
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
     private val repo = SourceRepository(db)
-
-    @After fun close() = db.close()
 
     private fun visible(text: String) = compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()
 
@@ -124,7 +123,8 @@ class SourceDetailScreenTest {
         list.performScrollToNode(hasText("Waiting for an edition", substring = true))
         list.performScrollToIndex(0)
 
-        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Remove source").performClick()
         compose.onNodeWithText("Remove Example?").assertExists()
         compose.onNode(hasText("Remove source") and hasAnyAncestor(isDialog())).performClick()
         // Compose only recomposes for the removal when its test clock runs.

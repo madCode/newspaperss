@@ -29,11 +29,11 @@ import com.app.newspaperss.data.TtrssRepository
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.FakeTtrss
 import com.app.newspaperss.testutil.TestApp
+import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.rss
 import com.app.newspaperss.testutil.testCipher
 import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -46,8 +46,9 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
 class SourcesScreenTest {
-    @get:Rule val compose = createComposeRule()
-    @get:Rule val tmp = TemporaryFolder()
+    @get:Rule(order = 0) val closeDb = closeAfter { db.close() }
+    @get:Rule(order = 1) val tmp = TemporaryFolder()
+    @get:Rule(order = 2) val compose = createComposeRule()
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
@@ -71,8 +72,6 @@ class SourcesScreenTest {
     private fun waitFor(text: String, present: Boolean = true) = compose.waitUntil(5_000) {
         compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() == present
     }
-
-    @After fun close() = db.close()
 
     private fun addSource(input: String) {
         compose.onNodeWithText("Add a source", useUnmergedTree = true).performClick()
@@ -174,12 +173,12 @@ class SourcesScreenTest {
         assertEquals(id, opened)
 
         compose.onNodeWithContentDescription("More for Posts").performClick()
-        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithText("Remove source").performClick()
         compose.onNodeWithText("Keep").performClick()
         assertEquals(1, runBlocking { db.sources().all().size })
 
         compose.onNodeWithContentDescription("More for Posts").performClick()
-        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithText("Remove source").performClick()
         compose.onNode(hasText("Remove source") and hasAnyAncestor(isDialog())).performClick()
         waitFor("Posts", present = false)
     }
