@@ -386,6 +386,9 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
                         keyboardActions = KeyboardActions(onGo = { viewModel.find() }),
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (state.page != null) {
+                        TextButton(onClick = viewModel::saveInstead) { Text("Save this page to your reading list instead") }
+                    }
                     if (curatedLists.isNotEmpty()) CuratedListChoices(curatedLists, viewModel::addList)
                 }
                 is AddState.Searching -> Text("Checking ${state.input}…")

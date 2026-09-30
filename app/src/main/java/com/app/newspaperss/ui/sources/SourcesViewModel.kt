@@ -33,7 +33,8 @@ data class SourceRow(val source: SourceEntity, val lastNew: Instant?)
 
 sealed interface AddState {
     data object Closed : AddState
-    data class Editing(val input: String = "", val error: String? = null) : AddState
+    /** @property page a page with no feed, which can be saved to the reading list instead. */
+    data class Editing(val input: String = "", val error: String? = null, val page: String? = null) : AddState
     data class Searching(val input: String) : AddState
     data class Choosing(val input: String, val feeds: List<FoundFeed>) : AddState
 }
@@ -54,6 +55,8 @@ class SourcesViewModel(
     private val repository: SourceRepository,
     private val finder: FeedFinder,
     private val ttrss: TtrssRepository? = null,
+    /** Saves a page to the reading list; null where that isn't offered. */
+    private val saveToReadingList: (suspend (url: String) -> Boolean)? = null,
     private val onSourcesChanged: () -> Unit,
 ) : ViewModel() {
     val rows: StateFlow<List<SourceRow>?> = combine(repository.observe(), repository.observeActivity()) { sources, activity ->
@@ -84,7 +87,7 @@ class SourcesViewModel(
         _add.value = AddState.Searching(input)
         search = viewModelScope.launch {
             _add.value = when (val result = finder.find(input)) {
-                is FindResult.NotFound -> AddState.Editing(input, result.reason)
+                is FindResult.NotFound -> AddState.Editing(input, result.reason, result.page?.takeIf { saveToReadingList != null })
                 is FindResult.Found ->
                     if (result.feeds.size == 1) {
                         subscribe(result.feeds.single())
@@ -93,6 +96,16 @@ class SourcesViewModel(
                         AddState.Choosing(input, result.feeds)
                     }
             }
+        }
+    }
+
+    /** A site with no feed: its page goes to the reading list instead, so the reader isn't left at a dead end. */
+    fun saveInstead() {
+        val page = (add.value as? AddState.Editing)?.page ?: return
+        val save = saveToReadingList ?: return
+        _add.value = AddState.Closed
+        viewModelScope.launch {
+            _message.value = if (save(page)) "Saved to your reading list" else "It's already in your reading list"
         }
     }
 

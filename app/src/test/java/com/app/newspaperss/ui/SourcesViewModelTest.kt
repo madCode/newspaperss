@@ -21,6 +21,8 @@ import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.sources.TtrssForm
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.runBlocking
+import com.app.newspaperss.ui.sources.AddState
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -49,6 +51,65 @@ class SourcesViewModelTest {
         vm.rows.launchIn(kotlinx.coroutines.MainScope())
         idleUntil { vm.rows.value != null }
         assertEquals(listOf("B"), vm.rows.value!!.map { it.source.title })
+    }
+
+    @Test
+    fun aSiteWithNoFeedCanBeSavedToTheReadingListInstead() {
+        val article = "https://blog.example/2026/a-post"
+        val http = FakeHttp().apply { page(article, "<html><body><p>No feed here.</p></body></html>") }
+        val reading = ReadingListRepository(db)
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(http), saveToReadingList = { reading.save(it) }) {}
+
+        vm.openAdd()
+        vm.editInput(article)
+        vm.find()
+        idleUntil { (vm.add.value as? AddState.Editing)?.error != null }
+        assertEquals(article, (vm.add.value as AddState.Editing).page)
+
+        vm.saveInstead()
+        idleUntil { vm.message.value != null }
+        assertEquals(AddState.Closed, vm.add.value)
+        assertEquals("Saved to your reading list", vm.message.value)
+        assertEquals(listOf(article), runBlocking { reading.observe().first() }.map { it.url })
+    }
+
+    @Test
+    fun aFrontPageIsntOfferedItWouldMakeAnEditionOfNavigation() {
+        val http = FakeHttp().apply { page("https://blog.example", "<html><body><p>No feed here.</p></body></html>") }
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(http), saveToReadingList = { true }) {}
+        vm.openAdd()
+        vm.editInput("blog.example")
+        vm.find()
+        idleUntil { (vm.add.value as? AddState.Editing)?.error != null }
+        assertEquals(null, (vm.add.value as AddState.Editing).page)
+    }
+
+    @Test
+    fun editingTheAddressWithdrawsTheOffer() {
+        val article = "https://blog.example/2026/a-post"
+        val http = FakeHttp().apply { page(article, "<html><body><p>No feed here.</p></body></html>") }
+        var saved = 0
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(http), saveToReadingList = { saved++; true }) {}
+        vm.openAdd()
+        vm.editInput(article)
+        vm.find()
+        idleUntil { (vm.add.value as? AddState.Editing)?.page != null }
+
+        vm.editInput("other.example")
+        vm.saveInstead()
+
+        assertEquals(0, saved)
+        assertEquals(AddState.Editing("other.example"), vm.add.value)
+    }
+
+    @Test
+    fun anAddressThatCantBeReachedIsntOfferedForTheReadingList() {
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(FakeHttp()), saveToReadingList = { true }) {}
+        vm.openAdd()
+        vm.editInput("gone.example")
+        vm.find()
+        idleUntil { (vm.add.value as? AddState.Editing)?.error != null }
+        assertEquals(null, (vm.add.value as AddState.Editing).page)
     }
 
     @Test

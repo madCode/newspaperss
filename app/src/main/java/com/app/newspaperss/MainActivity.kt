@@ -167,7 +167,11 @@ private fun App(container: AppContainer, preferOpen: Boolean) {
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { SourcesViewModel(container.sources, container.feedFinder, container.ttrss) { SyncWorker.syncNow(context) } }
+                val vm = viewModel {
+                    SourcesViewModel(container.sources, container.feedFinder, container.ttrss, saveToReadingList = { container.readingList.save(it) }) {
+                        SyncWorker.syncNow(context)
+                    }
+                }
                 SourcesScreen(
                     vm,
                     onOpenReadingList = { nav.navigate(READING_LIST) },
