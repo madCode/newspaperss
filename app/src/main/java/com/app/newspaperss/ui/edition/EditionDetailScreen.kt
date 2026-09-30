@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -91,7 +95,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
     detail?.edition?.takeIf { deleting }?.let { edition ->
         AlertDialog(
             onDismissRequest = { deleting = false },
-            title = { Text("Delete this edition?") },
+            title = { Text("Delete ${edition.title}?") },
             text = {
                 Text(
                     when (edition.status) {
@@ -101,8 +105,8 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                     },
                 )
             },
-            confirmButton = { TextButton(onClick = { deleting = false; viewModel.delete(onBack) }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
+            confirmButton = { TextButton(onClick = { deleting = false; viewModel.delete(onBack) }) { Text("Delete edition") } },
+            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Keep") } },
         )
     }
 
@@ -116,8 +120,16 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                         TextButton(onClick = viewModel::writeNotes) { Text("Notes") }
                     }
                     val status = detail?.edition?.status
+                    // Rare and destructive, so in the menu rather than beside Notes, where a slow
+                    // e-ink refresh makes a mis-tap easy.
                     if (status != null && status != EditionStatus.BUILDING) {
-                        TextButton(onClick = { deleting = true }) { Text("Delete") }
+                        var menu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(text = { Text("Delete edition") }, onClick = { menu = false; deleting = true })
+                            }
+                        }
                     }
                 },
             )
@@ -234,8 +246,9 @@ private fun ContentRow(
     onOpen: (() -> Unit)?,
 ) {
     val entry = content.entry
-    // "Starred" is a word, not the glyph, so it isn't mistaken for the toggle beside it.
-    val details = listOfNotNull(entry.sourceTitle, "${minutes(entry.minutes)} min", "Starred".takeIf { entry.starred }).joinToString(" · ")
+    // Words, not the glyph, so it isn't mistaken for the toggle beside it; past tense, since that
+    // toggle is about the next edition and may be off.
+    val details = listOfNotNull(entry.sourceTitle, "${minutes(entry.minutes)} min", "You starred it".takeIf { entry.starred }).joinToString(" · ")
     ArticleRowFrame(
         modifier = if (onOpen != null) Modifier.clickable(onClickLabel = "Read", onClick = onOpen) else Modifier,
         title = { Text(entry.title, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis) },
