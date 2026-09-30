@@ -208,6 +208,7 @@ class ArticleExtractorTest {
             "network" to FakeHttp(emptyMap()),
             "404" to FakeHttp(mapOf(url to page("<html><body>Not found</body></html>", code = 404))),
             "blocked" to FakeHttp(mapOf(url to page("<html>Forbidden</html>", code = 403))),
+            "paywall" to FakeHttp(mapOf(url to page("<html><head><title>Accès restreint</title></head></html>", code = 402))),
             "challenge" to FakeHttp(mapOf(url to page("<html><head><title>Just a moment...</title></head><body>Checking your browser</body></html>"))),
             "pdf" to FakeHttp(mapOf(url to page("%PDF-1.7 binary", type = "application/pdf"))),
             "fastly" to FakeHttp(mapOf(url to page(
@@ -221,7 +222,7 @@ class ArticleExtractorTest {
             assertTrue(name, article.note!!.startsWith("Couldn't fetch the full article"))
             assertTrue(name, "particular pleasure" in article.html)
             assertFalse(name, "Checking your browser" in article.html)
-            assertEquals("only a refusal or bot check counts as blocked: $name", name in setOf("blocked", "challenge", "fastly"), article.pageBlocked)
+            assertEquals("only a refusal or bot check counts as blocked: $name", name in setOf("blocked", "paywall", "challenge", "fastly"), article.pageBlocked)
         }
     }
 

@@ -18,6 +18,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **From a live edition:** Le Monde articles came out as "A required part of this site couldn't load": the app fetched Fastly's bot challenge ("Client Challenge", a 3 KB page served with a 200) and took it for the article.
 - **Shipped:** the challenge is recognised, so the feed's text is used with a note, and the source learns the site blocks fetching.
 - **Checks:** a live Le Monde edition has the feed's text and the note, and no challenge text.
+- **Review caught:** from a server, Le Monde can also answer 402 "Accès restreint", which wasn't counted as the site refusing. It is now, like 401, 403 and 429.
 
 ### Cycle 26: Chinese and Japanese reading time (17:20–17:30, [#41](https://github.com/madCode/newspaperss/pull/41))
 - **From the language work:** Chinese and Japanese have no spaces between words, so a whole NHK paragraph counted as one word: no reading time, and the full-text check would take a long Japanese feed for a teaser and fetch pages it didn't need.

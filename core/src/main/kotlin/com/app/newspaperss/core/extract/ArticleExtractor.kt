@@ -261,7 +261,8 @@ class ArticleExtractor(private val http: HttpClient) {
         private const val TEASER_RATIO = 2.0
         private const val CHALLENGE_PAGE_MAX_CHARS = 150 * 1024
         private const val MAX_PAGE_CHARS = 5 * 1024 * 1024
-        private val BLOCKED_STATUS_CODES = setOf(401, 403, 429, 503)
+        // 402 is a paywall's refusal (Le Monde's "Accès restreint").
+        private val BLOCKED_STATUS_CODES = setOf(401, 402, 403, 429, 503)
         // 410 only: a 404 is often a site having a bad day.
         private val GONE_STATUS_CODES = setOf(410)
         private val CHALLENGE_MARKERS = listOf(
