@@ -19,13 +19,13 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
@@ -91,11 +91,14 @@ fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: St
  * outside the book, and anything missing from it, gets an empty body rather than being passed on,
  * so an article's HTML can never reach the network (no tracking pixels, fonts or stylesheets).
  */
-internal fun bookResponse(url: String, pages: EpubPages): Pair<String, ByteArray> {
+internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: Int): Pair<String, ByteArray> {
     if (!url.startsWith(BOOK_ORIGIN)) return "text/plain" to ByteArray(0)
     val path = "OEBPS/" + url.removePrefix(BOOK_ORIGIN).substringBefore('#').substringBefore('?')
     val bytes = pages.entry(path) ?: return "text/plain" to ByteArray(0)
-    return EpubPages.mimeOf(path) to bytes
+    val mime = EpubPages.mimeOf(path)
+    // A page reached by a link in the book ("Next") comes this way, not through loadData.
+    if (mime == "application/xhtml+xml") return mime to forPreview(bytes.toString(Charsets.UTF_8), background, text).toByteArray()
+    return mime to bytes
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -113,7 +116,7 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
                 settings.allowContentAccess = false
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse {
-                        val (mime, bytes) = bookResponse(request.url.toString(), pages)
+                        val (mime, bytes) = bookResponse(request.url.toString(), pages, background, text)
                         return WebResourceResponse(mime, "utf-8", ByteArrayInputStream(bytes))
                     }
 
