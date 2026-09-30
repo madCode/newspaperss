@@ -174,7 +174,7 @@ object EpubWriter {
             return Page("cover", COVER, doc.title, xhtmlPage(doc.title, lang, body))
         }
 
-        private fun totalsLine() = "${plural(articles.size, "article")} · ${ReadingTime.format(totalMinutes)}"
+        private fun totalsLine() = listOfNotNull(plural(articles.size, "article"), minutesLabel(totalMinutes)).joinToString(" · ")
 
         private fun contentsPage(): Page {
             val body = buildString {
@@ -185,14 +185,15 @@ object EpubWriter {
                 sections.forEachIndexed { sectionIndex, section ->
                     val title = section.title?.trim().orEmpty()
                     if (title.isNotEmpty()) {
-                        val minutes = ReadingTime.format(section.articles.sumOf { it.minutes })
-                        append("<h2 class=\"section-title\" id=\"${sectionId(sectionIndex)}\">${esc(title)} <span class=\"meta\">· ${esc(minutes)}</span></h2>\n")
+                        val minutes = minutesLabel(section.articles.sumOf { it.minutes })?.let { " <span class=\"meta\">· ${esc(it)}</span>" }.orEmpty()
+                        append("<h2 class=\"section-title\" id=\"${sectionId(sectionIndex)}\">${esc(title)}$minutes</h2>\n")
                     }
                     append("<ol class=\"contents\" start=\"${index + 1}\">\n")
                     for (article in section.articles) {
                         val meta = listOfNotNull(article.sourceTitle.trim(), minutesLabel(article.minutes))
                             .filter { it.isNotEmpty() }.joinToString(" · ")
-                        append("<li><a href=\"${articleHrefs[index]}\"${languageAttributes(article.language, lang)}>${esc(articleTitle(index))}</a>")
+                        // On the item, not the link, so a right-to-left entry is aligned as one.
+                        append("<li${languageAttributes(article.language, lang)}><a href=\"${articleHrefs[index]}\">${esc(articleTitle(index))}</a>")
                         append("<br/><span class=\"meta\">${esc(meta)}</span></li>\n")
                         index++
                     }

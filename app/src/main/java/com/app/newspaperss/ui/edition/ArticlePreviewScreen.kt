@@ -121,8 +121,15 @@ private fun BookView(pages: EpubPages, xhtml: String, modifier: Modifier) {
                         return true
                     }
                 }
-                loadDataWithBaseURL(BOOK_ORIGIN, xhtml, "application/xhtml+xml", "utf-8", null)
+                loadDataWithBaseURL(BOOK_ORIGIN, withPreviewMargins(xhtml), "application/xhtml+xml", "utf-8", null)
             }
         },
     )
 }
+
+/**
+ * The book leaves side margins to the e-reader's own setting, so the preview adds some: a
+ * WebView has none, and the text would run to the screen's edges.
+ */
+internal fun withPreviewMargins(xhtml: String): String =
+    xhtml.replaceFirst("</head>", "<style>body { margin: 0 5%; }</style></head>")

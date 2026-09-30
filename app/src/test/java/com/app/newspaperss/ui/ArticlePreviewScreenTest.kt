@@ -10,6 +10,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
+import com.app.newspaperss.ui.edition.EpubPages
+import com.app.newspaperss.ui.edition.withPreviewMargins
+import org.junit.Assert.assertTrue
 import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
@@ -54,5 +57,17 @@ class ArticlePreviewScreenTest {
 
         idleUntil { compose.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("file is gone", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun thePreviewGivesTheBookSideMarginsTheEReaderWouldAdd() {
+        val file = tmp.newFile("m.epub")
+        val article = EditionArticle(title = "A story", sourceTitle = "S", url = "https://a.example/", bodyHtml = "<p>x</p>", minutes = 1.0)
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
+        }
+        val page = EpubPages(file).use { it.article(0)!! }
+        val head = withPreviewMargins(page).substringBefore("</head>")
+        assertTrue(head.contains("body { margin: 0 5%; }"))
     }
 }

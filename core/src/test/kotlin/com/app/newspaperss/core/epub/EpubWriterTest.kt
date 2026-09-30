@@ -651,8 +651,9 @@ class EpubWriterTest {
         // The page's own text (source, byline, "Read the original") stays English.
         assertEquals("en", pages[0].documentElement.getAttribute("lang"))
         // Headlines are tagged wherever they appear, so an Arabic one lays out right in the contents too.
-        val contents = epub.xml("OEBPS/contents.xhtml").documentElement.elements("a")
-        assertEquals("rtl", contents.single { it.getAttribute("href") == epub.articleHrefs()[1] }.getAttribute("dir"))
+        // On the whole entry, so it's right-aligned as one.
+        val entries = epub.xml("OEBPS/contents.xhtml").documentElement.elements("li")
+        assertEquals("rtl", entries.single { li -> li.elements("a").single().getAttribute("href") == epub.articleHrefs()[1] }.getAttribute("dir"))
     }
     @Test
     fun anArticleWithoutWordsShowsNoReadingTime() {
@@ -660,6 +661,14 @@ class EpubWriterTest {
         val (comic, _) = epub.articleHrefs()
         assertNull(epub.xml("OEBPS/$comic").elements("p").firstOrNull { it.getAttribute("class") == "byline" })
         assertEquals("xkcd", epub.xml("OEBPS/contents.xhtml").elements("span").first().textContent)
+    }
+
+    @Test
+    fun aSectionOrEditionOfOnlyComicsShowsNoZeroMinutes() {
+        val epub = write(doc(EditionSection("Fun", listOf(article(title = "Comic", source = "xkcd", minutes = 0.0)))))
+        val contents = epub.xml("OEBPS/contents.xhtml")
+        assertEquals("Fun", contents.elements("h2").single().textContent.trim())
+        assertEquals("1 article", contents.elements("p").single { it.getAttribute("class") == "totals" }.textContent)
     }
 
     @Test

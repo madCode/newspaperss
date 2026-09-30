@@ -8,10 +8,11 @@ package com.app.newspaperss.core.epub
 // Links take the text's colour: a reader's dark mode inverts the text, but a fixed link colour
 // stays dark on black. Borders take it too, so rules show in both modes.
 // Headings are aligned explicitly: Kindle justifies whatever isn't, which opens wide gaps in a
-// short line. `start` keeps right-to-left headlines right-aligned where it's understood.
+// short line. Plain `left`, not `start`: Kindle doesn't list `start`, and might keep it as the
+// last declaration and justify. Right-to-left articles get their own rules by `dir` instead.
 internal const val EPUB_CSS = """body { margin: 0; font-family: serif; line-height: 1.5; overflow-wrap: break-word; word-wrap: break-word; }
 a { color: inherit; }
-h1, h2, h3, h4, h5, h6 { line-height: 1.2; text-align: left; text-align: start; hyphens: manual; -webkit-hyphens: manual; page-break-after: avoid; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.2; text-align: left; hyphens: manual; -webkit-hyphens: manual; page-break-after: avoid; }
 p { margin: 0 0 0.7em 0; }
 .article-body p { text-align: justify; hyphens: auto; -webkit-hyphens: auto; -epub-hyphens: auto; }
 .article-body h2 { font-size: 1.2em; margin: 1.3em 0 0.5em 0; }
@@ -50,4 +51,6 @@ div.reflection { border-top: 1px solid; border-bottom: 1px solid; padding: 0.8em
 div.reflection p { text-align: left; margin: 0 0 0.4em 0; }
 p.reflection-label { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.12em; }
 p.end-imprint { text-align: center; font-size: 0.8em; margin-top: 3em; }
+h1[dir="rtl"], ol.contents li[dir="rtl"], div[dir="rtl"] figcaption { text-align: right; }
+div[dir="rtl"] blockquote { margin: 1em 3% 1em 0; padding-left: 0; padding-right: 4%; border-left: 0; border-right: 2px solid; }
 """
