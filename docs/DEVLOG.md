@@ -18,6 +18,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **From the resource audit:** the worst memory peak was a large page parsed and then copied whole for Readability.
 - **Shipped:** scripts, styles and SVGs are dropped right after the page's JSON-LD is read, before the copy; on script-heavy sites they're most of the page. On a 2.6 MB test page that's 36 MB allocated before and 16 MB after, in half the time. Pages over 5 MB aren't parsed at all; the feed's text is used with a note.
 - **Checks:** a live edition gives the same articles with the same word counts and passes epubcheck; xkcd, the New Yorker cartoon and Godslave all still get their image. The live-edition tool now prints each article's image count.
+- **Review caught:** a page that fails for its own reasons (too large, no connection) was counted as "the feed's text is enough", so a source whose pages are 5–10 MB would have been switched to teasers for good. A failed page now counts as no evidence either way. A saved link that will never be readable (too large, not a web page, gone) now goes in with a note saying why, instead of silently waiting forever. Declarative shadow-DOM templates, which are shown on the page, are kept.
 
 ### Cycle 23: a documentation pass (16:50–17:00, in [#39](https://github.com/madCode/newspaperss/pull/39))
 - **Why:** you asked for documentation passes in the cycles: readable, current, not onerous. CLAUDE.md now says so: behaviour changes update the docs in the same PR, and every few cycles a pass checks the docs against the code.

@@ -6,6 +6,7 @@ import org.jsoup.Jsoup
 import com.app.newspaperss.core.extract.ExtractInput
 import com.app.newspaperss.core.extract.FullTextCheck
 import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.core.extract.PageFailure
 import com.app.newspaperss.core.images.ArticleImages
 import com.app.newspaperss.core.images.EncodedImage
 import com.app.newspaperss.core.images.ImageAllowance
@@ -51,8 +52,9 @@ class ExtractorContentProvider(
         )
         FullTextCheck.evidence(extracted)?.let { onEvidence(source.id, it) }
         // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
-        // reader saved on purpose waits for the next edition instead of being used up as a stub.
-        if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
+        // reader saved on purpose waits for the next edition instead of being used up as a stub,
+        // unless it will never be readable: then the stub says why, rather than it waiting forever.
+        if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0 && extracted.pageFailure != PageFailure.PERMANENT) return null
         val encoded = download(ArticleImages.wanted(extracted.imageUrls), refererFor(article.url), images)
         val embedded = ArticleImages.embed(extracted.html, "a${article.id}", encoded)
         return ArticleContent(

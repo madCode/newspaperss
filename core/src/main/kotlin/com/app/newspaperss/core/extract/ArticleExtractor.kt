@@ -48,9 +48,19 @@ data class ExtractedArticle(
     val pageWordCount: Int?,
     /** The site turned the page request away or answered with a bot check. */
     val pageBlocked: Boolean = false,
+    /** The page was tried and couldn't be read for another reason, or null if it was read or not tried. */
+    val pageFailure: PageFailure? = null,
     /** The article's language as a BCP 47 tag, if the text or the page says. */
     val language: String? = null,
 )
+
+/** Why a page couldn't be read, when the site didn't turn the app away. */
+enum class PageFailure {
+    /** Worth trying again: no connection, a server error. */
+    TRANSIENT,
+    /** It will be the same next time: gone, not a web page, too large to parse. */
+    PERMANENT,
+}
 
 /**
  * Turns a feed item or saved link into a readable article, choosing between
@@ -70,8 +80,9 @@ class ArticleExtractor(private val http: HttpClient) {
         val feedWords = feed?.wordCount ?: 0
         val feedAuthor = PageExtractor.cleanAuthor(input.feedAuthor)
 
-        fun fromFeed(clean: CleanResult, note: String?, pageWords: Int?, blocked: Boolean = false, declaredLanguage: String? = null) =
-            article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked, declaredLanguage)
+        fun fromFeed(
+            clean: CleanResult, note: String?, pageWords: Int?, blocked: Boolean = false, declaredLanguage: String? = null, failure: PageFailure? = null,
+        ) = article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked, declaredLanguage, failure)
 
         // A FEED source's item with no content still gets its page fetched: better than an empty article.
         if (feed != null && (input.mode == ContentMode.FEED || (input.mode == ContentMode.AUTO && feedWords >= FULL_TEXT_WORDS))) {
@@ -80,8 +91,8 @@ class ArticleExtractor(private val http: HttpClient) {
 
         return when (val page = fetchPage(input)) {
             is PageResult.Failed ->
-                if (feed != null) fromFeed(feed, "Couldn't fetch the full article (${page.reason}); showing the feed's version.", null, page.blocked)
-                else failed(input, page.reason, page.blocked)
+                if (feed != null) fromFeed(feed, "Couldn't fetch the full article (${page.reason}); showing the feed's version.", null, page.blocked, failure = page.failure)
+                else failed(input, page.reason, page.blocked, page.failure)
             is PageResult.Fetched -> {
                 val words = page.clean.wordCount
                 // A cartoon or comic: extraction found little text and no image. Only on strong
@@ -123,7 +134,13 @@ class ArticleExtractor(private val http: HttpClient) {
 
     private sealed interface PageResult {
         class Fetched(val content: PageContent, val clean: CleanResult, val url: String) : PageResult
-        class Failed(val reason: String, val blocked: Boolean = false) : PageResult
+        class Failed(val reason: String, val blocked: Boolean = false, permanent: Boolean = false) : PageResult {
+            val failure: PageFailure? = when {
+                blocked -> null
+                permanent -> PageFailure.PERMANENT
+                else -> PageFailure.TRANSIENT
+            }
+        }
     }
 
     private suspend fun fetchPage(input: ExtractInput): PageResult {
@@ -140,12 +157,12 @@ class ArticleExtractor(private val http: HttpClient) {
 
     private fun unusable(response: HttpResponse): PageResult.Failed? {
         if (response.code in BLOCKED_STATUS_CODES) return PageResult.Failed("the site turned the app away (error ${response.code})", blocked = true)
-        if (!response.isSuccessful) return PageResult.Failed("error ${response.code}")
+        if (!response.isSuccessful) return PageResult.Failed("error ${response.code}", permanent = response.code in GONE_STATUS_CODES)
         val type = response.contentType?.lowercase()
-        if (type != null && "html" !in type && "xml" !in type) return PageResult.Failed("not a web page")
+        if (type != null && "html" !in type && "xml" !in type) return PageResult.Failed("not a web page", permanent = true)
         // Parsed, a page takes several times its size in memory, and Readability copies it. Real
         // articles are well under this; the feed's text is the better bet for anything bigger.
-        if (response.body.length > MAX_PAGE_CHARS) return PageResult.Failed("the page is too large")
+        if (response.body.length > MAX_PAGE_CHARS) return PageResult.Failed("the page is too large", permanent = true)
         // Bot checks are small pages served with a 200 status.
         if (response.body.length < CHALLENGE_PAGE_MAX_CHARS) {
             val head = response.body.take(30_000)
@@ -154,7 +171,7 @@ class ArticleExtractor(private val http: HttpClient) {
         return null
     }
 
-    private fun failed(input: ExtractInput, reason: String, blocked: Boolean = false): ExtractedArticle {
+    private fun failed(input: ExtractInput, reason: String, blocked: Boolean = false, failure: PageFailure? = null): ExtractedArticle {
         val link = HtmlCleaner.absoluteUrl(input.url, "")
         val html = if (link != null) {
             "<p>Couldn't fetch this article ($reason). <a href=\"${Entities.escape(link)}\">Read it on the web</a>.</p>"
@@ -173,6 +190,7 @@ class ArticleExtractor(private val http: HttpClient) {
             feedWordCount = 0,
             pageWordCount = null,
             pageBlocked = blocked,
+            pageFailure = failure,
         )
     }
 
@@ -214,7 +232,7 @@ class ArticleExtractor(private val http: HttpClient) {
 
     private fun article(
         title: String, author: String?, clean: CleanResult, usedFeed: Boolean, note: String?, feedWords: Int, pageWords: Int?,
-        blocked: Boolean = false, declaredLanguage: String? = null,
+        blocked: Boolean = false, declaredLanguage: String? = null, failure: PageFailure? = null,
     ) = ExtractedArticle(
         title = title.replace(WHITESPACE, " ").trim(),
         author = author,
@@ -227,6 +245,7 @@ class ArticleExtractor(private val http: HttpClient) {
         feedWordCount = feedWords,
         pageWordCount = pageWords,
         pageBlocked = blocked,
+        pageFailure = failure,
         language = LanguageDetector.detect(title + "\n" + Jsoup.parse(clean.html).text(), declaredLanguage),
     )
 
@@ -243,6 +262,8 @@ class ArticleExtractor(private val http: HttpClient) {
         private const val CHALLENGE_PAGE_MAX_CHARS = 150 * 1024
         private const val MAX_PAGE_CHARS = 5 * 1024 * 1024
         private val BLOCKED_STATUS_CODES = setOf(401, 403, 429, 503)
+        // 410 only: a 404 is often a site having a bad day.
+        private val GONE_STATUS_CODES = setOf(410)
         private val CHALLENGE_MARKERS = listOf(
             "<title>Just a moment...</title>", "<title>Verifying Device</title>", "cf-browser-verification",
             "challenge-platform", "_Incapsula_Resource", "captcha-delivery.com", "px-captcha",

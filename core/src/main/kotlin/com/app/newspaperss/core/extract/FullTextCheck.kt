@@ -38,6 +38,9 @@ object FullTextCheck {
     fun evidence(article: ExtractedArticle): FullTextEvidence? {
         val suggested = ArticleExtractor.suggestMode(article.feedWordCount, article.pageWordCount)
         return when {
+            // Unread for its own reasons (too large, gone, no connection): the feed's text standing
+            // in says nothing about whether the page has more.
+            article.pageFailure != null -> null
             suggested == ContentMode.PAGE -> FullTextEvidence.PAGE_LONGER
             article.usedFeedContent && article.feedWordCount >= ArticleExtractor.FULL_TEXT_WORDS -> FullTextEvidence.FEED_FULL
             suggested == ContentMode.FEED -> FullTextEvidence.FEED_SHORT
