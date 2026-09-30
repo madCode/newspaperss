@@ -54,9 +54,15 @@ who'd rather not set up Python, a server and a scheduler.
   <img src="docs/screenshots/07-settings.png" width="200" alt="Settings">
 </p>
 
-**Status:** early development, not yet released. See
-[docs/DESIGN.md](docs/DESIGN.md) for the design and
-[docs/BACKLOG.md](docs/BACKLOG.md) for the plan.
+**Status:** early development, not yet released.
+
+## Documentation
+
+- [How it works](docs/DESIGN.md): the edition, delivery, what happens to articles, the architecture.
+- [Backlog](docs/BACKLOG.md): what's next, grouped by part of the app, and ideas not yet planned.
+- [Devlog](docs/DEVLOG.md): what changed each work cycle, and why.
+- Research: [persona audits](docs/research/personas.md) and
+  [competitors](docs/research/competitors.md).
 
 ## Trying it
 
