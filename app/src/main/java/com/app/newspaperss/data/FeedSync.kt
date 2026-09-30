@@ -23,7 +23,8 @@ import java.io.IOException
 import java.time.Clock
 import java.time.Duration
 
-data class SyncResult(val newArticles: Int, val failedSources: Int)
+/** @property sources how many sources were synced (paused ones and the reading list aren't). */
+data class SyncResult(val newArticles: Int, val failedSources: Int, val sources: Int)
 
 class FeedSync(
     private val db: AppDatabase,
@@ -44,7 +45,7 @@ class FeedSync(
         val trimmed = db.articles().dropOldFeedHtml(clock.instant().minus(KEEP_FEED_TEXT))
         // Freed pages stay in the file until a VACUUM, and Auto Backup copies the file (25 MB quota).
         if (trimmed >= VACUUM_AFTER) runCatching { db.openHelper.writableDatabase.execSQL("VACUUM") }
-        SyncResult(results.sumOf { it ?: 0 }, results.count { it == null })
+        SyncResult(results.sumOf { it ?: 0 }, results.count { it == null }, feeds.size)
     }
 
     /** Returns the number of new articles, or null if the source failed. */

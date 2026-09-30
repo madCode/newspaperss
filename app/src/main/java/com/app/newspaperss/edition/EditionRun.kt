@@ -31,13 +31,19 @@ class EditionRun(
      */
     suspend fun run(scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}, dueAt: Instant? = null): BuildResult {
         val s = settings.current()
-        sync.syncAll()
+        val synced = sync.syncAll()
         onSyncDone()
-        val result = builder.build(s.edition, dueAt, onProgress)
+        val built = builder.build(s.edition, dueAt, onProgress)
+        // "Nothing new" when every source failed would hide the failure.
+        val result = if (built == BuildResult.NothingNew && synced.sources > 0 && synced.failedSources == synced.sources) {
+            BuildResult.Unreachable(synced.sources)
+        } else built
         when (result) {
             is BuildResult.Built -> deliver(result.editionId, s, scheduled)
             is BuildResult.Failed -> if (scheduled) notifier.problem("Today's edition couldn't be made", result.reason)
-            BuildResult.NothingNew -> {}
+            is BuildResult.Unreachable -> if (scheduled) notifier.problem("No edition today", result.reason)
+            // Quiet, but said: otherwise a timed paper that doesn't come looks like the app broke.
+            BuildResult.NothingNew -> if (scheduled) notifier.nothingNew()
         }
         editions.pruneFiles()
         return result

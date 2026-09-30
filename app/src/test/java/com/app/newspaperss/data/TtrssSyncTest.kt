@@ -83,7 +83,7 @@ class TtrssSyncTest {
         server.add(12345, "Rates rise", feedId = 111, feedTitle = "Example News")
         server.add(12346, "A long walk", feedId = 7, feedTitle = "A Blog")
 
-        assertEquals(SyncResult(newArticles = 2, failedSources = 0), sync.syncAll())
+        assertEquals(SyncResult(newArticles = 2, failedSources = 0, sources = 1), sync.syncAll())
         assertEquals("still unread on the server, but already known", 0, sync.syncAll().newArticles)
         assertEquals(2, db.articles().allForSource(source.id).size)
 
@@ -136,7 +136,7 @@ class TtrssSyncTest {
         server.add(1, "From tt-rss", feedId = 1, feedTitle = "Example News")
         sources.addFeed("https://blog.example/feed", "Blog")
         http.page("https://blog.example/feed", rss("Blog", "b1" to "From a feed"))
-        assertEquals(SyncResult(newArticles = 2, failedSources = 0), sync.syncAll())
+        assertEquals(SyncResult(newArticles = 2, failedSources = 0, sources = 2), sync.syncAll())
     }
 
     @Test

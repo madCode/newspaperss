@@ -39,7 +39,7 @@ class FeedSyncTest {
         assertEquals("example.com", db.sources().byId(id)!!.title)
         http.page(url, rss("Example Blog", "1" to "One", "2" to "Two"))
 
-        assertEquals(SyncResult(newArticles = 2, failedSources = 0), sync.syncAll())
+        assertEquals(SyncResult(newArticles = 2, failedSources = 0, sources = 1), sync.syncAll())
         http.page(url, rss("Example Blog", "2" to "Two", "3" to "Three"))
         assertEquals(1, sync.syncAll().newArticles)
 

@@ -52,7 +52,7 @@ class CuratedListSyncTest {
         val id = repo.addList(ArtsAndLettersDaily)
         publishDay(1)
 
-        assertEquals(SyncResult(newArticles = 3, failedSources = 0), sync.syncAll())
+        assertEquals(SyncResult(newArticles = 3, failedSources = 0, sources = 1), sync.syncAll())
         assertEquals(0, sync.syncAll().newArticles)
 
         val articles = db.articles().allForSource(id)

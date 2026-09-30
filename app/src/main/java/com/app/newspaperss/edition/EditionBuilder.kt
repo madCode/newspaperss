@@ -9,6 +9,7 @@ import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
 import com.app.newspaperss.core.epub.EpubImage
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.core.epub.EpubWriter
 import com.app.newspaperss.core.images.ImageBudget
 import com.app.newspaperss.core.images.ImageRules
@@ -38,6 +39,10 @@ sealed interface BuildResult {
     /** Nothing new to read; no edition was made. */
     data object NothingNew : BuildResult
     data class Failed(val editionId: Long, val reason: String) : BuildResult
+    /** Nothing to make it from because none of the [sources] could be reached; no edition was made. */
+    data class Unreachable(val sources: Int) : BuildResult {
+        val reason get() = "None of your ${plural(sources, "source")} could be reached. Check your connection, then try again."
+    }
 }
 
 /**

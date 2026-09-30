@@ -24,6 +24,8 @@ interface EditionNotifier {
     fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean = false)
     fun editionDelivered(edition: EditionEntity, where: String)
     fun problem(title: String, reason: String)
+    /** A timed run found nothing new, so no edition was made. */
+    fun nothingNew()
 }
 
 /**
@@ -76,6 +78,12 @@ class Notifier(private val context: Context) : EditionNotifier {
         NotificationCompat.Builder(context, EDITIONS)
             .setContentTitle("${edition.title} delivered")
             .setContentText("${summary(edition)} · saved to $where"),
+    )
+
+    override fun nothingNew() = notify(
+        NotificationCompat.Builder(context, EDITIONS)
+            .setContentTitle("No edition today")
+            .setContentText("Nothing new to read since your last one."),
     )
 
     override fun problem(title: String, reason: String) = notify(

@@ -39,6 +39,7 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             is BuildResult.Built -> Result.success(workDataOf(EDITION_ID to result.editionId))
             BuildResult.NothingNew -> Result.success(workDataOf(NOTHING_NEW to true))
             is BuildResult.Failed -> Result.failure(workDataOf(EDITION_ID to result.editionId, ERROR to result.reason))
+            is BuildResult.Unreachable -> Result.failure(workDataOf(ERROR to result.reason))
         }
     }
 

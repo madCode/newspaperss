@@ -110,6 +110,9 @@ module so it's all unit-tested without Android.
   time, not your morning. A clock or time-zone change re-arms the timer.
 - **Feeds sync right before each build,** and in the background every 12
   hours when the battery isn't low.
+- **No edition is never silent.** A timed run with nothing new sends a quiet
+  "No edition today"; if every source failed, that's a failure and says so.
+  A build waiting for a connection says that too.
 - **Fetching is polite and cheap.** An HTTP cache revalidates every feed
   (If-None-Match / If-Modified-Since), so an unchanged feed costs a small
   "not modified" reply. Requests use a browser-like mobile user agent.

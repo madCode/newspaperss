@@ -41,6 +41,7 @@ class EditionRunTest {
         override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean) { notices += if (openInstead) "open ${edition.title}" else "ready ${edition.title}" }
         override fun editionDelivered(edition: EditionEntity, where: String) { notices += "delivered to $where" }
         override fun problem(title: String, reason: String) { notices += "problem: $reason" }
+        override fun nothingNew() { notices += "nothing new" }
     }
     private val folderErrors = mutableMapOf<String, String>()
     private val saved = mutableListOf<String>()
@@ -59,6 +60,30 @@ class EditionRunTest {
     }
 
     private suspend fun status(result: BuildResult) = db.editions().byId((result as BuildResult.Built).editionId)!!.status
+
+    @Test
+    fun whenEverySourceFailsItSaysSoRatherThanNothingNew() = runTest {
+        SourceRepository(db).addFeed("https://example.com/feed", "Blog")  // no page: the fetch fails
+
+        val result = run.run(scheduled = true)
+
+        assertEquals(BuildResult.Unreachable(1), result)
+        assertEquals(listOf("problem: None of your 1 source could be reached. Check your connection, then try again."), notices)
+    }
+
+    @Test
+    fun aTimedRunWithNothingNewSaysSoQuietly() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Kobo") }
+        run.run(scheduled = true)
+
+        assertEquals(BuildResult.NothingNew, run.run(scheduled = true))
+        assertEquals(listOf("delivered to Kobo", "nothing new"), notices)
+
+        // Made by hand, the reader is looking at Today already.
+        assertEquals(BuildResult.NothingNew, run.run(scheduled = false))
+        assertEquals(listOf("delivered to Kobo", "nothing new"), notices)
+    }
 
     @Test
     fun folderDeliveryMarksTheEditionDelivered() = runTest {
