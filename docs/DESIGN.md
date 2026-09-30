@@ -272,8 +272,9 @@ articles go back, keeping their stars, before the new one is planned.
   network). **Notes** exports a Markdown file for a notes app: front matter
   (date, edition, sources, a tag) for Obsidian, the closing page's question and
   a few reflection prompts at the top, then per article its source, author, date, link, a citation and room for notes.
-  **Delete**. An article that went in because it was starred says
-  "Starred". On delivered editions each article has a trailing **☆** to
+  **Delete edition** is in the ⋮ menu, and asks by name, saying whether the
+  articles come back. An article that went in because it was starred says
+  "You starred it". On delivered editions each article has a trailing **☆** to
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). A source's page

@@ -166,7 +166,7 @@ class EditionDetailScreenTest {
         db.openHelper.writableDatabase.execSQL("UPDATE edition_articles SET starred = 1 WHERE title = 'Starred story'")
         show(id)
 
-        waitFor("Example News · 4 min · Starred")
+        waitFor("Example News · 4 min · You starred it")
         compose.onNodeWithText("Example News · 4 min").assertIsDisplayed()
     }
 
@@ -483,8 +483,9 @@ class EditionDetailScreenTest {
         val vm = EditionDetailViewModel(repo, id, notes) { dismissed += it }
         compose.setContent { EditionDetailScreen(vm, onBack = { left = true }) }
         idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
-        compose.onNodeWithText("Delete").performClick()
-        compose.onNode(hasText("Delete") and hasAnyAncestor(isDialog())).performClick()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Delete edition").performClick()
+        compose.onNode(hasText("Delete edition") and hasAnyAncestor(isDialog())).performClick()
         idleUntil { left }
     }
 
@@ -522,6 +523,19 @@ class EditionDetailScreenTest {
 
         assertTrue(isGone(id))
         assertEquals("its articles stay with the next edition", ArticleState.NEW, runBlocking { db.articles().byId(articles[0]) }?.state)
+    }
+
+    @Test
+    fun deletingAsksByNameAndSaysWhatHappensToTheArticles() {
+        val (id, _) = edition(EditionStatus.READY, listOf("A story"))
+        show(id)
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Delete edition").performClick()
+
+        compose.onNodeWithText("Delete Tuesday Morning Edition?").assertIsDisplayed()
+        compose.onNodeWithText("It hasn't been sent, so its articles go into your next edition.").assertIsDisplayed()
+        compose.onNodeWithText("Keep").performClick()
+        assertEquals(EditionStatus.READY, runBlocking { db.editions().byId(id) }?.status)
     }
 
     @Test
