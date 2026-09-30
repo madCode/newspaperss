@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,9 +71,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             ScheduleSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
-            ReaderSection(s, viewModel)
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
             DeliverySection(s, viewModel)
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            ReaderSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             val context = LocalContext.current
             val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
@@ -177,18 +178,25 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
 @Composable
 private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
     Heading("Your e-reader")
-    Device.entries.forEach { device ->
-        Row(
-            Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.setDevice(device) }.padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(selected = s.device == device, onClick = null)
-            Text(device.label, Modifier.padding(start = 12.dp))
+    Column(Modifier.selectableGroup()) {
+        Device.entries.forEach { device ->
+            Row(
+                Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.setDevice(device) }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = s.device == device, onClick = null)
+                Text(device.label, Modifier.padding(start = 12.dp))
+            }
         }
     }
-    s.device?.let {
+    // The tip describes the reader's usual route, which folder delivery overrides: say so,
+    // or a Kindle owner still saving to a KOReader folder is told to wait for a Send.
+    val tip = if (s.delivery == DeliveryMethod.FOLDER && s.folderUri != null) {
+        "Editions are saved to ${s.folderName ?: "your folder"}. To send them another way, change Delivery above."
+    } else s.device?.let(DeviceTips::tip)
+    tip?.let {
         Text(
-            DeviceTips.tip(it),
+            it,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),

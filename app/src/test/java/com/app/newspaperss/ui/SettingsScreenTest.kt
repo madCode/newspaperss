@@ -80,6 +80,15 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun withFolderDeliveryTheReaderTipSaysWhereEditionsGo() {
+        runBlocking {
+            store.update { it.copy(device = com.app.newspaperss.settings.Device.KINDLE, delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") }
+        }
+        waitFor("Editions are saved to Books")
+        compose.onNodeWithText("tap Send", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun theBuildIsNamedAtTheBottomSoFeedbackCanSayWhichOne() {
         compose.onNodeWithText("newspapeRSS 0.1.0", substring = true).performScrollTo().assertExists()
     }
