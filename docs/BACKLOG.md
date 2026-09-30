@@ -123,6 +123,26 @@ translation, so it goes to volunteers who read the language. What that needs fir
 - optionally a hosted tool such as Weblate (free for open-source projects; the repo is MIT);
 - then a call for translators in the README.
 
+### Newsletters *(you asked)*
+Many of the writers worth reading publish as newsletters. Two routes, from easy to heavy:
+- **Their own feeds, first.** Substack (`/feed`), Ghost (`/rss/`), Buttondown (`/rss`) and beehiiv
+  (when the writer turns RSS on) already work as sources. What to handle, recognised by the
+  platform's own markers (a feed's `<generator>`, a page's `generator` meta) rather than a list of
+  domains, since most use custom domains:
+  - paid posts arrive as a teaser ending in "Subscribe to read" or similar: treat as summary-only
+    and say so on the source, rather than fetching a paywall;
+  - redirect-wrapped and tracking links (`substack.com/redirect/…`, `utm_*`): unwrap for the
+    "Read the original" link and strip before fetching;
+  - "Share", "Subscribe", "Leave a comment" and like buttons: page-cleanup furniture;
+  - podcast episodes in the same feed (an enclosure, little text): skip or note, don't pad the paper.
+- **Newsletters that only arrive by email.** Options: a Kill the Newsletter-style address
+  (email in, Atom feed out; hosted or self-hosted), which needs nothing new in the app; or reading
+  one folder or label over IMAP with an app password (Fastmail, iCloud, most hosts; Gmail needs
+  OAuth, much heavier). Email HTML is table layouts, "View in browser" headers, unsubscribe
+  footers and tracking pixels, so it needs its own cleanup pass.
+- Start with the first route (it's mostly cleanup rules) and a help line pointing email-only
+  newsletters at a Kill the Newsletter address; IMAP only if that proves too fiddly.
+
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
 - **Engine:** Android's own `TextToSpeech`. It's offline and free, and voices already on the phone keep the no-account promise. Cloud voices sound better but need an account and send the text away, so they'd only ever be an option.
