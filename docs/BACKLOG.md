@@ -17,7 +17,17 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 ### Sources and fetching
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
 - [ ] "No feed found" in onboarding: offer the reading list there too (done in Sources) *(personas)*
-- [ ] Decide what tapping an article in a source's list does: open the original, render it, or offer "add to the next edition" *(device)*
+- [ ] Article rows in a source's list *(device; decided with you)*:
+  - tap opens the original in the browser and changes nothing;
+  - `☆` puts the article in the next paper; tap again to unstar;
+  - `✕` skips it: never in a paper (read or not interested), marked read in tt-rss for tt-rss
+    sources, with a "Skipped · Undo" message;
+  - two labelled 48dp buttons, no menu; the star is a shape, so it reads on e-ink.
+- [ ] Stars in the planner: starred articles first, taking turns across sources, then the rest.
+  A star uses up one of its source's slots and takes that slot before unstarred articles; held-back
+  stars come before held-back unstarred ones; a star beyond a source's own hard cap waits. The paper
+  stays capped: stars that don't fit wait for the next one, and Today says how many are waiting.
+  The star shows on the edition screen too
 - [ ] Page cleanup's furniture patterns ("Recommended stories", "Subscribe to", "Read more:") are English only, so "Lire aussi", "Mehr zum Thema" and "Lee también" slip into French, German and Spanish articles. Key them by the article's language *(live)*
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
 - [ ] Webcomic title text (xkcd's hover text) is dropped; show it as a caption *(device)*
