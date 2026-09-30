@@ -131,7 +131,8 @@ class FeedSync(
                 val category = source.ttrssCategoryId
                 // A few from each feed rather than the newest 200 overall: busy news feeds would
                 // fill those 200, and a feed that posts monthly would never reach the paper.
-                val headlines = fromEachFeed(client, client.unreadFeeds(category).filter { it.unread > 0 })
+                val leftOut = db.sources().allLeftOut().filter { it.sourceId == source.id }.map { it.originId }.toSet()
+                val headlines = fromEachFeed(client, client.unreadFeeds(category).filter { it.unread > 0 && it.id.toString() !in leftOut })
                 val articles = headlines.map {
                     it to ArticleEntity(
                         sourceId = source.id, guid = "$TTRSS_GUID_PREFIX${it.id}", url = it.link, title = it.title,

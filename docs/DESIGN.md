@@ -220,6 +220,11 @@ articles go back, keeping their stars, before the new one is planned.
   take one category instead of all unread; adding the account asks which,
   before the first sync. tt-rss's own stars aren't synced: there a star
   usually means "keep this", not "for tomorrow".
+  - **Feeds in your paper** (on the source's page) lists the account's feeds
+    seen in the last month, with a checkbox each. A feed left out isn't
+    fetched, and its waiting articles go too, except starred ones. It stays
+    in tt-rss, and stays listed so it can come back. Signing in as another
+    user clears the choices: feed ids belong to each tt-rss user.
   - **Start fresh** ("Back after a break?" on the source's page), after a
     confirmation, marks everything that reached tt-rss more than two weeks
     ago read there (in the source's category, if it has one), starred ones

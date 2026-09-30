@@ -84,7 +84,10 @@ class EditionBuilder(
             // (see ArticleDao.markReadAll): the articles picked here are written into the book, so a
             // change made afterwards would be silently undone when they're marked IN_EDITION.
             // The same link from two sources goes in once, and a starred copy is the one kept.
-            val articles = db.articles().candidates().filter { it.sourceId in sourcesById }
+            // A star is the reader asking for that article, even from a feed they left out.
+            val leftOut = db.sources().allLeftOut().map { publicationOf(it.sourceId, it.originId) }.toSet()
+            val articles = db.articles().candidates()
+                .filter { it.sourceId in sourcesById && (it.starredAt != null || publicationOf(it) !in leftOut) }
                 .sortedBy { it.starredAt == null }
                 .distinctBy { it.url.ifBlank { "#${it.id}" } }
             if (articles.isEmpty()) {

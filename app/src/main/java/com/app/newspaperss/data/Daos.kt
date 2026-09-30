@@ -18,6 +18,31 @@ import java.time.Instant
 
 @Dao
 interface SourceDao {
+    @Query("SELECT * FROM left_out_feeds WHERE sourceId = :sourceId")
+    fun observeLeftOut(sourceId: Long): Flow<List<LeftOutFeedEntity>>
+
+    @Query("SELECT * FROM left_out_feeds")
+    suspend fun allLeftOut(): List<LeftOutFeedEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun leaveOut(feed: LeftOutFeedEntity)
+
+    @Query("DELETE FROM left_out_feeds WHERE sourceId = :sourceId AND originId = :originId")
+    suspend fun takeBack(sourceId: Long, originId: String)
+
+    /**
+     * The feeds an aggregator's articles came from since [since], each with the name it was last
+     * seen under (SQLite takes a bare column from the row that gave the MAX).
+     */
+    @Query(
+        "SELECT originId, originTitle AS title, MAX(discoveredAt) AS lastSeen FROM articles " +
+            "WHERE sourceId = :sourceId AND originId IS NOT NULL AND discoveredAt >= :since GROUP BY originId",
+    )
+    fun observeFeeds(sourceId: Long, since: Instant): Flow<List<FeedName>>
+
+    @Query("DELETE FROM left_out_feeds WHERE sourceId = :sourceId")
+    suspend fun clearLeftOut(sourceId: Long)
+
     @Query("SELECT * FROM sources ORDER BY position, id")
     fun observeAll(): Flow<List<SourceEntity>>
 
@@ -291,6 +316,10 @@ interface ArticleDao {
 
     @Query("UPDATE articles SET reportedRead = 1 WHERE sourceId = :sourceId AND guid IN (:guids)")
     suspend fun setReportedRead(sourceId: Long, guids: List<String>)
+
+    /** Expires one of an aggregator's feeds' unpicked articles; starred ones stay. */
+    @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND originId = :originId AND state = 'NEW' AND starredAt IS NULL")
+    suspend fun expireWaitingFromFeed(sourceId: Long, originId: String)
 
     /** Expires a source's unpicked articles; starred ones are the reader's and stay. */
     @Query("UPDATE articles SET state = 'EXPIRED' WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL")

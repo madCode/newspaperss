@@ -59,6 +59,13 @@ class TtrssRepository(
      */
     suspend fun add(address: String, user: String, password: String, category: TtrssCategory?): String? {
         val account = TtrssAccount(TtrssClient.apiUrl(address), user.trim(), password)
+        val previous = try {
+            (accounts.load() as? StoredAccount.Ready)?.account
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
         try {
             accounts.save(account)
         } catch (e: Exception) {
@@ -67,9 +74,11 @@ class TtrssRepository(
             return "Couldn't store the password securely on this phone."
         }
         val sourceId = sources.addTtrss(account.apiUrl)
-        // Always set: category ids belong to each tt-rss user, and this may be another user on the
-        // same server.
+        // Category and feed ids belong to each tt-rss user, and this may be another user on the same
+        // server. The category is asked again each time; left-out feeds aren't, so they're kept for
+        // the same user signing in again (after a lost Keystore key, say) unless the old login is gone.
         db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
+        if (previous?.apiUrl != account.apiUrl || previous.user != account.user) db.sources().clearLeftOut(sourceId)
         return null
     }
 

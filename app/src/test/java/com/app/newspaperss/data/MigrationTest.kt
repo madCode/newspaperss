@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
@@ -150,6 +150,26 @@ class MigrationTest {
                 assertEquals("https://a.example/1", c.getString(0))
                 assertEquals(50L, c.getLong(1))
                 assertTrue(c.isNull(2))
+            }
+        }
+    }
+
+    @Test
+    fun version4GainsLeftOutFeedsThatGoWithTheirSource() {
+        helper.createDatabase(DB, 4).use { db ->
+            db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt) " +
+                    "VALUES (1, 'TTRSS', 'https://rss.example/api/', 'Tiny Tiny RSS', 0, 'AUTO', 0, 0, 0, 1, 0)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(DB, 5, true, AppDatabase.MIGRATION_4_5).use { db ->
+            db.execSQL("PRAGMA foreign_keys = ON")
+            db.execSQL("INSERT INTO left_out_feeds (sourceId, originId, title) VALUES (1, '42', 'Press releases')")
+            db.execSQL("DELETE FROM sources WHERE id = 1")
+            db.query("SELECT COUNT(*) FROM left_out_feeds").use { c ->
+                c.moveToFirst()
+                assertEquals("removing the account forgets its choices", 0, c.getInt(0))
             }
         }
     }
