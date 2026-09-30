@@ -139,7 +139,7 @@ class EditionDetailScreenTest {
     fun theStarOnADeliveredEditionBringsAnArticleBackAndUnstarringUndoesIt() {
         val (id, articles) = edition(EditionStatus.DELIVERED, listOf("Read it", "Missed one"))
         show(id)
-        compose.onNodeWithText("Didn't get to one? Tap Next edition to bring it back.").assertIsDisplayed()
+        compose.onNodeWithText("Didn't get to one? Tap ☆ to bring it back.").assertIsDisplayed()
 
         compose.onNodeWithContentDescription("Put Missed one in your next edition").assertIsOff().performClick()
 

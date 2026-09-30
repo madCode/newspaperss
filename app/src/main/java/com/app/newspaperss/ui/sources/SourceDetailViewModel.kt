@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.MarkedRead
+import com.app.newspaperss.data.StarBatch
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
@@ -112,24 +114,60 @@ class SourceDetailViewModel(
         viewModelScope.launch { repository.setStarred(articleId, starred) }
     }
 
-    /** An edition is being made: see [com.app.newspaperss.ui.components.ArticleButtons]. */
+    /** An edition is being made: unstarring and marking read wait (see [com.app.newspaperss.data.BUILD_HOLD]). */
     val building: StateFlow<Boolean> = repository.observeBuilding().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    /** One "Marked as read · Undo" to show. [seq] makes each mark its own offer, even of the same article twice. */
-    data class UndoOffer(val marked: MarkedRead, val seq: Long)
+    /** A change the snackbar can undo in one go, however many articles it touched. */
+    sealed interface Change {
+        data class Read(val marked: List<MarkedRead>) : Change
+        data class Stars(val batch: StarBatch) : Change
+    }
+
+    /** One snackbar with Undo to show. [seq] makes each change its own offer, even of the same articles twice. */
+    data class UndoOffer(val change: Change, val seq: Long)
 
     private var offers = 0L
     private val _undoOffer = MutableStateFlow<UndoOffer?>(null)
     /** The Undo to offer now, or null. The screen shows it once and calls [undoOfferEnded]. */
     val undoOffer: StateFlow<UndoOffer?> = _undoOffer.asStateFlow()
 
-    fun markRead(articleId: Long) {
-        viewModelScope.launch { repository.markRead(articleId)?.let { _undoOffer.value = UndoOffer(it, ++offers) } }
+    private val _notice = MutableStateFlow<String?>(null)
+    /** Why a change didn't (fully) happen, or null. The screen shows it once and calls [noticeShown]. */
+    val notice: StateFlow<String?> = _notice.asStateFlow()
+
+    fun noticeShown() {
+        _notice.value = null
     }
 
-    fun undoMarkRead(offer: UndoOffer) {
+    fun markRead(articleId: Long) = markRead(listOf(articleId))
+
+    fun markRead(articleIds: Collection<Long>) {
+        viewModelScope.launch {
+            val batch = repository.markRead(articleIds)
+            if (batch.marked.isNotEmpty()) _undoOffer.value = UndoOffer(Change.Read(batch.marked), ++offers)
+            if (batch.heldBack > 0) _notice.value = HELD_NOTICE
+        }
+    }
+
+    /** Stars or unstars the selected articles together, with one Undo. */
+    fun setStarred(articleIds: Collection<Long>, starred: Boolean) {
+        viewModelScope.launch {
+            val batch = repository.setStarred(articleIds, starred)
+            if (batch.changed.isNotEmpty()) _undoOffer.value = UndoOffer(Change.Stars(batch), ++offers)
+            if (batch.heldBack > 0) _notice.value = HELD_NOTICE
+        }
+    }
+
+    fun undo(offer: UndoOffer) {
         undoOfferEnded(offer)
-        viewModelScope.launch { repository.undoMarkRead(offer.marked) }
+        viewModelScope.launch {
+            val missed = when (val change = offer.change) {
+                is Change.Read -> change.marked.size - repository.undoMarkRead(change.marked)
+                is Change.Stars -> repository.undoStars(change.batch)
+            }
+            // Missed: an edition took them in meanwhile, or a build holds the unstarring.
+            if (missed > 0) _notice.value = "${plural(missed, "article")} couldn't be changed back: an edition is being made or already has ${if (missed == 1) "it" else "them"}."
+        }
     }
 
     fun undoOfferEnded(offer: UndoOffer) {
@@ -144,3 +182,6 @@ class SourceDetailViewModel(
         }
     }
 }
+
+/** Shown when a build held back a change the reader asked for, e.g. one that started as she tapped. */
+internal const val HELD_NOTICE = "Your edition is being made, so nothing was changed. Try again once it's ready."

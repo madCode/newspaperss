@@ -21,7 +21,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -41,7 +40,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.data.EditionContent
-import com.app.newspaperss.ui.components.ArticleButtons
+import com.app.newspaperss.ui.components.ArticleRowFrame
+import com.app.newspaperss.ui.components.StarToggle
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import com.app.newspaperss.ui.components.BUILDING_NOTE
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
@@ -141,9 +144,12 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                 if (current.contents.any(current::canStar)) {
                     item {
                         Text(
-                            "Didn't get to one? Tap Next edition to bring it back.",
+                            "Didn't get to one? Tap ☆ to bring it back.",
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).semantics {
+                                contentDescription = "Didn't get to one? Tap the star to bring it back."
+                            },
                         )
                         if (building) {
                             Text(BUILDING_NOTE, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
@@ -151,6 +157,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                     }
                 }
             }
+            val anyStar = current.contents.any(current::canStar)
             items(current.contents, key = { it.entry.id }) { content ->
                 val articleId = content.entry.articleId
                 ContentRow(
@@ -159,6 +166,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                     starred = current.isStarred(content),
                     onStar = { if (articleId != null) viewModel.setStarred(articleId, it) },
                     building = building,
+                    reserveStar = anyStar,
                     onOpen = if (current.file != null) { { onReadArticle(content.entry.position) } } else null,
                 )
                 HorizontalDivider()
@@ -209,6 +217,7 @@ private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> U
     }
 }
 
+/** @param reserveStar keeps the star's slot on a row without one, so titles line up with those that have it. */
 @Composable
 private fun ContentRow(
     content: EditionContent,
@@ -216,28 +225,28 @@ private fun ContentRow(
     starred: Boolean,
     onStar: (Boolean) -> Unit,
     building: Boolean,
+    reserveStar: Boolean,
     onOpen: (() -> Unit)?,
 ) {
     val entry = content.entry
-    // "Starred" is a word, not the glyph, so it isn't mistaken for the toggle below it.
+    // "Starred" is a word, not the glyph, so it isn't mistaken for the toggle beside it.
     val details = listOfNotNull(entry.sourceTitle, "${minutes(entry.minutes)} min", "Starred".takeIf { entry.starred }).joinToString(" · ")
-    Column {
-        ListItem(
-            modifier = if (onOpen != null) Modifier.clickable(onClickLabel = "Read", onClick = onOpen) else Modifier,
-            headlineContent = { Text(entry.title, maxLines = 3) },
-            supportingContent = {
-                Column {
-                    Text(details, style = MaterialTheme.typography.bodySmall)
-                    if (starred) {
-                        Text("Starred for your next edition", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                    }
+    ArticleRowFrame(
+        modifier = if (onOpen != null) Modifier.clickable(onClickLabel = "Read", onClick = onOpen) else Modifier,
+        title = { Text(entry.title, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis) },
+        details = {
+            Column {
+                Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (starred) {
+                    Text("Starred for your next edition", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
-            },
-        )
-        if (canStar) {
-            ArticleButtons(entry.title, starred, onStar, Modifier.padding(start = 4.dp, end = 16.dp, bottom = 4.dp), building = building)
-        }
-    }
+            }
+        },
+        trailing = if (canStar) {
+            { StarToggle(entry.title, starred, onStar, enabled = !(building && starred)) }
+        } else null,
+        reserveTrailing = canStar || reserveStar,
+    )
 }
 
 private fun minutes(value: Double) = value.roundToInt().coerceAtLeast(1)

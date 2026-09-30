@@ -10,7 +10,7 @@ import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
-import com.app.newspaperss.data.MarkedRead
+import com.app.newspaperss.data.MarkReadBatch
 import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.testutil.DbRule
@@ -341,25 +341,25 @@ class EditionBuilderTest {
         source("a", null, "a1")
         source("b", null, "b1")
         editions.setStarred(idOf("b1"), true)
-        var markedDuringBuild: MarkedRead? = null
+        var markedDuringBuild: MarkReadBatch? = null
         var unstarredDuringBuild: Boolean? = null
         val meddling = ArticleContentProvider { a, _, _ ->
             if (a.guid == "a1") {
-                markedDuringBuild = sources.markRead(a.id)
+                markedDuringBuild = sources.markRead(listOf(a.id))
                 unstarredDuringBuild = sources.setStarred(idOf("b1"), false)
             }
             ArticleContent(a.title, null, "<p>${a.title}</p>", wordCount = 200)
         }
         val built = EditionBuilder(db, meddling, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
 
-        assertEquals(null, markedDuringBuild)
+        assertEquals(MarkReadBatch(emptyList(), heldBack = 1), markedDuringBuild)
         assertEquals(false, unstarredDuringBuild)
         assertEquals(2, db.editions().articleIds(built.editionId).size)
         assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
         assertTrue("still starred, as the edition says", starredAt("b1") != null)
 
         editions.delete(built.editionId)
-        assertTrue("allowed again once the build is over", sources.markRead(idOf("a1")) != null)
+        assertEquals("allowed again once the build is over", 1, sources.markRead(listOf(idOf("a1"))).marked.size)
     }
 
     @Test
@@ -395,7 +395,7 @@ class EditionBuilderTest {
     @Test
     fun aStarredArticleThatWasMarkedReadIsStillMarkedReadIfItsEditionIsNeverSentAndItsUnstarred() = runTest {
         source("a", null, "a1")
-        sources.markRead(idOf("a1"))
+        sources.markRead(listOf(idOf("a1")))
         editions.setStarred(idOf("a1"), true)
         val unsent = builder.build(EditionSettings()) as BuildResult.Built
 
@@ -455,7 +455,7 @@ class EditionBuilderTest {
     @Test
     fun anArticleMarkedReadIsNeverPickedUntilUndone() = runTest {
         source("a", null, "a1")
-        val marked = sources.markRead(idOf("a1"))!!
+        val marked = sources.markRead(listOf(idOf("a1"))).marked.single()
         assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
 
         assertTrue(sources.undoMarkRead(marked))
