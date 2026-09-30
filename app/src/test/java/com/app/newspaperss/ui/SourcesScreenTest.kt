@@ -102,6 +102,45 @@ class SourcesScreenTest {
         assertEquals(1, syncRequests)
     }
 
+    private fun signInToTtrss(server: FakeTtrss) {
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Add tt-rss account").performClick()
+        val fields = compose.onAllNodes(hasSetTextAction())
+        fields[0].performTextInput("rss.example.com/tt-rss")
+        fields[1].performTextInput(server.user)
+        fields[2].performTextInput(server.password)
+        compose.onNodeWithText("Test and add").performClick()
+        waitFor("Which articles?")
+    }
+
+    @Test
+    fun aTtrssAccountWithCategoriesAsksWhichArticlesBeforeItsAdded() {
+        val server = FakeTtrss(http)
+        server.categories[4] = "Ideas"
+        signInToTtrss(server)
+        assertTrue("nothing saved before the choice", runBlocking { db.sources().all() }.none { it.kind == SourceKind.TTRSS })
+
+        compose.onNodeWithText("Ideas").performClick()
+        compose.onNodeWithText("Add").performClick()
+
+        waitFor("Which articles?", present = false)
+        compose.waitUntil(5_000) { syncRequests == 1 }
+        assertEquals(4, runBlocking { db.sources().all().single { it.kind == SourceKind.TTRSS }.ttrssCategoryId })
+    }
+
+    @Test
+    fun cancellingTheTtrssChoiceAddsNothing() {
+        val server = FakeTtrss(http)
+        server.categories[4] = "Ideas"
+        signInToTtrss(server)
+
+        compose.onNodeWithText("Cancel").performClick()
+
+        waitFor("Which articles?", present = false)
+        assertTrue(runBlocking { db.sources().all() }.none { it.kind == SourceKind.TTRSS })
+        assertEquals(0, syncRequests)
+    }
+
     @Test
     fun addingASiteFindsItsFeedAndStartsASync() {
         http.page("https://example.com", "<html><head><link rel=alternate type=application/rss+xml href=/feed title=Posts></head></html>")
