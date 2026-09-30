@@ -323,6 +323,20 @@ class SourceDetailScreenTest {
     }
 
     @Test
+    fun articlesAreDatedByWhenTheyWerePublished() {
+        val (id, _) = sourceWithArticles()
+        runBlocking {
+            db.articles().insertNew(
+                listOf(ArticleEntity(sourceId = id, guid = "old", url = "https://example.com/old", title = "An old essay", published = Instant.parse("2023-03-03T12:00:00Z"), discoveredAt = Instant.now())),
+            )
+        }
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { visible("An old essay") }
+        assertTrue(visible("Mar 3, 2023"))
+    }
+
+    @Test
     fun failuresAreOnlyCalledOutOnceTheyOutlastTheDay() {
         val now = Instant.parse("2026-09-29T10:00:00Z")
         val utc = ZoneOffset.UTC
