@@ -17,7 +17,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 
 ### Sources and fetching
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
-- [ ] "No feed found": offer to save the page to the reading list instead *(personas)*
+- [ ] "No feed found" in onboarding: offer the reading list there too (done in Sources) *(personas)*
 - [ ] Decide what tapping an article in a source's list does: open the original, render it, or offer "add to the next edition" *(device)*
 - [ ] Page cleanup's furniture patterns ("Recommended stories", "Subscribe to", "Read more:") are English only, so "Lire aussi", "Mehr zum Thema" and "Lee también" slip into French, German and Spanish articles. Key them by the article's language *(live)*
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
@@ -155,6 +155,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] "No feed found" in Sources offers to save the page to the reading list instead of a dead end
 - [x] Change the e-reader in Settings after onboarding (it decides Send or Open, and the tips)
 - [x] Deleting an edition takes down its "ready" or "delivered" notification, whose Send would have shared a missing file
 - [x] Say why there's no edition: a timed run with nothing new sends a quiet "No new edition"; when every source failed it's retried, then a failure that says so, not "nothing new"; a build queued offline shows "Waiting for an internet connection"

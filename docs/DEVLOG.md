@@ -8,13 +8,17 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** saying why there's no edition and a deleted edition's notification ([#42](https://github.com/madCode/newspaperss/pull/42)); changing the e-reader in Settings.
+- **In flight:** "no feed found" offers the reading list.
 - **Next:** the rest of the accessibility audit; language-aware page cleanup; saved links in onboarding.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
 ## Day 2 · Tue 29 Sep, afternoon
 
-### Cycle 30: change your e-reader later (18:10–)
+### Cycle 31: no feed? Save the page instead (18:25–)
+- **From the persona audit:** pasting a site with no feed ended at "No feed found at …", a dead end.
+- **Shipped:** when the page loads but has no feed, Add a source offers "Save this page to your reading list instead". An address that can't be reached isn't offered.
+
+### Cycle 30: change your e-reader later (18:10–18:25, in [#42](https://github.com/madCode/newspaperss/pull/42))
 - **From the persona audit:** the e-reader picked in onboarding couldn't be changed; a Kobo owner who got a Boox had to reinstall.
 - **Shipped:** Settings has "Your e-reader", with the same list and tip as onboarding. It decides whether editions offer Send or Open.
 

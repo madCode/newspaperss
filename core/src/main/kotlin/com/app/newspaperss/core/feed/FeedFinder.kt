@@ -9,7 +9,8 @@ data class FoundFeed(val url: String, val title: String?)
 
 sealed interface FindResult {
     data class Found(val feeds: List<FoundFeed>) : FindResult
-    data class NotFound(val reason: String) : FindResult
+    /** @property page the page itself, when it loaded but offers no feed: it can still be saved to read later. */
+    data class NotFound(val reason: String, val page: String? = null) : FindResult
 }
 
 /**
@@ -54,7 +55,7 @@ class FeedFinder(private val http: HttpClient) {
                 return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)))
             }
         }
-        return FindResult.NotFound("No feed found at $url.")
+        return FindResult.NotFound("No feed found at $url.", page = response.finalUrl)
     }
 
     companion object {
