@@ -44,6 +44,9 @@ class TtrssRepository(
         return null
     }
 
+    /** The account's source, if one is connected. */
+    suspend fun sourceId(): Long? = db.sources().all().firstOrNull { it.kind == SourceKind.TTRSS }?.id
+
     sealed interface Categories {
         data class Loaded(val categories: List<TtrssCategory>) : Categories
         data class Failed(val message: String) : Categories

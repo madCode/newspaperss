@@ -103,6 +103,28 @@ class SourcesScreenTest {
     }
 
     @Test
+    fun aTtrssAccountWithCategoriesAsksWhichArticlesBeforeTheFirstSync() {
+        val server = FakeTtrss(http)
+        server.categories[4] = "Ideas"
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Add tt-rss account").performClick()
+        val fields = compose.onAllNodes(hasSetTextAction())
+        fields[0].performTextInput("rss.example.com/tt-rss")
+        fields[1].performTextInput(server.user)
+        fields[2].performTextInput(server.password)
+        compose.onNodeWithText("Test and add").performClick()
+
+        waitFor("Which articles?")
+        assertEquals("no sync before the choice", 0, syncRequests)
+        compose.onNodeWithText("Ideas").performClick()
+        compose.onNodeWithText("Done").performClick()
+
+        waitFor("Which articles?", present = false)
+        compose.waitUntil(5_000) { syncRequests == 1 }
+        assertEquals(4, runBlocking { db.sources().all().single { it.kind == SourceKind.TTRSS }.ttrssCategoryId })
+    }
+
+    @Test
     fun addingASiteFindsItsFeedAndStartsASync() {
         http.page("https://example.com", "<html><head><link rel=alternate type=application/rss+xml href=/feed title=Posts></head></html>")
         http.page("https://example.com/feed", rss("Example"))

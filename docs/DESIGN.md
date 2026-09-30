@@ -156,7 +156,8 @@ articles go into the new one.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
   feed that posts monthly isn't crowded out by busy ones. Articles are marked read
   on the server once delivered. A
-  source can turn that off, or take one category instead of all unread.
+  source can turn that off, or take one category instead of all unread; adding
+  the account asks which, before the first sync.
 - **Housekeeping.** Only the newest 14 editions keep their EPUB on the
   phone (ready ones always do). An article's feed text is dropped a month
   after it's delivered or expires; its row stays, so it's never re-offered.

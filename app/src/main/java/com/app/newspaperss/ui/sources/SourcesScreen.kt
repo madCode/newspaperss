@@ -1,6 +1,8 @@
 package com.app.newspaperss.ui.sources
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -151,6 +153,29 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
 
 @Composable
 internal fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
+    val categories = form.categories
+    if (categories != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::closeTtrss,
+            title = { Text("Which articles?") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        "Take unread articles from all your feeds, or from one category. You can change this on the source's page.",
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    Column(Modifier.selectableGroup()) {
+                        TtrssCategoryRow("All your unread articles", form.category == null) { viewModel.pickTtrssCategory(null) }
+                        categories.forEach { category ->
+                            TtrssCategoryRow(category.title, form.category?.id == category.id) { viewModel.pickTtrssCategory(category) }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = viewModel::finishTtrss) { Text("Done") } },
+        )
+        return
+    }
     AlertDialog(
         onDismissRequest = viewModel::closeTtrss,
         title = { Text("Add tt-rss account") },
@@ -209,6 +234,17 @@ internal fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
         },
         dismissButton = { TextButton(onClick = viewModel::closeTtrss) { Text("Cancel") } },
     )
+}
+
+@Composable
+private fun TtrssCategoryRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Text(label, modifier = Modifier.padding(start = 12.dp))
+    }
 }
 
 @Composable

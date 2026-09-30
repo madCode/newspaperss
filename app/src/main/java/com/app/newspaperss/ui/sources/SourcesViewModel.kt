@@ -17,6 +17,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import java.time.Instant
 import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.core.ttrss.TtrssCategory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -46,6 +47,10 @@ data class TtrssForm(
     val password: String = "",
     val testing: Boolean = false,
     val error: String? = null,
+    /** Set once the account is added: its categories, to choose which one it takes articles from. */
+    val categories: List<TtrssCategory>? = null,
+    /** The chosen category; null is all unread articles. */
+    val category: TtrssCategory? = null,
 )
 
 /**
@@ -141,6 +146,8 @@ class SourcesViewModel(
 
     fun closeTtrss() {
         connecting?.cancel()
+        // Closed at the category step, the account is already added and needs its first sync.
+        if (_ttrssForm.value?.categories != null) onSourcesChanged()
         _ttrssForm.value = null
     }
 
@@ -154,12 +161,34 @@ class SourcesViewModel(
         _ttrssForm.value = form.copy(testing = true, error = null)
         connecting = viewModelScope.launch {
             val error = repo.connect(form.address, form.user, form.password)
-            if (error == null) {
+            if (error != null) {
+                _ttrssForm.value = form.copy(error = error)
+                return@launch
+            }
+            // Asked now, before the first sync: a returning reader's first edition would otherwise
+            // come from all unread, mostly news. With only Uncategorized there's nothing to choose.
+            val categories = (repo.categories() as? TtrssRepository.Categories.Loaded)?.categories.orEmpty()
+            if (categories.none { it.id != 0 }) {
                 _ttrssForm.value = null
                 onSourcesChanged()
             } else {
-                _ttrssForm.value = form.copy(error = error)
+                _ttrssForm.value = form.copy(testing = false, categories = categories)
             }
+        }
+    }
+
+    fun pickTtrssCategory(category: TtrssCategory?) {
+        _ttrssForm.value = _ttrssForm.value?.takeIf { it.categories != null }?.copy(category = category)
+    }
+
+    fun finishTtrss() {
+        val form = _ttrssForm.value?.takeIf { it.categories != null } ?: return
+        val repo = ttrss ?: return
+        _ttrssForm.value = null
+        viewModelScope.launch {
+            val category = form.category
+            if (category != null) repo.sourceId()?.let { repo.chooseCategory(it, category) }
+            onSourcesChanged()
         }
     }
 
