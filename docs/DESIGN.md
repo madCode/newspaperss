@@ -69,7 +69,9 @@ module so it's all unit-tested without Android.
   link waits in two sources, the starred copy goes in. Articles are fetched in plan
   order, so an edition goes over by at most one article. If a turn-taking
   pass leaves time unfilled, a second pass adds more from sources whose own
-  cap allows it.
+  cap allows it. Turns start with the source featured longest ago (a tt-rss
+  feed counts as a source), so with more sources than fit, the next edition
+  picks up the ones the last one left out.
 - **Extract.** Use the feed's own text when it's the full article;
   otherwise fetch the page, remove cookie banners and run Readability4J
   (Firefox's Reader View). schema.org JSON-LD is used instead when it has

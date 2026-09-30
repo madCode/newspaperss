@@ -19,6 +19,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -120,6 +121,70 @@ class EditionBuilderTest {
         }
         assertEquals(ArticleState.IN_EDITION, stateOf("a2"))
         assertEquals("the second article of a capped source waits", ArticleState.NEW, stateOf("a1"))
+    }
+
+    @Test
+    fun theNextEditionStartsWithTheSourcesTheLastOneLeftOut() = runTest {
+        for (name in listOf("a", "b", "c", "d")) source(name, null, "${name}1", "${name}2", "${name}3")
+        val settings = EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)
+        fun sourcesOf(id: Long) = runBlocking { editions.observeArticles(id).first().map { it.title.substringBefore(' ') }.toSet() }
+
+        val first = builder.build(settings) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        val second = builder.build(settings) as BuildResult.Built
+
+        assertEquals(setOf("a", "b"), sourcesOf(first.editionId))
+        assertEquals("not b and c, sliding by one", setOf("c", "d"), sourcesOf(second.editionId))
+    }
+
+    @Test
+    fun eachTtrssFeedTakesItsOwnTurnAcrossEditions() = runTest {
+        val account = sources.addTtrss("https://rss.example/api/")
+        db.articles().insertNew(
+            listOf("f1", "f2", "f3", "f4").flatMap { feed ->
+                (1..2).map { n ->
+                    ArticleEntity(
+                        sourceId = account, guid = "ttrss:$feed$n", url = "https://$feed.example/$n", title = "$feed $n",
+                        published = Instant.parse("2026-09-2${n}T00:00:00Z"), originId = feed, originTitle = feed,
+                    )
+                }
+            },
+        )
+        val settings = EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)
+        fun feedsOf(id: Long) = runBlocking { editions.observeArticles(id).first().map { it.title.substringBefore(' ') }.toSet() }
+
+        val first = builder.build(settings) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        val second = builder.build(settings) as BuildResult.Built
+
+        assertEquals(2, feedsOf(first.editionId).size)
+        assertTrue("the next edition takes the other two feeds", feedsOf(first.editionId).intersect(feedsOf(second.editionId)).isEmpty())
+    }
+
+    @Test
+    fun anEditionThatWasNeverSentDoesntCountAsTheirTurn() = runTest {
+        for (name in listOf("a", "b", "c", "d")) source(name, null, "${name}1", "${name}2", "${name}3")
+        val settings = EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)
+        fun sourcesOf(id: Long) = runBlocking { editions.observeArticles(id).first().map { it.title.substringBefore(' ') }.toSet() }
+
+        val unsent = builder.build(settings) as BuildResult.Built
+        val next = builder.build(settings) as BuildResult.Built
+
+        assertEquals(sourcesOf(unsent.editionId), sourcesOf(next.editionId))
+    }
+
+    @Test
+    fun aStarredArticleDoesntUseUpItsSourcesTurn() = runTest {
+        val a = source("a", null, "a1")
+        val d = source("d", null, "d1", "d2")
+        editions.setStarred(db.query("SELECT id FROM articles WHERE guid = 'd1'", null).use { it.moveToFirst(); it.getLong(0) }, true)
+
+        val first = builder.build(EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+
+        // d went in by its star; its own turn, for d2, still counts as never taken.
+        assertEquals(listOf(a), db.editions().lastFeatured().map { it.sourceId })
+        assertTrue(d !in db.editions().lastFeatured().map { it.sourceId })
     }
 
     @Test
