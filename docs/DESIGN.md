@@ -229,9 +229,10 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
   learns from them but copies no code.
 - **Tests:** JVM tests in `:core`; Robolectric and Compose UI tests in
   `:app` against a real Room database. CI runs `./gradlew build` and Kover.
+  A daily scheduled job reads each curated list's live page, so a site redesign
+  fails there before it reaches a phone.
+- **License:** MIT.
 
 ## 11. Open questions for the owner
 
-- **License.** The app needs one for F-Droid (Apache-2.0 or GPL-3.0 are the
-  usual choices).
 - **Name.** Shown as newspapeRSS; the repository stays newspaperss.
