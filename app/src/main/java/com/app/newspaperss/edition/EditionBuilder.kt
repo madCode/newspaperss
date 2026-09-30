@@ -39,9 +39,11 @@ sealed interface BuildResult {
     /** Nothing new to read; no edition was made. */
     data object NothingNew : BuildResult
     data class Failed(val editionId: Long, val reason: String) : BuildResult
-    /** Nothing to make it from because none of the [sources] could be reached; no edition was made. */
+    /** Nothing to make it from because none of the [sources] could be read; no edition was made. */
     data class Unreachable(val sources: Int) : BuildResult {
-        val reason get() = "None of your ${plural(sources, "source")} could be reached. Check your connection, then try again."
+        // Not "check your connection": a timed run only starts once there is one, so the usual
+        // causes are a tt-rss sign-in, a feed that moved, a list whose page changed.
+        val reason get() = "None of your ${plural(sources, "source")} could be read. Sources shows what went wrong with each."
     }
 }
 

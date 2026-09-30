@@ -313,6 +313,20 @@ class EditionDetailScreenTest {
     }
 
     @Test
+    fun aBuildQueuedWithoutAConnectionSaysItsWaitingForOne() {
+        val online = MutableStateFlow(false)
+        val vm = TodayViewModel(repo, flowOf(work(WorkInfo.State.ENQUEUED)), online = online) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+
+        idleUntil { vm.state.value.build == BuildState.WaitingForNetwork }
+        compose.onNodeWithText("Waiting for an internet connection…").assertExists()
+
+        online.value = true
+        idleUntil { vm.state.value.build == BuildState.Syncing }
+        compose.onNodeWithText("Checking your sources for new articles…").assertExists()
+    }
+
+    @Test
     fun anOldFailureIsShownButNotAnnouncedEachTimeTodayOpens() {
         val failed = work(WorkInfo.State.FAILED, output = workDataOf(EditionWorker.ERROR to "Couldn't reach any of your sources."))
         val vm = TodayViewModel(repo, flowOf(failed)) {}

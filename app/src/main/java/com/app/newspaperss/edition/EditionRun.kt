@@ -11,6 +11,8 @@ import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
+import java.time.Duration
 import java.time.Instant
 
 /** One edition from start to finish: sync, build, deliver, tell the reader. */
@@ -22,6 +24,7 @@ class EditionRun(
     private val folder: FolderWriter,
     private val notifier: EditionNotifier,
     private val notes: EditionNotes,
+    private val now: () -> Instant = Instant::now,
 ) {
     /**
      * @param scheduled true for the timed run. Only then does a shared edition
@@ -29,7 +32,13 @@ class EditionRun(
      *   already looking at it.
      * @param dueAt when a timed edition is due, which is what it's titled and dated for.
      */
-    suspend fun run(scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}, dueAt: Instant? = null): BuildResult {
+    /**
+     * @param finalAttempt false when the worker will retry an [BuildResult.Unreachable] timed run,
+     *   so the reader isn't told of a failure that a retry minutes later may undo.
+     */
+    suspend fun run(
+        scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}, dueAt: Instant? = null, finalAttempt: Boolean = true,
+    ): BuildResult {
         val s = settings.current()
         val synced = sync.syncAll()
         onSyncDone()
@@ -41,12 +50,20 @@ class EditionRun(
         when (result) {
             is BuildResult.Built -> deliver(result.editionId, s, scheduled)
             is BuildResult.Failed -> if (scheduled) notifier.problem("Today's edition couldn't be made", result.reason)
-            is BuildResult.Unreachable -> if (scheduled) notifier.problem("No edition today", result.reason)
+            is BuildResult.Unreachable -> if (scheduled && finalAttempt) notifier.problem("No new edition", result.reason)
             // Quiet, but said: otherwise a timed paper that doesn't come looks like the app broke.
-            BuildResult.NothingNew -> if (scheduled) notifier.nothingNew()
+            // Not when one came recently (made by hand just before): that one is the news.
+            BuildResult.NothingNew -> if (scheduled) {
+                val latest = editions.observeAll().first().firstOrNull()
+                if (latest == null || latest.createdAt.isBefore(now().minus(RECENT))) notifier.nothingNew(firstEver = latest == null)
+            }
         }
         editions.pruneFiles()
         return result
+    }
+
+    private companion object {
+        val RECENT: Duration = Duration.ofHours(12)
     }
 
     private suspend fun deliver(editionId: Long, s: Settings, scheduled: Boolean) {
