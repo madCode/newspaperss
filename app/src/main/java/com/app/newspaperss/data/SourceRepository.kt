@@ -10,6 +10,7 @@ import com.app.newspaperss.core.lists.CuratedList
 import com.app.newspaperss.core.lists.CuratedLists
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -29,6 +30,9 @@ data class MarkReadBatch(val marked: List<MarkedRead>, val heldBack: Int)
  */
 data class StarBatch(val starred: Boolean, val changed: List<MarkedRead>, val heldBack: Int)
 
+/** One of an aggregator's feeds, and whether its articles can go in the paper. */
+data class FeedChoice(val originId: String, val title: String, val inPaper: Boolean)
+
 class SourceRepository(private val db: AppDatabase, private val clock: Clock = Clock.systemUTC()) {
     private val sources = db.sources()
 
@@ -40,6 +44,18 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
 
     /** The source's newest articles, newest first, whatever their state. */
     fun observeRecentArticles(id: Long, limit: Int = 30): Flow<List<ArticleEntity>> = db.articles().observeRecentForSource(id, limit)
+
+    /** An aggregator's feeds by name, left-out ones included after their articles are gone. */
+    fun observeFeeds(id: Long): Flow<List<FeedChoice>> = combine(sources.observeFeeds(id), sources.observeLeftOut(id)) { seen, leftOut ->
+        val out = leftOut.associateBy { it.originId }
+        val names = seen.associate { it.originId to (it.title ?: out[it.originId]?.title ?: it.originId) } +
+            leftOut.filter { it.originId !in seen.map { s -> s.originId } }.associate { it.originId to it.title }
+        names.map { (originId, title) -> FeedChoice(originId, title, inPaper = originId !in out) }.sortedBy { it.title.lowercase() }
+    }
+
+    suspend fun setFeedInPaper(sourceId: Long, feed: FeedChoice, inPaper: Boolean) {
+        if (inPaper) sources.takeBack(sourceId, feed.originId) else sources.leaveOut(LeftOutFeedEntity(sourceId, feed.originId, feed.title))
+    }
 
     /** Adds a feed unless one with this URL exists; returns its id either way. */
     suspend fun addFeed(url: String, title: String?, section: String? = null): Long {

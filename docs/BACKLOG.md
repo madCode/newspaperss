@@ -32,7 +32,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
-- [ ] Per-feed control on the tt-rss source page: leave a feed out, or cap it
+- [ ] Per-feed cap on the tt-rss source page ("two from Current Affairs"); leaving a feed out is done
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] The source page dates articles by when they were fetched; show when they were published
 - [ ] Articles that expire in the app stay unread in tt-rss: an opt-in "mark read when they expire here"
@@ -200,6 +200,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] tt-rss: leave a feed out of the paper from the source's page; it isn't fetched, and a star still brings one of its articles in *(personas)*
 - [x] No Open for Kindle and Kobo readers, who send the book rather than open it on the phone *(personas)*
 - [x] tt-rss "Start fresh" for a reader back after a break: marks everything older than two weeks read on the server, after asking, and refuses on servers too old to limit it *(personas)*
 - [x] A question to think about on each edition's closing page, from a short list that suits any paper, and shown in its notes *(personas)*

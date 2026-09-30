@@ -18,6 +18,22 @@ import java.time.Instant
 
 @Dao
 interface SourceDao {
+    @Query("SELECT * FROM left_out_feeds WHERE sourceId = :sourceId")
+    fun observeLeftOut(sourceId: Long): Flow<List<LeftOutFeedEntity>>
+
+    @Query("SELECT * FROM left_out_feeds")
+    suspend fun allLeftOut(): List<LeftOutFeedEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun leaveOut(feed: LeftOutFeedEntity)
+
+    @Query("DELETE FROM left_out_feeds WHERE sourceId = :sourceId AND originId = :originId")
+    suspend fun takeBack(sourceId: Long, originId: String)
+
+    /** The feeds an aggregator's articles came from, with the latest name each was seen under. */
+    @Query("SELECT originId, MAX(originTitle) AS title FROM articles WHERE sourceId = :sourceId AND originId IS NOT NULL GROUP BY originId")
+    fun observeFeeds(sourceId: Long): Flow<List<FeedName>>
+
     @Query("SELECT * FROM sources ORDER BY position, id")
     fun observeAll(): Flow<List<SourceEntity>>
 

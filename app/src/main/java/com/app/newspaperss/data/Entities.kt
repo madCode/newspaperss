@@ -125,6 +125,21 @@ data class ArticleEntity(
  * source is removed, so a source removed and added again, or a story that turns up later in
  * another source, doesn't deliver it a second time.
  */
+/**
+ * A tt-rss feed the reader left out of the paper: the planner skips its articles (unless starred)
+ * and sync stops fetching it. [originId] is tt-rss's feed id; [title] keeps its name listed after
+ * its articles are gone.
+ */
+@Entity(
+    tableName = "left_out_feeds",
+    primaryKeys = ["sourceId", "originId"],
+    foreignKeys = [ForeignKey(entity = SourceEntity::class, parentColumns = ["id"], childColumns = ["sourceId"], onDelete = ForeignKey.CASCADE)],
+)
+data class LeftOutFeedEntity(val sourceId: Long, val originId: String, val title: String)
+
+/** A feed an aggregator's articles came from, as the source page lists it. */
+data class FeedName(val originId: String, val title: String?)
+
 @Entity(tableName = "delivered_urls")
 data class DeliveredUrlEntity(
     @PrimaryKey val url: String,

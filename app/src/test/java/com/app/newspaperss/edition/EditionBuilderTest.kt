@@ -1,5 +1,6 @@
 package com.app.newspaperss.edition
 
+import com.app.newspaperss.data.FeedChoice
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.core.extract.ArticleExtractor
@@ -176,6 +177,32 @@ class EditionBuilderTest {
 
         assertEquals(2, feedsOf(first.editionId).size)
         assertTrue("the next edition takes the other two feeds", feedsOf(first.editionId).intersect(feedsOf(second.editionId)).isEmpty())
+    }
+
+    @Test
+    fun aLeftOutTtrssFeedStaysOutUnlessStarred() = runTest {
+        val account = sources.addTtrss("https://rss.example/api/")
+        db.articles().insertNew(
+            listOf("news", "essays").flatMap { feed ->
+                (1..2).map { n -> ArticleEntity(sourceId = account, guid = "ttrss:$feed$n", url = "https://$feed.example/$n", title = "$feed $n", originId = feed, originTitle = feed) }
+            },
+        )
+        sources.setFeedInPaper(account, FeedChoice("news", "news", inPaper = true), inPaper = false)
+        val starred = db.articles().allForSource(account).single { it.guid == "ttrss:news2" }.id
+        db.articles().setStarred(starred, true, clock.instant())
+
+        val built = builder.build(EditionSettings(minutes = 120)) as BuildResult.Built
+
+        val titles = editions.observeArticles(built.editionId).first().map { it.title }.toSet()
+        assertEquals(setOf("news 2", "essays 1", "essays 2"), titles)
+    }
+
+    @Test
+    fun onlyLeftOutFeedsWaitingMeansNothingNewRatherThanAFailure() = runTest {
+        val account = sources.addTtrss("https://rss.example/api/")
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = account, guid = "ttrss:1", url = "https://news.example/1", title = "news 1", originId = "news", originTitle = "news")))
+        sources.setFeedInPaper(account, FeedChoice("news", "news", inPaper = true), inPaper = false)
+        assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.app.newspaperss.data
 
+import kotlinx.coroutines.flow.first
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.testutil.DbRule
@@ -114,6 +115,25 @@ class TtrssSyncTest {
             "the busy feed's newest few",
             (297L..301L).map { "ttrss:$it" }.toSet(),
             articles.filter { it.originId == "111" }.map { it.guid }.toSet(),
+        )
+    }
+
+    @Test
+    fun aLeftOutFeedIsntFetchedAndStaysListedByName() = runTest {
+        val source = connect()
+        server.add(1, "An essay", feedId = 7, feedTitle = "Quarterly Review")
+        server.add(2, "A press release", feedId = 42, feedTitle = "Press Office")
+        sync.syncAll()
+        val press = sources.observeFeeds(source.id).first().single { it.originId == "42" }
+        sources.setFeedInPaper(source.id, press, inPaper = false)
+        server.add(3, "Another press release", feedId = 42, feedTitle = "Press Office")
+
+        sync.syncAll()
+
+        assertTrue(db.articles().allForSource(source.id).none { it.title == "Another press release" })
+        assertEquals(
+            listOf(FeedChoice("42", "Press Office", inPaper = false), FeedChoice("7", "Quarterly Review", inPaper = true)),
+            sources.observeFeeds(source.id).first(),
         )
     }
 

@@ -11,6 +11,7 @@ import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.data.FeedChoice
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.core.ttrss.TtrssCategory
 import kotlinx.coroutines.Job
@@ -108,6 +109,13 @@ class SourceDetailViewModel(
     fun setMarkReadOnServer(markRead: Boolean) {
         val repo = ttrss ?: return
         viewModelScope.launch { repo.setMarkRead(id, markRead) }
+    }
+
+    /** A tt-rss account's feeds, for leaving some out of the paper. */
+    val feeds: StateFlow<List<FeedChoice>> = repository.observeFeeds(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setFeedInPaper(feed: FeedChoice, inPaper: Boolean) {
+        viewModelScope.launch { repository.setFeedInPaper(id, feed, inPaper) }
     }
 
     private val _startingFresh = MutableStateFlow(false)

@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui.sources
 
+import androidx.compose.material3.Checkbox
+import com.app.newspaperss.data.FeedChoice
 import android.content.Intent
 import android.net.Uri
 import android.text.format.DateFormat
@@ -206,6 +208,8 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     }
                     if (source.kind == SourceKind.TTRSS) {
                         TtrssOptions(source, viewModel::openCategories, viewModel::setMarkReadOnServer)
+                        val feeds by viewModel.feeds.collectAsState()
+                        FeedsRow(feeds, viewModel::setFeedInPaper)
                         val startingFresh by viewModel.startingFresh.collectAsState()
                         StartFresh(source, startingFresh, viewModel::startFresh)
                     } else {
@@ -299,6 +303,52 @@ private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onM
             )
         }
         Switch(checked = source.markReadOnServer, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun FeedsRow(feeds: List<FeedChoice>, onChange: (FeedChoice, Boolean) -> Unit) {
+    if (feeds.isEmpty()) return
+    var choosing by rememberSaveable { mutableStateOf(false) }
+    val leftOut = feeds.count { !it.inPaper }
+    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Feeds in your paper")
+            Text(
+                if (leftOut == 0) "All ${feeds.size}" else "${feeds.size - leftOut} of ${feeds.size}: $leftOut left out",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = { choosing = true }) { Text("Choose") }
+    }
+    if (choosing) {
+        AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text("Feeds in your paper") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        "A feed left out stays in tt-rss; it just doesn't come to the paper. A starred article still does.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    feeds.forEach { feed ->
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .toggleable(value = feed.inPaper, role = Role.Checkbox) { onChange(feed, it) }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = feed.inPaper, onCheckedChange = null)
+                            Text(feed.title, modifier = Modifier.padding(start = 12.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosing = false }) { Text("Done") } },
+        )
     }
 }
 

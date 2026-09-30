@@ -13,7 +13,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Night 2 · Tue 29 Sep, 20:30 PT –
 
-### Cycle 55: no Open for Kindle and Kobo (02:05–, this PR)
+### Cycle 56: leave a tt-rss feed out (02:15–, this PR)
+- **From the persona audit:** a noisy feed (a live blog, press releases) kept taking a slot, and the only fix was on the server.
+- **Shipped:** "Feeds in your paper" on the tt-rss source's page: a checkbox per feed. A left-out feed isn't fetched and its waiting articles stay out, unless you star one. Database version 5.
+
+### Cycle 55: no Open for Kindle and Kobo (02:05–02:15, [#71](https://github.com/madCode/newspaperss/pull/71))
 - **From the persona audit:** Today and the edition page offered Open to a Kindle owner, which opens the book on the phone, the one thing the app tells her not to do.
 - **Shipped:** Kindle and Kobo readers see Send (and Send again) without Open. Boox readers still get Open first; everyone else keeps both.
 
