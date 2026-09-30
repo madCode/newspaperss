@@ -34,7 +34,12 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 ### tt-rss, for a returning reader *(personas)*
 - [ ] Per-feed cap on the tt-rss source page ("two from Current Affairs"); leaving a feed out is done
 - [ ] Several categories, and tt-rss's Starred and Published as choices
-- [ ] The source page dates articles by when they were fetched; show when they were published
+- [ ] A heart for "loved this / keep it", synced to tt-rss *(you asked)*. The ☆ stays "put it in my next edition": two different wishes, and tt-rss's own star already means "keep" (which is why its stars aren't synced as ☆ today). Things to settle first:
+  - Where: on a source's rows, on delivered editions, and maybe from the book (a link on each article's end that opens the app).
+  - What it sets in tt-rss: its star (`marked`, field 0 of `updateArticle`), or Published (field 1) if she'd rather keep her stars for something else.
+  - Which way it syncs: app → tt-rss only, or also tt-rss → app, so a heart given on the laptop shows here. Both ways needs a rule for conflicts (the last change wins, like Mark as read reaching the server at sync).
+  - Not only tt-rss: for feeds and saved links, a hearted article could go to a "Loved" list here, exported with the notes (and later to Obsidian).
+  - Offline: queue the change and send it at the next sync, as Mark as read does, so Undo never has to reach the server.
 - [ ] Articles that expire in the app stay unread in tt-rss: an opt-in "mark read when they expire here"
 - [ ] Delay tt-rss mark-read a little after sharing, so a quick "Send again" or "Not sent" can still undo it
 
@@ -70,6 +75,11 @@ pitch, so it has to be the reader's own.
 ### Sharing an article
 Share an article with someone. The link is easy; the full extracted text raises copyright questions and
 shouldn't become a way around paywalls. A likely middle: the link plus a short excerpt.
+
+- [ ] **First step: Share the original's link** *(you asked)*. Android's share sheet with the title and the original URL (tracking tags already stripped; a link post's story, not the list's pick), nothing else.
+  - Where: the article preview's top bar, and on rows (in Select mode's bar, or a TalkBack action) so rows don't get a second icon on e-ink.
+  - From the book: each article already ends with "Read the original"; a Kindle can share that link itself, so nothing needed there.
+  - Later: the excerpt, if the link alone feels bare.
 
 ### Notes: what should they be?
 The edition notes export (a markdown checklist of each edition's articles) went in without much thought
