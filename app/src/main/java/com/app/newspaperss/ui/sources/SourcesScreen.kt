@@ -336,8 +336,8 @@ internal fun RemoveSourceDialog(source: SourceEntity, onConfirm: () -> Unit, onD
                 },
             )
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Remove") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Remove source") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Keep") } },
     )
 }
 
