@@ -448,9 +448,6 @@ interface EditionDao {
     @Query("UPDATE editions SET fileName = NULL WHERE id = :id")
     suspend fun clearFile(id: Long)
 
-    @Query("UPDATE editions SET fileName = :fileName WHERE id = :id")
-    suspend fun setFile(id: Long, fileName: String)
-
     @Query("DELETE FROM edition_articles WHERE editionId = :editionId")
     suspend fun deleteArticles(editionId: Long)
 

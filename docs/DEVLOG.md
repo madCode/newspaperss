@@ -17,7 +17,8 @@ caught, and what got in the way. Newest first. Times are Pacific.
 ### Cycle 61: older editions share under their title too (09:40–, this PR)
 - **From you:** on the new version, sharing Wednesday's edition still offered "edition-3.epub".
 - **Cause:** that edition was made before cycle 59, and its file kept the old name.
-- **Shipped:** at app start, a sent edition's file stored as `edition-<id>.epub` is renamed after its title. An edition not sent yet keeps its name until it's sent or released, since its Ready notification links the old file.
+- **Shipped:** the share sheet tells apps the file is called after the edition's title, whatever it's called on the phone, so older editions reach Send to Kindle titled too.
+- **Review caught:** the first version renamed old files at app start. That could race with clearing old files or deleting an edition, leaving a file nothing points at, and break Send or Open in a Ready notification still showing. Naming the file only when sharing avoids all of that. The second look found Android's own file sharing can already give a file another name, so no code of ours does it.
 
 ### Cycle 60: the author in Send to Kindle (09:10–09:30, [#78](https://github.com/madCode/newspaperss/pull/78))
 - **From you:** the author should be newspapeRSS. The book already says so, but the Kindle app's form fills in the Amazon account's name, and nothing an app sends changes it (Amazon reads the book's author only for emailed documents).

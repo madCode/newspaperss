@@ -44,29 +44,4 @@ class EditionFilesTest {
         assertEquals("e0.epub", db.editions().byId(unsent)!!.fileName)
         kept.forEachIndexed { i, id -> assertEquals("e${i + 2}.epub", db.editions().byId(id)!!.fileName) }
     }
-
-    @Test
-    fun aSentEditionsFileIsRenamedAfterItsTitleForSendToKindle() = runTest {
-        val dir = tmp.newFolder("editions")
-        val repo = EditionRepository(db, dir)
-        suspend fun edition(title: String, file: String, status: EditionStatus): Long {
-            dir.resolve(file).writeText(title)
-            return db.editions().insert(EditionEntity(title = title, createdAt = Instant.parse("2026-09-30T06:00:00Z"), status = status, fileName = file))
-        }
-        val sent = edition("Wednesday Morning Edition, Sep 30", "edition-3.epub", EditionStatus.DELIVERED)
-        val unsent = edition("Thursday Morning Edition, Oct 1", "edition-4.epub", EditionStatus.READY)
-        // Another file already has the title's name: nothing is overwritten.
-        dir.resolve("Tuesday Morning Edition, Sep 29.epub").writeText("other")
-        val clash = edition("Tuesday Morning Edition, Sep 29", "edition-2.epub", EditionStatus.DELIVERED)
-
-        repo.nameFilesAfterTitles()
-
-        assertEquals("Wednesday Morning Edition, Sep 30.epub", db.editions().byId(sent)!!.fileName)
-        assertEquals("Wednesday Morning Edition, Sep 30", repo.fileOf(db.editions().byId(sent)!!)!!.readText())
-        assertFalse(dir.resolve("edition-3.epub").exists())
-        assertEquals("its Ready notification still links the old file", "edition-4.epub", db.editions().byId(unsent)!!.fileName)
-        assertTrue(dir.resolve("edition-4.epub").exists())
-        assertEquals("edition-2.epub", db.editions().byId(clash)!!.fileName)
-        assertEquals("other", dir.resolve("Tuesday Morning Edition, Sep 29.epub").readText())
-    }
 }
