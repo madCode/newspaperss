@@ -126,6 +126,10 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
             }
         }
         if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, hadOne = latest != null, onMake = viewModel::makeOneNow) }
+        // Below the latest edition in every state, so it doesn't jump when the build panel moves.
+        if (make == MakeButton.ANOTHER && !isRunning(state.build)) {
+            item(key = "another") { TextButton(onClick = viewModel::makeOneNow, modifier = Modifier.padding(top = 8.dp)) { Text("Make another edition") } }
+        }
         if (editions.size > 1) {
             item(key = "earlier") {
                 Text(
@@ -154,6 +158,9 @@ fun Masthead(date: LocalDate, modifier: Modifier = Modifier) {
 
 internal const val BUILD_STATUS = "buildStatus"
 
+private fun isRunning(build: BuildState) =
+    build == BuildState.Syncing || build == BuildState.WaitingForNetwork || build is BuildState.Retrying || build is BuildState.Fetching
+
 private enum class MakeButton { PRIMARY, RETRY, ANOTHER, NONE }
 
 /**
@@ -167,7 +174,7 @@ private class BuildAnnouncer {
     var finished = false
 
     fun update(build: BuildState) {
-        val running = build == BuildState.Syncing || build == BuildState.WaitingForNetwork || build is BuildState.Retrying || build is BuildState.Fetching
+        val running = isRunning(build)
         if (running) finished = false
         else if (sawRunning && build == BuildState.Idle) finished = true
         if (running) sawRunning = true
@@ -176,7 +183,7 @@ private class BuildAnnouncer {
 
 @Composable
 private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeButton, hadOne: Boolean, onMake: () -> Unit) {
-    val running = build == BuildState.Syncing || build == BuildState.WaitingForNetwork || build is BuildState.Retrying || build is BuildState.Fetching
+    val running = isRunning(build)
     // Announced only once a build has run while this screen was up: a failure WorkManager still
     // remembers from earlier would otherwise be read out every time Today opens.
     announcer.update(build)
@@ -212,8 +219,7 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeB
             when (make) {
                 MakeButton.PRIMARY -> Button(onClick = onMake, modifier = top) { Text("Make an edition now") }
                 MakeButton.RETRY -> OutlinedButton(onClick = onMake, modifier = top) { Text("Try again") }
-                MakeButton.ANOTHER -> TextButton(onClick = onMake, modifier = top) { Text("Make another edition") }
-                MakeButton.NONE -> {}
+                MakeButton.ANOTHER, MakeButton.NONE -> {}
             }
         }
     }
@@ -272,7 +278,8 @@ private fun LatestEdition(
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 12.dp),
                     )
-                    TextButton(onClick = onSent) { Text("I've sent it") }
+                    // No start padding, so it lines up with the text above rather than sitting indented.
+                    TextButton(onClick = onSent, contentPadding = PaddingValues(end = 12.dp)) { Text("I've sent it") }
                 }
                 EditionStatus.DELIVERED -> Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onSend) { Text("Send again") }

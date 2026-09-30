@@ -462,6 +462,23 @@ class EditionDetailScreenTest {
     }
 
     @Test
+    fun makeAnotherEditionSitsBelowTheLatestWhetherSentOrNot() {
+        // One place for it, whether the edition is waiting to be sent or already sent.
+        val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"))
+        val vm = TodayViewModel(repo, flowOf(null)) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        idleUntil { vm.state.value.editions?.size == 1 }
+        fun below() = compose.onNodeWithText("Make another edition").fetchSemanticsNode().boundsInRoot.top >
+            compose.onNodeWithText("Tuesday Morning Edition").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("below a sent edition", below())
+
+        runBlocking { db.editions().update(db.editions().byId(id)!!.copy(status = EditionStatus.READY)) }
+        idleUntil { vm.state.value.editions?.single()?.status == EditionStatus.READY }
+        compose.waitForIdle()
+        assertTrue("below a ready edition", below())
+    }
+
+    @Test
     fun nothingNewAfterAnEditionSaysSoAsFinished() {
         edition(EditionStatus.DELIVERED, listOf("A story"))
         val nothing = work(WorkInfo.State.SUCCEEDED, output = workDataOf(EditionWorker.NOTHING_NEW to true))
