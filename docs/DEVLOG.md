@@ -8,70 +8,73 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **In flight:** "no feed found" offers the reading list.
-- **Next:** the rest of the accessibility audit; language-aware page cleanup; saved links in onboarding.
+- **In flight:** nothing; Day 2 is wrapped up. Its [report](https://claude.ai/artifact/MEiSg7nZzZLhubU3v5r6Bj) and [cycle retro](https://claude.ai/artifact/Piy8RvgmffBE3CSC1ByaP3) are published (private to your account).
+- **Next:** the rest of the accessibility audit (a TalkBack walk-through on a device first); language-aware page cleanup; saved links in onboarding; unreadable saved links shown in the reading list.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key for automatic Kobo delivery (optional). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
-## Day 2 · Tue 29 Sep, afternoon
+## Day 2 · Tue 29 Sep, 11:47–19:30 PT
 
-### Cycle 31: no feed? Save the page instead (18:25–)
+### Cycle 32: wrap-up (18:06–19:30)
+- **Shipped:** a 30-minute timeout on CI (a hung test would otherwise hold a PR for six hours), and the Day 2 report and retro pages.
+
+### Cycle 31: no feed? Save the page instead (17:53–18:06, [#43](https://github.com/madCode/newspaperss/pull/43))
 - **From the persona audit:** pasting a site with no feed ended at "No feed found at …", a dead end.
 - **Shipped:** when an article's page loads but its site has no feed, Add a source offers "Save this page to your reading list instead". An address that can't be reached isn't offered.
 - **Review caught:** a site's front page was offered too, the most common case, and would make an edition of navigation; so would a paywall's sign-in page a redirect landed on. Only an article-like page on the same site is offered now.
 
-### Cycle 30: change your e-reader later (18:10–18:25, in [#42](https://github.com/madCode/newspaperss/pull/42))
+### Cycle 30: change your e-reader later (17:42–17:53, in [#42](https://github.com/madCode/newspaperss/pull/42))
 - **From the persona audit:** the e-reader picked in onboarding couldn't be changed; a Kobo owner who got a Boox had to reinstall.
 - **Shipped:** Settings has "Your e-reader", with the same list and tip as onboarding. It decides whether editions offer Send or Open.
 
-### Cycle 29: a deleted edition's notification (18:00–18:10, in [#42](https://github.com/madCode/newspaperss/pull/42))
+### Cycle 29: a deleted edition's notification (17:35–17:45, in [#42](https://github.com/madCode/newspaperss/pull/42))
 - **From the backlog (tech debt):** deleting an edition left its "ready" notification up, and its Send would share a file that no longer exists.
 - **Shipped:** the notification carries its edition's id, and deleting that edition takes it down. Only if it's still about that edition: the slot is shared, and a newer edition's news stays.
 
-### Cycle 28: say why there's no edition (17:40–18:00, [#42](https://github.com/madCode/newspaperss/pull/42))
+### Cycle 28: say why there's no edition (17:24–17:53, [#42](https://github.com/madCode/newspaperss/pull/42))
 - **From the persona audit (every persona):** a timed run that found nothing new sent no notification, so the paper just didn't come; when every source failed, Today said "Nothing new to read yet"; offline, a queued build said "Checking your sources…" indefinitely.
 - **Shipped:** a timed run with nothing new sends a quiet "No new edition: nothing new to read since your last one." When nothing is new because every source failed, it's a failure that says so ("None of your 9 sources could be read. Sources shows what went wrong with each."), loud on a timed run and shown on Today. A build queued without a connection shows "Waiting for an internet connection…".
 - **Review caught:** "check your connection" blamed the wrong thing (a timed run only starts once connected, so it's usually a tt-rss sign-in, a moved feed or a changed list page); the message now points to Sources. A timed run that reads no source is retried twice, five minutes apart, before the reader hears of it. "No new edition" no longer arrives minutes after a paper made by hand, and says "add a few sources" when there's never been one. Today's connection check now wants a working connection, as WorkManager does (a captive portal isn't online), is debounced so a flaky signal doesn't flip the status line, and can't crash on the Android 11 builds whose network callback throws. A second look caught Today saying "Checking your sources…" through the retry wait, with nothing running; it now says "Couldn't read your sources. Trying again at 6:20."
 
-### Cycle 27: Le Monde's bot check (17:30–17:40, in [#41](https://github.com/madCode/newspaperss/pull/41))
+### Cycle 27: Le Monde's bot check (17:18–17:24, in [#41](https://github.com/madCode/newspaperss/pull/41))
 - **From a live edition:** Le Monde articles came out as "A required part of this site couldn't load": the app fetched Fastly's bot challenge ("Client Challenge", a 3 KB page served with a 200) and took it for the article.
 - **Shipped:** the challenge is recognised, so the feed's text is used with a note, and the source learns the site blocks fetching.
 - **Checks:** a live Le Monde edition has the feed's text and the note, and no challenge text.
 - **Review caught:** from a server, Le Monde can also answer 402 "Accès restreint", which wasn't counted as the site refusing. It is now, like 401, 403 and 429.
 
-### Cycle 26: Chinese and Japanese reading time (17:20–17:30, [#41](https://github.com/madCode/newspaperss/pull/41))
+### Cycle 26: Chinese and Japanese reading time (17:10–17:24, [#41](https://github.com/madCode/newspaperss/pull/41))
 - **From the language work:** Chinese and Japanese have no spaces between words, so a whole NHK paragraph counted as one word: no reading time, and the full-text check would take a long Japanese feed for a teaser and fetch pages it didn't need.
 - **Shipped:** one word count everywhere, which counts each Chinese or Japanese character as about 2/3 of a word (people read about 350 characters a minute, against 238 English words). Korean uses spaces and is counted by word.
 - **Checks:** a live edition with BBC Chinese gives 3–7 minute articles instead of seconds, and passes epubcheck.
 
-### Cycle 25: where things are tracked (17:15–17:20, in [#40](https://github.com/madCode/newspaperss/pull/40))
+### Cycle 25: where things are tracked (17:05–17:10, in [#40](https://github.com/madCode/newspaperss/pull/40))
 - **From your question:** onboarding items and the research were hard to find. The backlog was sorted by where each item came from, and the persona audits only existed as backlog bullets.
 - **Shipped:** the backlog is grouped by part of the app (onboarding, sources, the book, delivery, reading list, accessibility, performance), each item tagged with its origin. The two persona audits are written up in [research/personas.md](research/personas.md), with each finding's status. The README has a short documentation index.
 
-### Cycle 24: lighter extraction (17:00–17:15, [#40](https://github.com/madCode/newspaperss/pull/40))
+### Cycle 24: lighter extraction (16:54–17:10, [#40](https://github.com/madCode/newspaperss/pull/40))
 - **From the resource audit:** the worst memory peak was a large page parsed and then copied whole for Readability.
 - **Shipped:** scripts, styles and SVGs are dropped right after the page's JSON-LD is read, before the copy; on script-heavy sites they're most of the page. On a 2.6 MB test page that's 36 MB allocated before and 16 MB after, in half the time. Pages over 5 MB aren't parsed at all; the feed's text is used with a note.
 - **Checks:** a live edition gives the same articles with the same word counts and passes epubcheck; xkcd, the New Yorker cartoon and Godslave all still get their image. The live-edition tool now prints each article's image count.
 - **Review caught:** a page that fails for its own reasons (too large, no connection) was counted as "the feed's text is enough", so a source whose pages are 5–10 MB would have been switched to teasers for good. A failed page now counts as no evidence either way. Declarative shadow-DOM templates, which are shown on the page, are kept.
 - **Left:** a saved link that can never be read (a PDF, a video, a huge page) waits silently, as it did before for anything over 10 MB. Putting it in the edition as a "couldn't fetch" page was tried and dropped: such pages cost no reading time, so a backlog of saved PDFs could fill an edition with them. The reading list should show these links as unreadable instead; that's in the backlog.
 
-### Cycle 23: a documentation pass (16:50–17:00, in [#39](https://github.com/madCode/newspaperss/pull/39))
+### Cycle 23: a documentation pass (16:45–16:54, in [#39](https://github.com/madCode/newspaperss/pull/39))
 - **Why:** you asked for documentation passes in the cycles: readable, current, not onerous. CLAUDE.md now says so: behaviour changes update the docs in the same PR, and every few cycles a pass checks the docs against the code.
 - **Shipped:** DESIGN.md rewritten to describe the app as it is. It had SMTP delivery, edition profiles, user-named sections and a reading-speed setting that don't exist, and nothing on today's changes: timed editions starting early, the feed cache and 12-hour sync, when an edition counts as delivered, housekeeping, comics, language tags, the preview. The finished milestone plan and history are gone (BACKLOG and this log have them), and it's shorter. README: the delivery rule, "ready by", the book's features, a link to the debug APK, and fresh screenshots. CLAUDE.md: database migrations and debug builds.
 - **How:** an agent checked every statement in the three docs against the code and listed what was wrong or missing, with file references; I rewrote from that.
 
-### Cycle 22: TalkBack and large fonts (16:30–16:50, [#39](https://github.com/madCode/newspaperss/pull/39))
+### Cycle 22: TalkBack and large fonts (16:32–16:54, [#39](https://github.com/madCode/newspaperss/pull/39))
 - **Why:** the persona audit's TalkBack items, and you asked for an accessibility audit. These are the known gaps; the full audit is in the backlog.
 - **Shipped:** Today announces what the build is doing ("Checking your sources", "Making your edition", and the result) through a live region. The running count isn't announced, or TalkBack would read every number. Onboarding's progress bar says "Step 2 of 3" instead of "66 percent". Earlier editions say what tapping does. Onboarding's Add and the reading list's Save moved below their text fields, where a 200% font can't squeeze out the space to type.
 - **Review caught:** in Compose a live region announces when its text changes, not when it first appears, so the failure message and "Checking…" would have been silent. And if they had spoken, a failure WorkManager still remembered would have been read out every time Today opened. The status is now one always-present line whose text changes, and it's only live once a build has run while the screen is up. Onboarding's Add button stays put instead of being swapped for "Checking…" under TalkBack's focus. A second look found a new reader's very first "Checking…" still silent (the list rebuilt the panel when the first-edition prompt went away; items are keyed now), and success said nothing; it now says "Your edition is ready." Still to confirm with TalkBack on a device.
 
-### Cycle 21: articles know their language (16:15–16:30, [#38](https://github.com/madCode/newspaperss/pull/38))
+### Cycle 21: articles know their language (16:13–16:32, [#38](https://github.com/madCode/newspaperss/pull/38))
 - **Why:** your note on languages. E-readers choose hyphenation, fonts and text direction from `xml:lang`, and every article was tagged English, so a French article was hyphenated with English rules and an Arabic one laid out left to right.
 - **Shipped:** each article's headline and body are tagged with its language, and right-to-left languages get `dir="rtl"`. The text decides: the writing system for non-Latin scripts, and common words for English, French, German, Spanish, Italian, Portuguese and Dutch. The page's declared language breaks ties, and is kept when it agrees because it's more precise (pt-BR, Persian in Arabic script). Many sites declare the same language on every page, and a feed's text declares nothing. No database change.
 - **Checks:** a live edition from Le Monde, Spiegel, El País, NHK, Al Jazeera Arabic, the Guardian and g1 tagged every article correctly and passes epubcheck. The Arabic page lays out right to left, with the English kicker and byline left to right.
 - **Review caught:** ordinary Spanish and Italian news came out French: the word lists left out "la", so every "la" counted for French alone. The lists now include each language's most frequent words, and a shared word counts for much less. A page declaring Persian or Urdu site-wide could have turned an English caption right to left: Latin text now never takes a tag in another script. Galician read as Portuguese over the page's own "gl": a Latin language the lists don't know keeps the page's tag. Declared regions like "en-UK" (no such region) are dropped, a kanji-heavy Japanese page stays Japanese, and headlines in the contents and "Next" links are tagged too. A second look found Latin-script Serbian taken for Portuguese over the page's "sr-Latn", and Danish for English (the English list had "at" and "for"); both keep the page's tag now. A second live edition added Italian (ANSA) and Dutch (NOS); all eight languages are tagged right.
 - **Found on the way:** NHK's Japanese articles count as "1 word" (reading time assumes spaces), and Le Monde serves a script wall the bot check doesn't catch. Both are in the backlog.
 
-### Cycle 20: the first tap on an article (16:00–16:15, [#37](https://github.com/madCode/newspaperss/pull/37))
+### Cycle 20: the first tap on an article (16:00–16:13, [#37](https://github.com/madCode/newspaperss/pull/37))
 - **From device testing:** the first tap on an article seemed not to open it, and the article was a little wider than the phone.
 - **Found:** the width came from this morning's EPUB, which printed the full original URL on its own line with no word breaking; the EPUB design round replaced both. A fresh live edition (11 articles, cover and contents) rendered at 360px wide has nothing wider than the screen. The tap wasn't being dropped: the preview read the EPUB during composition, and the first WebView of a session starts slowly, so the screen held still long enough to look ignored.
 - **Shipped:** the preview appears at once with a progress bar, and the book is read in the background. One open zip serves the page and all its images, instead of reopening the zip for each one.
