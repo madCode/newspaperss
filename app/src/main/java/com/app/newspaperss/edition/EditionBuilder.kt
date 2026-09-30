@@ -10,6 +10,7 @@ import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
 import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.core.plural
+import com.app.newspaperss.core.net.hostOf
 import com.app.newspaperss.core.epub.EpubWriter
 import com.app.newspaperss.core.images.ImageBudget
 import com.app.newspaperss.core.images.ImageRules
@@ -169,7 +170,7 @@ class EditionBuilder(
             CoverInfo(
                 title = title,
                 date = now.toLocalDate(),
-                headlines = arranged.map { (a, c) -> CoverHeadline(c.title, bylineOf(a, sourcesById.getValue(a.sourceId))) },
+                headlines = arranged.map { (a, c) -> CoverHeadline(c.title, bylineOf(a, c, sourcesById.getValue(a.sourceId))) },
                 articleCount = arranged.size,
                 minutes = totalMinutes,
             ),
@@ -208,10 +209,11 @@ class EditionBuilder(
         db.withTransaction {
             db.editions().insertArticles(
                 arranged.mapIndexed { i, (a, c) ->
-                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = bylineOf(a, sourcesById.getValue(a.sourceId)), minutes = minutesOf(c), starred = a.starredAt != null, stateBefore = a.state)
+                    EditionArticleEntity(editionId = editionId, articleId = a.id, position = i, title = c.title, sourceTitle = bylineOf(a, c, sourcesById.getValue(a.sourceId)), minutes = minutesOf(c), starred = a.starredAt != null, stateBefore = a.state)
                 },
             )
             db.articles().setState(arranged.map { it.first.id }, ArticleState.IN_EDITION)
+            db.articles().unlinkFromStory(arranged.filter { it.second.notTheStory }.map { it.first.id })
             db.editions().update(
                 db.editions().byId(editionId)!!.copy(
                     status = EditionStatus.READY, fileName = fileName,
@@ -270,8 +272,8 @@ class EditionBuilder(
 
     private fun toEpub(a: ArticleEntity, c: ArticleContent, minutes: Double, source: SourceEntity) = EditionArticle(
         title = c.title,
-        sourceTitle = bylineOf(a, source),
-        url = a.url,
+        sourceTitle = bylineOf(a, c, source),
+        url = a.viaUrl?.takeIf { c.notTheStory } ?: a.url,
         bodyHtml = c.bodyHtml,
         minutes = minutes,
         author = c.author,
@@ -286,7 +288,11 @@ class EditionBuilder(
 
     private fun publicationOf(sourceId: Long, originId: String?) = originId?.let { "$sourceId/$it" } ?: sourceId.toString()
 
-    private fun bylineOf(a: ArticleEntity, source: SourceEntity) = a.originTitle ?: source.title
+    /** Where [a] came from: its source, or for a link post "Equator via Longreads". */
+    private fun bylineOf(a: ArticleEntity, c: ArticleContent, source: SourceEntity): String {
+        val from = a.originTitle ?: source.title
+        return if (a.viaUrl == null || c.notTheStory) from else "${c.siteName ?: hostOf(a.url)} via $from"
+    }
 
     companion object {
         private fun fileNameOf(editionId: Long) = "edition-$editionId.epub"

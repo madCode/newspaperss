@@ -48,9 +48,11 @@ class ExtractorContentProvider(
                 feedHtml = article.feedHtml,
                 feedAuthor = article.author,
                 mode = modeFor(article, source),
+                feedUrl = article.viaUrl,
             ),
         )
-        FullTextCheck.evidence(extracted)?.let { onEvidence(source.id, it) }
+        // A link post's story page against its pitch says nothing about the source's own feed.
+        if (article.viaUrl == null) FullTextCheck.evidence(extracted)?.let { onEvidence(source.id, it) }
         // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
         // reader saved on purpose waits for the next edition instead of being used up as a stub.
         if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
@@ -64,6 +66,8 @@ class ExtractorContentProvider(
             note = extracted.note,
             images = embedded.images,
             language = extracted.language,
+            siteName = extracted.siteName,
+            notTheStory = extracted.notTheStory,
         )
     }
 
@@ -89,9 +93,13 @@ class ExtractorContentProvider(
         /**
          * A source the check settled on the feed's text still has its short items checked against
          * the page: otherwise it could never find out that the site stopped blocking or started
-         * sending teasers. A mode the reader chose is used as is.
+         * sending teasers. A mode the reader chose is used as is. A link post's story is always
+         * fetched unless the reader chose the feed's text: its pitch is never the article.
          */
         fun modeFor(article: ArticleEntity, source: SourceEntity): ContentMode {
+            if (article.viaUrl != null) {
+                return if (source.contentModeChosen && source.contentMode == ContentMode.FEED) ContentMode.FEED else ContentMode.PAGE
+            }
             if (source.contentModeChosen || source.contentMode != ContentMode.FEED) return source.contentMode
             val words = article.feedHtml?.let { ReadingTime.words(Jsoup.parse(it).text()) } ?: 0
             return if (words < ArticleExtractor.FULL_TEXT_WORDS) ContentMode.AUTO else ContentMode.FEED

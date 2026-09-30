@@ -149,14 +149,6 @@ Many of the writers worth reading publish as newsletters. Two routes, from easy 
   putting it in a paper. Risks: it depends on a third party's form and goodwill (be a polite client,
   let people point it at their own instance), and the inbox address is effectively a password.
 
-### Link posts: Longreads and friends *(you asked)*
-Longreads' feed works, but most posts are picks: a ~200-word excerpt on longreads.com linking to the
-story elsewhere (`?src=longreads`). As a plain feed the paper would carry the teaser, not the story.
-Handle it generally, not per site: a feed item with little text of its own whose main link points to
-another site is a pointer, so the edition fetches the linked page (and credits both). Strip the
-`src=` tracking so a story Arts & Letters Daily also picked isn't delivered twice. Longreads' own
-reading lists and interviews are full text and stay as they are.
-
 ### Listen: the paper as an audiobook
 An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
 - **Engine:** Android's own `TextToSpeech`. It's offline and free, and voices already on the phone keep the no-account promise. Cloud voices sound better but need an account and send the text away, so they'd only ever be an option.
@@ -212,6 +204,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Link posts (Longreads' picks): a short item whose link to another site carries a referral tag naming its own site is stored as that story, fetched and credited "Equator via Longreads", with its pitch as the fallback; tracking tags come off stored links, so a story two sources picked goes out once *(you asked)*
 - [x] Sources take turns starting with the one featured longest ago, not shifting by one each edition, so with many feeds every one gets its turn *(personas)*
 - [x] Stars: `☆ Next edition` on a source's articles and on delivered editions puts an article first in the next edition (it replaces bring back); the planner takes stars first, taking turns across sources, within each source's slots and the budget; Today says how many are waiting
 - [x] Article rows in a source's list: tap opens the original; "Mark as read" with Undo, marked read in tt-rss at the next sync

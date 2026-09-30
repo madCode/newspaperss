@@ -15,6 +15,10 @@ data class ArticleContent(
     val images: List<EpubImage> = emptyList(),
     /** BCP 47 language tag, if known. */
     val language: String? = null,
+    /** The name of the site the text came from, if its page says: a link post's story is credited to it. */
+    val siteName: String? = null,
+    /** A link post whose page wasn't the story it pitched: the article is the item itself, from its own page. */
+    val notTheStory: Boolean = false,
 )
 
 fun interface ArticleContentProvider {

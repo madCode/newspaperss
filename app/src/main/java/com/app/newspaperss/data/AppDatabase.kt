@@ -17,7 +17,7 @@ class Converters {
 
 @Database(
     entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -82,7 +82,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE articles ADD COLUMN viaUrl TEXT")
+            }
+        }
+
         fun open(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
     }
 }

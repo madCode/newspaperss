@@ -205,4 +205,46 @@ class FeedSyncTest {
         assertEquals(null, byGuid.getValue("old").feedHtml)
         assertEquals("<p>recent</p>", byGuid.getValue("recent").feedHtml)
     }
+
+    /** A link remembered as delivered with its tracking tags still counts once stored links lose them, so re-adding its feed doesn't send it again. */
+    @Test
+    fun aLinkDeliveredWithItsTrackingTagsIsntStoredAgainWhenItsFeedIsAddedBack() = runTest {
+        db.openHelper.writableDatabase.execSQL("INSERT INTO delivered_urls (url, deliveredAt) VALUES ('https://example.com/1?utm_source=rss', 0)")
+        repo.addFeed(url, "Example")
+        http.page(
+            url,
+            """<rss version="2.0"><channel><title>Example</title>
+               <item><title>One</title><link>https://example.com/1?utm_source=rss</link><guid>1</guid><description>Sent before.</description></item>
+               </channel></rss>""",
+        )
+
+        assertEquals(0, sync.syncAll().newArticles)
+    }
+
+    /**
+     * A link post is stored as the story it points to, so every check on links (delivered, copies
+     * in other sources, stars) sees the story; its guid stays the feed's, which is how the feed's
+     * next copy of it is recognised.
+     */
+    @Test
+    fun aLinkPostIsStoredAsItsStoryAndTrackingComesOffOtherLinks() = runTest {
+        val id = repo.addFeed(url, "Example")
+        val pick = "<p>A short pitch for a story elsewhere.</p><p><a href=\"https://news.example/story?src=example\">Read the story</a></p>"
+        http.page(
+            url,
+            """<rss version="2.0"><channel><title>Example</title><link>https://example.com/</link>
+               <item><title>Pick</title><link>https://example.com/pick</link><guid>pick-1</guid><description><![CDATA[$pick]]></description></item>
+               <item><title>Own</title><link>https://example.com/own?utm_source=rss&amp;id=2</link><guid>own-2</guid><description>Our own post.</description></item>
+               </channel></rss>""",
+        )
+
+        sync.syncAll()
+        assertEquals("the same items again aren't new", 0, sync.syncAll().newArticles)
+
+        val byGuid = db.articles().allForSource(id).associateBy { it.guid }
+        assertEquals("https://news.example/story", byGuid.getValue("pick-1").url)
+        assertEquals("https://example.com/pick", byGuid.getValue("pick-1").viaUrl)
+        assertEquals("https://example.com/own?id=2", byGuid.getValue("own-2").url)
+        assertNull(byGuid.getValue("own-2").viaUrl)
+    }
 }

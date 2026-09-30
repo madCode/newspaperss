@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
@@ -130,6 +130,26 @@ class MigrationTest {
             db.query("SELECT articleId FROM edition_articles WHERE id = 1").use { c ->
                 c.moveToFirst()
                 assertEquals(3L, c.getLong(0))
+            }
+        }
+    }
+
+    @Test
+    fun version3ArticlesSurviveAsOrdinaryArticles() {
+        helper.createDatabase(DB, 3).use { db ->
+            db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt) " +
+                    "VALUES (1, 'FEED', 'https://a.example/feed', 'A', 0, 'AUTO', 0, 0, 0, 1, 0)",
+            )
+            db.execSQL("INSERT INTO articles (id, sourceId, guid, url, title, discoveredAt, state, starredAt) VALUES (7, 1, 'g', 'https://a.example/1', 'Kept', 0, 'NEW', 50)")
+        }
+
+        helper.runMigrationsAndValidate(DB, 4, true, AppDatabase.MIGRATION_3_4).use { db ->
+            db.query("SELECT url, starredAt, viaUrl FROM articles WHERE id = 7").use { c ->
+                c.moveToFirst()
+                assertEquals("https://a.example/1", c.getString(0))
+                assertEquals(50L, c.getLong(1))
+                assertTrue(c.isNull(2))
             }
         }
     }

@@ -79,6 +79,45 @@ module so it's all unit-tested without Android.
   preview. If the page can't be fetched (or is over 5 MB, too big to parse
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
+- **Link posts.** Some feeds mostly pitch stories on other sites
+  (Longreads' picks: a few paragraphs, then "Read the story" at
+  `equator.org/…?src=longreads`). A feed or tt-rss item counts as a link
+  post when its own text is under 500 words and it links to another site
+  with a referral tag naming its own site (`src=`, `ref=`, `source=`,
+  `via=`, `utm_source=`), and to only one such page: that's the story.
+  (Some platforms tag every outbound link, so a short post linking to
+  several isn't a pointer.) Nothing is set up per site.
+  - The article is stored as the story's address, so the same story from
+    two sources goes out once, and a delivered story isn't stored again.
+    The feed's guid is kept, so the pitch isn't offered twice.
+  - The edition fetches the story's page, with the usual paywall, bot
+    check and size rules. It replaces the pitch only if it's clearly the
+    story: at least half the words of the item's title are in the page's
+    title or address (pointer sites title a pick with the story's
+    headline), and it has twice the pitch's words.
+  - The story goes in credited to both ("Equator via Longreads"), with
+    the story's own author, and "Read the original" links the story.
+  - A page that's too short (a paywall preview) or can't be fetched leaves
+    the pitch, with a note, still credited to both. So does a pick of a
+    comic or image post: the image rules above don't apply to link posts.
+  - A page titled for something else means the post wasn't a pointer (a
+    short commentary post with one tagged link): the post goes in as
+    itself, credited to its source, with its own page as the original.
+    Until it's picked it waits under the linked address, so two such posts
+    about the same page, or the page itself from another source, can't go
+    in the same edition; once it goes in, it's the post's own page that
+    counts as delivered.
+  - Only "Feed's text", chosen by the reader, always keeps the pitch.
+  - Link posts aren't evidence for the source's article text: a Longreads
+    source is judged by its own full-text posts.
+- **Tracking.** `utm_*`, click ids and a referral tag naming the source's
+  own site are removed from stored feed, tt-rss and curated-list links,
+  so one story compares equal wherever it came from. The link as fetched
+  is still checked against delivered links. The guid is left as the feed
+  gave it. Saved links are kept as the reader saved them.
+- **One story, one delivery.** When a link goes out, its waiting copies
+  in other sources are used up, tt-rss ones included; those are marked
+  read on the server along with the edition's own tt-rss articles.
 - **Comics and image posts.** A feed item that's just an image counts as
   content. When a page's text is clearly not the article, the page's main
   image is used, and a webcomic's own comic (all its panels) beats the

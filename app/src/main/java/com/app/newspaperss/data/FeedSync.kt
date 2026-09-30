@@ -2,6 +2,8 @@ package com.app.newspaperss.data
 
 import com.app.newspaperss.core.feed.FeedParseException
 import com.app.newspaperss.core.feed.FeedParser
+import com.app.newspaperss.core.feed.LinkPosts
+import com.app.newspaperss.core.net.withoutTracking
 import com.app.newspaperss.core.lists.CuratedLists
 import com.app.newspaperss.core.lists.ListLayoutChangedException
 import com.app.newspaperss.core.net.HttpClient
@@ -59,12 +61,12 @@ class FeedSync(
             val response = http.get(source.url)
             if (response.isSuccessful) {
                 val feed = FeedParser.parse(response.body, response.finalUrl)
-                val added = db.articles().insertNew(
+                val added = db.articles().insertFetched(
                     feed.items.map {
                         ArticleEntity(
                             sourceId = source.id, guid = it.guid, url = it.url, title = it.title,
                             author = it.author, published = it.published, feedHtml = it.contentHtml, discoveredAt = now,
-                        )
+                        ).linkedToStory(feed.siteUrl ?: source.siteUrl) to it.url
                     },
                 )
                 // A title that is still the host-name placeholder gives way to the feed's own.
@@ -130,6 +132,13 @@ class FeedSync(
                 // A few from each feed rather than the newest 200 overall: busy news feeds would
                 // fill those 200, and a feed that posts monthly would never reach the paper.
                 val headlines = fromEachFeed(client, client.unreadFeeds(category).filter { it.unread > 0 })
+                val articles = headlines.map {
+                    it to ArticleEntity(
+                        sourceId = source.id, guid = "$TTRSS_GUID_PREFIX${it.id}", url = it.link, title = it.title,
+                        author = it.author, published = it.updated?.let(Instant::ofEpochSecond), feedHtml = it.content,
+                        discoveredAt = now, originId = it.feedId, originTitle = it.feedTitle,
+                    ).linkedToStory(siteUrl = null)
+                }
                 // A link already delivered (from a feed, or before the account was reconnected) is
                 // skipped like any other, and tt-rss is told it's read unless the reader said not to:
                 // otherwise it would sit unread there for good. Articles the reader marked read in
@@ -138,23 +147,18 @@ class FeedSync(
                 // include them.
                 if (source.markReadOnServer) {
                     // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
-                    val delivered = headlines.map { it.link }.distinct().chunked(500).flatMap { db.articles().deliveredAmong(it) }.toSet()
+                    // The headline's own link as well as the stored one (a link post's story, tracking
+                    // removed): delivered_urls holds whichever went out.
+                    fun linksOf(h: TtrssHeadline, a: ArticleEntity) = listOf(h.link, a.url)
+                    val delivered = articles.flatMap { (h, a) -> linksOf(h, a) }.distinct().chunked(500).flatMap { db.articles().deliveredAmong(it) }.toSet()
                     val markedRead = db.articles().unreportedRead(source.id, limit = 500)
                     client.markRead(
-                        (headlines.filter { it.link in delivered }.map { it.id } +
+                        (articles.filter { (h, a) -> linksOf(h, a).any { it in delivered } }.map { it.first.id } +
                             markedRead.mapNotNull { it.removePrefix(TTRSS_GUID_PREFIX).toLongOrNull() }).distinct(),
                     )
                     if (markedRead.isNotEmpty()) db.articles().setReportedRead(source.id, markedRead)
                 }
-                val added = db.articles().insertNew(
-                    headlines.map {
-                        ArticleEntity(
-                            sourceId = source.id, guid = "$TTRSS_GUID_PREFIX${it.id}", url = it.link, title = it.title,
-                            author = it.author, published = it.updated?.let(Instant::ofEpochSecond), feedHtml = it.content,
-                            discoveredAt = now, originId = it.feedId, originTitle = it.feedTitle,
-                        )
-                    },
-                )
+                val added = db.articles().insertFetched(articles.map { (h, a) -> a to h.link })
                 // tt-rss answers a deleted (or another user's) category with no articles and no error.
                 if (headlines.isEmpty() && category != null && client.categories().none { it.id == category }) {
                     CATEGORY_GONE
@@ -191,13 +195,14 @@ class FeedSync(
                 if (response.isSuccessful) {
                     val links = list.links(response.body, response.finalUrl)
                     val added = db.withTransaction {
-                        db.articles().insertNew(
+                        db.articles().insertFetched(
                             links.map {
                                 ArticleEntity(
-                                    sourceId = source.id, guid = it.url, url = it.url, title = it.title.orEmpty(),
+                                    sourceId = source.id, guid = it.url, url = withoutTracking(it.url, LinkPosts.siteNames(list.pageUrl)),
+                                    title = it.title.orEmpty(),
                                     // The teaser is what the edition shows if the page can't be fetched.
                                     feedHtml = it.summary?.let { s -> "<p>${Entities.escape(s)}</p>" }, discoveredAt = now,
-                                )
+                                ) to it.url
                             },
                         ).also { db.articles().keepNewest(source.id, listKeep) }
                     }
@@ -238,6 +243,17 @@ class FeedSync(
         const val CATEGORY_GONE = "Your chosen tt-rss category isn't there any more. Choose another on this source's page."
         const val SIGN_IN_AGAIN = "Sign in to tt-rss again: tap the menu at the top of Sources."
     }
+}
+
+/**
+ * The article as stored: a link post's url becomes the story it points to, with its own page kept
+ * as [ArticleEntity.viaUrl]. Tracking parameters come off the stored url either way, so the same
+ * story from two sources is one link to the planner and to the delivered-links memory. The guid
+ * is left as the feed gave it: it's how the feed's next copy of the item is recognised.
+ */
+internal fun ArticleEntity.linkedToStory(siteUrl: String?): ArticleEntity {
+    val story = LinkPosts.storyUrl(url, feedHtml, siteUrl)
+    return if (story != null) copy(url = story, viaUrl = url) else copy(url = withoutTracking(url, LinkPosts.siteNames(url, siteUrl)))
 }
 
 /**
