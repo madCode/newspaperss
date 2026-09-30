@@ -17,7 +17,8 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 ### Sources and fetching
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
 - [ ] "No feed found" in onboarding: offer the reading list there too (done in Sources) *(personas)*
-- [ ] Article rows in a source's list *(device; decided with you)*:
+- [ ] Article rows in a source's list *(device; decided with you)*. Before building, a few design
+  passes: mockups of the row and the edition screen, checked for e-ink, TalkBack and large fonts, and your OK:
   - tap opens the original in the browser and changes nothing;
   - `☆` puts the article in the next paper; tap again to unstar;
   - "Mark as read" (for read or not interested): never in a paper, marked read in tt-rss for
