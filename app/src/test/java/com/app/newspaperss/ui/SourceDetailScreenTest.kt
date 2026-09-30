@@ -124,7 +124,8 @@ class SourceDetailScreenTest {
         list.performScrollToNode(hasText("Waiting for an edition", substring = true))
         list.performScrollToIndex(0)
 
-        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Remove source").performClick()
         compose.onNodeWithText("Remove Example?").assertExists()
         compose.onNode(hasText("Remove source") and hasAnyAncestor(isDialog())).performClick()
         // Compose only recomposes for the removal when its test clock runs.

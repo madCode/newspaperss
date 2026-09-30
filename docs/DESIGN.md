@@ -283,7 +283,8 @@ allowed to read that edition's file until the phone restarts.
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). A source's page
-  shows its recent articles, its cap, pause and the article-text setting.
+  shows its recent articles, its cap, pause and the article-text setting;
+  **Remove source** is in its ⋮ menu, as on the list.
   Each row is a status mark (`●` waiting, `✓` delivered, `○` not used),
   the title, a details line and a trailing **☆**; tapping the row opens
   the original. The star (a 48dp target) puts the article in the next
