@@ -138,19 +138,19 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
     )
     Text("Order", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp).semantics { heading() })
     Column(Modifier.selectableGroup()) {
-    listOf(
-        Ordering.TAKE_TURNS to "Take turns between sources",
-        Ordering.IN_ORDER to "Source by source, in list order",
-        Ordering.SHUFFLE to "Shuffle",
-    ).forEach { (ordering, label) ->
-        Row(
-            Modifier.fillMaxWidth().selectable(s.edition.ordering == ordering, role = Role.RadioButton) { vm.setOrdering(ordering) }.heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(selected = s.edition.ordering == ordering, onClick = null)
-            Text(label, Modifier.padding(start = 12.dp))
+        listOf(
+            Ordering.TAKE_TURNS to "Take turns between sources",
+            Ordering.IN_ORDER to "Source by source, in list order",
+            Ordering.SHUFFLE to "Shuffle",
+        ).forEach { (ordering, label) ->
+            Row(
+                Modifier.fillMaxWidth().selectable(s.edition.ordering == ordering, role = Role.RadioButton) { vm.setOrdering(ordering) }.heightIn(min = 48.dp).padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = s.edition.ordering == ordering, onClick = null)
+                Text(label, Modifier.padding(start = 12.dp))
+            }
         }
-    }
     }
 }
 
@@ -164,7 +164,7 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
         Modifier.fillMaxWidth().toggleable(s.scheduleEnabled, role = Role.Switch) { on ->
             vm.setScheduleEnabled(on)
             if (on && Build.VERSION.SDK_INT >= 33) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }.heightIn(min = 48.dp),
+        }.heightIn(min = 48.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("Make an edition automatically", Modifier.weight(1f))
@@ -200,7 +200,7 @@ private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
     Column(Modifier.selectableGroup()) {
         Device.entries.forEach { device ->
             Row(
-                Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.setDevice(device) }.heightIn(min = 48.dp),
+                Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.setDevice(device) }.heightIn(min = 48.dp).padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = s.device == device, onClick = null)
@@ -283,7 +283,7 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
                 release(context, s.notesFolderUri, keep = setOf(s.folderUri))
                 vm.setNotesFolder(null, null)
             }
-        }.heightIn(min = 48.dp),
+        }.heightIn(min = 48.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {

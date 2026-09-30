@@ -61,7 +61,7 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun theOrderChoicesAreFullSizeTargets() {
+    fun theOrderAndScheduleRowsAreFullSizeTargets() {
         listOf("Take turns between sources", "Source by source, in list order", "Shuffle", "Make an edition automatically").forEach {
             compose.onNodeWithText(it).performScrollTo().assertHeightIsAtLeast(48.dp)
         }
