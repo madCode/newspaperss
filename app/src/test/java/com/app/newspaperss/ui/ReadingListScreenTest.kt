@@ -1,8 +1,12 @@
 package com.app.newspaperss.ui
 
 import android.content.Intent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -48,5 +52,59 @@ class ReadingListScreenTest {
         val opened = shadowOf(app).nextStartedActivity
         assertEquals(Intent.ACTION_VIEW, opened.action)
         assertEquals("https://b.example/long-read", opened.dataString)
+    }
+
+    @Test
+    fun aRemovedLinkCanBeUndoneAndIsUntouched() {
+        val list = app.container.readingList
+        runBlocking { list.save("https://b.example/long-read", "A long read") }
+        val before = runBlocking { app.container.db.articles().allForSource(list.sourceId()).single() }
+        val vm = ReadingListViewModel(list)
+        compose.setContent { ReadingListScreen(vm, onBack = {}) }
+        waitFor("A long read")
+
+        // Named, so TalkBack doesn't read "Remove" on every row alike.
+        compose.onNodeWithContentDescription("Remove A long read").performClick()
+        waitFor("Removed “A long read”")
+        compose.onNodeWithText("A long read").assertDoesNotExist()
+        compose.onNodeWithText("Undo").performClick()
+
+        waitFor("A long read")
+        assertEquals(listOf(before), runBlocking { app.container.db.articles().allForSource(list.sourceId()) })
+    }
+
+    @Test
+    fun leavingTheScreenKeepsAWaitingRemoval() {
+        // Another tab keeps this screen's ViewModel alive, so leaving must settle it.
+        val list = app.container.readingList
+        runBlocking { list.save("https://a.example/one", "One") }
+        val vm = ReadingListViewModel(list, outlive = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined))
+        var shown by mutableStateOf(true)
+        compose.setContent { if (shown) ReadingListScreen(vm, onBack = {}) }
+        waitFor("One")
+        compose.onNodeWithContentDescription("Remove One").performClick()
+        waitFor("Removed “One”")
+
+        shown = false
+        compose.waitForIdle()
+        assertEquals("settled on the way out", null, vm.removed.value)
+
+        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.isEmpty() }
+    }
+
+    @Test
+    fun aRemovalIsKeptOnceUndoIsGoneEvenIfTheScreenIsLeft() {
+        val list = app.container.readingList
+        runBlocking { list.save("https://a.example/one", "One"); list.save("https://b.example/two", "Two") }
+        val vm = ReadingListViewModel(list, outlive = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined))
+        compose.setContent { ReadingListScreen(vm, onBack = {}) }
+        waitFor("One")
+
+        compose.onNodeWithContentDescription("Remove One").performClick()
+        // A second removal settles the first; leaving settles the second.
+        compose.onNodeWithContentDescription("Remove Two").performClick()
+        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.map { it.title } == listOf("Two") }
+        vm.commitRemove()
+        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.isEmpty() }
     }
 }

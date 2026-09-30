@@ -303,7 +303,8 @@ allowed to read that edition's file until the phone restarts.
   site and reading time (looked up in the background). They go into the
   next edition under "Saved for later". Import and export as a Markdown
   checklist (compatible with the library); Pocket and Instapaper exports
-  import too.
+  import too. **✕** removes a link at once, with **Undo** in a snackbar, since
+  removing is routine and a confirm would only be tapped through.
 - **Settings:** the edition (size, per-source cap, order), the schedule
   (time and days), your e-reader, delivery (share or folder), reading notes, and the
   app's version.

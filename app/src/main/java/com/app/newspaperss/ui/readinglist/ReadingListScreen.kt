@@ -4,6 +4,7 @@ import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.ReadingTime
 import androidx.compose.foundation.clickable
 import android.net.Uri
+import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,12 +32,15 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,6 +78,18 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
             snackbar.showSnackbar(it)
             viewModel.dismissMessage()
         }
+    }
+    // Removing is one tap and routine, so it's undone rather than confirmed.
+    // Leaving by another tab keeps this screen's state, so the ViewModel isn't cleared: settle a
+    // waiting removal on the way out too, but not on rotation, which shows the Undo again.
+    DisposableEffect(Unit) {
+        onDispose { if ((context as? Activity)?.isChangingConfigurations != true) viewModel.commitRemove() }
+    }
+    val removed by viewModel.removed.collectAsState()
+    LaunchedEffect(removed) {
+        val gone = removed ?: return@LaunchedEffect
+        val result = snackbar.showSnackbar("Removed “${titleOf(gone)}”", actionLabel = "Undo", duration = SnackbarDuration.Long)
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoRemove() else viewModel.commitRemove()
     }
 
     Scaffold(
@@ -164,14 +180,16 @@ private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
         modifier = Modifier.clickable(onClickLabel = "Open in your browser") {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         },
-        // Before its title is found, a title made from the address reads better than the bare domain.
-        headlineContent = { Text(article.title.ifBlank { ArticleExtractor.titleFromUrl(article.url) }, maxLines = 2) },
+        headlineContent = { Text(titleOf(article), maxLines = 2) },
         supportingContent = {
             Column {
                 if (site.isNotEmpty()) Text(site, style = MaterialTheme.typography.bodySmall)
                 Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        trailingContent = { IconButton(onClick = onRemove) { Icon(Icons.Default.Close, contentDescription = "Remove") } },
+        trailingContent = { IconButton(onClick = onRemove) { Icon(Icons.Default.Close, contentDescription = "Remove ${titleOf(article)}") } },
     )
 }
+
+/** Before its title is found, a title made from the address reads better than the bare domain. */
+private fun titleOf(article: ArticleEntity) = article.title.ifBlank { ArticleExtractor.titleFromUrl(article.url) }
