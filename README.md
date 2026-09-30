@@ -41,14 +41,16 @@ who'd rather not set up Python, a server and a scheduler.
   Dropbox for a Kobo, email), a synced folder (KOReader), or Open on a
   Boox. Articles are used up only once the edition is delivered: saved to
   your folder, sent through an app you pick, or opened on a Boox.
-- **Didn't finish?** Bring articles back into tomorrow's edition.
+- **Star what you want next.** Star an article in a source's list, or one
+  from an edition you didn't finish, and it goes first into the next
+  edition. Mark the rest as read (for tt-rss too).
 - **Take notes.** Export a Markdown notes file per edition, with a citation
   and reflection prompts for each article, for Obsidian, Logseq or any notes app.
 - **Calm by design.** No unread counts, no infinite timeline, no
   animations to smear on an e-ink screen.
 
 <p>
-  <img src="docs/screenshots/05b-edition-detail.png" width="200" alt="Edition contents with bring back">
+  <img src="docs/screenshots/05b-edition-detail.png" width="200" alt="Edition contents with a star to bring an article back">
   <img src="docs/screenshots/06-sources.png" width="200" alt="Sources">
   <img src="docs/screenshots/06b-source-detail.png" width="200" alt="One source's health and recent articles">
   <img src="docs/screenshots/07-settings.png" width="200" alt="Settings">
