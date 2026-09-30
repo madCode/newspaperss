@@ -304,8 +304,8 @@ class EditionBuilder(
     companion object {
         /**
          * The edition's title: Send to Kindle takes the shared file's name as the book's title, and
-         * the Kindle library would list "edition-3". Titles are dated and never repeat within
-         * the files kept, so the name is unique.
+         * the Kindle library would list "edition-3". Titles are unique among recent editions,
+         * and a dated title ("Wednesday … Sep 30") only comes round again years later.
          */
         private fun fileNameOf(title: String) = FolderDelivery.fileName(title)
         private const val TAG = "EditionBuilder"
