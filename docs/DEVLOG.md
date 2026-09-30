@@ -15,7 +15,7 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
-### UX pass (13:00–, afternoon)
+### UX pass (13:00–15:00, afternoon)
 UX design only, no new features. Twelve patterns listed, four research sweeps (onboarding, delivery and hand-off, lists and destructive actions, settings with accessibility and e-ink), then one PR per fix, each reviewed. The options considered and what was decided for every pattern are in the session's UX report page. Pattern by pattern:
 - **Today** ([#81](https://github.com/madCode/newspaperss/pull/81)): once an edition exists, "Make another edition" is a quiet link, not the filled button; a failure reads before its Try again, and there's one retry per failure; "N starred articles are waiting for your next edition". Review caught two retry buttons in the most common failure, a retry beside Send, and a first fix that would have told TalkBack "Your edition is ready." for a failure.
 - **Edition page** ([#83](https://github.com/madCode/newspaperss/pull/83)): Delete edition moved into a ⋮ menu, away from Notes; the dialog names the edition and answers Delete edition / Keep; "You starred it" instead of a bare "Starred" beside an empty ☆.
@@ -26,6 +26,7 @@ UX design only, no new features. Twelve patterns listed, four research sweeps (o
 - **Reading list** ([#88](https://github.com/madCode/newspaperss/pull/88)): ✕ offers Undo, and says which link. Reviews sank a delete-and-restore design; the link is now hidden while Undo is offered and deleted after.
 - **Article preview** ([#90](https://github.com/madCode/newspaperss/pull/90)): "Opening…" instead of an animated bar, and long titles end in an ellipsis.
 - **Onboarding:** no change. An "Add all" button for starter packs was tried and dropped: at large text it broke pack names mid-word and lost TalkBack's checked state.
+- **Round two** ([#91](https://github.com/madCode/newspaperss/pull/91)–[#94](https://github.com/madCode/newspaperss/pull/94)): a fresh visual audit of every screen after round one found twelve more. Fixed: outlined buttons you can see on e-ink (they were a 1.2:1 line on Today's card), a filled Add a source, "sent" for editions and "Delivered" for articles, one waiting phrase, "Ready by" in Settings, a calm message for an edition that wasn't marked sent, "nothing new since your last edition", Make another edition always below the latest, and the per-site buttons on their own line at large text. Left, with reasons in the report: the disabled − and Add, the "Mark 2 as read" count, the Settings gutter, heading styles.
 - **Also:** two flaky tests fixed at the root (a settings store outliving its folder, #82; screen tests closing their database under a live screen, #89), and the pass now uses a branch per PR, so PRs no longer queue behind each other.
 
 ### Cycle 63: Send to Kindle can read the book (14:25–14:45, [#82](https://github.com/madCode/newspaperss/pull/82))
