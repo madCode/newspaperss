@@ -23,7 +23,7 @@ jobs:
           distribution: temurin
           cache: gradle
       - name: Build, unit tests and coverage
-        run: ./gradlew build koverXmlReport koverHtmlReport
+        run: ./gradlew build koverXmlReport koverHtmlReport koverVerify
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
