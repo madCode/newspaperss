@@ -42,7 +42,7 @@ class EditionDetailViewModel(
     private val id: Long,
     private val notes: EditionNotes,
     /** Takes down this edition's notification once it's deleted. */
-    private val dismissNotification: (Long) -> Unit = {},
+    private val dismissNotification: (Long) -> Unit,
 ) : ViewModel() {
     val detail: StateFlow<EditionDetail?> = combine(editions.observe(id), editions.observeContents(id)) { edition, contents ->
         EditionDetail(edition, contents, edition?.let(editions::fileOf))

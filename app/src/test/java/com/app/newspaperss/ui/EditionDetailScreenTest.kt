@@ -108,7 +108,7 @@ class EditionDetailScreenTest {
     }
 
     private fun show(editionId: Long, preferOpen: Boolean = false): EditionDetailViewModel {
-        val vm = EditionDetailViewModel(repo, editionId, notes)
+        val vm = EditionDetailViewModel(repo, editionId, notes) {}
         compose.setContent { EditionDetailScreen(vm, onBack = {}, preferOpen = preferOpen) }
         idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
         return vm

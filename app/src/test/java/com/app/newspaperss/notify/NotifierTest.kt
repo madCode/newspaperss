@@ -76,5 +76,12 @@ class NotifierTest {
 
         notifier.dismissFor(5)
         assertEquals(0, shown.allNotifications.size)
+
+        // The one that matters: a Send left up would share the deleted file.
+        clearFileProviderCache()
+        val file = java.io.File(app.filesDir, "editions/e.epub").apply { parentFile!!.mkdirs(); writeText("epub") }
+        notifier.editionReady(EditionEntity(id = 7, title = "Tuesday Morning Edition", articleCount = 7, minutes = 30.0), file)
+        notifier.dismissFor(7)
+        assertEquals(0, shown.allNotifications.size)
     }
 }

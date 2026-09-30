@@ -76,6 +76,8 @@ class EditionRun(
             val error = folder.deliver(file, folderUri, FolderDelivery.fileName(edition.title), EditionIntents.EPUB_MIME)
             if (error == null) {
                 editions.markDelivered(editionId)
+                // Deleted while its file was being copied: no news about an edition that's gone.
+                if (editions.byId(editionId)?.status != EditionStatus.DELIVERED) return
                 notifier.editionDelivered(edition, s.folderName ?: "your folder")
                 if (s.notesWithEdition) {
                     // Only after the edition is saved: notes that fail mustn't hold back the book.
@@ -91,7 +93,7 @@ class EditionRun(
                 // Left READY: the reader can still send it by hand, and nothing is used up.
                 notifier.problem("${edition.title} wasn't delivered", error)
             }
-        } else if (scheduled) {
+        } else if (scheduled && editions.byId(editionId)?.status == EditionStatus.READY) {
             notifier.editionReady(edition, file, openInstead = s.device == Device.BOOX)
         }
     }
