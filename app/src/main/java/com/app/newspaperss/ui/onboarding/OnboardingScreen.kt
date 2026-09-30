@@ -58,6 +58,7 @@ import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.core.plural
 import com.app.newspaperss.ui.components.CheckChip
+import com.app.newspaperss.ui.readinglist.ReadingListViewModel
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.sources.TtrssDialog
 import com.app.newspaperss.ui.today.Masthead
@@ -69,7 +70,7 @@ import kotlin.math.roundToInt
 
 @Composable
 /** @param sources offers importing from another reader: an OPML file or a tt-rss account. */
-fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? = null) {
+fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? = null, readingList: ReadingListViewModel? = null) {
     val s by viewModel.state.collectAsState()
     BackHandler(enabled = s.step != Step.WELCOME) { viewModel.back() }
     // Asked here, as the first edition is made, because a scheduled edition is only
@@ -92,7 +93,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
                 when (s.step) {
                     Step.WELCOME -> Welcome()
                     Step.DEVICE -> DeviceStep(s, viewModel)
-                    Step.SOURCES -> SourcesStep(s, viewModel, sources)
+                    Step.SOURCES -> SourcesStep(s, viewModel, sources, readingList)
                     Step.SIZE -> SizeStep(s, viewModel)
                 }
             }
@@ -163,10 +164,11 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel, sources: SourcesViewModel?) {
+private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel, sources: SourcesViewModel?, readingList: ReadingListViewModel?) {
     Title("What do you like to read?")
     Text("Pick a few to start. You can change them any time.", style = MaterialTheme.typography.bodyMedium)
     if (sources != null) FromAnotherReader(s.added, vm, sources)
+    if (readingList != null) SavedLinks(s.savedLinks, readingList)
     Text(
         "Saw something to read later? In any app, tap Share and choose \u201cRead in newspapeRSS\u201d.",
         style = MaterialTheme.typography.bodySmall,
@@ -242,6 +244,21 @@ private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sourc
         Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp).semantics { liveRegion = LiveRegionMode.Polite })
     }
     ttrssForm?.let { TtrssDialog(it, sources) }
+}
+
+/** For someone leaving Pocket or Instapaper: their saved links can be the whole paper. */
+@Composable
+private fun SavedLinks(saved: Int, readingList: ReadingListViewModel) {
+    val context = LocalContext.current
+    val message by readingList.message.collectAsState()
+    val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) readingList.import(context.contentResolver, uri)
+    }
+    Text("Leaving Pocket or Instapaper?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+    OutlinedButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Import your saved links") }
+    (message ?: if (saved > 0) "${plural(saved, "saved link")} waiting. That's enough to start; add sites too if you like." else null)?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp).semantics { liveRegion = LiveRegionMode.Polite })
+    }
 }
 
 @Composable

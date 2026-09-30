@@ -43,6 +43,7 @@ import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.theme.NewspaperssTheme
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
+import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.work.Connectivity
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.work.EditionScheduler
@@ -84,13 +85,17 @@ class MainActivity : ComponentActivity() {
                     false -> {
                         val context = LocalContext.current.applicationContext
                         val vm = viewModel {
-                            OnboardingViewModel(container.settings, container.sources, container.feedFinder, createSavedStateHandle()) { saved ->
+                            OnboardingViewModel(
+                                container.settings, container.sources, container.feedFinder, createSavedStateHandle(),
+                                savedLinks = container.readingList.observe().map { list -> list.count { it.state == ArticleState.NEW } },
+                            ) { saved ->
                                 container.appScope.launch { EditionScheduler.reschedule(context, saved) }
                                 EditionWorker.buildNow(context)
                             }
                         }
                         val sources = viewModel { SourcesViewModel(container.sources, container.feedFinder, container.ttrss) { SyncWorker.syncNow(context) } }
-                        OnboardingScreen(vm, sources)
+                        val readingList = viewModel { ReadingListViewModel(container.readingList) }
+                        OnboardingScreen(vm, sources, readingList)
                     }
                     true -> App(container, preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX)
                 }

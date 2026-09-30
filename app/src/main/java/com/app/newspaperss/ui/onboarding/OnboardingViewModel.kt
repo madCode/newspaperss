@@ -14,6 +14,8 @@ import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,13 +43,16 @@ data class OnboardingState(
     val finishing: Boolean = false,
     /** Sources already saved, from a tt-rss account or an OPML import made during onboarding. */
     val added: Int = 0,
+    /** Links waiting in the reading list, e.g. from a Pocket or Instapaper import made during onboarding. */
+    val savedLinks: Int = 0,
 ) {
     /** KOReader reads from a synced folder, so it's offered folder delivery. */
     val needsFolder get() = device == Device.KOREADER
     val canContinue get() = when (step) {
         Step.WELCOME -> true
         Step.DEVICE -> device != null
-        Step.SOURCES -> chosen.isNotEmpty() || added > 0
+        // Saved links alone are enough: for someone leaving Pocket, they're the paper.
+        Step.SOURCES -> chosen.isNotEmpty() || added > 0 || savedLinks > 0
         Step.SIZE -> !finishing
     }
 }
@@ -58,6 +63,8 @@ class OnboardingViewModel(
     private val finder: FeedFinder,
     /** Survives process death: the folder picker or the Play Store can get the app killed mid-flow. */
     private val saved: SavedStateHandle = SavedStateHandle(),
+    /** How many links wait in the reading list; any is enough to start with. */
+    savedLinks: Flow<Int> = flowOf(0),
     /** Schedules the timer and starts the first edition once onboarding is saved. */
     private val onFinished: (Settings) -> Unit,
 ) : ViewModel() {
@@ -66,6 +73,7 @@ class OnboardingViewModel(
 
     init {
         viewModelScope.launch { _state.collect { store(it, saved) } }
+        viewModelScope.launch { savedLinks.collect { n -> _state.update { it.copy(savedLinks = n) } } }
     }
 
     fun next() = _state.update { s -> if (!s.canContinue) s else s.copy(step = Step.entries.getOrElse(s.step.ordinal + 1) { s.step }) }
@@ -112,7 +120,8 @@ class OnboardingViewModel(
         _state.update { it.copy(finishing = true) }
         viewModelScope.launch {
             // The database, not state.added, which the screen may not have reported yet.
-            if (s.chosen.isEmpty() && sources.observe().first().none { it.kind != SourceKind.READING_LIST }) {
+            val hasFeeds = sources.observe().first().any { it.kind != SourceKind.READING_LIST }
+            if (s.chosen.isEmpty() && !hasFeeds && state.value.savedLinks == 0) {
                 _state.update { it.copy(finishing = false) }
                 return@launch
             }

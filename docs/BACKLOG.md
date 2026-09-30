@@ -11,7 +11,6 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 *live* (building real editions), *a11y* (the accessibility audit).
 
 ### Onboarding and setup
-- [ ] Saved links in onboarding: Pocket/Instapaper import there, and a reading-list-only setup *(personas)*
 - [ ] A short Kindle how-to: same Amazon account, pick the device in Send to Kindle, Library › Docs *(personas)*
 - [ ] Explain per device what counts as "delivered" *(personas)*
 
@@ -155,6 +154,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Saved links in onboarding: import a Pocket or Instapaper export there, and start with saved links alone
 - [x] "No feed found" in Sources offers to save the page to the reading list instead of a dead end
 - [x] Change the e-reader in Settings after onboarding (it decides Send or Open, and the tips)
 - [x] Deleting an edition takes down its "ready" or "delivered" notification, whose Send would have shared a missing file
