@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.assertIsEnabled
@@ -426,6 +427,8 @@ class EditionDetailScreenTest {
         idleUntil { vm.state.value.editions?.size == 1 && vm.state.value.build is BuildState.Failed }
 
         assertEquals("said once", 1, compose.onAllNodes(hasText(EditionBuilder.UNEXPECTED)).fetchSemanticsNodes().size)
+        // In the status line, where TalkBack announces a build's result.
+        compose.onNodeWithTag(BUILD_STATUS).assertTextEquals(EditionBuilder.UNEXPECTED)
 
         assertEquals(1, compose.onAllNodes(hasText("Try again") and hasClickAction()).fetchSemanticsNodes().size)
         compose.onNodeWithText("Make another edition").assertDoesNotExist()

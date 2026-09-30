@@ -96,15 +96,17 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
             state.build is BuildState.Failed -> MakeButton.RETRY
             else -> MakeButton.ANOTHER
         }
-        // A build that failed making an edition leaves the reason on the edition's card too.
-        val build = state.build.let { if (it is BuildState.Failed && latest?.status == EditionStatus.FAILED && it.reason == latest.error) BuildState.Idle else it }
+        // A build that failed making an edition leaves its reason on the card too; the status line
+        // keeps it, so TalkBack announces it, and the card doesn't say it again.
+        val saidAbove = (state.build as? BuildState.Failed)?.reason
         // The same key in both places: only one exists at a time, and it moves rather than restarts.
-        if (!readyWaiting) item(key = "build") { BuildPanel(build, announcer, make, onMake = viewModel::makeOneNow) }
+        if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
         if (latest != null) {
             item(key = "latest") {
                 LatestEdition(
                     latest,
                     first = editions.size == 1,
+                    saidAbove = saidAbove,
                     deviceName = state.deviceName,
                     preferOpen = state.preferOpen,
                     offerOpen = state.offerOpen,
@@ -121,7 +123,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 )
             }
         }
-        if (readyWaiting) item(key = "build") { BuildPanel(build, announcer, make, onMake = viewModel::makeOneNow) }
+        if (readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, onMake = viewModel::makeOneNow) }
         if (editions.size > 1) {
             item(key = "earlier") {
                 Text(
@@ -218,6 +220,7 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeB
 private fun LatestEdition(
     edition: EditionEntity,
     first: Boolean,
+    saidAbove: String?,
     deviceName: String,
     preferOpen: Boolean,
     offerOpen: Boolean,
@@ -232,7 +235,7 @@ private fun LatestEdition(
             Column(Modifier.fillMaxWidth().clickable(onClickLabel = "See what's inside", onClick = onDetails)) {
                 Text(edition.title, style = MaterialTheme.typography.headlineSmall)
                 // An empty failed edition's summary is just "Not sent", which its error already says.
-                if (!(edition.status == EditionStatus.FAILED && edition.articleCount == 0 && edition.error != null)) {
+                if (!(edition.status == EditionStatus.FAILED && edition.articleCount == 0 && edition.error != null && edition.error != saidAbove)) {
                     Text(summary(edition), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
                 }
             }
@@ -272,11 +275,8 @@ private fun LatestEdition(
                     if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }
                 }
                 EditionStatus.FAILED -> {
-                    Text(
-                        edition.error ?: "This edition couldn't be made.",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+                    val error = edition.error ?: "This edition couldn't be made."
+                    if (error != saidAbove) Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
                     OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") }
                 }
                 EditionStatus.BUILDING, EditionStatus.DELETED -> {}
