@@ -21,6 +21,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
 - [ ] "No feed found": offer to save the page to the reading list instead *(personas)*
 - [ ] Decide what tapping an article in a source's list does: open the original, render it, or offer "add to the next edition" *(device)*
+- [ ] Page cleanup's furniture patterns ("Recommended stories", "Subscribe to", "Read more:") are English only, so "Lire aussi", "Mehr zum Thema" and "Lee también" slip into French, German and Spanish articles. Key them by the article's language *(live)*
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
 - [ ] Webcomic title text (xkcd's hover text) is dropped; show it as a caption *(device)*
 
