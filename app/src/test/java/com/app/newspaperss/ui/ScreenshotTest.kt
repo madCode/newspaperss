@@ -35,6 +35,7 @@ import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
+import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
@@ -53,7 +54,6 @@ import com.app.newspaperss.ui.sources.SourceDetailScreen
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -72,15 +72,14 @@ import java.time.Instant
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = TestApp::class, qualifiers = "w411dp-h891dp-xxhdpi")
 class ScreenshotTest {
-    @get:Rule val compose = createComposeRule()
-    @get:Rule val tmp = TemporaryFolder()
+    @get:Rule(order = 0) val closeDb = closeAfter { db.close() }
+    @get:Rule(order = 1) val tmp = TemporaryFolder()
+    @get:Rule(order = 2) val compose = createComposeRule()
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
     private val store by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
     private val out = File("build/screenshots").apply { mkdirs() }
-
-    @After fun close() = db.close()
 
     /** [act] runs once [ready], before the capture, e.g. to enter a mode through the UI. */
     private fun shoot(name: String, ready: () -> Boolean = { true }, act: () -> Unit = {}, content: @Composable () -> Unit) {
@@ -248,7 +247,9 @@ class ScreenshotTest {
                 val first = hasText("Talks resume after a week of storms") and hasClickAction()
                 compose.onNode(hasScrollAction()).performScrollToNode(first)
                 compose.onNode(first).performClick()
-                compose.onNode(hasText("The town that voted to keep its library open") and hasClickAction()).performClick()
+                val second = hasText("The town that voted to keep its library open") and hasClickAction()
+                compose.onNode(hasScrollAction()).performScrollToNode(second)
+                compose.onNode(second).performClick()
             },
         ) { SourceDetailScreen(vm, onBack = {}) }
     }
