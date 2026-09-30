@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.notes.Reflection
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
@@ -121,6 +122,22 @@ class EditionBuilderTest {
         }
         assertEquals(ArticleState.IN_EDITION, stateOf("a2"))
         assertEquals("the second article of a capped source waits", ArticleState.NEW, stateOf("a1"))
+    }
+
+    @Test
+    fun theClosingPageAsksTheSameQuestionTheNotesStartWith() = runTest {
+        // What she turned over on the Kindle is waiting in her notes app.
+        source("a", null, "a1")
+        val first = (builder.build(EditionSettings()) as BuildResult.Built).editionId
+        val question = Reflection.forEdition(first)
+
+        val end = ZipFile(editions.fileOf(db.editions().byId(first)!!)!!).use { zip ->
+            javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(zip.getInputStream(zip.getEntry("OEBPS/end.xhtml"))).documentElement.textContent
+        }
+        assertTrue(end.contains(question))
+        val notes = EditionNotes(db, tmp.newFolder("notes")).write(first)!!.readText()
+        assertTrue(notes.contains("From the end of the paper: *$question*"))
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
 import com.app.newspaperss.core.epub.EpubImage
+import com.app.newspaperss.core.notes.Reflection
 import com.app.newspaperss.core.plural
 import com.app.newspaperss.core.net.hostOf
 import com.app.newspaperss.core.epub.EpubWriter
@@ -192,6 +193,7 @@ class EditionBuilder(
             },
             modified = clock.instant(),
             cover = coverImage,
+            reflection = Reflection.forEdition(editionId),
         )
         // The try is inside withContext so a cancellation surfacing from it isn't reported as
         // a write error.

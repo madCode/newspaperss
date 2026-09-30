@@ -35,7 +35,8 @@ who'd rather not set up Python, a server and a scheduler.
   paper is there when you wake.
 - **A proper book.** A cover with the day's headlines, contents with reading
   times, bylines and a link to each original, images and comics sized for
-  e-ink, each article tagged with its language, and an end page. Preview any
+  e-ink, each article tagged with its language, and an end page with a question to
+  think about. Preview any
   article in the app as your e-reader will show it.
 - **Delivered your way.** A notification with a Send button (Kindle app,
   Dropbox for a Kobo, email), a synced folder (KOReader), or Open on a
@@ -45,9 +46,10 @@ who'd rather not set up Python, a server and a scheduler.
   from an edition you didn't finish, and it goes first into the next
   edition. Mark the rest as read (for tt-rss too).
 - **Take notes.** A Markdown notes file per edition for Obsidian, Logseq or
-  any notes app: properties Obsidian understands, a few reflection prompts, and a
-  citation and room for notes under each article. Pick a folder (your vault) and
-  each delivered edition's notes are saved there, however you send the edition.
+  any notes app: properties Obsidian understands, the end page's question, a
+  few reflection prompts, and a citation and room for notes under each
+  article. Pick a folder (your vault) and each delivered edition's notes are
+  saved there, however you send the edition.
 - **Calm by design.** No unread counts, no infinite timeline, no
   animations to smear on an e-ink screen.
 

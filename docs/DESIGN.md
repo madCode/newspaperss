@@ -142,7 +142,9 @@ module so it's all unit-tested without Android.
   - each article: section and source, headline, "By … · date · N min read",
     the body, an end mark, "Read the original at site", and a "Next" link
     with its source and time; then "That's all for today" with the day's
-    totals and, if given, a question to reflect on;
+    totals and a question to think about, one of a short list of open
+    questions that suit any paper ("What surprised you?"). It usually differs from
+    one edition to the next, and the notes file shows the same one;
   - styles Kindle's conversion keeps: plain class selectors, relative
     sizes, no side margins, headings aligned explicitly;
   - images as JPEG up to 1200px, about 15 MB in all including the cover, up
@@ -248,8 +250,8 @@ articles go back, keeping their stars, before the new one is planned.
 - **Edition:** its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
   network). **Notes** exports a Markdown file for a notes app: front matter
-  (date, edition, sources, a tag) for Obsidian, a few reflection prompts at the
-  top, then per article its source, author, date, link, a citation and room for notes.
+  (date, edition, sources, a tag) for Obsidian, the closing page's question and
+  a few reflection prompts at the top, then per article its source, author, date, link, a citation and room for notes.
   **Delete**. An article that went in because it was starred says
   "Starred". On delivered editions each article has a trailing **☆** to
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").

@@ -70,6 +70,13 @@ class NotesWriterTest {
     }
 
     @Test
+    fun theClosingPagesQuestionComesBeforeThePrompts() {
+        val notes = NotesWriter.write(edition().copy(question = "What surprised you?"))
+        assertTrue(notes.contains("# Tuesday Morning Edition\n\nFrom the end of the paper: *What surprised you?*\n\nPick one piece"))
+        assertEquals("a blank question adds nothing", NotesWriter.write(edition()), NotesWriter.write(edition().copy(question = " ")))
+    }
+
+    @Test
     fun missingDetailsAreLeftOutRatherThanLeftBlank() {
         val notes = NotesWriter.write(edition(NotesArticle("A story", "Blog", url = null, author = " ", published = null)))
 

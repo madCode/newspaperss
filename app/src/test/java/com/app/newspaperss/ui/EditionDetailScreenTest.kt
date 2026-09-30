@@ -26,6 +26,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.notes.NotesArticle
 import com.app.newspaperss.core.notes.NotesEdition
 import com.app.newspaperss.core.notes.NotesWriter
+import com.app.newspaperss.core.notes.Reflection
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
@@ -277,6 +278,7 @@ class EditionDetailScreenTest {
                     NotesArticle("Kept", "Example News", "https://example.com/a", "Jane Doe", LocalDate.of(2026, 9, 28)),
                     NotesArticle("Orphan", "Old Blog", url = null),
                 ),
+                question = Reflection.forEdition(editionId),
             ),
         )
         assertEquals(expected, File(notes.notesDir, "Tuesday Morning Edition notes.md").readText())

@@ -6,6 +6,8 @@ data class NotesEdition(
     val title: String,
     val date: LocalDate,
     val articles: List<NotesArticle>,
+    /** The closing page's question ([Reflection]), shown above the prompts. */
+    val question: String? = null,
 )
 
 data class NotesArticle(
@@ -43,6 +45,8 @@ object NotesWriter {
         append("tags:\n  - newspaperss\n")
         append("---\n\n")
         append("# ").append(editionTitle).append("\n\n")
+        // Its own line, in the book's words: the prompts below are in the reader's own voice.
+        edition.question?.takeIf { it.isNotBlank() }?.let { append("From the end of the paper: *").append(text(it)).append("*\n\n") }
         append("Pick one piece that stayed with you. Some questions to start:\n\n")
         PROMPTS.forEach { append("- ").append(it).append('\n') }
         for (article in edition.articles) {
