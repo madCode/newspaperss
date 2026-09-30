@@ -3,10 +3,12 @@ package com.app.newspaperss.ui
 import android.content.Intent
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.ui.readinglist.ReadingListScreen
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
@@ -48,5 +50,35 @@ class ReadingListScreenTest {
         val opened = shadowOf(app).nextStartedActivity
         assertEquals(Intent.ACTION_VIEW, opened.action)
         assertEquals("https://b.example/long-read", opened.dataString)
+    }
+
+    @Test
+    fun aRemovedLinkCanBeUndoneAndComesBackAsItWas() {
+        val list = app.container.readingList
+        runBlocking { list.save("https://b.example/long-read", "A long read") }
+        val before = runBlocking { app.container.db.articles().allForSource(list.sourceId()).single() }
+        val vm = ReadingListViewModel(list)
+        compose.setContent { ReadingListScreen(vm, onBack = {}) }
+        waitFor("A long read")
+
+        // Named, so TalkBack doesn't read "Remove" on every row alike.
+        compose.onNodeWithContentDescription("Remove A long read").performClick()
+        waitFor("Removed “A long read”")
+        compose.onNodeWithText("Undo").performClick()
+
+        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) } == listOf(before) }
+    }
+
+    @Test
+    fun aLinkRemovedFromAnUnsentEditionComesBackWaiting() = runBlocking {
+        // Removing it unlinked it from that edition, which would never deliver or release it.
+        val list = app.container.readingList
+        list.save("https://b.example/long-read", "A long read")
+        val article = app.container.db.articles().allForSource(list.sourceId()).single().copy(state = ArticleState.IN_EDITION)
+        list.remove(article)
+
+        list.restore(article)
+
+        assertEquals(ArticleState.NEW, app.container.db.articles().allForSource(list.sourceId()).single().state)
     }
 }

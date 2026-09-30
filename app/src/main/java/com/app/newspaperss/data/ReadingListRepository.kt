@@ -58,6 +58,15 @@ class ReadingListRepository(
 
     suspend fun remove(article: ArticleEntity) = db.articles().delete(article.id)
 
+    /**
+     * Puts back a link just removed, as it was, except one that was in an unsent edition: removing
+     * it unlinked it from that edition, which would never mark it delivered or give it back, so it
+     * waits for the next one instead.
+     */
+    suspend fun restore(article: ArticleEntity) {
+        db.articles().insertIgnoring(if (article.state == ArticleState.IN_EDITION) article.copy(state = ArticleState.NEW) else article)
+    }
+
     /** @property unread how many of the [added] links are waiting for an edition (archived ones aren't). */
     data class Imported(val format: ReadingListFile.Format, val added: Int, val unread: Int = added)
 

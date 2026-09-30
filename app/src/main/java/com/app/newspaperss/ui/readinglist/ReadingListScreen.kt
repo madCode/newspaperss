@@ -31,8 +31,10 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -74,6 +76,13 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
             snackbar.showSnackbar(it)
             viewModel.dismissMessage()
         }
+    }
+    // Removing is one tap and routine, so it's undone rather than confirmed.
+    val removed by viewModel.removed.collectAsState()
+    LaunchedEffect(removed) {
+        val article = removed ?: return@LaunchedEffect
+        val result = snackbar.showSnackbar("Removed “${titleOf(article)}”", actionLabel = "Undo", duration = SnackbarDuration.Long)
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoRemove(article) else viewModel.dismissRemoved()
     }
 
     Scaffold(
@@ -164,14 +173,16 @@ private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
         modifier = Modifier.clickable(onClickLabel = "Open in your browser") {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         },
-        // Before its title is found, a title made from the address reads better than the bare domain.
-        headlineContent = { Text(article.title.ifBlank { ArticleExtractor.titleFromUrl(article.url) }, maxLines = 2) },
+        headlineContent = { Text(titleOf(article), maxLines = 2) },
         supportingContent = {
             Column {
                 if (site.isNotEmpty()) Text(site, style = MaterialTheme.typography.bodySmall)
                 Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        trailingContent = { IconButton(onClick = onRemove) { Icon(Icons.Default.Close, contentDescription = "Remove") } },
+        trailingContent = { IconButton(onClick = onRemove) { Icon(Icons.Default.Close, contentDescription = "Remove ${titleOf(article)}") } },
     )
 }
+
+/** Before its title is found, a title made from the address reads better than the bare domain. */
+private fun titleOf(article: ArticleEntity) = article.title.ifBlank { ArticleExtractor.titleFromUrl(article.url) }

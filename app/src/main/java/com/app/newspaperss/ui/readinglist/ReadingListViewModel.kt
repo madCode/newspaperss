@@ -36,9 +36,23 @@ class ReadingListViewModel(private val list: ReadingListRepository) : ViewModel(
         return true
     }
 
+    private val _removed = MutableStateFlow<ArticleEntity?>(null)
+    /** The link just removed, offered back until the reader moves on. */
+    val removed: StateFlow<ArticleEntity?> = _removed.asStateFlow()
+
     fun remove(article: ArticleEntity) {
-        viewModelScope.launch { list.remove(article) }
+        viewModelScope.launch {
+            list.remove(article)
+            _removed.value = article
+        }
     }
+
+    fun undoRemove(article: ArticleEntity) {
+        viewModelScope.launch { list.restore(article) }
+        _removed.value = null
+    }
+
+    fun dismissRemoved() { _removed.value = null }
 
     // Files come from the system picker, often a cloud provider: reads and writes can be slow or fail.
     fun import(resolver: ContentResolver, uri: Uri) {
