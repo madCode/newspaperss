@@ -413,7 +413,8 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
         title = { Text(if (state is AddState.Choosing) "Which part of this site?" else "Add a source") },
         text = {
             when (state) {
-                is AddState.Editing -> Column {
+                // Scrolls: at large text an error plus the curated lists can outgrow the dialog.
+                is AddState.Editing -> Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text("Paste a website or feed address.", modifier = Modifier.padding(bottom = 8.dp))
                     OutlinedTextField(
                         value = state.input,

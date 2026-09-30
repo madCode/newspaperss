@@ -61,12 +61,12 @@ class FeedFinderTest {
 
     @Test
     fun anErrorAnswerSaysWhatItMeansAndWhatToTry() = runTest {
-        val finder = FeedFinder(FakeHttp(emptyMap(), mapOf("https://blocked.example" to 403, "https://down.example" to 503, "https://odd.example" to 418)))
+        val finder = FeedFinder(FakeHttp(emptyMap(), mapOf("https://blocked.example" to 403, "https://down.example" to 502, "https://odd.example" to 418)))
         assertEquals(
-            "https://blocked.example turned newspapeRSS away (error 403). Some sites block apps; if it lists a feed or RSS link, try that address.",
+            "https://blocked.example turned newspapeRSS away (error 403). Some sites block apps: try its feed or RSS link if it lists one, or try again later.",
             (finder.find("blocked.example") as FindResult.NotFound).reason,
         )
-        assertEquals("https://down.example isn't working right now (error 503). Try again later.", (finder.find("down.example") as FindResult.NotFound).reason)
+        assertEquals("https://down.example isn't working right now (error 502). Try again later.", (finder.find("down.example") as FindResult.NotFound).reason)
         assertEquals("https://odd.example answered with error 418.", (finder.find("odd.example") as FindResult.NotFound).reason)
     }
 

@@ -23,7 +23,8 @@ class FeedFinder(private val http: HttpClient) {
     /** What an error answer means for someone adding a site, with the code kept for anyone who asks. */
     private fun refused(url: String, code: Int): String = when (code) {
         404, 410 -> "There's nothing at $url. Check the address."
-        401, 403, 429 -> "$url turned newspapeRSS away (error $code). Some sites block apps; if it lists a feed or RSS link, try that address."
+        // The codes ArticleExtractor counts as blocked: a Cloudflare wall answers 503, a paywall 402.
+        401, 402, 403, 429, 503 -> "$url turned newspapeRSS away (error $code). Some sites block apps: try its feed or RSS link if it lists one, or try again later."
         in 500..599 -> "$url isn't working right now (error $code). Try again later."
         else -> "$url answered with error $code."
     }
