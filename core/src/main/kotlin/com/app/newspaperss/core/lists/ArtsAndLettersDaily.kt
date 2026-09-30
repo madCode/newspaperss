@@ -56,5 +56,6 @@ object ArtsAndLettersDaily : CuratedList {
     }
 
     /** The entry's last link, if it's the "more »" one: a link in the teaser can start with "more" too. */
-    private fun moreLink(entry: Element): Element? = entry.select("a[href]").lastOrNull()?.takeIf { it.text().startsWith("more") }
+    private fun moreLink(entry: Element): Element? =
+        entry.select("a[href]").lastOrNull()?.takeIf { it.text().startsWith("more") && it.text().endsWith("»") }
 }
