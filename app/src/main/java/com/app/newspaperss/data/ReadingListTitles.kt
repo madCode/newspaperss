@@ -8,7 +8,8 @@ import java.io.IOException
 /**
  * Looks up saved links' pages before they reach an edition: the title of one
  * that arrived without one, so the reading list shows a headline instead of a
- * bare domain, and every one's length, for its reading time.
+ * bare domain, and every one's length, for its reading time. Curated lists'
+ * untitled links are looked up the same way.
  */
 class ReadingListTitles(private val db: AppDatabase, private val http: HttpClient) {
     /** Returns false if a page couldn't be reached, so the lookup is worth trying again later. */

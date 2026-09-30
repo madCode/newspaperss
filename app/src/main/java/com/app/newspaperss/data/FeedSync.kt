@@ -40,6 +40,12 @@ class FeedSync(
     private val ttrssAccounts: TtrssAccountStore? = null,
     /** How many unpicked links a curated list keeps; older ones expire as new ones arrive. */
     private val listKeep: Int = 12,
+    /**
+     * Given the ids of curated-list links that came without a title, to look up in the background
+     * (see [ReadingListTitles]): Arts & Letters Daily gives only a teaser, and a source's page
+     * would otherwise list its picks by site name. Must return quickly.
+     */
+    private val onUntitled: (articleIds: List<Long>) -> Unit = {},
 ) {
     suspend fun syncAll(): SyncResult = coroutineScope {
         val feeds = db.sources().all().filter { it.kind != SourceKind.READING_LIST && !it.paused }
@@ -210,6 +216,8 @@ class FeedSync(
                         ).also { db.articles().keepNewest(source.id, listKeep) }
                     }
                     db.sources().recordSuccess(source.id, now, null, null, source.title)
+                    // All untitled ones, not just new ones, so a lookup that failed is tried again.
+                    db.articles().untitledWaiting(source.id).takeIf { it.isNotEmpty() }?.let(onUntitled)
                     return added
                 }
                 "The site answered with error ${response.code}."
