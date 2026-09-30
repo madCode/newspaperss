@@ -110,8 +110,7 @@ translation, so it goes to volunteers who read the language. What that needs fir
 - the app's text moved out of the code into `strings.xml` (today almost all of it is written
   inline in the screens), and the book's own words ("Contents", "min read") into a table per language;
 - a CONTRIBUTING section on how to translate: which file to copy, how to test it, how to send it;
-- optionally a hosted tool such as Weblate, whose free plan for open-source projects needs a
-  license on the repo;
+- optionally a hosted tool such as Weblate (free for open-source projects; the repo is MIT);
 - then a call for translators in the README.
 
 ### Listen: the paper as an audiobook

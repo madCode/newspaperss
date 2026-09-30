@@ -82,3 +82,7 @@ JDK 21 and the Android SDK (API 37):
 the EPUB writer) with fast JVM tests; `:app` is the Android app (Compose,
 Room, WorkManager). Screenshots come from `ScreenshotTest`, which renders
 each screen under Robolectric into `app/build/screenshots`.
+
+## License
+
+MIT: see [LICENSE](LICENSE).
