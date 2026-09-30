@@ -35,7 +35,7 @@ object NotesWriter {
         append("---\n")
         append("date: ").append(edition.date).append('\n')
         append("edition: ").append(yaml(edition.title)).append('\n')
-        val sources = edition.articles.map { it.sourceTitle.replace(whitespace, " ").trim() }.filter { it.isNotEmpty() }.distinct()
+        val sources = edition.articles.map { it.sourceTitle.replace(whitespace, " ").replace(controls, "").trim() }.filter { it.isNotEmpty() }.distinct()
         if (sources.isNotEmpty()) {
             append("sources:\n")
             sources.forEach { append("  - ").append(yaml(it)).append('\n') }
@@ -60,9 +60,15 @@ object NotesWriter {
         }
     }
 
-    /** A double-quoted YAML string: only backslash and quote need escaping, once it's one line. */
+    /**
+     * A double-quoted YAML string. Control characters go: titles can carry a stray one (a decoded
+     * `&#7;`), and strict parsers reject the whole front matter over it.
+     */
     private fun yaml(value: String): String =
-        "\"" + value.replace(whitespace, " ").trim().replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        "\"" + value.replace(whitespace, " ").replace(controls, "").trim()
+            .replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+    private val controls = Regex("""[\u0000-\u001F\u007F-\u009F]""")
 
     /** A simple MLA-like line: Author. "Title." *Source*, date. link */
     private fun citation(title: String, source: String, author: String?, article: NotesArticle): String =

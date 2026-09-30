@@ -141,4 +141,18 @@ class NotesWriterTest {
         assertTrue("edition: \"The \\\"Big\\\" \\\\ Edition\"" in front)
         assertTrue("  - \"Says \\\"hi\\\" there\"" in front)
     }
+
+    @Test
+    fun controlCharactersAreDroppedFromTheFrontMatterAndSourcesListedOnce() {
+        val notes = NotesWriter.write(
+            NotesEdition(
+                "Bell\u0007 Edition",
+                LocalDate.of(2026, 9, 29),
+                listOf(NotesArticle("A", "Blog\u007F", null), NotesArticle("B", "Blog", null)),
+            ),
+        )
+        val front = notes.lines().takeWhile { it != "tags:" }
+        assertTrue("edition: \"Bell Edition\"" in front)
+        assertEquals(listOf("  - \"Blog\""), front.filter { it.startsWith("  - ") })
+    }
 }
