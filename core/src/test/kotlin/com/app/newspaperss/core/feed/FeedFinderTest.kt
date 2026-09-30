@@ -11,11 +11,12 @@ import org.junit.Test
 import java.io.IOException
 
 class FeedFinderTest {
-    private class FakeHttp(private val pages: Map<String, String>) : HttpClient {
+    private class FakeHttp(private val pages: Map<String, String>, private val codes: Map<String, Int> = emptyMap()) : HttpClient {
         val requested = mutableListOf<String>()
         override suspend fun get(url: String): HttpResponse {
             requested += url
             if (url.contains("unreachable")) throw IOException("no route")
+            codes[url]?.let { return HttpResponse(it, url, "text/html", "error") }
             val body = pages[url] ?: return HttpResponse(404, url, "text/html", "not found")
             return HttpResponse(200, url, null, body)
         }
@@ -59,11 +60,22 @@ class FeedFinderTest {
     }
 
     @Test
+    fun anErrorAnswerSaysWhatItMeansAndWhatToTry() = runTest {
+        val finder = FeedFinder(FakeHttp(emptyMap(), mapOf("https://blocked.example" to 403, "https://down.example" to 503, "https://odd.example" to 418)))
+        assertEquals(
+            "https://blocked.example turned newspapeRSS away (error 403). Some sites block apps; if it lists a feed or RSS link, try that address.",
+            (finder.find("blocked.example") as FindResult.NotFound).reason,
+        )
+        assertEquals("https://down.example isn't working right now (error 503). Try again later.", (finder.find("down.example") as FindResult.NotFound).reason)
+        assertEquals("https://odd.example answered with error 418.", (finder.find("odd.example") as FindResult.NotFound).reason)
+    }
+
+    @Test
     fun explainsFailures() = runTest {
         val finder = FeedFinder(FakeHttp(mapOf("https://example.com" to "<html></html>")))
         assertTrue((finder.find("not a url") as FindResult.NotFound).reason.contains("web address"))
         assertTrue((finder.find("unreachable.example") as FindResult.NotFound).reason.contains("reach"))
-        assertTrue((finder.find("missing.example") as FindResult.NotFound).reason.contains("404"))
+        assertTrue((finder.find("missing.example") as FindResult.NotFound).reason.contains("Check the address"))
         assertTrue((finder.find("example.com") as FindResult.NotFound).reason.contains("No feed"))
     }
 

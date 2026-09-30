@@ -20,14 +20,22 @@ sealed interface FindResult {
  */
 class FeedFinder(private val http: HttpClient) {
 
+    /** What an error answer means for someone adding a site, with the code kept for anyone who asks. */
+    private fun refused(url: String, code: Int): String = when (code) {
+        404, 410 -> "There's nothing at $url. Check the address."
+        401, 403, 429 -> "$url turned newspapeRSS away (error $code). Some sites block apps; if it lists a feed or RSS link, try that address."
+        in 500..599 -> "$url isn't working right now (error $code). Try again later."
+        else -> "$url answered with error $code."
+    }
+
     suspend fun find(input: String): FindResult {
         val url = normalize(input) ?: return FindResult.NotFound("That doesn't look like a web address.")
         val response = try {
             http.get(url)
         } catch (e: IOException) {
-            return FindResult.NotFound("Couldn't reach $url.")
+            return FindResult.NotFound("Couldn't reach $url. Check the address and your connection.")
         }
-        if (!response.isSuccessful) return FindResult.NotFound("$url answered with error ${response.code}.")
+        if (!response.isSuccessful) return FindResult.NotFound(refused(url, response.code))
 
         if (FeedParser.looksLikeFeed(response.body)) {
             val title = runCatching { FeedParser.parse(response.body, response.finalUrl).title }.getOrNull()
