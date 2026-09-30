@@ -7,6 +7,7 @@ import com.app.newspaperss.core.ttrss.TtrssClient
 import com.app.newspaperss.core.ttrss.TtrssException
 import kotlinx.coroutines.CancellationException
 import java.io.IOException
+import java.io.InterruptedIOException
 
 /** Connecting a tt-rss account, forgetting it, and telling tt-rss what was delivered. */
 class TtrssRepository(
@@ -37,7 +38,10 @@ class TtrssRepository(
         } catch (e: TtrssException) {
             return Check.Failed(e.message ?: "tt-rss reported an error.")
         } catch (e: IOException) {
-            return Check.Failed("Couldn't reach ${address.trim()}. Check the address and your connection.")
+            return Check.Failed(
+                if (e is InterruptedIOException) "${address.trim()} took too long to answer. Try again in a moment."
+                else "Couldn't reach ${address.trim()}. Check the address and your connection.",
+            )
         } finally {
             logOut(client)
         }
@@ -103,7 +107,7 @@ class TtrssRepository(
         } catch (e: TtrssException) {
             Categories.Failed(e.message ?: "tt-rss reported an error.")
         } catch (e: IOException) {
-            Categories.Failed("Couldn't reach tt-rss.")
+            Categories.Failed(FeedSync.ttrssUnreachable(e))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -150,7 +154,7 @@ class TtrssRepository(
         } catch (e: TtrssException) {
             return e.message ?: "tt-rss reported an error."
         } catch (e: IOException) {
-            return "Couldn't reach tt-rss."
+            return FeedSync.ttrssUnreachable(e)
         } finally {
             logOut(client)
         }
@@ -189,7 +193,7 @@ class TtrssRepository(
         } catch (e: TtrssException) {
             e.message to (e is TtrssException.HttpError)
         } catch (e: IOException) {
-            "Couldn't reach tt-rss." to true
+            FeedSync.ttrssUnreachable(e) to true
         } finally {
             logOut(client)
         }

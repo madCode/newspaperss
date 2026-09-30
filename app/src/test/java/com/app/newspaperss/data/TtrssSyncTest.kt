@@ -64,6 +64,9 @@ class TtrssSyncTest {
             "Couldn't reach rss.example.com/tt-rss. Check the address and your connection.",
             ttrss.connect("rss.example.com/tt-rss", "reader", "secret"),
         )
+        http.unreachable.clear()
+        http.timingOut += server.apiUrl
+        assertEquals("rss.example.com/tt-rss took too long to answer. Try again in a moment.", ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
         assertEquals(StoredAccount.None, accounts.load())
         assertTrue(db.sources().all().isEmpty())
     }
@@ -208,7 +211,13 @@ class TtrssSyncTest {
         sync.syncAll()
         assertEquals("Couldn't reach tt-rss.", db.sources().byId(source.id)!!.lastError)
 
+        // A slow home server isn't a connection problem, and shouldn't send the reader to check one.
         http.unreachable.clear()
+        http.timingOut += server.apiUrl
+        sync.syncAll()
+        assertEquals("tt-rss took too long to answer. It'll be tried again at the next sync.", db.sources().byId(source.id)!!.lastError)
+
+        http.timingOut.clear()
         sync.syncAll()
         assertNull(db.sources().byId(source.id)!!.lastError)
     }

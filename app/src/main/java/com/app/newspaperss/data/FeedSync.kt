@@ -24,6 +24,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.time.Clock
 import java.time.Duration
 
@@ -172,7 +173,7 @@ class FeedSync(
             } catch (e: TtrssException) {
                 e.message ?: "tt-rss reported an error."
             } catch (e: IOException) {
-                "Couldn't reach tt-rss."
+                ttrssUnreachable(e)
             } catch (e: SQLiteConstraintException) {
                 return null
             } catch (e: Exception) {
@@ -243,6 +244,16 @@ class FeedSync(
         const val TTRSS_PER_FEED = 5
         const val CATEGORY_GONE = "Your chosen tt-rss category isn't there any more. Choose another on this source's page."
         const val SIGN_IN_AGAIN = "Sign in to tt-rss again: tap the menu at the top of Sources."
+
+        /**
+         * What to tell the reader when tt-rss couldn't be read. A timeout gets its own words: a home
+         * server on a slow line answers eventually, and "couldn't reach" sends people to check a
+         * connection that works.
+         */
+        fun ttrssUnreachable(e: IOException): String = when (e) {
+            is InterruptedIOException -> "tt-rss took too long to answer. It'll be tried again at the next sync."
+            else -> "Couldn't reach tt-rss."
+        }
     }
 }
 
