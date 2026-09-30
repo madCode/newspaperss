@@ -122,6 +122,30 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 - **Later:** export the edition as an audiobook file (M4B with a chapter per article) for podcast and audiobook apps. The EPUB could carry media overlays, but few e-readers play them.
 - **Open questions:** remember the position between sessions? Count listened articles as read for "bring back"?
 
+### Cloud backup
+Android's Auto Backup already copies the database and settings (sources, reading list, edition
+history) to the reader's Google account, within its 25 MB quota. Past EPUBs, the schedule timer and
+the tt-rss password are left out on purpose: the password is sealed by a key that never leaves the
+phone. What's missing:
+- it's invisible: nothing in the app says it's on, when it last ran, or what comes back;
+- a restore has never been tried on a real phone (the timer re-arms, but does a restored tt-rss
+  source ask for its password clearly?);
+- no manual copy: one "Export everything" file (sources as OPML, the reading list as the
+  library's Markdown checklist, settings), for people without Google services or moving to another
+  reader, and a matching import.
+
+### An iOS app
+Possible, but a second app rather than a port:
+- `:core` is plain Kotlin, but leans on JVM libraries (jsoup, Readability4J, OkHttp). Kotlin
+  Multiplatform would need replacements (Ksoup, Ktor, a Readability port), then Compose
+  Multiplatform or SwiftUI for the screens.
+- iOS decides when background work runs (`BGAppRefreshTask`), so "ready by 6:30" can't be
+  promised the way Android's timers allow; a notification to build on opening may be the honest version.
+- Delivery works: the share sheet reaches Send to Kindle, Dropbox (Kobo) and Files; Boox and
+  KOReader users are mostly on Android anyway.
+- It needs a Mac to build and an Apple developer account ($99 a year) to ship.
+A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps the logic shared.
+
 ### From the competitor research ([docs/research/competitors.md](research/competitors.md))
 - **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
   has no folder trees, so this needs the Drive API (an OAuth client, like Dropbox's app key).
