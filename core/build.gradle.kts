@@ -25,3 +25,10 @@ tasks.register<JavaExec>("liveEdition") {
     mainClass.set("com.app.newspaperss.core.tools.LiveEditionKt")
     workingDir = projectDir
 }
+
+// A developer tool, not part of the build: see PlatformCorpus.kt.
+tasks.register<JavaExec>("platformCorpus") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.app.newspaperss.core.tools.PlatformCorpusKt")
+    workingDir = projectDir
+}

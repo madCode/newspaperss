@@ -14,6 +14,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 4 · Thu 1 Oct
 
+### Cycle 72: the platform pass, round 1
+- **From you:** test against the big blog and newsletter platforms, from their own feeds and through tt-rss.
+- **Built:** a corpus of 40 real posts from Substack, Ghost, WordPress, Medium, Blogger, Buttondown and Micro.blog, with their words scrambled. Each one is run through tt-rss's own sanitizer as well. A test runs the extractor over every post both ways.
+- **Found and fixed:**
+  - Pictures through tt-rss came out at a third of the size.
+  - Paid posts weren't told apart: Substack's "Read more" and paywall pitch reached the book, and a Ghost paid post was a picture and a sentence. They now say they're the free part.
+  - Substack's subscribe box got through tt-rss.
+  - Videos and YouTube players vanished, leaving their captions.
+  - Medium's tracking pixel got in through tt-rss.
+  - Newsletter sign-up boxes and comment-form labels got in.
+- **Not yet:** Tumblr turned the collector away (429); galleries, tweets and beehiiv are for round 2.
+
 ### Cycle 71: five small asks
 - **From you:** the backlog's quick ones, after the README catch-up.
 - **Shipped:** "It can take a few minutes to show up" after a send with the Kindle app; a text size for the article preview; comics in the preview fill the width and pinch to zoom; xkcd's hover text as a caption in the book; sync errors on a source's page in plain words.

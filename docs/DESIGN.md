@@ -79,6 +79,18 @@ module so it's all unit-tested without Android.
   preview. If the page can't be fetched (or is over 5 MB, too big to parse
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
+- **Paid posts.** A post for paying subscribers goes in as its free part,
+  with a note saying so. It's known by what the platform puts on the page
+  in place of the rest: Ghost's upgrade box or Substack's paywall. Not
+  schema.org's `isAccessibleForFree`: metered news sites set it to false
+  and serve the whole story. A feed text ending in "Read more" back to the
+  post (Substack's paid openings, excerpt feeds) counts as an excerpt
+  however long, so the page is fetched; that link and the pitch over the
+  paywall are removed.
+- **Embeds.** A video can't play in a book: a video's poster frame stands
+  in for it, and a YouTube or Vimeo player becomes a link to the video
+  (with YouTube's thumbnail). tt-rss passes no players on, so a caption
+  left without its video becomes a plain paragraph.
 - **Link posts.** Some feeds mostly pitch stories on other sites
   (Longreads' picks: a few paragraphs, then "Read the story" at
   `equator.org/…?src=longreads`). A feed or tt-rss item counts as a link

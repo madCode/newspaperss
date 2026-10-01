@@ -1,9 +1,7 @@
 package com.app.newspaperss.edition
 
-import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
-import org.jsoup.Jsoup
 import com.app.newspaperss.core.extract.ExtractInput
 import com.app.newspaperss.core.extract.FullTextCheck
 import com.app.newspaperss.core.extract.FullTextEvidence
@@ -91,18 +89,18 @@ class ExtractorContentProvider(
 
     private companion object {
         /**
-         * A source the check settled on the feed's text still has its short items checked against
-         * the page: otherwise it could never find out that the site stopped blocking or started
-         * sending teasers. A mode the reader chose is used as is. A link post's story is always
-         * fetched unless the reader chose the feed's text: its pitch is never the article.
+         * A source the check settled on the feed's text still has its short items, and ones ending
+         * in "Read more", checked against the page: otherwise it could never find out that the site
+         * stopped blocking or started sending teasers, or tell a paid post's opening. AUTO does
+         * that and takes a long feed text as it is. A mode the reader chose is used as is. A link
+         * post's story is always fetched unless the reader chose the feed's text: its pitch is
+         * never the article.
          */
         fun modeFor(article: ArticleEntity, source: SourceEntity): ContentMode {
             if (article.viaUrl != null) {
                 return if (source.contentModeChosen && source.contentMode == ContentMode.FEED) ContentMode.FEED else ContentMode.PAGE
             }
-            if (source.contentModeChosen || source.contentMode != ContentMode.FEED) return source.contentMode
-            val words = article.feedHtml?.let { ReadingTime.words(Jsoup.parse(it).text()) } ?: 0
-            return if (words < ArticleExtractor.FULL_TEXT_WORDS) ContentMode.AUTO else ContentMode.FEED
+            return if (source.contentModeChosen || source.contentMode != ContentMode.FEED) source.contentMode else ContentMode.AUTO
         }
 
         /**
