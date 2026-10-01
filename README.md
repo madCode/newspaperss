@@ -69,6 +69,7 @@ who'd rather not set up Python, a server and a scheduler.
 ## Documentation
 
 - [How it works](docs/DESIGN.md): the edition, delivery, what happens to articles, the architecture.
+- [Architecture](docs/ARCHITECTURE.md): how the code is built, with diagrams.
 - [Backlog](docs/BACKLOG.md): what's next, grouped by part of the app, and ideas not yet planned.
 - [Devlog](docs/DEVLOG.md): what changed each work cycle, and why.
 - Research: [persona audits](docs/research/personas.md) and
