@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
+### Cycle 68: what reading an edition on the Kindle turned up (20:10–21:00)
+- **From you:** a quote missing after "…from *South Park*:", footnotes that don't work, "Next" feeling unneeded between short articles, and the closing page hard to reach.
+- **Found:** the quote was a Substack Note, an embed the page fills in with script, dropped as an empty "comment" box. Footnotes broke in tt-rss, which strips ids and points "#footnote-4" at the site's address.
+- **Shipped:** Notes become quotes with their author (from Substack's feed; tt-rss strips their text, now in the backlog), footnotes are paired up again by number so they work, "Next" only after reads of 5 minutes or more, and "That's all for today" is a chapter in the contents.
+
 ### Cycle 65: a send that didn't arrive can be undone (17:15–18:10)
 - **From you:** a Send to Kindle that failed still marked the edition sent, so its articles were used up and marked read in tt-rss, with no way back.
 - **Shipped:** **Didn't arrive? Mark as not sent** on a sent edition, on Today and its page, after a dialog that names it. It's ready to send again: its articles go back into it with the stars they went in with, its links stop counting as delivered, and its tt-rss articles are marked unread on the server. Send it again, or the next edition takes them.
