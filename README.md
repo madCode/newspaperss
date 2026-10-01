@@ -41,10 +41,13 @@ who'd rather not set up Python, a server and a scheduler.
 - **Delivered your way.** A notification with a Send button (Kindle app,
   Dropbox for a Kobo, email), a synced folder (KOReader), or Open on a
   Boox. Articles are used up only once the edition is delivered: saved to
-  your folder, sent through an app you pick, or opened on a Boox.
+  your folder, sent through an app you pick, or opened on a Boox. If one
+  never arrives, mark it as not sent and its articles go back.
 - **Star what you want next.** Star an article in a source's list, or one
   from an edition you didn't finish, and it goes first into the next
-  edition. Mark the rest as read. With tt-rss, read and unread stay in
+  edition. Mark the rest as read. Each article says where it stands:
+  waiting (and for how many more days), in Thursday's edition, sent
+  Wednesday, read, or not picked. With tt-rss, read and unread stay in
   step both ways.
 - **Take notes.** A Markdown notes file per edition for Obsidian, Logseq or
   any notes app: properties Obsidian understands, the end page's question, a
