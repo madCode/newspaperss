@@ -120,22 +120,22 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         // A live region, so pressing − or + is followed by the new number.
         Text(
-            "${plural(s.edition.maxPerSource, "article")} from each site, then more if there's room",
+            "${plural(s.edition.maxPerSource, "article")} from each source, then more if there's room",
             Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
         )
         OutlinedButton(
             onClick = { vm.setMaxPerSource(s.edition.maxPerSource - 1) },
             enabled = s.edition.maxPerSource > 1,
-            modifier = Modifier.semantics { contentDescription = "Fewer from each site" },
+            modifier = Modifier.semantics { contentDescription = "Fewer from each source" },
         ) { Text("−") }
         OutlinedButton(
             onClick = { vm.setMaxPerSource(s.edition.maxPerSource + 1) },
             enabled = s.edition.maxPerSource < SettingsViewModel.MAX_PER_SOURCE,
-            modifier = Modifier.padding(start = 8.dp).semantics { contentDescription = "More from each site" },
+            modifier = Modifier.padding(start = 8.dp).semantics { contentDescription = "More from each source" },
         ) { Text("+") }
     }
     Text(
-        "A site can have its own number: tap it in Sources.",
+        "A source can have its own number: tap it in Sources.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -252,7 +252,7 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
                 mailApp = s.mailApp,
                 onMailApp = vm::setMailApp,
                 label = "Kindle's email address",
-                modifier = Modifier.padding(start = 48.dp),
+                modifier = Modifier.padding(start = OPTION_INDENT),
             )
             // The saved address, not the typed one: Send goes by what's saved.
             if (s.kindleEmailTarget == null) {
@@ -260,21 +260,21 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
                     "Add your Kindle's email address; until then Send opens the share sheet.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                    modifier = Modifier.padding(start = OPTION_INDENT, top = 4.dp),
                 )
             }
             Text(
                 "The address you send from must be on Amazon's approved list.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 48.dp, top = 4.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = OPTION_INDENT, top = 4.dp, bottom = 8.dp),
             )
         }
     }
     DeliveryOption(
         selected = s.delivery == DeliveryMethod.SHARE,
         title = "Send it myself",
-        detail = "You get a notification with a Send button. Pick the Kindle app, Dropbox (for a Kobo), email, or any other app.",
+        detail = "Tap Send on each edition and choose an app: the Kindle app, Dropbox, email or any other.",
         onClick = vm::useShare,
     )
     DeliveryOption(
@@ -285,9 +285,12 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
         onClick = { if (s.folderUri != null) vm.useFolder(s.folderUri, s.folderName ?: "your folder") else pickFolder.launch(null) },
     )
     if (s.delivery == DeliveryMethod.FOLDER) {
-        OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = 48.dp)) { Text("Choose another folder") }
+        OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = OPTION_INDENT)) { Text("Choose another delivery folder") }
     }
 }
+
+/** How far a setting's own controls sit in, under the option or switch they belong to. */
+private val OPTION_INDENT = 48.dp
 
 private const val FOLDER_GRANT = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 
@@ -327,14 +330,14 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
             Text("Save notes for each edition", style = MaterialTheme.typography.bodyLarge)
             Text(
                 s.notesFolderName?.let { "Saved to $it when an edition is delivered." }
-                    ?: "A Markdown file for Obsidian, Logseq or any notes app: each article's details, and a few questions to think about. Pick your vault or notes folder.",
+                    ?: "A Markdown file for each edition, for Obsidian or any notes app. You'll pick the folder.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Switch(checked = saving, onCheckedChange = null)
     }
-    if (saving) OutlinedButton(onClick = { pickFolder.launch(null) }) { Text("Choose another folder") }
+    if (saving) OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = OPTION_INDENT)) { Text("Choose another notes folder") }
 }
 
 @Composable

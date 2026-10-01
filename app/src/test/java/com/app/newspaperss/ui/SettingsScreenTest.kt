@@ -88,10 +88,10 @@ class SettingsScreenTest {
 
     @Test
     fun screenReadersHearWhatTheStepperChangesAndTheNewNumber() {
-        compose.onNodeWithContentDescription("More from each site").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("More from each source").performScrollTo().performClick()
         idleUntil { runBlocking { store.current().edition.maxPerSource } == 2 }
-        compose.onNode(hasText("2 articles from each site", substring = true) and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
-        compose.onNodeWithContentDescription("Fewer from each site").assertIsEnabled()
+        compose.onNode(hasText("2 articles from each source", substring = true) and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
+        compose.onNodeWithContentDescription("Fewer from each source").assertIsEnabled()
     }
 
     @Test
@@ -116,7 +116,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("Save notes for each edition").performScrollTo().performClick()
 
         idleUntil { runBlocking { store.current().notesFolderUri } == null }
-        waitFor("Pick your vault or notes folder")
+        waitFor("You'll pick the folder.")
         assertEquals("the delivery folder is left alone", DeliveryMethod.SHARE, runBlocking { store.current().delivery })
     }
 
@@ -158,7 +158,7 @@ class SettingsScreenTest {
     @Test
     fun perSourceCapCanBeRaised() {
         compose.onNodeWithText("+").performClick()
-        waitFor("2 articles from each site, then more")
+        waitFor("2 articles from each source, then more")
     }
 
     @Test
@@ -215,5 +215,15 @@ class SettingsScreenTest {
         // Still said after the e-reader changes, with an address that doesn't work.
         runBlocking { store.update { it.copy(device = Device.KOBO, kindleEmail = "me_42@kindle") } }
         waitFor(line)
+    }
+
+    @Test
+    fun theTwoFolderButtonsSayWhichFolderAndLineUp() {
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books", notesFolderUri = "content://vault", notesFolderName = "Vault") } }
+        waitFor("Choose another notes folder")
+        val starts = listOf("Choose another delivery folder", "Choose another notes folder").map {
+            compose.onNodeWithText(it).fetchSemanticsNode().positionInRoot.x
+        }
+        assertEquals(starts[0], starts[1])
     }
 }
