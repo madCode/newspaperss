@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.feed
 
+import com.app.newspaperss.core.net.ErrorAnswers
 import com.app.newspaperss.core.net.HttpClient
 import org.jsoup.Jsoup
 import java.io.IOException
@@ -20,15 +21,6 @@ sealed interface FindResult {
  */
 class FeedFinder(private val http: HttpClient) {
 
-    /** What an error answer means for someone adding a site, with the code kept for anyone who asks. */
-    private fun refused(url: String, code: Int): String = when (code) {
-        404, 410 -> "There's nothing at $url. Check the address."
-        // The codes ArticleExtractor counts as blocked: a Cloudflare wall answers 503, a paywall 402.
-        401, 402, 403, 429, 503 -> "$url turned newspapeRSS away (error $code). Some sites block apps: try its feed or RSS link if it lists one, or try again later."
-        in 500..599 -> "$url isn't working right now (error $code). Try again later."
-        else -> "$url answered with error $code."
-    }
-
     suspend fun find(input: String): FindResult {
         val url = normalize(input) ?: return FindResult.NotFound("That doesn't look like a web address.")
         val response = try {
@@ -36,7 +28,7 @@ class FeedFinder(private val http: HttpClient) {
         } catch (e: IOException) {
             return FindResult.NotFound("Couldn't reach $url. Check the address and your connection.")
         }
-        if (!response.isSuccessful) return FindResult.NotFound(refused(url, response.code))
+        if (!response.isSuccessful) return FindResult.NotFound(ErrorAnswers.message(response.code, url))
 
         if (FeedParser.looksLikeFeed(response.body)) {
             val title = runCatching { FeedParser.parse(response.body, response.finalUrl).title }.getOrNull()

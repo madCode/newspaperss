@@ -2,6 +2,7 @@ package com.app.newspaperss.core.extract
 
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.feed.LinkPosts
+import com.app.newspaperss.core.net.ErrorAnswers
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.net.HttpResponse
 import org.jsoup.Jsoup
@@ -200,7 +201,7 @@ class ArticleExtractor(private val http: HttpClient) {
     }
 
     private fun unusable(response: HttpResponse): PageResult.Failed? {
-        if (response.code in BLOCKED_STATUS_CODES) return PageResult.Failed("the site turned the app away (error ${response.code})", blocked = true)
+        if (response.code in ErrorAnswers.BLOCKED) return PageResult.Failed("the site turned the app away (error ${response.code})", blocked = true)
         if (!response.isSuccessful) return PageResult.Failed("error ${response.code}", permanent = response.code in GONE_STATUS_CODES)
         val type = response.contentType?.lowercase()
         if (type != null && "html" !in type && "xml" !in type) return PageResult.Failed("not a web page", permanent = true)
@@ -303,8 +304,6 @@ class ArticleExtractor(private val http: HttpClient) {
         private const val TEASER_RATIO = 2.0
         private const val CHALLENGE_PAGE_MAX_CHARS = 150 * 1024
         private const val MAX_PAGE_CHARS = 5 * 1024 * 1024
-        // 402 is a paywall's refusal (Le Monde's "Accès restreint").
-        private val BLOCKED_STATUS_CODES = setOf(401, 402, 403, 429, 503)
         // 410 only: a 404 is often a site having a bad day.
         private val GONE_STATUS_CODES = setOf(410)
         private val CHALLENGE_MARKERS = listOf(

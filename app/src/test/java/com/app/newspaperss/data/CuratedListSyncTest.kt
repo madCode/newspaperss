@@ -119,7 +119,7 @@ class CuratedListSyncTest {
         val id = repo.addList(ArtsAndLettersDaily)
         http.page(ArtsAndLettersDaily.pageUrl, "", code = 503)
         sync.syncAll()
-        assertEquals("The site answered with error 503.", db.sources().byId(id)!!.lastError)
+        assertEquals("The site turned newspapeRSS away (error 503). Some sites block apps: try again later.", db.sources().byId(id)!!.lastError)
 
         http.unreachable += ArtsAndLettersDaily.pageUrl
         sync.syncAll()
