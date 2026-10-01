@@ -105,7 +105,10 @@ data class ArticleEntity(
     val originTitle: String? = null,
     /** Words in a saved link's article, counted when its page is first looked up: the reading list's time estimate. */
     val pageWords: Int? = null,
-    /** tt-rss only: marked read on the server after the reader marked it read here, so it isn't sent again. */
+    /**
+     * tt-rss only: the server has it as read, from a sync or delivery. Compared with [state] at each
+     * sync to tell the server what the reader marked read or unread here since.
+     */
     @ColumnInfo(defaultValue = "0") val reportedRead: Boolean = false,
     /**
      * A link post's own page, when [url] is the story it points to (see

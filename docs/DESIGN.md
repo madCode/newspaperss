@@ -222,9 +222,14 @@ allowed to read that edition's file until the phone restarts.
   their stars, each in the state it had before (a starred delivered article
   goes back to delivered). A paused source holds its stars; removing a
   source removes them.
-- **Mark as read.** A waiting article you've read elsewhere, or don't want,
-  is marked `SKIPPED` and never goes in an edition. Undo puts back its state
-  and star, for a whole batch at once.
+- **Read and unread.** A waiting article you've read elsewhere, or don't
+  want, is marked `SKIPPED` and never goes in an edition; its star goes.
+  Marking it unread puts it back to waiting. So does marking a delivered
+  or expired one unread: it waits its turn with the others, unlike ★, which
+  puts it in the next edition. It counts as found again, so it gets a week
+  before it expires. Marking one read whose link has gone out before makes it
+  delivered again rather than read. A batch marked read from selection has
+  one Undo.
 - **While an edition is being made** you can star articles but not unstar
   them or mark them read: the build may already have put them in the book.
   A batch is held whole, never half done.
@@ -237,8 +242,8 @@ allowed to read that edition's file until the phone restarts.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
   read on the server once delivered (and unread again if the edition is
-  marked as not sent), and ones you marked as read at the next sync (so Undo
-  never has to reach the server). A source can turn that off, or
+  marked as not sent). What you mark read or unread here reaches the server
+  at the next sync, so a change of mind before then never does. A source can turn that off, or
   take one category instead of all unread; adding the account asks which,
   before the first sync. tt-rss's own stars aren't synced: there a star
   usually means "keep this", not "for tomorrow".
@@ -300,17 +305,24 @@ allowed to read that edition's file until the phone restarts.
   only", "Site blocks fetching", "Failing for N days"). A source's page
   shows its recent articles, its cap, pause and the article-text setting;
   **Remove source** is in its ⋮ menu, as on the list.
-  Each row is a status mark (`●` waiting, `✓` delivered, `○` not used),
-  the title, a details line and a trailing **☆**; tapping the row opens
-  the original. The star (a 48dp target) puts the article in the next
-  edition and turns into **★** on an outlined disc. A row already in an
-  unsent edition has no star, but keeps the slot so titles line up.
+  Each row is a status mark (`●` waiting, `✓` delivered, `○` read or not
+  used), the title, a details line and a trailing **☆**; tapping the row
+  opens the original. Two toggles, one per question:
+  - The status mark marks the article read (`●` → `○`) or unread (`○` or
+    `✓` → `●`). A second tap undoes it, so there's no Undo. It has no
+    outline; the line above the list says it can be tapped. Its touch
+    area is 48dp, though the mark is narrower so titles line up.
+  - The star (a 48dp target) puts the article in the next edition and
+    turns into **★** on an outlined disc.
+  A row already in an unsent edition can't change: its mark doesn't
+  respond, and it has no star but keeps the slot so titles line up.
   - **Select** (or pressing and holding a row) enters selection mode:
     checkboxes take the status marks' place, the top bar says "N
     selected", and a bar at the bottom has **☆ Next edition** and
     **Mark N as read** (counting only waiting articles). One Undo covers
     the whole batch. Back or ✕ leaves without changing anything.
-  - With TalkBack, each waiting row has a "Mark as read" action.
+  - With TalkBack, the mark is its own button: "Mark <title> as read" or
+    "as unread".
   - Nothing moves: a marked-read row stays in place with `○`, and
     entering or leaving selection doesn't shift the list, so e-ink
     doesn't redraw it.

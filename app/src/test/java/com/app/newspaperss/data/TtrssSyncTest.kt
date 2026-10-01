@@ -369,6 +369,57 @@ class TtrssSyncTest {
         assertEquals(ArticleState.SKIPPED, db.articles().byId(byGuid.getValue("ttrss:10").id)!!.state)
     }
 
+    /** The read toggle reaches tt-rss at the next sync, both ways, and only the last of a change of mind. */
+    @Test
+    fun theReadToggleReachesTtrssAtTheNextSyncBothWays() = runTest {
+        val source = connect()
+        server.add(10, "Toggled", feedId = 1, feedTitle = "Example News")
+        server.add(11, "Changed my mind", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        val byGuid = db.articles().allForSource(source.id).associateBy { it.guid }
+        val toggled = byGuid.getValue("ttrss:10").id
+        val changedMind = byGuid.getValue("ttrss:11").id
+
+        assertTrue(sources.toggleRead(toggled))
+        assertTrue(sources.toggleRead(changedMind))
+        assertTrue(sources.toggleRead(changedMind))
+        sync.syncAll()
+        assertEquals(listOf(10L), server.markedRead)
+
+        assertTrue(sources.toggleRead(toggled))
+        assertEquals(ArticleState.NEW, db.articles().byId(toggled)!!.state)
+        sync.syncAll()
+        assertEquals(listOf(10L), server.markedUnread)
+
+        sync.syncAll()
+        assertEquals("each told once", listOf(10L) to listOf(10L), server.markedRead to server.markedUnread)
+    }
+
+    /**
+     * A delivered article marked unread is unread in tt-rss again and waits for an edition, even one
+     * found weeks ago, which would otherwise expire at the next sync.
+     */
+    @Test
+    fun aDeliveredArticleMarkedUnreadIsUnreadInTtrssAndDoesntExpire() = runTest {
+        val source = connect()
+        db.articles().insertNew(
+            listOf(ArticleEntity(sourceId = source.id, guid = "ttrss:20", url = "https://news.example/20", title = "Old", discoveredAt = now.minus(Duration.ofDays(20)))),
+        )
+        val editionId = editionWith(source.id, "ttrss:20")
+        tmp.newFile("old.epub")
+        db.editions().update(db.editions().byId(editionId)!!.copy(fileName = "old.epub"))
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionId)
+        assertTrue(ttrss.syncRead(editionId))
+        val article = db.articles().allForSource(source.id).single()
+
+        assertTrue(sources.toggleRead(article.id))
+        sync.syncAll()
+
+        assertEquals(listOf(20L), server.markedUnread)
+        assertEquals(ArticleState.NEW, db.articles().byId(article.id)!!.state)
+        assertEquals("delivery told tt-rss; the sync doesn't again", listOf(20L), server.markedRead)
+    }
+
     @Test
     fun anArticleMarkedReadReachesTtrssEvenOncePushedOutOfItsFeedsFewNewestAndOnlyOnce() = runTest {
         val source = connect()

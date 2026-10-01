@@ -17,6 +17,7 @@ import com.app.newspaperss.ui.components.StarToggle
 import com.app.newspaperss.ui.components.rowIconSize
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
@@ -44,8 +45,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
@@ -84,6 +83,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -243,7 +243,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                         building,
                         selection = if (selecting) article.id in selected else null,
                         onStar = { viewModel.setStarred(article.id, it) },
-                        onMarkRead = { viewModel.markRead(article.id) },
+                        onToggleRead = { viewModel.toggleRead(article.id) },
                         onSelect = { selected = if (article.id in selected) selected - article.id else selected + article.id },
                         onStartSelecting = {
                             selecting = true
@@ -503,22 +503,19 @@ private fun ArticlesHeading(articles: List<ArticleEntity>, selecting: Boolean, o
     }
     if (articles.isEmpty()) Text("No articles yet.", modifier = Modifier.padding(horizontal = 16.dp))
     if (articles.isNotEmpty()) {
-        val canStar = articles.any { it.state != ArticleState.IN_EDITION }
-        val second = if (selecting) CHOOSE_HELP else SELECT_HELP.takeIf { articles.any { it.state == ArticleState.NEW } }
-        val shown = listOfNotNull(STAR_HELP.takeIf { canStar }, second).joinToString(" ")
-        // The longest wordings are laid out invisibly under the one shown, so the line keeps one
+        val canChange = articles.any { it.state != ArticleState.IN_EDITION }
+        // Nothing while selecting: the selection bar says what to do then.
+        val shown = TAP_HELP.takeIf { canChange && !selecting }
+        // The longest wording is laid out invisibly under the one shown, so the line keeps one
         // height as what it says changes: a change in its line count would move every row below it.
         Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp)) {
-            HelperText("$STAR_HELP $SELECT_HELP", shown = false)
-            HelperText("$STAR_HELP $CHOOSE_HELP", shown = false)
-            if (shown.isNotEmpty()) HelperText(shown, shown = true)
+            HelperText(TAP_HELP, shown = false)
+            if (shown != null) HelperText(shown, shown = true)
         }
     }
 }
 
-private const val STAR_HELP = "Tap ☆ to put one in your next edition."
-private const val SELECT_HELP = "Tap Select to mark some as read."
-private const val CHOOSE_HELP = "Tap articles to choose them."
+private const val TAP_HELP = "Tap ● to mark one read or unread, and ☆ to put it in your next edition."
 
 @Composable
 private fun HelperText(text: String, shown: Boolean) {
@@ -638,7 +635,7 @@ private fun RecentArticle(
     building: Boolean,
     selection: Boolean?,
     onStar: (Boolean) -> Unit,
-    onMarkRead: () -> Unit,
+    onToggleRead: () -> Unit,
     onSelect: () -> Unit,
     onStartSelecting: () -> Unit,
 ) {
@@ -671,14 +668,8 @@ private fun RecentArticle(
             },
         )
     }
-    // One step for TalkBack and Switch Access, where selecting would take several.
-    val markRead = if (article.state == ArticleState.NEW && !building) {
-        Modifier.semantics { customActions = listOf(CustomAccessibilityAction("Mark as read") { onMarkRead(); true }) }
-    } else {
-        Modifier
-    }
     ArticleRowFrame(
-        modifier = action.then(markRead),
+        modifier = action,
         leading = {
             if (selection != null) {
                 Icon(
@@ -688,8 +679,7 @@ private fun RecentArticle(
                     tint = if (selection) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                // A shape per state, not a colour, so it reads on e-ink; the words are in the line below.
-                Text(statusMark(article), style = MaterialTheme.typography.bodyLarge, softWrap = false, modifier = Modifier.clearAndSetSemantics {})
+                ReadToggle(title, article, building, onToggleRead)
             }
         },
         title = { Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium) },
@@ -706,7 +696,31 @@ private fun RecentArticle(
 /** A star counts unless the article is already in an unsent edition, where it can't change. */
 private fun isStarred(article: ArticleEntity) = article.starredAt != null && article.state != ArticleState.IN_EDITION
 
-private fun statusMark(article: ArticleEntity) = if (isStarred(article)) "●" else when (article.state) {
+/**
+ * The read toggle: the article's status mark, which marks a waiting article read and brings back
+ * a read or delivered one. No outline: it would box in every row. Narrower than a touch target,
+ * so as not to push the titles right; Compose widens its touch area to 48dp. Not tappable on an
+ * article in an unsent edition, or while a build may be writing a waiting one into its book.
+ */
+@Composable
+private fun ReadToggle(title: String, article: ArticleEntity, building: Boolean, onToggle: () -> Unit) {
+    val waiting = article.state == ArticleState.NEW
+    val tappable = article.state != ArticleState.IN_EDITION && !(building && waiting)
+    // Its own node, not merged into the row's, so TalkBack can reach it apart from opening the article.
+    val toggle = if (tappable) {
+        Modifier
+            .clickable(interactionSource = null, indication = ripple(bounded = false, radius = 24.dp), role = Role.Button, onClick = onToggle)
+            .semantics { contentDescription = if (waiting) "Mark $title as read" else "Mark $title as unread" }
+    } else {
+        Modifier
+    }
+    Box(toggle, contentAlignment = Alignment.Center) {
+        // A shape per state, not a colour, so it reads on e-ink; the words are in the line below.
+        Text(statusMark(article), style = MaterialTheme.typography.bodyLarge, softWrap = false, modifier = Modifier.clearAndSetSemantics {})
+    }
+}
+
+private fun statusMark(article: ArticleEntity) = when (article.state) {
     ArticleState.NEW, ArticleState.IN_EDITION -> "●"
     ArticleState.DELIVERED -> "✓"
     ArticleState.SKIPPED, ArticleState.EXPIRED -> "○"

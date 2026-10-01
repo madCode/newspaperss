@@ -186,13 +186,13 @@ class TtrssRepository(
      * way that may pass (the server unreachable), after noting the problem on the source.
      */
     suspend fun markRead(editionId: Long): Boolean =
-        update(db.articles().ttrssInEdition(editionId), "Delivered articles weren't marked read in tt-rss.") { markRead(it) }
+        update(db.articles().ttrssInEdition(editionId), read = true, "Delivered articles weren't marked read in tt-rss.") { markRead(it) }
 
     /** Marks the tt-rss articles of an edition marked as not sent unread again, like [markRead]. */
     suspend fun markUnread(editionId: Long): Boolean =
-        update(db.articles().ttrssUnsentInEdition(editionId), "Articles from an edition that wasn't sent weren't marked unread in tt-rss.") { markUnread(it) }
+        update(db.articles().ttrssUnsentInEdition(editionId), read = false, "Articles from an edition that wasn't sent weren't marked unread in tt-rss.") { markUnread(it) }
 
-    private suspend fun update(articles: List<ArticleEntity>, failed: String, call: suspend TtrssClient.(List<Long>) -> Unit): Boolean {
+    private suspend fun update(articles: List<ArticleEntity>, read: Boolean, failed: String, call: suspend TtrssClient.(List<Long>) -> Unit): Boolean {
         if (articles.isEmpty()) return true
         val sourceIds = articles.map { it.sourceId }.distinct()
         val account = (accounts.load() as? StoredAccount.Ready)?.account
@@ -204,6 +204,7 @@ class TtrssRepository(
         val client = account.client(http)
         val (problem, retry) = try {
             client.call(ids)
+            articles.groupBy { it.sourceId }.forEach { (sourceId, its) -> db.articles().setReportedRead(sourceId, its.map { it.guid }, read) }
             sourceIds.forEach { db.sources().setServerNote(it, null) }
             return true
         } catch (e: CancellationException) {

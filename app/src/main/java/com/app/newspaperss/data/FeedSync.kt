@@ -149,8 +149,9 @@ class FeedSync(
                 }
                 // A link already delivered (from a feed, or before the account was reconnected) is
                 // skipped like any other, and tt-rss is told it's read unless the reader said not to:
-                // otherwise it would sit unread there for good. Articles the reader marked read in
-                // the app are told here too, rather than when marked, so Undo never reaches the server.
+                // otherwise it would sit unread there for good. Articles the reader marked read or
+                // unread in the app are told here too, rather than when marked, so a change of mind
+                // before the sync never reaches the server.
                 // They're taken from the database, not these headlines: a few per feed may no longer
                 // include them.
                 if (source.markReadOnServer) {
@@ -165,6 +166,9 @@ class FeedSync(
                             markedRead.mapNotNull { it.removePrefix(TTRSS_GUID_PREFIX).toLongOrNull() }).distinct(),
                     )
                     if (markedRead.isNotEmpty()) db.articles().setReportedRead(source.id, markedRead)
+                    val markedUnread = db.articles().unreportedUnread(source.id, limit = 500)
+                    client.markUnread(markedUnread.mapNotNull { it.removePrefix(TTRSS_GUID_PREFIX).toLongOrNull() })
+                    if (markedUnread.isNotEmpty()) db.articles().setReportedRead(source.id, markedUnread, read = false)
                 }
                 val added = db.articles().insertFetched(articles.map { (h, a) -> a to h.link })
                 // tt-rss answers a deleted (or another user's) category with no articles and no error.
