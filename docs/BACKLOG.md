@@ -25,6 +25,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
 - [ ] A text size setting for the article preview *(your brother asked; medium priority)*
 - [ ] Comics in the article preview: let a strip fill the page width, and allow pinch to zoom *(you asked)*
+- [ ] Substack Notes embedded in posts that come through tt-rss: tt-rss strips the Note's text, so the sentence introducing it hangs. Fetching the post's page would bring it back (the full post is in the page's data), at one page fetch per Substack article *(device)*
 
 ### Delivery and schedule
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; waiting on an app key ([#18](https://github.com/madCode/newspaperss/issues/18)) *(personas)*

@@ -140,8 +140,14 @@ module so it's all unit-tested without Android.
   - "In this edition" contents with each section's and article's reading
     time. Kindle opens the book here, like a paper's front page;
   - each article: section and source, headline, "By … · date · N min read",
-    the body, an end mark, "Read the original at site", and a "Next" link
-    with its source and time; then "That's all for today" with the day's
+    the body, an end mark, "Read the original at site", and, after a read of
+    5 minutes or more, a "Next" link with the next one's source and time (a
+    pause after a long piece; after a short one, turning the page is enough);
+  - footnotes that work in the book, even from tt-rss, which strips the
+    ids they point at (they're paired up again by number), and Substack
+    Notes quoted where the post embeds them (from Substack's own feed: tt-rss
+    strips the Note's text);
+  - "That's all for today", a chapter in the contents, with the day's
     totals and a question to think about, one of a short list of open
     questions that suit any paper ("What surprised you?"). It usually differs from
     one edition to the next, and the notes file shows the same one;

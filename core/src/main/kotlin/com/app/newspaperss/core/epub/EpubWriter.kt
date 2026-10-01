@@ -24,6 +24,9 @@ object EpubWriter {
     private const val COVER = "cover.xhtml"
     private const val CONTENTS = "contents.xhtml"
     private const val END = "end.xhtml"
+    private const val END_TITLE = "That's all for today"
+    /** Articles at least this long are followed by a line naming the next one. */
+    const val NEXT_AFTER_MINUTES = 5.0
     private const val COVER_IMAGE_ID = "cover-image"
     private const val MAX_COVER_SOURCES = 4
     private val IMAGE_TYPES = setOf("image/jpeg", "image/png", "image/gif")
@@ -145,6 +148,9 @@ object EpubWriter {
                     entries += TocEntry(title, articleEntries.first().href, articleEntries)
                 }
             }
+            // A chapter of its own, so the wrap-up and the closing question can be found from the
+            // contents; an e-reader's own "go to end" lands past it.
+            entries += TocEntry(END_TITLE, END)
             return entries
         }
 
@@ -238,7 +244,8 @@ object EpubWriter {
                         append("<p class=\"source-link\">Original: ${esc(url)}</p>\n")
                     }
                 }
-                if (index + 1 < articles.size) {
+                // After a long read, a pause before the next; after a short one, turning the page is enough.
+                if (index + 1 < articles.size && article.minutes >= NEXT_AFTER_MINUTES) {
                     append("<p class=\"article-nav\">Next: <a href=\"${articleHrefs[index + 1]}\"${languageAttributes(articles[index + 1].language, lang)}>")
                     append(esc(articleTitle(index + 1)))
                     val next = articles[index + 1]
@@ -253,7 +260,7 @@ object EpubWriter {
 
         private fun endPage(): Page {
             val body = buildString {
-                append("<h1 class=\"end-title\">That's all for today.</h1>\n")
+                append("<h1 class=\"end-title\">$END_TITLE.</h1>\n")
                 val from = when {
                     sources.size <= 1 -> sources.joinToString()
                     sources.size <= MAX_COVER_SOURCES -> sources.dropLast(1).joinToString(", ") + " and " + sources.last()
@@ -318,6 +325,7 @@ object EpubWriter {
                 append("<li><a epub:type=\"cover\" href=\"$COVER\">Cover</a></li>\n")
                 append("<li><a epub:type=\"toc\" href=\"$CONTENTS\">Contents</a></li>\n")
                 append("<li><a epub:type=\"bodymatter\" href=\"$CONTENTS\">Start</a></li>\n")
+                append("<li><a epub:type=\"backmatter\" href=\"$END\">$END_TITLE</a></li>\n")
                 append("</ol>\n</nav>")
             }
             return xhtmlPage("Contents", lang, body)

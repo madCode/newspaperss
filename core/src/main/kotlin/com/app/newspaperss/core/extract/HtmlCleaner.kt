@@ -1,6 +1,10 @@
 package com.app.newspaperss.core.extract
 
 import com.app.newspaperss.core.ReadingTime
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Comment
 import org.jsoup.nodes.Document
@@ -40,6 +44,7 @@ object HtmlCleaner {
         val doc = Jsoup.parse(source, baseUrl)
         val body = doc.body()
         removeComments(body)
+        expandSubstackNotes(body)
         body.select(REMOVE_TAGS.joinToString(",")).remove()
         removeHidden(body)
         removeScreenReaderOnly(body)
@@ -355,7 +360,61 @@ object HtmlCleaner {
         }
     }
 
+    /**
+     * Substack embeds a Note as an empty element its page script fills in from `data-attrs`. Read
+     * without the script, it's an empty div that goes (its class, "comment", reads as a comments
+     * box, and tt-rss strips classes anyway), leaving the sentence that introduced it hanging. Its
+     * text and author make a quote instead.
+     */
+    private fun expandSubstackNotes(body: Element) {
+        for (el in body.select("[data-attrs]")) {
+            if (!el.isAttached()) continue
+            val comment = runCatching { Json.parseToJsonElement(el.attr("data-attrs")) as? JsonObject }.getOrNull()?.get("comment") as? JsonObject ?: continue
+            val text = (comment["body"] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+            val quote = Element("blockquote")
+            text.split(NEWLINES).map { it.trim() }.filter { it.isNotEmpty() }.forEach { quote.appendElement("p").text(it) }
+            (comment["name"] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }?.let { quote.appendElement("p").text("— $it") }
+            el.replaceWith(quote)
+        }
+    }
+
+    /**
+     * Gets footnote links working again after tt-rss, which rewrites "#footnote-4" against the
+     * site's address and strips ids. A link to this page's or its site's address plus a fragment
+     * becomes a plain fragment, and a footnote's missing target is found from its other link: the
+     * one with the same number, which links back. Only short link texts count, as footnote markers
+     * are, so two unrelated numbered links ("#section-2", "#figure-2") aren't taken for a pair.
+     */
+    private fun repairFragmentLinks(body: Element, baseUrl: String) {
+        val self = selfAddresses(baseUrl)
+        for (link in body.select("a[href]")) {
+            val href = link.attr("href").trim()
+            val hash = href.indexOf('#')
+            if (hash > 0 && href.substring(0, hash) in self) link.attr("href", href.substring(hash))
+        }
+        val ids = body.select("[id]").map { it.id() }.toMutableSet()
+        val markers = body.select("a[href^=#]").filter { it.text().trim().length <= FOOTNOTE_MARKER_MAX }
+        val byNumber = markers.groupBy { TRAILING_NUMBER.find(it.attr("href"))?.value }
+        for (link in markers) {
+            val target = link.attr("href").substring(1)
+            if (target.isEmpty() || target in ids) continue
+            val number = TRAILING_NUMBER.find(target)?.value ?: continue
+            val back = byNumber[number].orEmpty().singleOrNull { it !== link && !it.hasAttr("id") && it.attr("href").substring(1) != target } ?: continue
+            back.id(target)
+            ids += target
+        }
+    }
+
+    /** The article's own address and its site's, as tt-rss resolves a bare "#fragment" against either. */
+    private fun selfAddresses(baseUrl: String): Set<String> {
+        val base = baseUrl.substringBefore('#').trim()
+        val uri = runCatching { URI(base) }.getOrNull()?.takeIf { it.scheme != null && it.host != null } ?: return setOf(base)
+        val site = "${uri.scheme}://${uri.rawAuthority}"
+        return setOf(base, site, "$site/")
+    }
+
     private fun fixLinks(body: Element, baseUrl: String) {
+        repairFragmentLinks(body, baseUrl)
         val ids = mutableMapOf<String, String>()
         for (el in body.select("[id]")) {
             val old = el.id()
@@ -529,6 +588,9 @@ object HtmlCleaner {
     private val HTML_TAG = Regex("<\\s*[a-zA-Z!/]")
     private val WHITESPACE = Regex("\\s+")
     private val BLANK_LINE = Regex("\\n\\s*\\n")
+    private val NEWLINES = Regex("\\n+")
+    private val TRAILING_NUMBER = Regex("\\d+$")
+    private const val FOOTNOTE_MARKER_MAX = 4
     private val TOKEN_SEPARATOR = Regex("[\\s_\\-]+")
     private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
     private val INVALID_ID_CHARS = Regex("[^A-Za-z0-9_.\\-]")
