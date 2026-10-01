@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performTextInput
+import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.KindleEmail
@@ -110,6 +111,7 @@ class SettingsScreenTest {
     @Test
     fun notesCanBeSavedWhateverTheDeliveryAndTurnedOff() {
         // A Kindle reader shares each edition, and still gets notes in her vault.
+        grant("content://vault")
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.SHARE, notesFolderUri = "content://vault", notesFolderName = "Vault") } }
         waitFor("Saved to Vault when an edition is delivered.")
 
@@ -228,5 +230,18 @@ class SettingsScreenTest {
             compose.onNodeWithText(it).fetchSemanticsNode().positionInRoot.x
         }
         assertEquals(starts[0], starts[1])
+    }
+
+    private fun grant(uri: String) = ApplicationProvider.getApplicationContext<android.app.Application>().contentResolver
+        .takePersistableUriPermission(android.net.Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+
+    @Test
+    fun aFolderTheAppCanNoLongerReachSaysSoInsteadOfSavingAutomatically() {
+        grant("content://tree/books")
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree/books", folderName = "Books", notesFolderUri = "content://tree/gone", notesFolderName = "Vault") } }
+        waitFor("Saved automatically to Books.")
+        // The notes folder's grant is gone (its app uninstalled, say): every save there would fail.
+        compose.onNodeWithText("Can't reach Vault. Choose it again.").performScrollTo().assertExists()
+        compose.onNodeWithText("Choose another notes folder").assertExists()
     }
 }

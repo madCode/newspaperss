@@ -276,12 +276,17 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
         detail = "Tap Send on each edition and choose an app: the Kindle app, Dropbox, email or any other.",
         onClick = vm::useShare,
     )
+    val folderReachable = rememberReachable(s.folderUri)
     DeliveryOption(
         selected = s.delivery == DeliveryMethod.FOLDER,
         title = "Save to a folder",
-        detail = s.folderName?.let { "Saved automatically to $it." }
-            ?: "Fully automatic, for KOReader and other readers that sync a folder on this phone (for example with Syncthing).",
-        onClick = { if (s.folderUri != null) vm.useFolder(s.folderUri, s.folderName ?: "your folder") else pickFolder.launch(null) },
+        detail = when {
+            s.folderUri == null -> "Fully automatic, for KOReader and other readers that sync a folder on this phone (for example with Syncthing)."
+            !folderReachable -> "Can't reach ${s.folderName ?: "your folder"}. Choose it again."
+            else -> "Saved automatically to ${s.folderName ?: "your folder"}."
+        },
+        problem = s.folderUri != null && !folderReachable,
+        onClick = { if (s.folderUri != null && folderReachable) vm.useFolder(s.folderUri, s.folderName ?: "your folder") else pickFolder.launch(null) },
     )
     if (s.delivery == DeliveryMethod.FOLDER) {
         OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = OPTION_INDENT)) { Text("Choose another delivery folder") }
@@ -290,6 +295,23 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
 
 /** How far a setting's own controls sit in, under the option or switch they belong to. */
 private val OPTION_INDENT = 48.dp
+
+/**
+ * Whether the app still holds its grant to the folder at [uri], checked again whenever the screen
+ * comes back: the grant goes if the folder's app is uninstalled or its access is revoked, and
+ * then every save to it fails.
+ */
+@Composable
+private fun rememberReachable(uri: String?): Boolean {
+    val context = LocalContext.current
+    fun check() = uri == null || context.contentResolver.persistedUriPermissions.any { it.uri.toString() == uri && it.isWritePermission }
+    var reachable by remember(uri) { mutableStateOf(check()) }
+    LifecycleResumeEffect(uri) {
+        reachable = check()
+        onPauseOrDispose {}
+    }
+    return reachable
+}
 
 private const val FOLDER_GRANT = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 
@@ -313,6 +335,7 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
         }
     }
     val saving = s.notesFolderUri != null
+    val reachable = rememberReachable(s.notesFolderUri)
     Heading("Reading notes")
     Row(
         Modifier.fillMaxWidth().toggleable(saving, role = Role.Switch) { on ->
@@ -327,11 +350,15 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
     ) {
         Column(Modifier.weight(1f)) {
             Text("Save notes for each edition", style = MaterialTheme.typography.bodyLarge)
+            val name = s.notesFolderName ?: "your folder"
             Text(
-                s.notesFolderName?.let { "Saved to $it when an edition is delivered." }
-                    ?: "A Markdown file for each edition, for Obsidian or any notes app. You'll pick the folder.",
+                when {
+                    !saving -> "A Markdown file for each edition, for Obsidian or any notes app. You'll pick the folder."
+                    !reachable -> "Can't reach $name. Choose it again."
+                    else -> "Saved to $name when an edition is delivered."
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (reachable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
             )
         }
         Switch(checked = saving, onCheckedChange = null)
@@ -340,12 +367,12 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
 }
 
 @Composable
-private fun DeliveryOption(selected: Boolean, title: String, detail: String, onClick: () -> Unit) {
+private fun DeliveryOption(selected: Boolean, title: String, detail: String, problem: Boolean = false, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().selectable(selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 8.dp)) {
         RadioButton(selected = selected, onClick = null)
         Column(Modifier.padding(start = 12.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = if (problem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
