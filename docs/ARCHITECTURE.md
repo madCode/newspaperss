@@ -81,6 +81,7 @@ Entry points from outside the app (`app/src/main/AndroidManifest.xml`):
 | `MainActivity` | The app. |
 | `ShareActivity` | Share target: saves a link to the reading list and closes. |
 | `OpenEditionActivity` | The notification's **Open** (Boox): opens the EPUB and marks it sent. |
+| `SendEditionActivity` | The notification's **Send** with email to a Kindle: opens the mail app and marks it sent. |
 | `EditionSentReceiver` | The share sheet reports which app was picked: marks the edition sent. |
 | `ClockChangeReceiver` | Time or time zone changed: re-arms the edition timer. |
 | `FileProvider` | Hands EPUB and notes files to other apps by `content://` URI. |
@@ -171,6 +172,8 @@ flowchart LR
     folder["EditionRun: folder copy succeeded"] --> md
     share["EditionSentReceiver: app picked in share sheet"] --> ms
     open["OpenEditionActivity / Open button (Boox)"] --> ms
+    email["SendEditionActivity / Send button: mail app opened"] --> me
+    me["markEmailedToKindle: only if still READY"] --> md
     sent["I've sent it (Today, Edition)"] --> ms
     ms["markSent: only if still READY"] --> md
     md["markDelivered (one transaction)"]
@@ -181,14 +184,23 @@ flowchart LR
     md --> ttrss["TtrssMarkReadWorker, if it has tt-rss articles"]
 ```
 
-- **Share** builds a chooser intent with a callback
-  (`app/delivery/EditionIntents.kt`). The callback also grants the chosen
-  app read access to the file until reboot, because Send to Kindle reads
-  it after its screen closes.
+- **Send** is `EditionIntents.send` (`app/delivery/EditionIntents.kt`).
+  Usually it's the share sheet, a chooser intent with a callback
+  (`EditionSentReceiver`). The callback also grants the chosen app read
+  access to the file until reboot, because Send to Kindle reads it after
+  its screen closes.
+- **Email to a Kindle** aims an email intent at the chosen mail app
+  (`MailApps` lists them; the manifest's `<queries>` make them visible).
+  With no chooser to report back, launching it is what marks the edition
+  sent: the screen's ViewModel does it in the app, and from the
+  notification a small activity (`SendEditionActivity`) does, since a
+  receiver can't start an activity from a notification. If the app is
+  gone, or none was chosen, it's the share sheet with the same email.
 - **`markNotSent`** is the reverse: it puts the articles back in the
   edition, forgets the delivered links and asks tt-rss to mark them unread.
-- **`KindleSends`** (`app/delivery/KindleSends.kt`) remembers recent Send
-  to Kindle picks in memory only, for the "can take a few minutes" note.
+- **`KindleSends`** (`app/delivery/KindleSends.kt`) remembers recent sends
+  to a Kindle, by the Kindle app or by email, in memory only, for the "can
+  take a few minutes" note.
 
 ## Background work
 

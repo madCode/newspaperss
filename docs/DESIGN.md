@@ -203,12 +203,24 @@ module so it's all unit-tested without Android.
 
 | Device | How it gets there | Unattended? |
 |---|---|---|
-| Kindle | Share to the Kindle app, one tap from the "ready" notification | One tap |
+| Kindle | Email it to the Kindle's own address: Send opens your mail app with everything filled in, and you tap Send | One tap, then Send in the mail app |
+| Kindle, without email | Share to the Kindle app, one tap from the "ready" notification. It only reaches the cloud library | One tap |
 | Kobo | Share to Dropbox, into the folder the Kobo syncs (`Apps/Rakuten Kobo`) | One tap |
 | PocketBook | Share to an email app, to your `@pbsync.com` address | One tap |
 | KOReader | Save to a folder that syncs to the device (Syncthing) | Yes |
 | Boox | Open it in the device's reader, from the app or the notification | Yes |
 | Anything else | The share sheet | One tap |
+
+**Email to a Kindle.** Each Kindle has its own Send-to-Kindle address
+(…@kindle.com), and a book emailed there is delivered to that device by
+itself. The app doesn't send mail: Send opens the mail app chosen in
+setup, straight to a compose screen with the Kindle's address, the
+edition's title as the subject and the EPUB attached. "Ask each time", or
+a chosen app that's been uninstalled, opens the share sheet with the same
+email instead. Android can't choose the "From" account for another app,
+so the address you send from has to be on Amazon's approved list
+(Personal Document Settings), and setup says so. The app's mail apps are
+the ones that both write mail and take an EPUB.
 
 Folders use Android's folder picker. Google Drive and Dropbox don't offer
 whole folders to other apps that way, so cloud delivery goes through a
@@ -216,16 +228,18 @@ share for now (a direct Dropbox connection is in the backlog).
 
 **When is an edition delivered?** Saving it to your folder; choosing an app
 in the share sheet (Android reports the choice back, from the notification
-too); or opening it on a Boox. **I've sent it** covers any other route, and
+too); opening the mail app to email it to a Kindle; or opening it on a Boox. **I've sent it** covers any other route, and
 **Send again** is there if a send didn't arrive. An edition still "ready"
 when the next one is built was never sent: it's marked not sent and its
 articles go back, keeping their stars, before the new one is planned.
 
-**Send to Kindle is slow.** A book can take a few minutes to reach the
-Kindle library, so for half an hour after a send with the Kindle app, the
-edition (on Today and its own page) says "Sent to Kindle. It can take a few
-minutes to show up in your library." Any other delivery, or marking it as
-not sent, takes the note away. It's only remembered while the app is running.
+**Send to Kindle is slow.** A book can take a few minutes to reach a
+Kindle, so for half an hour after a send the edition (on Today and its own
+page) says so: "Sent to Kindle. It can take a few minutes to show up in
+your library." after the Kindle app, or "Emailed to your Kindle. It can
+take a few minutes to arrive; it shows up by itself." after an email. Any
+other delivery, or marking it as not sent, takes the note away. It's only
+remembered while the app is running.
 
 **A send that didn't arrive can be undone.** A failed Send to Kindle still
 counts as sent, because Android only reports the app you chose.
@@ -241,8 +255,9 @@ article brought back into a newer edition since stays in that one.
 
 **The app you send to can read the book after its screen closes.** A share
 only lets the receiving screen read the file, and Send to Kindle uploads
-after its form closes. So the Kindle app, and whichever app you pick, is
-allowed to read that edition's file until the phone restarts.
+after its form closes. So the Kindle app, the mail app that emails it, and
+whichever app you pick, are allowed to read that edition's file until the
+phone restarts.
 
 ## 7. What happens to articles you didn't read
 
@@ -315,7 +330,11 @@ allowed to read that edition's file until the phone restarts.
 1. **Welcome.**
 2. **Where do you read?** Kindle, Kobo, Boox, PocketBook, KOReader, or
    "just the file". This picks the delivery method; KOReader asks for its
-   folder.
+   folder. Kindle sets up email to the Kindle: its address (Next waits for
+   one that looks like an email address, and an address not at kindle.com
+   or kindle.cn gets a warning), the mail app to send with, and a reminder
+   to approve the sending address on Amazon. **Use the Kindle app
+   instead** shares to the Kindle app.
 3. **Pick your sources:** starter packs of well-known public feeds; paste
    any website (the app finds its feed); import an OPML file; connect a
    tt-rss account; or import saved links from Pocket or Instapaper, which
@@ -329,7 +348,9 @@ allowed to read that edition's file until the phone restarts.
 - **Today** (home): when the next edition is due, how many starred articles
   will go in the next one (only when some will), and the latest edition with
   **Send**, **Open** and **I've sent it** (**Send again** and **Didn't
-  arrive? Mark as not sent** once delivered).
+  arrive? Mark as not sent** once delivered). The line under the buttons
+  says what counts as sent: choosing an app, or, with email to a Kindle,
+  opening the mail app.
   **Make an edition now** is the main button only before the first edition;
   after that it's a quiet **Make another edition**, since today's paper is
   done. A failed build or edition offers **Try again** after saying what
@@ -393,8 +414,13 @@ allowed to read that edition's file until the phone restarts.
   import too. **✕** removes a link at once, with **Undo** in a snackbar, since
   removing is routine and a confirm would only be tapped through.
 - **Settings:** the edition (size, per-source cap, order), the schedule
-  (time and days), your e-reader, delivery (share or folder), reading notes, and the
+  (time and days), your e-reader, delivery, reading notes, and the
   app's version.
+  - **Delivery:** **Email it to your Kindle** (shown for a Kindle, or once
+    chosen) with the Kindle's address and the mail app to send with;
+    **Send it myself** (the share sheet); or **Save to a folder**. Unless
+    editions go to a folder, a schedule with notifications off gets a
+    warning: a timed edition's Send is in its notification.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
     delivered, by share, folder or Open, in the background so a slow cloud folder
