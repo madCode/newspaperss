@@ -20,7 +20,12 @@ class KindleSends(private val clock: Clock = Clock.systemUTC()) {
 
     /** [packageName] was picked to send [editionId]; any other app than Kindle clears its note. */
     fun record(editionId: Long, packageName: String) {
-        sent.update { if (packageName == EditionIntents.KINDLE_PACKAGE) it + (editionId to clock.instant()) else it - editionId }
+        if (packageName == EditionIntents.KINDLE_PACKAGE) sent.update { it + (editionId to clock.instant()) } else clear(editionId)
+    }
+
+    /** [editionId] went another way, or wasn't sent after all: there's nothing to wait for in the Kindle library. */
+    fun clear(editionId: Long) {
+        sent.update { it - editionId }
     }
 
     /** The editions sent with the Kindle app in the last [NOTE_FOR], updated as each one's time runs out. */

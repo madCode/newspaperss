@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,6 +70,29 @@ class EditionSentTest {
         // Send again, this time by email: no Kindle library to wait for.
         pick("com.example.mail")
         idleUntil { runBlocking { recent.first() }.isEmpty() }
+    }
+
+    @Test
+    fun theKindleNoteGoesWhenTheEditionIsMarkedNotSentAndThenSentAnotherWay() {
+        File(app.filesDir, "editions/n.epub").apply { parentFile!!.mkdirs(); writeText("epub") }
+        val id = runBlocking { db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.READY, fileName = "n.epub")) }
+        val editions = app.container.editions
+        val recent = app.container.kindleSends.recent
+
+        runBlocking { editions.markSent(id, EditionIntents.KINDLE_PACKAGE) }
+        assertEquals(setOf(id), runBlocking { recent.first() })
+
+        runBlocking { assertTrue(editions.markNotSent(id)) }
+        assertEquals(emptySet<Long>(), runBlocking { recent.first() })
+
+        // Sent by hand ("I've sent it", or Open on a Boox): the note mustn't come back.
+        runBlocking { editions.markSent(id, EditionIntents.KINDLE_PACKAGE); editions.markNotSent(id); editions.markSent(id) }
+        assertEquals(EditionStatus.DELIVERED, statusOf(id))
+        assertEquals(emptySet<Long>(), runBlocking { recent.first() })
+
+        // Delivered to a folder after a Kindle send.
+        runBlocking { editions.markNotSent(id); editions.markSent(id, EditionIntents.KINDLE_PACKAGE); editions.markDelivered(id) }
+        assertEquals(emptySet<Long>(), runBlocking { recent.first() })
     }
 
     @Test

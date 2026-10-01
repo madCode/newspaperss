@@ -204,8 +204,8 @@ articles go back, keeping their stars, before the new one is planned.
 **Send to Kindle is slow.** A book can take a few minutes to reach the
 Kindle library, so for half an hour after a send with the Kindle app, the
 edition (on Today and its own page) says "Sent to Kindle. It can take a few
-minutes to show up in your library." Sending it with another app takes the
-note away. It's only remembered while the app is running.
+minutes to show up in your library." Any other delivery, or marking it as
+not sent, takes the note away. It's only remembered while the app is running.
 
 **A send that didn't arrive can be undone.** A failed Send to Kindle still
 counts as sent, because Android only reports the app you chose.
@@ -320,8 +320,10 @@ allowed to read that edition's file until the phone restarts.
   and its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
   network). **Aa** in the preview's top bar sets its text size (Small,
-  Default, Large, Larger), kept for next time. Pictures that stand alone
-  fill the width, and the page can be pinched to zoom into a comic. **Notes** exports a Markdown file for a notes app: front matter
+  Default, Large, Larger), kept for next time. Large pictures that stand
+  alone fill the width (small ones keep their size), and the page can be
+  pinched to zoom into a comic. **Notes** exports a Markdown file for a
+  notes app: front matter
   (date, edition, sources, a tag) for Obsidian, the closing page's question and
   a few reflection prompts at the top, then per article its source, author, date, link, a citation and room for notes.
   **Delete edition** is in the ⋮ menu, and asks by name, saying what happens

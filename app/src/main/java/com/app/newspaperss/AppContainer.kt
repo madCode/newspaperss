@@ -55,7 +55,7 @@ class AppContainer(
     val notifier = Notifier(context)
     val kindleSends = KindleSends()
     // A sent edition's Ready notification comes down: its Send would offer an edition already sent.
-    val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead)
+    val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead, kindleSends = kindleSends)
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)
