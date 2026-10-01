@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -48,6 +50,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
@@ -58,6 +61,7 @@ import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.core.plural
 import com.app.newspaperss.ui.components.CheckChip
+import com.app.newspaperss.ui.components.KindleEmailFields
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.sources.TtrssDialog
@@ -147,7 +151,14 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
         }
     }
     val device = s.device ?: return
+    if (s.emailsKindle) {
+        KindleEmailSetup(s, vm)
+        return
+    }
     Text(DeviceTips.tip(device), modifier = Modifier.padding(top = 16.dp), style = MaterialTheme.typography.bodyMedium)
+    if (device == Device.KINDLE) {
+        TextButton(onClick = vm::useKindleEmail, contentPadding = PaddingValues(end = 12.dp)) { Text("Email it to your Kindle instead") }
+    }
     if (s.needsFolder) {
         OutlinedButton(onClick = { pickFolder.launch(null) }, modifier = Modifier.padding(top = 12.dp)) {
             Text(s.folderName?.let { "Folder: $it" } ?: "Choose the folder")
@@ -159,6 +170,41 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun KindleEmailSetup(s: OnboardingState, vm: OnboardingViewModel) {
+    HorizontalDivider(Modifier.padding(vertical = 16.dp))
+    Text("Send it straight to your Kindle", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+    Text(
+        "Each Kindle has its own email address. Editions emailed there arrive on it by themselves. " +
+            "When an edition is ready, Send opens your mail app with everything filled in; you tap Send.",
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+    )
+    KindleEmailFields(
+        address = s.kindleEmail,
+        onAddress = vm::editKindleEmail,
+        mailApp = s.mailApp,
+        onMailApp = vm::chooseMailApp,
+        label = "Your Kindle's email address",
+        hint = "Find it on Amazon: Content & Devices \u203a Devices \u203a your Kindle.",
+    )
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+    ) {
+        Text(
+            "One more step on Amazon: add the email address you'll send from to your approved list " +
+                "(Preferences \u203a Personal Document Settings). Otherwise Amazon drops the edition.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+    TextButton(onClick = vm::useKindleApp, modifier = Modifier.padding(top = 8.dp), contentPadding = PaddingValues(end = 12.dp)) {
+        Text("Use the Kindle app instead")
     }
 }
 

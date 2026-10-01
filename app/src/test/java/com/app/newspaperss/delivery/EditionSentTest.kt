@@ -65,7 +65,7 @@ class EditionSentTest {
         val recent = app.container.kindleSends.recent
 
         pick(EditionIntents.KINDLE_PACKAGE)
-        idleUntil { runBlocking { recent.first() } == setOf(ready) }
+        idleUntil { runBlocking { recent.first() } == mapOf(ready to KindleSend.APP) }
 
         // Send again, this time by email: no Kindle library to wait for.
         pick("com.example.mail")
@@ -80,19 +80,27 @@ class EditionSentTest {
         val recent = app.container.kindleSends.recent
 
         runBlocking { editions.markSent(id, EditionIntents.KINDLE_PACKAGE) }
-        assertEquals(setOf(id), runBlocking { recent.first() })
+        assertEquals(mapOf(id to KindleSend.APP), runBlocking { recent.first() })
 
         runBlocking { assertTrue(editions.markNotSent(id)) }
-        assertEquals(emptySet<Long>(), runBlocking { recent.first() })
+        assertEquals(emptyMap<Long, KindleSend>(), runBlocking { recent.first() })
 
         // Sent by hand ("I've sent it", or Open on a Boox): the note mustn't come back.
         runBlocking { editions.markSent(id, EditionIntents.KINDLE_PACKAGE); editions.markNotSent(id); editions.markSent(id) }
         assertEquals(EditionStatus.DELIVERED, statusOf(id))
-        assertEquals(emptySet<Long>(), runBlocking { recent.first() })
+        assertEquals(emptyMap<Long, KindleSend>(), runBlocking { recent.first() })
 
         // Delivered to a folder after a Kindle send.
         runBlocking { editions.markNotSent(id); editions.markSent(id, EditionIntents.KINDLE_PACKAGE); editions.markDelivered(id) }
-        assertEquals(emptySet<Long>(), runBlocking { recent.first() })
+        assertEquals(emptyMap<Long, KindleSend>(), runBlocking { recent.first() })
+
+        // Emailed to the Kindle, then marked as not sent, then sent by hand.
+        runBlocking { editions.markNotSent(id); editions.markEmailedToKindle(id) }
+        assertEquals(mapOf(id to KindleSend.EMAIL), runBlocking { recent.first() })
+        runBlocking { editions.markNotSent(id) }
+        assertEquals(emptyMap<Long, KindleSend>(), runBlocking { recent.first() })
+        runBlocking { editions.markEmailedToKindle(id); editions.markNotSent(id); editions.markSent(id) }
+        assertEquals(emptyMap<Long, KindleSend>(), runBlocking { recent.first() })
     }
 
     @Test

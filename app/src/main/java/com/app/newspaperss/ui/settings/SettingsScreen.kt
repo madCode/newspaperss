@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,7 @@ import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.core.plural
 import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.ui.components.CheckChip
+import com.app.newspaperss.ui.components.KindleEmailFields
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.ui.onboarding.DeviceTips
 import com.app.newspaperss.settings.DeliveryMethod
@@ -171,7 +173,8 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
         Switch(checked = s.scheduleEnabled, onCheckedChange = null)
     }
     if (!s.scheduleEnabled) return
-    if (s.delivery == DeliveryMethod.SHARE) NotificationsOffWarning()
+    // Folder delivery needs no one; otherwise the notification is where a timed edition's Send is.
+    if (s.delivery != DeliveryMethod.FOLDER) NotificationsOffWarning()
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
         Text("Ready by", Modifier.weight(1f))
         OutlinedButton(onClick = {
@@ -208,10 +211,13 @@ private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
             }
         }
     }
-    // The tip describes the reader's usual route, which folder delivery overrides: say so,
-    // or a Kindle owner still saving to a KOReader folder is told to wait for a Send.
+    // The tip describes the reader's usual route, which folder or email delivery overrides: say
+    // so, or a Kindle owner still saving to a KOReader folder is told to wait for a Send.
+    val email = s.kindleEmailTarget
     val tip = if (s.delivery == DeliveryMethod.FOLDER && s.folderUri != null) {
         "Editions are saved to ${s.folderName ?: "your folder"}. To send them another way, change Delivery above."
+    } else if (email != null) {
+        "Send emails each edition to ${email.address}. To send them another way, change Delivery above."
     } else s.device?.let(DeviceTips::tip)
     tip?.let {
         Text(
@@ -234,6 +240,32 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
         }
     }
     Heading("Delivery")
+    if (s.device == Device.KINDLE || s.delivery == DeliveryMethod.KINDLE_EMAIL) {
+        DeliveryOption(
+            selected = s.delivery == DeliveryMethod.KINDLE_EMAIL,
+            title = "Email it to your Kindle",
+            detail = "Arrives on your Kindle by itself.",
+            onClick = vm::useKindleEmail,
+        )
+        if (s.delivery == DeliveryMethod.KINDLE_EMAIL) {
+            // Held here and saved as it changes: fed back from the store, each save would move the cursor.
+            var address by rememberSaveable { mutableStateOf(s.kindleEmail.orEmpty()) }
+            KindleEmailFields(
+                address = address,
+                onAddress = { address = it; vm.setKindleEmail(it) },
+                mailApp = s.mailApp,
+                onMailApp = vm::setMailApp,
+                label = "Kindle's email address",
+                modifier = Modifier.padding(start = 48.dp),
+            )
+            Text(
+                "The address you send from must be on Amazon's approved list.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 48.dp, top = 4.dp, bottom = 8.dp),
+            )
+        }
+    }
     DeliveryOption(
         selected = s.delivery == DeliveryMethod.SHARE,
         title = "Send it myself",

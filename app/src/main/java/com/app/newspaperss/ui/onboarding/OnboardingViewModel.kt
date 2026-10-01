@@ -12,6 +12,7 @@ import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.KindleAddress
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,11 @@ data class OnboardingState(
     val device: Device? = null,
     val folderUri: String? = null,
     val folderName: String? = null,
+    /** A Kindle reader emails editions to their Kindle, unless they choose the Kindle app instead. */
+    val kindleByEmail: Boolean = true,
+    val kindleEmail: String = "",
+    /** The mail app Send opens; null asks each time. */
+    val mailApp: String? = null,
     /** Feed URLs chosen from the starter packs or found from a pasted address. */
     val chosen: Set<String> = emptySet(),
     val found: List<StarterFeed> = emptyList(),
@@ -48,9 +54,11 @@ data class OnboardingState(
 ) {
     /** KOReader reads from a synced folder, so it's offered folder delivery. */
     val needsFolder get() = device == Device.KOREADER
+    /** The Kindle's email setup is showing, so Next needs its address. */
+    val emailsKindle get() = device == Device.KINDLE && kindleByEmail
     val canContinue get() = when (step) {
         Step.WELCOME -> true
-        Step.DEVICE -> device != null
+        Step.DEVICE -> device != null && (!emailsKindle || KindleAddress.isValid(kindleEmail))
         // Saved links alone are enough: for someone leaving Pocket, they're the paper.
         Step.SOURCES -> chosen.isNotEmpty() || added > 0 || savedLinks > 0
         Step.SIZE -> !finishing
@@ -83,6 +91,10 @@ class OnboardingViewModel(
 
     fun chooseDevice(device: Device) = _state.update { it.copy(device = device) }
     fun chooseFolder(uri: String, name: String) = _state.update { it.copy(folderUri = uri, folderName = name) }
+    fun editKindleEmail(address: String) = _state.update { it.copy(kindleEmail = address) }
+    fun chooseMailApp(packageName: String?) = _state.update { it.copy(mailApp = packageName) }
+    fun useKindleApp() = _state.update { it.copy(kindleByEmail = false) }
+    fun useKindleEmail() = _state.update { it.copy(kindleByEmail = true) }
 
     fun toggleFeed(url: String) = _state.update { it.copy(chosen = if (url in it.chosen) it.chosen - url else it.chosen + url) }
 
@@ -135,9 +147,15 @@ class OnboardingViewModel(
                     edition = it.edition.copy(minutes = s.minutes),
                     scheduleEnabled = s.scheduleEnabled,
                     schedule = Schedule(time = s.time),
-                    delivery = if (s.needsFolder && s.folderUri != null) DeliveryMethod.FOLDER else DeliveryMethod.SHARE,
+                    delivery = when {
+                        s.needsFolder && s.folderUri != null -> DeliveryMethod.FOLDER
+                        s.emailsKindle && KindleAddress.isValid(s.kindleEmail) -> DeliveryMethod.KINDLE_EMAIL
+                        else -> DeliveryMethod.SHARE
+                    },
                     folderUri = s.folderUri,
                     folderName = s.folderName,
+                    kindleEmail = s.kindleEmail.trim().takeIf { s.emailsKindle && it.isNotEmpty() },
+                    mailApp = s.mailApp.takeIf { s.emailsKindle },
                 )
             }
             onFinished(settings.current())
@@ -152,6 +170,9 @@ private fun store(s: OnboardingState, saved: SavedStateHandle) {
     saved[KEY + "device"] = s.device?.name
     saved[KEY + "folderUri"] = s.folderUri
     saved[KEY + "folderName"] = s.folderName
+    saved[KEY + "kindleByEmail"] = s.kindleByEmail
+    saved[KEY + "kindleEmail"] = s.kindleEmail
+    saved[KEY + "mailApp"] = s.mailApp
     saved[KEY + "chosen"] = ArrayList(s.chosen)
     saved[KEY + "foundUrls"] = ArrayList(s.found.map { it.url })
     saved[KEY + "foundTitles"] = ArrayList(s.found.map { it.title })
@@ -170,6 +191,9 @@ private fun restore(saved: SavedStateHandle): OnboardingState {
         device = saved.get<String>(KEY + "device")?.let { runCatching { Device.valueOf(it) }.getOrNull() },
         folderUri = saved[KEY + "folderUri"],
         folderName = saved[KEY + "folderName"],
+        kindleByEmail = saved[KEY + "kindleByEmail"] ?: d.kindleByEmail,
+        kindleEmail = saved[KEY + "kindleEmail"] ?: d.kindleEmail,
+        mailApp = saved[KEY + "mailApp"],
         chosen = saved.get<ArrayList<String>>(KEY + "chosen").orEmpty().toSet(),
         found = urls.zip(titles) { url, title -> StarterFeed(title, url) },
         minutes = saved[KEY + "minutes"] ?: d.minutes,

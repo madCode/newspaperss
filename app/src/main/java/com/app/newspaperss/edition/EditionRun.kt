@@ -82,7 +82,7 @@ class EditionRun(
                 notifier.problem("${edition.title} wasn't delivered", error)
             }
         } else if (scheduled && editions.byId(editionId)?.status == EditionStatus.READY) {
-            notifier.editionReady(edition, file, openInstead = s.device == Device.BOOX)
+            notifier.editionReady(edition, file, openInstead = s.device == Device.BOOX, kindleEmail = s.kindleEmailTarget)
         }
     }
 }

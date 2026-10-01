@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.app.newspaperss.edition.EditionNotes
+import com.app.newspaperss.settings.KindleEmail
 import java.io.File
 
 object EditionIntents {
@@ -32,6 +33,39 @@ object EditionIntents {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         return Intent.createChooser(send, "Send “$title” to your e-reader", EditionSentReceiver.callback(context, editionId, uri))
+    }
+
+    /**
+     * What Send starts for an edition.
+     *
+     * @property countsOnLaunch starting [intent] is what counts as sent: it opens the mail app
+     *   directly, so there's no share sheet to report the pick (see [EditionSentReceiver]).
+     */
+    class Send(val intent: Intent, val countsOnLaunch: Boolean)
+
+    /**
+     * Send for an edition: with [kindleEmail], an email to the Kindle's address with the edition
+     * attached, opened straight in the chosen mail app while it's still installed, otherwise in
+     * the share sheet so a mail app picked there gets To and Subject filled in. Without it, [share].
+     */
+    fun send(context: Context, file: File, title: String, editionId: Long?, kindleEmail: KindleEmail?): Send {
+        if (kindleEmail == null) return Send(share(context, file, title, editionId), countsOnLaunch = false)
+        val uri = uriFor(context, file)
+        val email = Intent(Intent.ACTION_SEND).apply {
+            type = EPUB_MIME
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(kindleEmail.address))
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val app = kindleEmail.mailApp?.takeIf { context.packageManager.queryIntentActivities(Intent(email).setPackage(it), 0).isNotEmpty() }
+        if (app != null) {
+            // A mail app can attach the file after its compose screen has gone, like Send to Kindle.
+            grantRead(context, app, uri)
+            return Send(email.setPackage(app), countsOnLaunch = true)
+        }
+        val callback = EditionSentReceiver.callback(context, editionId, uri, kindleEmail = true)
+        return Send(Intent.createChooser(email, "Email “$title” to your Kindle", callback), countsOnLaunch = false)
     }
 
     /**

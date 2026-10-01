@@ -103,7 +103,7 @@ class ScreenshotTest {
 
     @Test
     fun onboardingDevice() {
-        val vm = onboarding().apply { next(); chooseDevice(Device.KINDLE) }
+        val vm = onboarding().apply { next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com") }
         shoot("02-onboarding-device") { OnboardingScreen(vm) }
     }
 
@@ -116,7 +116,7 @@ class ScreenshotTest {
     @Test
     fun onboardingSize() {
         val vm = onboarding().apply {
-            next(); chooseDevice(Device.KINDLE); next(); toggleFeed(StarterPacks.all[0].feeds[0].url); next()
+            next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com"); next(); toggleFeed(StarterPacks.all[0].feeds[0].url); next()
         }
         shoot("04-onboarding-size") { OnboardingScreen(vm) }
     }
