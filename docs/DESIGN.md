@@ -414,16 +414,24 @@ phone restarts.
   checklist (compatible with the library); Pocket and Instapaper exports
   import too. **✕** removes a link at once, with **Undo** in a snackbar, since
   removing is routine and a confirm would only be tapped through.
-- **Settings:** the edition (size, per-source cap, order), the schedule
-  (time and days), your e-reader, delivery, reading notes, and the
-  app's version.
+- **Settings,** in this order: the edition (size, how many from each
+  source, order), the schedule (time and days), your e-reader, delivery,
+  reading notes, and the app's version. The e-reader comes before
+  delivery because it decides which delivery options show.
+  - **Schedule:** with notifications off, a warning for every delivery:
+    a shared or emailed edition's Send is in its notification, and a
+    folder save that fails is only reported there.
   - **Delivery:** **Email it to your Kindle** (shown for a Kindle, or once
     chosen) with the Kindle's address and the mail app to send with
     (without a working address it says Send opens the share sheet until
-    one is added);
-    **Send it myself** (the share sheet); or **Save to a folder**. Unless
-    editions go to a folder, a schedule with notifications off gets a
-    warning: a timed edition's Send is in its notification.
+    one is added); **Send it myself** (tap Send and choose an app), with
+    a tip on sending to your e-reader under it while it's chosen; or
+    **Save to a folder**. A folder the app can no longer reach (its access
+    was revoked, or its app uninstalled) says "Can't reach <name>. Tap to
+    choose it again." instead of saving automatically, and tapping picks
+    it again; so does the notes folder, which also offers **Turn off**.
+  - At large text sizes, the − and + for the per-source count go below
+    its words.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
     delivered, by share, folder or Open, in the background so a slow cloud folder

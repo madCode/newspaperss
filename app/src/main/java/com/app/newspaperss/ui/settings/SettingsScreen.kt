@@ -10,6 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -32,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -45,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -60,6 +63,7 @@ import com.app.newspaperss.ui.components.CheckChip
 import com.app.newspaperss.ui.components.KindleEmailFields
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.ui.onboarding.DeviceTips
+import com.app.newspaperss.ui.sources.LARGE_TEXT
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Settings as AppSettings
 import java.time.DayOfWeek
@@ -80,11 +84,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             ScheduleSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            // Before Delivery: the e-reader decides which delivery options are offered.
+            ReaderSection(s, viewModel)
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
             DeliverySection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             NotesSection(s, viewModel)
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
-            ReaderSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             val context = LocalContext.current
             val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
@@ -116,25 +121,38 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
         steps = (SettingsViewModel.MAX_MINUTES - SettingsViewModel.MIN_MINUTES) / 5 - 1,
         modifier = Modifier.semantics { stateDescription = "${minutes.roundToInt()} minutes" },
     )
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val perSource = @Composable { modifier: Modifier ->
         // A live region, so pressing − or + is followed by the new number.
         Text(
-            "${plural(s.edition.maxPerSource, "article")} from each site, then more if there's room",
-            Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            "${plural(s.edition.maxPerSource, "article")} from each source, then more if there's room",
+            modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
+    }
+    val buttons = @Composable {
         OutlinedButton(
             onClick = { vm.setMaxPerSource(s.edition.maxPerSource - 1) },
             enabled = s.edition.maxPerSource > 1,
-            modifier = Modifier.semantics { contentDescription = "Fewer from each site" },
+            modifier = Modifier.semantics { contentDescription = "Fewer from each source" },
         ) { Text("−") }
         OutlinedButton(
             onClick = { vm.setMaxPerSource(s.edition.maxPerSource + 1) },
             enabled = s.edition.maxPerSource < SettingsViewModel.MAX_PER_SOURCE,
-            modifier = Modifier.padding(start = 8.dp).semantics { contentDescription = "More from each site" },
+            modifier = Modifier.padding(start = 8.dp).semantics { contentDescription = "More from each source" },
         ) { Text("+") }
     }
+    // At large text the buttons get their own line, as on a source's page: beside the words they
+    // squeezed them to a few words a line.
+    if (LocalDensity.current.fontScale >= LARGE_TEXT) {
+        perSource(Modifier)
+        Row(Modifier.padding(top = 8.dp)) { buttons() }
+    } else {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            perSource(Modifier.weight(1f))
+            buttons()
+        }
+    }
     Text(
-        "A site can have its own number: tap it in Sources.",
+        "A source can have its own number: tap it in Sources.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -173,8 +191,7 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
         Switch(checked = s.scheduleEnabled, onCheckedChange = null)
     }
     if (!s.scheduleEnabled) return
-    // Folder delivery needs no one; otherwise the notification is where a timed edition's Send is.
-    if (s.delivery != DeliveryMethod.FOLDER) NotificationsOffWarning()
+    NotificationsOffWarning(s.delivery)
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
         Text("Ready by", Modifier.weight(1f))
         OutlinedButton(onClick = {
@@ -211,22 +228,6 @@ private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
             }
         }
     }
-    // The tip describes the reader's usual route, which folder or email delivery overrides: say
-    // so, or a Kindle owner still saving to a KOReader folder is told to wait for a Send.
-    val email = s.kindleEmailTarget
-    val tip = if (s.delivery == DeliveryMethod.FOLDER && s.folderUri != null) {
-        "Editions are saved to ${s.folderName ?: "your folder"}. To send them another way, change Delivery above."
-    } else if (email != null) {
-        "Send emails each edition to ${email.address}. To send them another way, change Delivery above."
-    } else s.device?.let(DeviceTips::tip)
-    tip?.let {
-        Text(
-            it,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
 }
 
 @Composable
@@ -256,7 +257,7 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
                 mailApp = s.mailApp,
                 onMailApp = vm::setMailApp,
                 label = "Kindle's email address",
-                modifier = Modifier.padding(start = 48.dp),
+                modifier = Modifier.padding(start = OPTION_INDENT),
             )
             // The saved address, not the typed one: Send goes by what's saved.
             if (s.kindleEmailTarget == null) {
@@ -264,33 +265,70 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
                     "Add your Kindle's email address; until then Send opens the share sheet.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                    modifier = Modifier.padding(start = OPTION_INDENT, top = 4.dp),
                 )
             }
             Text(
                 "The address you send from must be on Amazon's approved list.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 48.dp, top = 4.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = OPTION_INDENT, top = 4.dp, bottom = 8.dp),
             )
         }
     }
     DeliveryOption(
         selected = s.delivery == DeliveryMethod.SHARE,
         title = "Send it myself",
-        detail = "You get a notification with a Send button. Pick the Kindle app, Dropbox (for a Kobo), email, or any other app.",
+        detail = "Tap Send on each edition and choose an app: the Kindle app, Dropbox, email or any other.",
         onClick = vm::useShare,
     )
+    // How to send to this e-reader with the share sheet: under the choice, where the reader is
+    // looking when they pick it, and only then (a folder or email reader doesn't wait for a Send).
+    if (s.delivery == DeliveryMethod.SHARE) {
+        s.device?.let {
+            Text(
+                DeviceTips.tip(it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = OPTION_INDENT, bottom = 8.dp),
+            )
+        }
+    }
+    val folderReachable = rememberReachable(s.folderUri)
     DeliveryOption(
         selected = s.delivery == DeliveryMethod.FOLDER,
         title = "Save to a folder",
-        detail = s.folderName?.let { "Saved automatically to $it." }
-            ?: "Fully automatic, for KOReader and other readers that sync a folder on this phone (for example with Syncthing).",
-        onClick = { if (s.folderUri != null) vm.useFolder(s.folderUri, s.folderName ?: "your folder") else pickFolder.launch(null) },
+        detail = when {
+            s.folderUri == null -> "Fully automatic, for KOReader and other readers that sync a folder on this phone (for example with Syncthing)."
+            !folderReachable -> "Can't reach ${s.folderName ?: "your folder"}. Tap to choose it again."
+            else -> "Saved automatically to ${s.folderName ?: "your folder"}."
+        },
+        problem = s.folderUri != null && !folderReachable,
+        onClick = { if (s.folderUri != null && folderReachable) vm.useFolder(s.folderUri, s.folderName ?: "your folder") else pickFolder.launch(null) },
     )
     if (s.delivery == DeliveryMethod.FOLDER) {
-        OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = 48.dp)) { Text("Choose another folder") }
+        OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = OPTION_INDENT)) { Text("Choose another delivery folder") }
     }
+}
+
+/** How far a setting's own controls sit in, under the option or switch they belong to. */
+private val OPTION_INDENT = 48.dp
+
+/**
+ * Whether the app still holds its grant to the folder at [uri], checked again whenever the screen
+ * comes back: the grant goes if the folder's app is uninstalled or its access is revoked, and
+ * then every save to it fails.
+ */
+@Composable
+private fun rememberReachable(uri: String?): Boolean {
+    val context = LocalContext.current
+    fun check() = uri == null || context.contentResolver.persistedUriPermissions.any { it.uri.toString() == uri && it.isWritePermission }
+    var reachable by remember(uri) { mutableStateOf(check()) }
+    LifecycleResumeEffect(uri) {
+        reachable = check()
+        onPauseOrDispose {}
+    }
+    return reachable
 }
 
 private const val FOLDER_GRANT = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -315,46 +353,64 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
         }
     }
     val saving = s.notesFolderUri != null
+    val reachable = rememberReachable(s.notesFolderUri)
     Heading("Reading notes")
+    fun turnOff() {
+        release(context, s.notesFolderUri, keep = setOf(s.folderUri))
+        vm.setNotesFolder(null, null)
+    }
+    // A folder that can't be reached is what the row offers to fix, so tapping it picks one again
+    // rather than turning notes off under a line that says "Tap to choose it again".
+    val tap = if (saving && !reachable) {
+        Modifier.clickable(onClickLabel = "Choose the notes folder again") { pickFolder.launch(null) }
+    } else {
+        Modifier.toggleable(saving, role = Role.Switch) { on -> if (on) pickFolder.launch(null) else turnOff() }
+    }
     Row(
-        Modifier.fillMaxWidth().toggleable(saving, role = Role.Switch) { on ->
-            if (on) {
-                pickFolder.launch(null)
-            } else {
-                release(context, s.notesFolderUri, keep = setOf(s.folderUri))
-                vm.setNotesFolder(null, null)
-            }
-        }.heightIn(min = 48.dp).padding(vertical = 4.dp),
+        Modifier.fillMaxWidth().then(tap).heightIn(min = 48.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text("Save notes for each edition", style = MaterialTheme.typography.bodyLarge)
+            val name = s.notesFolderName ?: "your folder"
             Text(
-                s.notesFolderName?.let { "Saved to $it when an edition is delivered." }
-                    ?: "A Markdown file for Obsidian, Logseq or any notes app: each article's details, and a few questions to think about. Pick your vault or notes folder.",
+                when {
+                    !saving -> "A Markdown file for each edition, for Obsidian or any notes app. You'll pick the folder."
+                    !reachable -> "Can't reach $name. Tap to choose it again."
+                    else -> "Saved to $name when an edition is delivered."
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (reachable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
             )
         }
         Switch(checked = saving, onCheckedChange = null)
     }
-    if (saving) OutlinedButton(onClick = { pickFolder.launch(null) }) { Text("Choose another folder") }
-}
-
-@Composable
-private fun DeliveryOption(selected: Boolean, title: String, detail: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().selectable(selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 8.dp)) {
-        RadioButton(selected = selected, onClick = null)
-        Column(Modifier.padding(start = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (saving) {
+        Row(Modifier.padding(start = OPTION_INDENT), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { pickFolder.launch(null) }) { Text("Choose another notes folder") }
+            // The row no longer turns notes off while the folder is unreachable, so this does.
+            if (!reachable) TextButton(onClick = ::turnOff, modifier = Modifier.padding(start = 8.dp)) { Text("Turn off") }
         }
     }
 }
 
-/** Without notifications a scheduled shared edition is made but nobody hears about it. */
 @Composable
-private fun NotificationsOffWarning() {
+private fun DeliveryOption(selected: Boolean, title: String, detail: String, problem: Boolean = false, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().selectable(selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 8.dp)) {
+        RadioButton(selected = selected, onClick = null)
+        Column(Modifier.padding(start = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = if (problem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * Without notifications a timed edition is made but nobody hears about it: a shared or emailed
+ * one's Send is in its notification, and a folder delivery that fails says so only there.
+ */
+@Composable
+private fun NotificationsOffWarning(delivery: DeliveryMethod) {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
     LifecycleResumeEffect(Unit) {
@@ -364,7 +420,8 @@ private fun NotificationsOffWarning() {
     if (enabled) return
     Column(Modifier.padding(vertical = 8.dp)) {
         Text(
-            "Notifications are off, so you won't hear when an edition is ready to send.",
+            if (delivery == DeliveryMethod.FOLDER) "Notifications are off, so you won't hear if an edition fails to arrive."
+            else "Notifications are off, so you won't hear when an edition is ready to send.",
             color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodyMedium,
         )
