@@ -221,7 +221,7 @@ details summary { cursor: pointer; font-weight: 500 }
     <div class="notes">
       <h3>What it means here</h3>
       <ul>
-        <li><b>Grouped under the account is the norm</b> (NetNewsWire, Readrops, Capy). Only the most limited clients fold an account into one item.</li>
+        <li><b>Among full feed readers, grouping an account's feeds under it is the norm</b> (NetNewsWire, Readrops, Capy). The closest finite-edition peers (ttrss2calibre, Reabble) don't group at all: they send everything unread.</li>
         <li><b>Paper settings belong in the app, keyed by the feed's address</b> (Fluent Reader). tt-rss can't hold them, and an address survives signing in again or moving a feed.</li>
         <li><b>Clutter is handled with show/hide, not more structure:</b> Reeder's "show in Home", Miniflux's hide. That's today's "leave out".</li>
         <li><b>Write-back is explicit:</b> NetNewsWire asks which account and folder. Nobody found sends feeds to a server silently.</li>
@@ -243,7 +243,7 @@ details summary { cursor: pointer; font-weight: 500 }
         <li><b>Article text</b> (Automatic / Feed's text / Full page), and learning it from three days of evidence.</li>
         <li><b>Its own cap</b> ("at most 1 from this site"): tt-rss follows the edition setting.</li>
         <li><b>A section</b>: every tt-rss article lands in one section of the contents.</li>
-        <li><b>A page of its own</b>: Recent articles mixes all 58, so one busy local-news feed fills the top of the list.</li>
+        <li><b>A page of its own</b>: Recent articles mixes all 58, so one busy local-news feed fills the top of the list (the paper itself already gives each feed its turn).</li>
       </ul>
       <h3>What works and stays at the account</h3>
       <ul>
@@ -390,27 +390,39 @@ details summary { cursor: pointer; font-weight: 500 }
 <section class="tab" id="d" data-label="D · Balance">
   <div class="split">
     <div class="notes">
-      <span class="kicker">New in round 1 · <span class="pill v">v2</span></span>
+      <span class="kicker">Rounds D1–D2 · <span class="pill v">v3</span></span>
       <h2>D. Balance the paper by section</h2>
-      <p>With 54 feeds and seven slots, per-feed controls don't shape the paper. What the owner wants is "thoughtful, varied, some fun": <b>more of some sections, less of others</b>. Each section gets Less, Normal or More, which weights whose turn comes next. The paper stays about its size.</p>
+      <p>With 54 feeds and seven slots, per-feed controls don't shape the paper. What the owner wants is "thoughtful, varied, some fun": <b>every section represented, and more of some</b>. One rule the reader can predict:</p>
+      <p style="border-left:3px solid var(--accent);padding-left:12px"><b>Each section gets one article. Then More sections take the next turns, then Normal. Less gets a second only if there's room. Starred articles always go in, and count as their section's one.</b></p>
       <h3>What changes</h3>
       <ul>
-        <li><b>Settings › Sections</b>, shown only with two or more real sections (the reading list and empty ones don't count).</li>
-        <li><b>Less / Normal / More</b> per section. A share, not minutes: it survives changing the size, can't add up wrong, and has no zero (leaving things out is Leave out).</li>
-        <li><b>Stars ignore it.</b> A starred article goes in whatever its section's share.</li>
-        <li><b>One budget, as today.</b> Shares weight the turns in both passes, so the paper still goes over by at most one article.</li>
-        <li><b>A section's page</b> lists its phone feeds and its tt-rss feeds as one row (what survived of B).</li>
-        <li><b>"What would go in now"</b> on request: exact order and sections, lengths marked "about" because they come from feed text.</li>
-        <li><b>Contents order</b> stays as today (from Sources' order). No dragging in v2.</li>
-        <li><b>Where sections come from:</b> OPML folders work today; tt-rss needs A's "categories as sections".</li>
+        <li><b>Settings › Sections</b>, shown only with two or more real sections. <b>Off by default</b>: importing a friend's OPML never changes the paper by itself.</li>
+        <li><b>Less / Normal / More</b> per section, applied <b>per section</b>, not per source: a 21-feed section doesn't win just by being big.</li>
+        <li><b>Only with Take turns.</b> With In order or Shuffle, the screen says balance steps aside.</li>
+        <li><b>Within a section</b>, sources still take turns, featured-longest-ago first; so does the order sections get their one article, so a section cut today leads tomorrow.</li>
+        <li><b>"What would go in now"</b> on request, each heading saying its share and count ("Long reads · More · 2") and why.</li>
+        <li><b>When only one section has news</b>, the contents say so ("Only Front page had new articles today") rather than padding or holding back.</li>
+        <li><b>Saved for later</b> is a section: with balance on, a saved link goes in most days. The screen says so.</li>
+        <li><b>Sections come from</b> OPML folders today; for tt-rss, A's "categories as sections".</li>
       </ul>
       <div class="pros-cons">
-        <div><h3>For</h3><ul><li>Shapes the paper at the level the reader thinks in.</li><li>Works for OPML folders now, tt-rss after A.</li><li>Inoreader's per-folder digests and KTool's per-feed magazines point the same way.</li></ul></div>
-        <div><h3>Against</h3><ul><li>A new idea to explain: weighted turns.</li><li>"More" can't promise minutes.</li><li>Needs sections to exist first.</li></ul></div>
+        <div><h3>For</h3><ul><li>"Varied" by construction: every section, when the budget allows.</li><li>A rule you can say out loud and check against the paper.</li><li>Works for OPML folders now, tt-rss after A.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Long articles in the first round can still fill the budget.</li><li>One more screen in Settings.</li><li>Changes how often saved links appear.</li></ul></div>
       </div>
-      <div id="d-crit" class="log">
+      
+<div id="d-crit" class="log">
+        <div class="critique"><h3>Round 2 · D2 · does it deliver?</h3><ul>
+          <li><span class="who">Owner, worked numbers:</span> today's turns already give Long reads about 3 of 7 articles (21 of the 47 sources in the worked example). Weighting per section, More gave about 2.5: fewer essays than with balance off. Per source, Science and Saved vanished. <b>Fixed:</b> a guaranteed one per section, then More.</li>
+          <li><span class="who">Owner:</span> two 20-minute essays taking the first turns fill the paper; "More" meant less variety. <b>Fixed:</b> everyone gets one before anyone gets two.</li>
+          <li><span class="who">Everyone:</span> "weights whose turn comes next" can't be predicted. <b>Reduced:</b> one rule, said on the screen, in the preview and in the contents.</li>
+          <li><span class="who">Kindle reader:</span> a friend's OPML with 12 folders switched balance on, giving a 1-feed folder as many turns as a 40-feed one. <b>Fixed:</b> off by default.</li>
+          <li><span class="who">Shuffle and In order:</span> weights are unpredictable or do nothing there. <b>Fixed:</b> Take turns only, and said.</li>
+          <li><span class="who">Owner:</span> only Front page (Less) had news, and the paper was all news with no word why. <b>New:</b> a line in the contents.</li>
+          <li><span class="who">Stars, Saved for later:</span> does a starred essay use Long reads' turn? <b>Fixed:</b> yes, it's the section's one. Saved links become near-daily. <b>Said on the screen.</b></li>
+        </ul></div>
+
         <div class="critique"><h3>Round 1 · D1 · the planner and the personas</h3><ul>
-          <li><span class="who">Pocket refugee:</span> stars go first across every source; a section's minutes would hold back starred saved links. <b>Fixed:</b> stars ignore shares.</li>
+          <li><span class="who">Pocket refugee:</span> stars go first across every source; a section's minutes would hold back starred saved links. <b>Fixed:</b> stars ignore shares <i>(refined in D2: a star counts as its section's one)</i>.</li>
           <li><span class="who">Owner:</span> length is only known after fetching, so a budget per section means going over once per section, and a 25-minute essay alone breaks "Long reads 12". <b>Fixed:</b> one budget; shares only weight the turns.</li>
           <li><span class="who">Everyone:</span> minutes that must add up to "30 of 30" break when the size changes, and 0 clashes with Leave out. <b>Reduced:</b> Less / Normal / More.</li>
           <li><span class="who">Owner:</span> leftover time went to whichever section was held back first. <b>Fixed:</b> the second pass follows the shares too.</li>
@@ -420,6 +432,59 @@ details summary { cursor: pointer; font-weight: 500 }
         </ul></div></div>
     </div>
     <div class="stage" data-flow="d"></div>
+  </div>
+</section>
+<section class="tab" id="compare" data-label="Compare &amp; recommend">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 12–13 · <span class="pill v">final</span></span>
+      <h2>Compare and recommend</h2>
+      <p style="border-left:3px solid var(--accent);padding-left:12px"><b>Your gut is right for Sources: tt-rss stays one row.</b> One thing can't wait: tt-rss feeds don't learn their article text, and nothing you can set fixes that today. Build that now, live with it, and only then decide on the rest.</p>
+      <h3>Your three questions</h3>
+      <ul>
+        <li><b>Each tt-rss feed as its own source?</b> Not in Sources: spreading 58 feeds there (B) buried everyone else's rows and was dropped. Underneath, yes, in steps: first an invisible per-feed record for article text, and feed pages (A2) only if you find you miss them.</li>
+        <li><b>Add what you subscribe to here back to tt-rss?</b> You can already: Sources › ⋮ › Export your sites (OPML), then import in tt-rss, or subscribe in tt-rss itself. C, a second button when adding, is designed and ready if that turns out to be a chore.</li>
+        <li><b>Cluttered or not?</b> It depends on the feed. A blog you'd read on the laptop anyway belongs in tt-rss. A feed that exists for the paper becomes an unread count there. So the app should never send feeds to tt-rss by default, and never on import.</li>
+      </ul>
+      <h3>In order</h3>
+      <ol style="margin:0;padding-left:1.3em;display:grid;gap:6px">
+        <li><b>Now · A1: article text learned per tt-rss feed.</b> No screen. A small per-feed table (feed id, address, category, learned text) with a migration, because today the learning lives on the source row and skips tt-rss.</li>
+        <li><b>After living with A1 · categories as sections, then D.</b> A1's table already knows each feed's category, so "Use tt-rss categories as sections" is one switch on the account page. D then balances the paper by section: one from each, then More. Both only if the paper still isn't varied enough.</li>
+        <li><b>Only if missed · A2: feed pages.</b> Leave out, an article text override, a cap and a section per feed, one tap below the account. It also changes sync: a daily full feed list, and choosing a category expires only the feeds outside it.</li>
+        <li><b>Only if OPML and tt-rss's own subscribe feel like a chore · C.</b></li>
+      </ol>
+      <div class="tablewrap"><table>
+        <thead><tr><th></th><th>What it fixes</th><th>Who sees it</th><th>Touches</th><th>Cost</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td><b>A1</b></td><td>Teaser and stripped tt-rss feeds stay short in the paper</td><td>No one: automatic</td><td>Full-text check, a new table</td><td>Small–medium; migration</td><td class="y">Now</td></tr>
+          <tr><td><b>Categories as sections</b></td><td>All of tt-rss is one section of the contents</td><td>tt-rss users who switch it on</td><td>How sections are chosen</td><td>Small, on A1's table</td><td>After A1</td></tr>
+          <tr><td><b>D</b></td><td>No way to say "less news, more essays"</td><td>Anyone with two or more sections who turns it on</td><td>The planner's core (pure JVM, testable)</td><td>Medium</td><td>After A1, if needed</td></tr>
+          <tr><td><b>A2</b></td><td>No per-feed control; one busy feed fills the Recent articles list (the paper already takes turns)</td><td>tt-rss users, one tap below the account</td><td>Sync, category choice, text, caps, sections</td><td>Medium</td><td class="n">If missed</td></tr>
+          <tr><td><b>C</b></td><td>Adding to tt-rss from the phone</td><td>tt-rss users adding one feed</td><td>Add flow, a stored pending state</td><td>Medium; migration</td><td class="n">If OPML is a chore</td></tr>
+        </tbody>
+      </table></div>
+      <p class="dek">In the backlog, this settles "Decide what tt-rss is as a source", folds "several categories" and "categories as sections" into the steps above, and suggests dropping the per-feed cap: in a 30-minute paper from 54 feeds it rarely bites.</p>
+      <h3>For you to decide</h3>
+      <ol style="margin:0;padding-left:1.3em;display:grid;gap:4px">
+        <li>Is A1 enough for now?</li>
+        <li>Do you add feeds in your other tt-rss apps at all? That's C's premise; if not, C can go.</li>
+        <li>D's rule, "one from each section, then More": does it match how you'd edit the paper by hand?</li>
+        <li>Should balance be on for you from the start, and should Saved for later count as a section (a saved link most days)?</li>
+        <li>Drop the per-feed cap from the backlog?</li>
+      </ol>
+      <div id="compare-crit" class="log">
+        <div class="critique"><h3>Critique · cycle 13 · the recommendation itself</h3><ul>
+          <li><span class="who">Owner:</span> v1 never mentioned your gut or the week you wanted to sit with it, then recommended four builds. <b>Fixed:</b> opens with where it agrees, and builds one thing now.</li>
+          <li><span class="who">Engineer:</span> A1 was rated "low, small", but learning lives on the source row and skips tt-rss: it needs a table and a migration. A2 was said to leave sync alone; it doesn't. <b>Fixed:</b> re-rated.</li>
+          <li><span class="who">Engineer:</span> too much for one persona. <b>Reduced:</b> A1 now; categories as sections and D after living with it; feed pages only if missed.</li>
+          <li><span class="who">Owner:</span> OPML export and tt-rss's own subscribe already add feeds to tt-rss. <b>Reduced:</b> stated as the zero-code answer; C waits.</li>
+          <li><span class="who">Engineer:</span> "every section, every day" overclaimed; the preview's 33 minutes was unexplained. <b>Fixed:</b> "when the budget allows", and the preview says it went over by one article.</li>
+          <li><span class="who">Engineer:</span> stale lines across tabs (D's shares, a switch drawn on with "Off" text, unqualified claims). <b>Fixed</b> and marked superseded where kept for the record.</li>
+          <li><span class="who">Owner:</span> the decide list missed "is A1 enough?" and "do you add feeds in other tt-rss apps?". <b>Fixed.</b></li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="rec"></div>
   </div>
 </section>
   </main>
@@ -663,21 +728,51 @@ FLOWS.d = {
       ${H.row("Size", "About 30 minutes", { right: "" })}${H.row("When", "Ready by 6:30, every day", { right: "" })}${H.row("Order", "Take turns between sources", { right: "" })}
       ${H.row("Sections", "Balanced: more Long reads, less Front page", { go: "balance" })}
       <div class="h3">Delivery</div>${H.row("Kindle", "Send to Kindle", { right: "" })}</div>` + H.nav("set") },
-    balance: { label: "Sections", note: "A share per section, not minutes: it survives changing the size, and there's no zero. Stars ignore it.", path: ["settings", "balance"], html: () =>
+    balance: { label: "Sections", note: "One rule, said on the screen. Off by default; only with Take turns.", path: ["settings", "balance"], html: () =>
       H.bar("Sections") +
-      `<div class="body">${H.set("Balance by section", "Sections with More get more turns; Less, fewer. The paper stays about 30 minutes.", H.sw(true))}
-      <div class="hint">In the order of the contents. Starred articles always go in, whatever their section.</div>
+      `<div class="body">${H.set("Balance by section", "On. Off, the paper takes turns between all sources, as now.", H.sw(true))}
+      <div class="note" style="color:var(--fg)"><b>How it works:</b> each section gets one article. Then More sections take the next turns, then Normal. Less gets a second only if there's room. Starred articles always go in, and count as their section's one.</div>
       ${SHARES.map(([s, su, v]) => `<div class="set" style="flex-wrap:wrap"><div class="main" data-go="sec" style="cursor:pointer;min-width:150px"><div>${s}</div><div class="su">${su}</div></div>${share(s, v)}</div>`).join("")}
+      <div class="hint">Saved for later is a section too: with Balance on, one saved link goes in most days.</div>
       ${H.row("What would go in now", "Tomorrow's contents, from what's waiting", { go: "preview" })}</div>` + H.nav("set") },
+    order: { label: "Another order", note: "With In order or Shuffle, the shares step aside and say why.", path: ["settings", "order"], html: () =>
+      H.bar("Sections") + `<div class="body">${H.set("Balance by section", "", H.sw(true))}<div class="note">Balance works with "Take turns between sources". Your edition is set to Shuffle, so sections aren't balanced. <b style="color:var(--accent)">Change order</b></div></div>` + H.nav("set") },
     sec: { label: "A section", note: "Where B's \"Sources by section\" ended up: its phone feeds, and its tt-rss feeds as one row.", path: ["settings", "balance", "sec"], html: () =>
       H.bar("Long reads") + `<div class="body"><div class="pad"><span>More · first in the contents</span><span class="host">From tt-rss categories Essays &amp; ideas and Newsletters</span></div>
       <div class="h3">Sources</div>${H.row("Tiny Tiny RSS · 21 feeds", "Essays &amp; ideas and Newsletters · New articles today", { icon: I.rss, right: I.chev })}
       <div class="hint">No phone feeds here yet. A source's section is set on its own page.</div></div>` + H.nav("set") },
     preview: { label: "What would go in", note: "On request, from feed text: lengths are \"about\". Order and sections are exact.", path: ["settings", "balance", "preview"], html: () =>
-      H.bar("If made now") + `<div class="body"><div class="pad"><span class="host">About 30 minutes · 9 articles · lengths from feed text</span></div>
-      ${[["Front page", ["Council delays vote on the waterfront plan · ~3 min", "★ A school board weighs a new lottery · ~3 min"]], ["Long reads", ["On rereading old notebooks · ~7 min", "17 small observations on patience · ~6 min", "The 1% of readers, part II · ~4 min"]], ["Science", ["Tagging shorebirds at dawn · ~4 min"]], ["Arts &amp; music", ["A gallery walk in the rain · ~2 min"]], ["Saved for later", ["Distributed databases, an interview · ~4 min"]]].map(([h, items]) => `<div class="h3">${h}</div>` + items.map(t => `<div class="art"><span class="mk">·</span><div class="main"><div class="ti">${t}</div></div></div>`).join("")).join("")}</div>` + H.nav("set") },
+      H.bar("If made now") + `<div class="body"><div class="pad"><span class="host">About 33 minutes · 6 articles · lengths from feed text · went over by one article, as editions do</span><span class="host">One from each section, then Long reads (More) took the next turn. The star counts as Front page’s one.</span></div>
+      ${[["Front page · Less · 1", ["★ A school board weighs a new lottery · ~3 min"]], ["Long reads · More · 2", ["On rereading old notebooks · ~12 min", "17 small observations on patience · ~6 min"]], ["Science · Normal · 1", ["Tagging shorebirds at dawn · ~4 min"]], ["Arts &amp; music · Normal · 1", ["A gallery walk in the rain · ~3 min"]], ["Saved for later · Normal · 1", ["Distributed databases, an interview · ~5 min"]]].map(([h, items]) => `<div class="h3" role="heading" aria-level="3">${h}</div>` + items.map(t => `<div class="art"><span class="mk">·</span><div class="main"><div class="ti">${t}</div></div></div>`).join("")).join("")}</div>` + H.nav("set") },
   },
-  chips: ["settings", "balance", "sec", "preview"],
+  chips: ["settings", "balance", "preview", "sec", "order"],
+};
+
+/* ---------- the recommended path, end to end ---------- */
+FLOWS.rec = {
+  start: "sources",
+  screens: {
+    sources: { label: "1 · Sources", note: "Unchanged for everyone. Tap tt-rss.", html: () => FLOWS.a.screens.sources.html() },
+    acct: { label: "2 · Account", note: "After A1: the account page gains \"Use tt-rss categories as sections\". The feed list below it is A2, only if missed.", path: ["sources", "acct"], html: () => acctPage() },
+    afeed: { label: "If missed · A feed", note: "A2, only if missed: one feed's page. Article text is already learned per feed by A1; this only overrides.", path: ["sources", "acct", "afeed"], html: () => feedPage() },
+    balance: { label: "3 · Balance", note: "D, after A1 and categories as sections: one per section, then More.", path: ["settings", "balance"], html: () => FLOWS.d.screens.balance.html() },
+    preview: { label: "4 · What would go in", note: "D: the rule, visible in tomorrow's contents.", path: ["settings", "balance", "preview"], html: () => FLOWS.d.screens.preview.html() },
+    found: { dialog: true, over: ["sources"], label: "If needed · C", note: "C, only if OPML export and tt-rss's own subscribe feel like a chore.", html: () => FLOWS.c.screens.found.html() },
+    settings: { label: "Settings", note: "", path: ["settings"], html: () => FLOWS.d.screens.settings.html() },
+    leave: { dialog: true, over: ["sources", "acct", "afeed"], label: "Leave out", note: "", html: () => FLOWS.a.screens.leave.html() },
+    atext: { dialog: true, over: ["sources", "acct", "afeed"], label: "Article text", note: "", html: () => textDlg },
+    section: { dialog: true, over: ["sources", "acct", "afeed"], label: "Section", note: "", html: () => sectionDlg },
+    lfeed: { label: "Left out", note: "", path: ["sources", "acct", "lfeed"], html: () => FLOWS.a.screens.lfeed.html() },
+    recent: { label: "Recent", note: "", path: ["sources", "acct", "recent"], html: () => FLOWS.a.screens.recent.html() },
+    sec: { label: "Section", note: "", path: ["settings", "balance", "sec"], html: () => FLOWS.d.screens.sec.html() },
+    where: { dialog: true, over: ["sources"], label: "Add to tt-rss", note: "", html: () => FLOWS.c.screens.where.html() },
+    cat: { dialog: true, over: ["sources"], then: "where", label: "Category", note: "", html: () => FLOWS.c.screens.cat.html() },
+    adding: { label: "Adding", note: "", path: ["adding"], html: () => FLOWS.c.screens.adding.html() },
+    added: { label: "Added", note: "", path: ["added"], html: () => FLOWS.c.screens.added.html() },
+    undo: { dialog: true, over: ["added"], label: "Undo", note: "", html: () => FLOWS.c.screens.undo.html() },
+  },
+  menus: { acctmenu: [["Sign in again"], ["Remove tt-rss"]] },
+  chips: ["sources", "acct", "balance", "preview", "afeed", "found"],
 };
 
 /* ---------- engine ---------- */
@@ -737,12 +832,14 @@ const PLAN = [
   ["9", "Proposal C: adding feeds back to tt-rss", "C v1", "done"],
   ["4 · 7 · 10", "Critique round 1 for A, B and C, run side by side", "A v2, B v2 (cut down), C v2 (cut down), new D v1", "done"],
   ["5 · 8 · 11 · D1", "Critique round 2 for A, B and C (the code and the edges); D's first", "A v3, B dropped into D, C v3, D v2", "done"],
-  ["D2", "D's second critique round", "D v3", "next"],
-  ["12", "Compare and recommend", "Compare tab", ""],
-  ["13", "Critique of compare and recommend, then the final version", "Compare v2", ""],
+  ["D2", "D's second critique round", "D v3", "done"],
+  ["12", "Compare and recommend", "Compare tab", "done"],
+  ["13", "Critique of compare and recommend, then the final version", "Compare, final", "done"],
 ];
 const LOG = [
-  ["Round 2 · cycles 5, 8, 11 and D1", "This round read the real code: sync, read sync, mark-read, the planner, the add flow, and the tt-rss API's answers.", "Changed: A keeps articles on the account and stores per-feed settings in a table keyed like the planner's feed key, so sync and delivery stay untouched (this reverses the first doc's storage choice). B is dropped and folded into D. C becomes a second button, \"Add to tt-rss instead\", trimming back issues at the first sync that sees the feed. D moves from minutes to Less / Normal / More shares that weight the turns, with stars exempt."],
+  ["Cycles 12–13 · compare, critique, final", "Compared A1, A2, C and D (B dropped) on what each fixes for the owner, who sees it, what code it touches and cost. Then a critic read the comparison as the owner and as a senior engineer.", "Changed: the recommendation now opens with where your gut is right, builds only A1 now (re-rated: it needs a table), puts categories-as-sections and D after living with it, A2 only if missed, and points to OPML export instead of C. Stale lines across tabs fixed."],
+  ["Round D2 · does balance deliver?", "Worked the owner's numbers through the real planner (rotation by featured-longest-ago, caps, one budget).", "Changed: D v3 replaces weights with one rule: one article per section, then More, then Normal, Less if room. Off by default, Take turns only, stars count as their section's one, and the contents say when only one section had news."],
+  ["Round 2 · cycles 5, 8, 11 and D1", "This round read the real code: sync, read sync, mark-read, the planner, the add flow, and the tt-rss API's answers.", "Changed: A keeps articles on the account and stores per-feed settings in a table keyed like the planner's feed key, so sync and delivery stay untouched (this reverses the first doc's storage choice). B is dropped and folded into D. C becomes a second button, \"Add to tt-rss instead\", trimming back issues at the first sync that sees the feed. D moves from minutes to Less / Normal / More shares that weight the turns, with stars exempt (replaced in D2 by a rule)."],
   ["Round 1 · cycles 4, 7, 10", "Three critics walked A, B and C as the owner, the self-hoster, the Kindle reader in their sixties, a TalkBack user and a Boox owner. Findings are under each proposal.", "Changed: A learns article text per feed with no screen, folds categories and writes settings in words. B is cut to an optional by-section view, with tt-rss folded per section. C is cut to one choice when adding, phone by default, with Undo; Move to tt-rss waits. New: D, a share of the paper per section, which A's and B's critics both arrived at independently."],
   ["Cycles 3, 6, 9 · proposals v1", "A: feeds open up under the account. B: every tt-rss feed in Sources, by section. C: adding a feed asks phone or tt-rss, and Move to tt-rss.", "All three are clickable on the same made-up account (58 feeds, 7 categories)."],
   ["Cycle 2 · tt-rss today", "Read the tt-rss source in the code (SourceDetailScreen, TtrssRepository, FeedSync, EditionBuilder) and your screenshots. The app has since renamed \"Mark as read in tt-rss\" to \"Sync read status with tt-rss\"; the mockup follows main.", "Found: per-feed turns and caps already exist in the planner; what's missing is anything the reader can set or see per feed."],
@@ -762,5 +859,5 @@ function show(id) {
   t.querySelectorAll(".stage[data-flow]").forEach(s => { if (!s.dataset.ready) { s.dataset.ready = 1; mountPhone(s); } });
 }
 tl.addEventListener("click", e => { const id = e.target.dataset.t; if (id) { show(id); history.replaceState(null, "", "#" + id); } });
-show(location.hash.slice(1));
+show(location.hash.slice(1) || "compare");
 </script>
