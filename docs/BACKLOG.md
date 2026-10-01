@@ -46,7 +46,13 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
   - Offline: queue the change and send it at the next sync, as Mark as read does, so Undo never has to reach the server.
 - [ ] Articles that expire in the app stay unread in tt-rss: an opt-in "mark read when they expire here"
 - [ ] Delay tt-rss mark-read a little after sharing, so a quick "Mark as not sent" doesn't flip articles read and then unread again on the server
-- [ ] Read/unread, after trying the toggle *(you asked)*. The status mark on a source's page now marks read and unread, reaching tt-rss at the next sync. Still open: whether starring a delivered article should also mark it unread in tt-rss, and whether an article read in tt-rss itself should leave the app (today it stays waiting here). If the two toggles don't feel right on the phone, the one-button cycle (option A in the mockups) is the alternative
+- [ ] Read/unread, after trying the toggle *(you asked)*. The status mark on a source's page now marks read and unread, reaching tt-rss at the next sync. If the two toggles don't feel right on the phone, the one-button cycle (option A in the mockups) is the alternative
+- [ ] **Open question for you: when is tt-rss the source of truth on read, and when is the app?** *(you asked, to mull over)* Today the app tells tt-rss and never listens: what you mark here reaches the server at the next sync, but reading on the server doesn't change anything here. Cases to decide:
+  - An article you read in tt-rss (on the laptop) while it waits here: should it leave the app, or still go in an edition?
+  - One you mark unread in tt-rss after it was sent: should it come back here, like marking it unread in the app?
+  - Both changed between syncs (read here, unread there): does the newest change win, or does one side always win?
+  - Starring a sent article to bring it back: should that also mark it unread in tt-rss?
+  - Accounts set to leave tt-rss unread: does anything flow either way?
 
 ### From the UX pass *(ux)*
 - [ ] Sync errors on a source's page still read "The site answered with error 403"; give them the plain words the add dialog now uses ("turned newspapeRSS away… try again later")
