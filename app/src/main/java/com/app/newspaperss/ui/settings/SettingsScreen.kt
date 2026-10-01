@@ -80,11 +80,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             ScheduleSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            // Before Delivery: the e-reader decides which delivery options are offered.
+            ReaderSection(s, viewModel)
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
             DeliverySection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             NotesSection(s, viewModel)
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
-            ReaderSection(s, viewModel)
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             val context = LocalContext.current
             val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
@@ -211,14 +212,9 @@ private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
             }
         }
     }
-    // The tip describes the reader's usual route, which folder or email delivery overrides: say
-    // so, or a Kindle owner still saving to a KOReader folder is told to wait for a Send.
-    val email = s.kindleEmailTarget
-    val tip = if (s.delivery == DeliveryMethod.FOLDER && s.folderUri != null) {
-        "Editions are saved to ${s.folderName ?: "your folder"}. To send them another way, change Delivery above."
-    } else if (email != null) {
-        "Send emails each edition to ${email.address}. To send them another way, change Delivery above."
-    } else s.device?.let(DeviceTips::tip)
+    // The tip is about sending with the share sheet. Folder and email delivery say what they do
+    // under their own options, where a Kindle owner saving to a folder isn't told to wait for a Send.
+    val tip = s.device?.takeIf { s.delivery == DeliveryMethod.SHARE }?.let(DeviceTips::tip)
     tip?.let {
         Text(
             it,

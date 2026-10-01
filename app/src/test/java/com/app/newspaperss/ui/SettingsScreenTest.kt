@@ -129,12 +129,25 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun withFolderDeliveryTheReaderTipSaysWhereEditionsGo() {
-        runBlocking {
-            store.update { it.copy(device = com.app.newspaperss.settings.Device.KINDLE, delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") }
-        }
-        waitFor("Editions are saved to Books")
+    fun theReaderTipIsAboutSharingSoOnlySharingShowsIt() {
+        runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.SHARE) } }
+        waitFor("tap Send and choose the Kindle app")
+
+        // A Kindle owner saving to a folder isn't told to wait for a Send.
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") } }
+        idleUntil { compose.onAllNodes(hasText("tap Send", substring = true)).fetchSemanticsNodes().isEmpty() }
+
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_42@kindle.com") } }
+        waitFor("Email it to your Kindle")
         compose.onNodeWithText("tap Send", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun theEReaderComesBeforeDeliveryWhichItsChoicesDependOn() {
+        val order = listOf("Your edition", "Schedule", "Your e-reader", "Delivery", "Reading notes").map {
+            compose.onNode(hasText(it) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).fetchSemanticsNode().positionInRoot.y
+        }
+        assertEquals(order.sorted(), order)
     }
 
     @Test
@@ -166,7 +179,6 @@ class SettingsScreenTest {
         compose.onNodeWithText("Example Mail").performClick()
 
         idleUntil { runBlocking { store.current().kindleEmailTarget } == KindleEmail("me_42@kindle.com", MAIL_APP) }
-        compose.onNodeWithText("Send emails each edition to me_42@kindle.com", substring = true).performScrollTo().assertExists()
     }
 
     @Test
