@@ -155,6 +155,11 @@ details summary { cursor: pointer; font-weight: 500 }
 .phone .seg button { border: 0; background: none; color: var(--fg); font: 500 12px var(--sans); padding: 6px 10px; cursor: pointer }
 .phone .seg button + button { border-left: 1px solid var(--line) }
 .phone .seg button.on, .phone .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--on-accent-soft) }
+.phone .insetgroup { border-left: 2px solid var(--line-soft); margin-left: 28px }
+.phone .foldbtn { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 50%; background: none; color: var(--fg); font-size: 16px; cursor: pointer; flex: none }
+.phone .row.inset { padding: 9px 12px 9px 14px }
+.phone .row.inset .ti { font-size: 14px }
+.phone .row.inset .su { font-size: 12px }
 .hot .phone [data-go], .hot .phone [data-dlg], .hot .phone [data-act] { outline: 2px dashed var(--accent); outline-offset: -2px }
 .stagebar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center }
 .stagebar button { font: 500 12px var(--sans); border: 1px solid var(--line-soft); background: var(--bg); color: var(--fg); padding: 4px 10px; border-radius: 999px; cursor: pointer }
@@ -613,6 +618,47 @@ details summary { cursor: pointer; font-weight: 500 }
     </div>
     <div class="stage" data-flow="f4"></div>
   </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F5 · your idea · inset under the tt-rss row · <span class="pill v">v2</span></span>
+      <h3>tt-rss is a source, and its feeds sit just beneath it</h3>
+      <ul>
+        <li><b>Sources looks as it does today</b> down to the tt-rss row. Under it, indented a little and joined by a thin line, are its 54 feeds in the paper, A to Z.</li>
+        <li><b>The tt-rss group is always last</b>: a feed you add later lands above it, not under 54 rows and the Add button.</li>
+        <li><b>Two clear controls on the tt-rss row</b>: "Settings" opens the account; a round ▾ / ▴ button shows or hides the feeds.</li>
+        <li><b>Starts folded</b> (today's Sources) until you open it; then it stays as you left it.</li>
+        <li><b>A line under a feed only when it says something</b>: "Nothing new in 3 weeks", "Also on this phone", or its own settings. 54 rows of "newest today" would be noise.</li>
+        <li><b>Left out</b> is one row at the end, opening a plain list of the four. <b>Without tt-rss</b>, nothing changes.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Every feed on Sources, no extra tap, and still plainly part of tt-rss.</li><li>One level: no categories to open (unlike F1).</li><li>Folded, it's today's screen.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Open, Sources is ~60 rows: closer to a feed reader's sidebar than to the paper.</li><li>No search or categories (F4 has search; F1 has categories).</li><li>On TalkBack ~60 stops open; on e-ink, folding redraws the list.</li></ul></div>
+      </div>
+      <div class="critique"><h3>Critique · F5</h3><ul>
+        <li><span class="who">Owner:</span> a feed added after tt-rss landed under all 54 rows, behind the Add button. <b>Fixed:</b> tt-rss group always last.</li>
+        <li><span class="who">Everyone:</span> the fold arrow was the same chevron that means "opens a page", and the account had no visible way in. <b>Fixed:</b> a round ▾ button and a "Settings" link.</li>
+        <li><span class="who">TalkBack, Boox:</span> label said 58 but showed 54 + one; open every visit. <b>Fixed:</b> "Show 54 feeds in your paper", starts folded.</li>
+        <li><span class="who">Boox, TalkBack:</span> 54 identical "newest today" lines. <b>Reduced:</b> a line only for quiet feeds, duplicates and own settings.</li>
+        <li><span class="who">Owner:</span> the same site on the phone and in tt-rss sat 30 rows apart, unlinked. <b>Fixed:</b> "also on this phone" / "also in your tt-rss".</li>
+        <li><span class="who">Owner:</span> the Left out screen repeated the account page. <b>Fixed:</b> a plain list.</li>
+      </ul></div>
+    </div>
+    <div class="stage" data-flow="f5"></div>
+  </div>
+  <div class="notes">
+    <h3>The five side by side</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th></th><th>Feeds on Sources?</th><th>Taps to a feed</th><th>Rows on Sources (open)</th><th>Find a feed</th><th>Categories</th><th>Duplicates shown</th><th>Without tt-rss</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><b>F1</b> by account</td><td>Yes, under categories</td><td>1</td><td>~70</td><td>Scroll</td><td>Yes</td><td>No</td><td>Unchanged</td><td>Works; heavy</td></tr>
+        <tr><td><b>F2</b> by section</td><td>Yes, mixed with phone</td><td>1</td><td>~70</td><td>Scroll</td><td>As sections</td><td>No</td><td>Can change after an OPML import</td><td class="n">Not recommended</td></tr>
+        <tr><td><b>F3</b> A–Z, filters</td><td>Yes, mixed with phone</td><td>1</td><td>~60</td><td>Search, chips</td><td>No</td><td>Side by side</td><td>Unchanged</td><td>Works; reads like a sidebar</td></tr>
+        <tr><td><b>F4</b> account page</td><td>No: one row</td><td>2</td><td>5</td><td>Search, chips</td><td>Per row</td><td>Said</td><td>Unchanged</td><td class="y">Safest default</td></tr>
+        <tr><td><b>F5</b> inset</td><td>Yes, under the tt-rss row</td><td>1</td><td>~60, or 5 folded</td><td>Scroll</td><td>No</td><td>Said</td><td>Unchanged</td><td class="y">Best if you want them on Sources</td></tr>
+      </tbody>
+    </table></div>
+    <p class="dek">F4 and F5 aren't rivals: the account page can have F4's searchable list while Sources has F5's inset list, folded until you open it. That gives you every feed on Sources, search one tap down, and a five-feed reader sees no change.</p>
+  </div>
   <div class="critique"><h3>Critique · personas with 58 feeds and with 5</h3><ul>
     <li><span class="who">Owner:</span> freshness lines would be false: the app only fetches unread, so a feed read on the laptop looks dead. <b>Fixed:</b> taken from tt-rss's own feed list.</li>
     <li><span class="who">Kindle reader:</span> F2 is B again, rearranging Sources after an OPML import. <b>Not recommended.</b></li>
@@ -652,6 +698,7 @@ details summary { cursor: pointer; font-weight: 500 }
           <tr><td><b>C</b></td><td>Adding to tt-rss from the phone</td><td>tt-rss users adding one feed</td><td>Add flow, a stored pending state</td><td>Medium; migration</td><td class="n">If OPML is a chore</td></tr>
         </tbody>
       </table></div>
+      <p class="dek"><b>If you want every tt-rss feed on Sources:</b> F5, the feeds inset under the tt-rss row, folded until you open it, with F4's searchable list on the account page (see All feeds in Sources). It needs the same per-feed record as step 1, nothing more.</p>
       <p class="dek">In the backlog, this settles "Decide what tt-rss is as a source", folds "several categories" and "categories as sections" into the steps above, and suggests dropping the per-feed cap: in a 30-minute paper from 54 feeds it rarely bites.</p>
       <h3>For you to decide</h3>
       <ol style="margin:0;padding-left:1.3em;display:grid;gap:4px">
@@ -1069,6 +1116,34 @@ FLOWS.f4 = { start: "sources", screens: {
   section: { dialog: true, over: ["sources", "acct", "feed"], label: "", html: () => sectionDlg },
 }, chips: ["sources", "acct", "acct_left", "feed"] };
 
+/* ---------- F5 v2: tt-rss row with its feeds inset beneath it, on Sources ---------- */
+const QUIET = { "Garbage Collection": 1, "Night Sky Notes": "Nothing new in 3 weeks", "Old Friend's Journal": "Nothing new in 2 months", "The Patient Essay": "Nothing new in 5 weeks" };
+const insetRow = f => { const notes = [typeof QUIET[f.t] === "string" ? QUIET[f.t] : "", f.t === "Morning Wire" ? "Also on this phone" : "", OWN[f.t] && !LEFT(f.t) && OWN[f.t] !== "New from tt-rss" ? OWN[f.t] : ""].filter(Boolean).join(" · ");
+  return `<button class="row inset" data-go="feed"><span class="main"><span class="ti">${f.t}</span>${notes ? `<span class="su">${notes}</span>` : ""}</span>${I.chev}</button>`; };
+const f5sources = (open) => {
+  const live = ALL.filter(f => !LEFT(f.t)).sort((a, b) => a.t.replace(/^(The|A) /, "").localeCompare(b.t.replace(/^(The|A) /, "")));
+  return H.bar("Sources", { big: true, refresh: true }) + `<div class="body">
+  ${H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" })}
+  ${LOCALS.map(([t]) => H.row(t, t === "The Morning Wire" ? "New articles today · also in your tt-rss" : "New articles today")).join("")}
+  ${H.row("The Long Essay", "Added just now · checking…")}
+  <div class="row" style="border-bottom:0;padding-right:4px"><span class="ic">${I.rss}</span><span class="main"><span class="ti" style="font-weight:600">Tiny Tiny RSS</span><span class="su">54 feeds in your paper, 4 left out</span></span>
+    <button class="tb" data-go="acct" style="padding:8px">Settings</button>
+    <button class="foldbtn" data-go="${open ? "closed" : "sources"}" aria-expanded="${open}" aria-label="${open ? "Hide" : "Show"} 54 feeds in your paper">${open ? "▴" : "▾"}</button></div>
+  ${open ? `<div class="insetgroup" role="group" aria-label="Feeds in Tiny Tiny RSS">${live.map(insetRow).join("")}
+    <button class="row inset" data-go="left"><span class="main"><span class="ti" style="color:var(--muted)">Left out · 4</span></span>${I.chev}</button></div>` : ""}
+  </div>` + H.fab() + H.nav();
+};
+FLOWS.f5 = { start: "sources", screens: {
+  sources: { label: "Open", note: "Phone sources (a new one included) stay above tt-rss. Under it, all 54 feeds, A–Z; a line only where there's something to say.", html: () => f5sources(true) },
+  closed: { label: "Folded", note: "Folded is today's Sources, and how it starts until you open it; then it stays as you left it.", path: ["closed"], html: () => f5sources(false) },
+  left: { label: "Left out", note: "A plain list of the four, to bring one back.", path: ["sources", "left"], html: () => H.bar("Left out of the paper") + `<div class="body"><div class="hint" style="padding-top:8px">These stay in your tt-rss. Open one to bring it back.</div>${ALL.filter(f => LEFT(f.t)).map(f => H.row(f.t, f.c, { go: "feed" })).join("")}</div>` + H.nav() },
+  feed: { ...feedScreen, path: ["sources", "feed"] },
+  acct: { ...acctScreen, path: ["sources", "acct"] },
+  leave: { dialog: true, over: ["sources", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "closed", "feed", "acct", "left"] };
+
 /* ---------- the recommended path, end to end ---------- */
 FLOWS.rec = {
   start: "sources",
@@ -1157,8 +1232,10 @@ const PLAN = [
   ["12", "Compare and recommend", "Compare tab", "done"],
   ["13", "Critique of compare and recommend, then the final version", "Compare, final", "done"],
   ["14", "Your follow-ups: sections in the paper; every tt-rss feed on Sources", "S1–S4 and F1–F4, one critique round", "done"],
+  ["15", "Your idea: tt-rss feeds inset under the tt-rss row on Sources", "F5 v1, a critique, F5 v2, and a five-way comparison", "done"],
 ];
 const LOG = [
+  ["Cycle 15 · feeds inset under the tt-rss row", "Mocked your idea as F5 and had a critic walk it as the owner, the Kindle reader, TalkBack and Boox.", "Changed: the tt-rss group stays last, a separate fold button and Settings link, folded until opened, lines only for quiet feeds and duplicates, a plain Left-out list. Added a comparison of F1–F5. F5 with F4's list on the account page is the pick if you want every feed on Sources."],
   ["Cycle 14 · your follow-ups", "Sections in the paper: three ways the book could show them (today's headings, section fronts, a front page). Every tt-rss feed on Sources: by account, by the paper's sections, one A–Z list. A critic read them on a Kindle, a Boox and KOReader, with 58 feeds and with 5.", "Changed: S4 added and recommended (today's book plus a section flag and a section-aware Next). S3 isn't recommended (Kindle opens past it). S2 only for big sections. F4 added and recommended (all 58 A–Z on the account page). F2 isn't recommended (B again). F1 and F3 now take freshness from tt-rss itself, because the app only fetches unread."],
   ["Cycles 12–13 · compare, critique, final", "Compared A1, A2, C and D (B dropped) on what each fixes for the owner, who sees it, what code it touches and cost. Then a critic read the comparison as the owner and as a senior engineer.", "Changed: the recommendation now opens with where your gut is right, builds only A1 now (re-rated: it needs a table), puts categories-as-sections and D after living with it, A2 only if missed, and points to OPML export instead of C. Stale lines across tabs fixed."],
   ["Round D2 · does balance deliver?", "Worked the owner's numbers through the real planner (rotation by featured-longest-ago, caps, one budget).", "Changed: D v3 replaces weights with one rule: one article per section, then More, then Normal, Less if room. Off by default, Take turns only, stars count as their section's one, and the contents say when only one section had news."],
