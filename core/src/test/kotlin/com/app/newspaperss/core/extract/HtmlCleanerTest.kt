@@ -24,6 +24,9 @@ class HtmlCleanerTest {
             assertTrue(html, html.contains("<blockquote><p>Quixote vomits in Sancho's face \"more vigorously than if he were firing a musket.\"</p><p>— Lincoln Michel</p></blockquote>"))
         }
         assertFalse("other data-attrs are left alone", clean("""<div data-attrs="{&quot;src&quot;:&quot;x&quot;}"></div><p>$longText</p>""").contains("blockquote"))
+        assertFalse("a hidden one stays hidden", clean("""<div hidden data-attrs="$attrs"></div><p>$longText</p>""").contains("blockquote"))
+        val inline = clean("""<p>As I wrote: <span data-attrs="$attrs"></span></p><p>$longText</p>""")
+        assertTrue("a quote can't sit inside a paragraph", inline.contains("</p><blockquote>"))
     }
 
     /** tt-rss strips ids and resolves "#footnote-4" against the site; the book's footnotes must still work. */
@@ -48,10 +51,33 @@ class HtmlCleanerTest {
     }
 
     @Test
-    fun numberedLinksThatArentFootnoteMarkersArentPaired() {
-        val html = clean("""<p><a href="https://example.com#section-2">See the second section</a> and <a href="https://example.com#figure-2">the second figure</a>. $longText</p>""")
-        assertFalse(html, html.contains("id="))
-        assertFalse("with nothing to land on, the links don't stay", html.contains("<a"))
+    fun aFootnoteIsntPairedWithAnUnrelatedNumberedLink() {
+        // A numbered contents entry beside a footnote whose back-link is long: no pair to make.
+        val html = clean(
+            """<p><a href="https://example.com#part-1">1</a> Part one. Text.<a href="https://example.com#fn-1">1</a></p>
+               <p>$longText</p><p id="part-1">Part one</p><p>The note. <a href="https://example.com#fnref-1">Back to the text</a></p>""",
+        )
+        val doc = Jsoup.parse(html)
+        assertEquals("the contents entry still finds its part", "#part-1", doc.select("a").first()!!.attr("href"))
+        assertTrue("and isn't given the footnote's id", doc.select("#fn-1").isEmpty())
+    }
+
+    @Test
+    fun aSiteUnderAPathCountsAsTheArticlesOwn() {
+        val html = HtmlCleaner.clean(
+            """<p>Text.<a href="http://blog.example.com/notes/#footnote-1">1</a></p><p>$longText</p>
+               <div><a href="http://blog.example.com/notes/#footnote-anchor-1">1</a> The note.</div>""",
+            "https://www.blog.example.com/notes/2026/a-post", null,
+        ).html
+        assertTrue(html, html.contains("""href="#footnote-1""""))
+        assertTrue(html, html.contains("""id="footnote-1""""))
+    }
+
+    /** With nothing in the book to land on, a link to the site's front page stays one. */
+    @Test
+    fun aLinkToTheSitesFrontPageWithAFragmentStaysALink() {
+        val html = clean("""<p><a href="https://example.com/#subscribe">Subscribe to the newsletter</a> $longText</p>""")
+        assertTrue(html, html.contains("""href="https://example.com/#subscribe""""))
     }
 
     @Test

@@ -44,9 +44,9 @@ object HtmlCleaner {
         val doc = Jsoup.parse(source, baseUrl)
         val body = doc.body()
         removeComments(body)
-        expandSubstackNotes(body)
         body.select(REMOVE_TAGS.joinToString(",")).remove()
         removeHidden(body)
+        expandSubstackNotes(body)
         removeScreenReaderOnly(body)
         removeJunk(body)
         removeRelatedLinks(body)
@@ -374,44 +374,55 @@ object HtmlCleaner {
             val quote = Element("blockquote")
             text.split(NEWLINES).map { it.trim() }.filter { it.isNotEmpty() }.forEach { quote.appendElement("p").text(it) }
             (comment["name"] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }?.let { quote.appendElement("p").text("— $it") }
-            el.replaceWith(quote)
+            // A quote can't sit inside a paragraph in XHTML: one embedded in one goes after it.
+            val paragraph = el.parents().firstOrNull { it.tagName() == "p" }
+            if (paragraph != null) {
+                el.remove()
+                paragraph.after(quote)
+            } else {
+                el.replaceWith(quote)
+            }
         }
     }
 
     /**
-     * Gets footnote links working again after tt-rss, which rewrites "#footnote-4" against the
-     * site's address and strips ids. A link to this page's or its site's address plus a fragment
-     * becomes a plain fragment, and a footnote's missing target is found from its other link: the
-     * one with the same number, which links back. Only short link texts count, as footnote markers
-     * are, so two unrelated numbered links ("#section-2", "#figure-2") aren't taken for a pair.
+     * Gets footnote links working again after tt-rss, which strips ids and resolves "#footnote-4"
+     * against the site's address (which may have a path, like a blog's). A footnote's missing target
+     * is found from its other link, the one with the same number whose fragment is named alike
+     * ("footnote-4" and "footnote-anchor-4", "fn1" and "fnref1"), which links back; only short link
+     * texts count, as footnote markers are. A link to this page or its site plus a fragment then
+     * becomes an in-book link, but only when something in the book has that id: otherwise it may be
+     * a real link to the site's front page, and it stays one.
      */
     private fun repairFragmentLinks(body: Element, baseUrl: String) {
-        val self = selfAddresses(baseUrl)
-        for (link in body.select("a[href]")) {
+        val page = comparable(baseUrl.substringBefore('#'))
+        fun fragmentOf(link: Element): String? {
             val href = link.attr("href").trim()
             val hash = href.indexOf('#')
-            if (hash > 0 && href.substring(0, hash) in self) link.attr("href", href.substring(hash))
+            if (hash < 0 || hash == href.length - 1) return null
+            val address = comparable(href.substring(0, hash))
+            return if (hash == 0 || (address.contains('/') && page.startsWith(address))) href.substring(hash + 1) else null
         }
+        val links = body.select("a[href]").mapNotNull { link -> fragmentOf(link)?.let { link to it } }
         val ids = body.select("[id]").map { it.id() }.toMutableSet()
-        val markers = body.select("a[href^=#]").filter { it.text().trim().length <= FOOTNOTE_MARKER_MAX }
-        val byNumber = markers.groupBy { TRAILING_NUMBER.find(it.attr("href"))?.value }
-        for (link in markers) {
-            val target = link.attr("href").substring(1)
-            if (target.isEmpty() || target in ids) continue
+        val markers = links.filter { (link, _) -> link.text().trim().length <= FOOTNOTE_MARKER_MAX }
+        val byNumber = markers.groupBy { (_, fragment) -> TRAILING_NUMBER.find(fragment)?.value }
+        for ((link, target) in markers) {
+            if (target in ids) continue
             val number = TRAILING_NUMBER.find(target)?.value ?: continue
-            val back = byNumber[number].orEmpty().singleOrNull { it !== link && !it.hasAttr("id") && it.attr("href").substring(1) != target } ?: continue
-            back.id(target)
+            val stem = target.removeSuffix(number)
+            val back = byNumber[number].orEmpty().singleOrNull { (other, fragment) ->
+                val otherStem = fragment.removeSuffix(number)
+                other !== link && !other.hasAttr("id") && otherStem != stem && otherStem.commonPrefixWith(stem).length >= STEM_PREFIX_MIN
+            } ?: continue
+            back.first.id(target)
             ids += target
         }
+        for ((link, fragment) in links) if (fragment in ids) link.attr("href", "#$fragment")
     }
 
-    /** The article's own address and its site's, as tt-rss resolves a bare "#fragment" against either. */
-    private fun selfAddresses(baseUrl: String): Set<String> {
-        val base = baseUrl.substringBefore('#').trim()
-        val uri = runCatching { URI(base) }.getOrNull()?.takeIf { it.scheme != null && it.host != null } ?: return setOf(base)
-        val site = "${uri.scheme}://${uri.rawAuthority}"
-        return setOf(base, site, "$site/")
-    }
+    /** An address with what tt-rss and sites vary dropped: the scheme, "www." and a trailing slash. */
+    private fun comparable(url: String): String = url.trim().substringAfter("://").removePrefix("www.").trimEnd('/') + "/"
 
     private fun fixLinks(body: Element, baseUrl: String) {
         repairFragmentLinks(body, baseUrl)
@@ -591,6 +602,7 @@ object HtmlCleaner {
     private val NEWLINES = Regex("\\n+")
     private val TRAILING_NUMBER = Regex("\\d+$")
     private const val FOOTNOTE_MARKER_MAX = 4
+    private const val STEM_PREFIX_MIN = 2
     private val TOKEN_SEPARATOR = Regex("[\\s_\\-]+")
     private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
     private val INVALID_ID_CHARS = Regex("[^A-Za-z0-9_.\\-]")
