@@ -24,9 +24,11 @@ class EditionSentReceiver : BroadcastReceiver() {
         val id = intent.getLongExtra(EXTRA_EDITION_ID, 0L).takeIf { it > 0 } ?: return
         val app = context.applicationContext as NewspaperssApp
         val pending = goAsync()
+        // Picked from an email to the Kindle: a mail app sends it there, anything else is another route.
+        val emailed = intent.getBooleanExtra(EXTRA_KINDLE_EMAIL, false) && chosen != null && MailApps.isMailApp(context, chosen.packageName)
         app.container.appScope.launch {
             try {
-                app.container.editions.markSent(id, chosen?.packageName)
+                if (emailed) app.container.editions.markEmailedToKindle(id) else app.container.editions.markSent(id, chosen?.packageName)
             } finally {
                 pending.finish()
             }
@@ -36,20 +38,23 @@ class EditionSentReceiver : BroadcastReceiver() {
     companion object {
         const val EXTRA_EDITION_ID = "editionId"
         const val EXTRA_FILE = "file"
+        const val EXTRA_KINDLE_EMAIL = "kindleEmail"
 
         /**
          * Mutable so the share sheet can fill in the app that was picked, which is then allowed to
          * read [file] after its screen closes (see [EditionIntents.grantRead]).
          *
          * @param editionId the edition to mark sent, or null to only grant the read.
+         * @param kindleEmail the share sheet offers an email to the reader's Kindle address.
          */
-        fun callback(context: Context, editionId: Long?, file: Uri): IntentSender {
-            val intent = Intent(context, EditionSentReceiver::class.java).putExtra(EXTRA_FILE, file)
+        fun callback(context: Context, editionId: Long?, file: Uri, kindleEmail: Boolean = false): IntentSender {
+            val intent = Intent(context, EditionSentReceiver::class.java).putExtra(EXTRA_FILE, file).putExtra(EXTRA_KINDLE_EMAIL, kindleEmail)
             editionId?.let { intent.putExtra(EXTRA_EDITION_ID, it) }
             return PendingIntent.getBroadcast(
                 context,
-                // Extras don't tell PendingIntents apart, so without an edition the file does.
-                editionId?.toInt() ?: file.hashCode(),
+                // Extras don't tell PendingIntents apart, so the code does: per edition (or, without
+                // one, file) and per kind, or a later sheet's callback would rewrite an open one's.
+                ((editionId?.toInt() ?: file.hashCode()) shl 1) or (if (kindleEmail) 1 else 0),
                 intent,
                 PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             ).intentSender

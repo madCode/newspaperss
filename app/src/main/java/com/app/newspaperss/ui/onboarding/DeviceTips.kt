@@ -6,7 +6,9 @@ object DeviceTips {
     fun tip(device: Device): String = when (device) {
         Device.KINDLE ->
             "When an edition is ready, tap Send and choose the Kindle app (“Send to Kindle”). " +
-                "In its form, change Author to newspapeRSS so your editions sit together in your library. " +
+                "In its form, turn off “Add to your library” and pick your Kindle to send it straight to the device " +
+                "(it won't sync to your other devices); otherwise it only goes to your library. " +
+                "Changing Author to newspapeRSS keeps your editions together. " +
                 "If Kindle isn't on your phone, install it from the Play Store and sign in."
         Device.KOBO ->
             "Once, on your Kobo: More \u203a Settings \u203a Dropbox \u203a Link, and sign in. Then, when an edition " +

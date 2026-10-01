@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import com.app.newspaperss.MainActivity
 import com.app.newspaperss.OpenEditionActivity
 import com.app.newspaperss.R
+import com.app.newspaperss.SendEditionActivity
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.plural
 import com.app.newspaperss.data.EditionEntity
@@ -21,8 +22,11 @@ import com.app.newspaperss.delivery.EditionIntents
 import java.io.File
 
 interface EditionNotifier {
-    /** @param openInstead the reader reads on this device, so the action opens the edition rather than sharing it. */
-    fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean = false)
+    /**
+     * @param openInstead the reader reads on this device, so the action opens the edition rather than sharing it.
+     * @param byEmail Send emails the edition to the reader's Kindle (to the address set when it's tapped) rather than sharing it.
+     */
+    fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean = false, byEmail: Boolean = false)
     fun editionDelivered(edition: EditionEntity, where: String)
     fun problem(title: String, reason: String)
     /** Takes down the notification about [editionId], if it's the one showing (the edition was deleted). */
@@ -57,11 +61,13 @@ class Notifier(private val context: Context) : EditionNotifier {
         )
     }
 
-    override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean) {
+    override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean, byEmail: Boolean) {
         val intent = if (openInstead) {
             Intent(context, OpenEditionActivity::class.java)
                 .putExtra(OpenEditionActivity.EXTRA_EDITION_ID, edition.id)
                 .putExtra(OpenEditionActivity.EXTRA_FILE, file.path)
+        } else if (byEmail) {
+            SendEditionActivity.intent(context, edition.id, file, edition.title)
         } else {
             EditionIntents.share(context, file, edition.title, edition.id)
         }

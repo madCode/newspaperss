@@ -176,6 +176,20 @@ class ArticlePreviewScreenTest {
     }
 
     @Test
+    @Config(fontScale = 1.5f)
+    fun theTextSizeFollowsAndroidsFontSize() {
+        val file = oneArticleEdition()
+        var size by mutableStateOf(PreviewTextSize.DEFAULT)
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size) }
+        val view = webView()
+        assertEquals(150, view.settings.textZoom)
+
+        size = PreviewTextSize.LARGER
+        compose.waitForIdle()
+        assertEquals(218, view.settings.textZoom)
+    }
+
+    @Test
     fun thePreviewCanBePinchedToZoomWithoutButtonsOverThePage() {
         val file = oneArticleEdition()
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}) }

@@ -14,6 +14,23 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 4 · Thu 1 Oct
 
+### Cycle 75: a tidier Settings page
+- **From you:** a pass over Settings, to clean it up.
+- **Shipped:**
+  - Your e-reader comes before Delivery, which depends on it.
+  - The share tip sits under "Send it myself", and only shows when that's chosen.
+  - Every delivery warns when notifications are off.
+  - A folder the app can no longer reach says so, and tapping it picks it again.
+  - The two folder buttons say which folder they change.
+  - "Source" instead of "site" throughout.
+  - At large text, the per-source buttons go under the words.
+- **Review caught:** tapping an unreachable notes folder's row turned notes off, despite its line saying "choose it again". Fixed, with a separate Turn off.
+
+### Cycle 74: editions emailed straight to your Kindle ([#123](https://github.com/madCode/newspaperss/issues/123))
+- **From you:** sharing to the Kindle app put editions in the library but not on the Kindle; the Kindle app's send screen turned out to offer library or device, not both, and it still errors on a cold first tap.
+- **Shipped:** "Email it to your Kindle" delivery. Set your Kindle's own address and a mail app once; Send opens that app with everything filled in and counts as sent. Onboarding offers it for Kindle readers; Settings › Delivery has it first. "Ask each time" or a missing app falls back to the share sheet.
+- **Review caught:** the notification's Send used an address from when it was posted, overlapping share sheets overwrote each other, hints and error messages that were wrong in the fallback, a blank address falling back silently, and an address field that went red as you typed. All fixed.
+
 ### Cycle 73: skipping paid posts with nothing free
 - **From you:** detect premium posts with no content at all, and let a source opt in to skipping them.
 - **Shipped:** a paid post with under 50 words free (a title and a picture) is remembered when an edition tries it. Its source's page then offers "Skip paid posts with nothing free", off until you turn it on. Skipped posts read "Skipped: a paid post", aren't fetched again, and are counted on the page. A starred one still goes in.

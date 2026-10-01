@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.app.newspaperss.core.edition.Ordering
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -33,6 +35,8 @@ class SettingsStoreTest {
                 notesFolderUri = "content://tree/vault",
                 notesFolderName = "Vault",
                 previewTextSize = PreviewTextSize.LARGER,
+                kindleEmail = "me_42@kindle.com",
+                mailApp = "com.example.mail",
             )
         }
         val s = store.current()
@@ -49,6 +53,42 @@ class SettingsStoreTest {
         assertEquals("content://tree/vault", s.notesFolderUri)
         assertEquals("Vault", s.notesFolderName)
         assertEquals(PreviewTextSize.LARGER, s.previewTextSize)
+        assertEquals("me_42@kindle.com", s.kindleEmail)
+        assertEquals("com.example.mail", s.mailApp)
+    }
+
+    @Test
+    fun emailToKindleSurvivesARoundTripAndAskEachTimeStaysUnset() = runTest {
+        store.update { it.copy(delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_42@kindle.com", mailApp = "com.example.mail") }
+        store.update { it.copy(mailApp = null) }
+        val s = store.current()
+        assertEquals(DeliveryMethod.KINDLE_EMAIL, s.delivery)
+        assertEquals(KindleEmail("me_42@kindle.com", null), s.kindleEmailTarget)
+    }
+
+    @Test
+    fun aDeliveryThisVersionDoesntKnowReadsAsSharing() = runTest {
+        dataStore.edit { it[stringPreferencesKey("delivery_method")] = "CARRIER_PIGEON" }
+        assertEquals(DeliveryMethod.SHARE, store.current().delivery)
+    }
+
+    @Test
+    fun emailDeliveryWithoutAUsableAddressSharesInstead() {
+        val email = Settings(delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = " me_42@kindle.com ")
+        assertEquals("me_42@kindle.com", email.kindleEmailTarget?.address)
+        assertNull(email.copy(kindleEmail = null).kindleEmailTarget)
+        assertNull(email.copy(kindleEmail = "me_42@kindle").kindleEmailTarget)
+        assertNull("an address left from before isn't used once another delivery is chosen", email.copy(delivery = DeliveryMethod.SHARE).kindleEmailTarget)
+    }
+
+    @Test
+    fun kindleAddressesAreCheckedLightly() {
+        assertTrue(KindleAddress.isValid("first.last_7@kindle.com"))
+        assertTrue("any domain is an address; it's only warned about", KindleAddress.isValid("me@example.org"))
+        listOf("", "me", "me@", "@kindle.com", "me@kindle", "me@@kindle.com", "me @kindle.com").forEach { assertFalse(it, KindleAddress.isValid(it)) }
+        assertTrue(KindleAddress.looksLikeKindle("Me@Kindle.com"))
+        assertTrue(KindleAddress.looksLikeKindle("me@kindle.cn"))
+        assertFalse(KindleAddress.looksLikeKindle("me@gmail.com"))
     }
 
     @Test

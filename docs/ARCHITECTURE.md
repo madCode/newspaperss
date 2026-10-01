@@ -1,0 +1,356 @@
+# newspaperss: architecture
+
+How the code is built. What the app does, and why, is in
+[DESIGN.md](DESIGN.md); this doc doesn't repeat the rules it describes
+(how the planner picks, what counts as delivered). Paths are relative to
+`app/src/main/java/com/app/newspaperss/` (`app/…`) and
+`core/src/main/kotlin/com/app/newspaperss/core/` (`core/…`).
+
+## Modules
+
+Two Gradle modules (`settings.gradle.kts`):
+
+- **`:core`** is plain Kotlin on the JVM. It knows nothing about Android,
+  Room or WorkManager: it takes values in and gives values back, so it's
+  tested with plain JUnit.
+- **`:app`** is the Android app. It stores things, runs things in the
+  background, draws the screens and calls into `:core`.
+
+```mermaid
+flowchart TB
+    subgraph app[":app (Android)"]
+        ui["ui/: Compose screens + ViewModels"]
+        work["work/: WorkManager workers, EditionScheduler"]
+        edition["edition/: EditionRun, EditionBuilder,<br/>ExtractorContentProvider, CoverRenderer"]
+        data["data/: Room database, repositories, FeedSync"]
+        delivery["delivery/: share, folder, sent callback"]
+        settings["settings/: SettingsStore (DataStore)"]
+        notify["notify/: Notifier"]
+        container["AppContainer"]
+    end
+    subgraph core[":core (JVM, no Android)"]
+        feed["feed/: FeedParser, FeedFinder, OPML, imports"]
+        plan["edition/: EditionPlanner, titles, schedule"]
+        extract["extract/: ArticleExtractor, PageExtractor"]
+        images["images/: ImageRules, ImageBudget"]
+        epub["epub/: EpubWriter"]
+        lists["lists/: curated-list scrapers"]
+        ttrss["ttrss/: TtrssClient"]
+        notes["notes/: NotesWriter"]
+        net["net/: HttpClient (OkHttp)"]
+    end
+    container --> ui & work & edition & data & delivery & settings & notify
+    ui --> data & settings
+    work --> edition & data
+    edition --> data & delivery & notify & plan & extract & images & epub & notes
+    data --> feed & lists & ttrss & net
+    extract & feed & lists & ttrss --> net
+```
+
+`:core` gets its libraries from `core/build.gradle.kts`: jsoup,
+Readability4J, kotlinx.serialization and OkHttp. The two things `:core`
+can't do without Android are passed in as interfaces:
+
+- `ImageEncoder` (`core/images/ImageRules.kt`), implemented by
+  `app/edition/AndroidImageEncoder.kt` with Android's bitmap decoder.
+- The cover, a `(CoverInfo) -> EpubImage?` function given to
+  `EditionBuilder`, drawn on an Android `Canvas` by
+  `app/edition/CoverRenderer.kt`.
+
+## Wiring
+
+- **`AppContainer`** (`app/AppContainer.kt`) builds one of each service for
+  the app's lifetime, by hand: no Hilt or Dagger. Its constructor takes the
+  HTTP client, database and worker-enqueuing functions as parameters, so
+  tests can swap them.
+- **`NewspaperssApp`** (`app/NewspaperssApp.kt`) creates the container,
+  creates the notification channels, schedules the 12-hour sync and arms
+  the edition timer.
+- Everything else reaches services through
+  `(applicationContext as NewspaperssApp).container`: workers, receivers
+  and the small activities.
+- **Screens** are Jetpack Compose in one activity, `MainActivity`, with
+  Navigation Compose. Each ViewModel is created with
+  `viewModel { … }`, given the services it needs from the container, and
+  exposes `StateFlow`s built from Room `Flow`s.
+
+Entry points from outside the app (`app/src/main/AndroidManifest.xml`):
+
+| Entry point | What it does |
+|---|---|
+| `MainActivity` | The app. |
+| `ShareActivity` | Share target: saves a link to the reading list and closes. |
+| `OpenEditionActivity` | The notification's **Open** (Boox): opens the EPUB and marks it sent. |
+| `SendEditionActivity` | The notification's **Send** with email to a Kindle: opens the mail app and marks it sent. |
+| `EditionSentReceiver` | The share sheet reports which app was picked: marks the edition sent. |
+| `ClockChangeReceiver` | Time or time zone changed: re-arms the edition timer. |
+| `FileProvider` | Hands EPUB and notes files to other apps by `content://` URI. |
+
+## Making an edition
+
+One build runs in `EditionWorker` (`app/work/EditionWorker.kt`), which
+calls `EditionRun.run` (`app/edition/EditionRun.kt`): sync, build, deliver,
+notify.
+
+```mermaid
+sequenceDiagram
+    participant W as EditionWorker
+    participant R as EditionRun
+    participant S as FeedSync
+    participant B as EditionBuilder
+    participant P as EditionPlanner
+    participant C as ExtractorContentProvider
+    participant E as EpubWriter
+    participant DB as Room
+    W->>R: run(scheduled, dueAt)
+    R->>S: syncAll()
+    S->>DB: insert new articles, expire old ones
+    R->>B: build(settings, dueAt)
+    B->>DB: fail BUILDING leftovers, release unsent READY editions
+    B->>DB: insert edition (BUILDING), read candidates
+    B->>P: order(candidates)
+    B->>P: fill(ordered, rules, fetch)
+    loop each candidate, until the budget is met
+        P->>C: contentFor(article)
+        C->>C: ArticleExtractor.extract, download images
+    end
+    B->>B: ImageBudget.fit in reading order, draw the cover
+    B->>E: write(EditionDoc) to editions/
+    B->>DB: one transaction: edition_articles, IN_EDITION, READY
+    R->>R: deliver (folder) or notify (ready)
+```
+
+The steps, with where they live:
+
+1. **Sync.** `FeedSync.syncAll` (`app/data/FeedSync.kt`) fetches every
+   unpaused source except the reading list, four at a time. Feeds go
+   through `FeedParser`, tt-rss through `TtrssClient`, curated lists
+   through `CuratedLists`. It then
+   expires old waiting articles, forgets delivered links after a year and
+   drops old feed text.
+2. **Start.** `EditionBuilder.build` (`app/edition/EditionBuilder.kt`)
+   marks any edition left `BUILDING` by a dead process as failed, and
+   releases editions still `READY` (never sent) so their articles go back.
+   It then inserts the new edition as `BUILDING` and reads the candidates
+   (`ArticleDao.candidates`).
+3. **Order.** `EditionPlanner.order` (`core/edition/EditionPlanner.kt`)
+   sorts candidates: stars first, then by turns across sources. A tt-rss
+   account's feeds each count as their own source ("publication").
+4. **Fill.** `EditionPlanner.fill` walks that order, fetching one article
+   at a time through a callback, and stops when the time budget is met.
+   Fetching inside the loop is what keeps a big pool cheap: articles
+   after the budget are never fetched.
+5. **Extract.** `ExtractorContentProvider.contentFor`
+   (`app/edition/ExtractorContentProvider.kt`) runs `ArticleExtractor`
+   (`core/extract/`), then downloads the images, four at a time, drawing
+   on an `ImageAllowance` so images that can't fit aren't downloaded.
+   Decoding is one at a time (a mutex) to bound memory.
+6. **Fit and write.** Articles are put in reading order (sections, then
+   sources in list order), `ImageBudget.fit` settles the final image set,
+   `CoverRenderer` draws the cover, and `EpubWriter` (`core/epub/`) writes
+   the book to `files/editions/`.
+7. **Commit.** One Room transaction writes `edition_articles`, sets the
+   articles to `IN_EDITION` and the edition to `READY`. Until then no
+   article has changed state, so a failure leaves them all for next time.
+   (The one exception: a paid post its source skips becomes `EXPIRED` as
+   soon as its fetch finds it, and stays so.)
+8. **Deliver.** With folder delivery, `EditionRun` copies the file
+   (`FolderDelivery`, through the Storage Access Framework) and marks it
+   delivered. Otherwise a timed run posts the "ready" notification.
+
+Failures inside a build mark the edition `FAILED` with a reason the
+reader can read; an exception never escapes as a crash
+(`EditionBuilder.fail`, `EditionWorker.doWork`).
+
+## Delivery and what follows
+
+Articles are only used up in `EditionRepository.markDelivered`
+(`app/data/EditionRepository.kt`). Every delivery route ends there:
+
+```mermaid
+flowchart LR
+    folder["EditionRun: folder copy succeeded"] --> md
+    share["EditionSentReceiver: app picked in share sheet"] --> ms
+    open["OpenEditionActivity / Open button (Boox)"] --> ms
+    email["SendEditionActivity / Send button: mail app opened"] --> me
+    me["markEmailedToKindle: only if still READY"] --> md
+    sent["I've sent it (Today, Edition)"] --> ms
+    ms["markSent: only if still READY"] --> md
+    md["markDelivered (one transaction)"]
+    md --> arts["articles DELIVERED, stars cleared"]
+    md --> urls["delivered_urls remembered"]
+    md --> copies["copies in other sources used up"]
+    md --> first["first delivery only: dismiss the ready<br/>notification, start NotesWorker"]
+    md --> ttrss["TtrssMarkReadWorker, if it has tt-rss articles"]
+```
+
+- **Send** is `EditionIntents.send` (`app/delivery/EditionIntents.kt`).
+  Usually it's the share sheet, a chooser intent with a callback
+  (`EditionSentReceiver`). The callback also grants the chosen app read
+  access to the file until reboot, because Send to Kindle reads it after
+  its screen closes.
+- **Email to a Kindle** aims an email intent at the chosen mail app
+  (`MailApps` lists them; the manifest's `<queries>` make them visible).
+  With no chooser to report back, launching it is what marks the edition
+  sent: the screen's ViewModel does it in the app, and from the
+  notification a small activity (`SendEditionActivity`) does, since a
+  receiver can't start an activity from a notification. If the app is
+  gone, or none was chosen, it's the share sheet with the same email.
+- **`markNotSent`** is the reverse: it puts the articles back in the
+  edition, forgets the delivered links and asks tt-rss to mark them unread.
+- **`KindleSends`** (`app/delivery/KindleSends.kt`) remembers recent sends
+  to a Kindle, by the Kindle app or by email, in memory only, for the "can
+  take a few minutes" note.
+
+## Background work
+
+All background work is WorkManager. Unique names keep work from running
+twice.
+
+| Work | Started by | Unique name, policy | Notes |
+|---|---|---|---|
+| `EditionWorker` | "Make an edition", the timer | `edition-build`, KEEP | One build at a time. Needs a connection. A timed run that reaches no source retries twice (5, then 10 min). |
+| `EditionScheduler.Timer` | `EditionScheduler.reschedule` | `edition-schedule`, REPLACE / APPEND | One-off timer 30 min before the due time; it starts a build and arms the next timer. |
+| `SyncWorker` (periodic) | App start | `sync-periodic-12h`, KEEP | Every 12 h, connected, battery not low. Only keeps the Sources screen fresh. |
+| `SyncWorker` (now) | Adding a source, refresh | `sync-now`, APPEND_OR_REPLACE | Appended so a new source isn't missed by a sync already running. |
+| `NotesWorker` | First delivery | `notes-<edition>`, KEEP | Saves the notes file to the notes folder. |
+| `TtrssMarkReadWorker` | Delivery, mark not sent | `ttrss-mark-read-<edition>`, REPLACE | Up to 4 attempts. Reads the edition's state when it runs. |
+| `ReadingListTitleWorker` | New untitled links | `reading-list-titles`, APPEND_OR_REPLACE | Batches of 20, one batch at a time. |
+
+Timed editions use a chain of one-off timers, not periodic work, because
+periodic work can't say "6:30 on weekdays" and its start time drifts
+(`app/work/EditionScheduler.kt`). The decision to keep, cancel or re-arm
+a timer is pure logic in `ScheduleTimer` (`core/edition/Schedule.kt`).
+The pending and last due times are kept in SharedPreferences
+(`edition-schedule`).
+
+## Data model
+
+Room database `newspaperss.db` (`app/data/AppDatabase.kt`, entities in
+`app/data/Entities.kt`, queries in `app/data/Daos.kt`). Schemas are
+exported to `app/schemas/`, and each version step has a `Migration`.
+
+```mermaid
+erDiagram
+    sources ||--o{ articles : "has (cascade delete)"
+    sources ||--o{ left_out_feeds : "tt-rss feeds left out"
+    editions ||--o{ edition_articles : "contains (cascade delete)"
+    articles |o--o{ edition_articles : "set null on delete"
+    sources {
+        long id PK
+        enum kind "FEED, READING_LIST, TTRSS, LIST"
+        string url UK
+        string section
+        enum contentMode
+        int maxArticles
+        bool paused
+    }
+    articles {
+        long id PK
+        long sourceId FK
+        string guid "unique with sourceId"
+        string url
+        string viaUrl "link posts"
+        string feedHtml
+        enum state
+        instant starredAt
+        string originId "tt-rss feed"
+    }
+    editions {
+        long id PK
+        string title
+        enum status
+        string fileName
+        instant deliveredAt
+    }
+    edition_articles {
+        long id PK
+        long editionId FK
+        long articleId FK
+        int position
+        string title "copied"
+        string sourceTitle "copied"
+        enum stateBefore
+    }
+    delivered_urls {
+        string url PK
+        instant deliveredAt
+    }
+    left_out_feeds {
+        long sourceId PK
+        string originId PK
+        string title
+    }
+```
+
+- **`delivered_urls`** stands alone, with no foreign key, so a delivered
+  link is remembered even after its source is removed.
+- **`edition_articles`** copies the title and source name, so an
+  edition's contents survive its source being removed.
+- **A star** is the `starredAt` column, not a state.
+
+An article's `state` moves like this (the queries are in `ArticleDao`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> NEW: FeedSync inserts it
+    NEW --> IN_EDITION: build commits
+    IN_EDITION --> DELIVERED: markDelivered
+    IN_EDITION --> NEW: release (never sent)
+    DELIVERED --> IN_EDITION: markNotSent
+    NEW --> SKIPPED: marked read
+    NEW --> EXPIRED: too old, or a skipped paid post
+    SKIPPED --> NEW: marked unread
+    EXPIRED --> NEW: marked unread
+    DELIVERED --> NEW: marked unread
+```
+
+A starred `DELIVERED`, `SKIPPED` or `EXPIRED` article is a candidate too,
+so it can go straight to `IN_EDITION`; if that edition is never sent, it
+returns to the state saved in `edition_articles.stateBefore`.
+
+An edition's `status` is `BUILDING`, then `READY` or `FAILED` (with
+nothing new, the row is deleted instead); `READY`
+becomes `DELIVERED` (or `FAILED` when a newer build releases it), and
+`DELIVERED` goes back to `READY` when marked not sent. A deleted edition
+stays as a `DELETED` row to keep its title taken.
+
+## Other storage
+
+| What | Where | Code |
+|---|---|---|
+| Settings | DataStore (Preferences) | `app/settings/SettingsStore.kt` |
+| tt-rss account | Its own DataStore; the password encrypted with an Android Keystore AES-GCM key, excluded from backups | `app/data/TtrssAccountStore.kt`, `app/data/SecretCipher.kt` |
+| Timer state | SharedPreferences `edition-schedule` | `app/work/EditionScheduler.kt` |
+| EPUBs | `files/editions/`; only the newest 14 keep their file (unsent ones always do) | `EditionRepository.pruneFiles` |
+| Notes files | `files/notes/` | `app/edition/EditionNotes.kt` |
+| HTTP cache | `cache/http`, used to revalidate feeds | `AppContainer`, `core/net/HttpClient.kt` |
+
+Auto Backup leaves out the EPUBs, the timer state and the tt-rss account
+(`app/src/main/res/xml/backup_rules.xml`).
+
+## Doing things safely at the same time
+
+- **One build at a time:** the build's unique work name with KEEP.
+- **No changes under a build:** unstarring and marking read are refused in
+  SQL while an edition is `BUILDING` (`ArticleDao.unstar`,
+  `markReadAll`); starring is still allowed.
+- **Re-check inside transactions:** `markDelivered` and
+  `releaseUndelivered` re-read the edition's status inside their
+  transaction, since a send and a build can race.
+- **Timer changes are serialized** by a mutex in `EditionScheduler`.
+- **Cancellation:** a stopped build marks its edition `FAILED` in
+  `NonCancellable` before rethrowing.
+- **Short-lived callers hand off:** receivers use `goAsync()` and the
+  container's `appScope`, and work that may be slow (notes to a cloud
+  folder, tt-rss) goes to a worker.
+
+## Tests and CI
+
+- `:core`: plain JUnit, `./gradlew :core:test`.
+- `:app`: Robolectric and Compose UI tests against a real Room database,
+  plus `MigrationTest` for schema steps.
+- CI (`.github/workflows/build-and-test.yml`) runs `./gradlew build` and
+  Kover's 90% line-coverage check, then publishes the debug APK.
+- A daily job (`.github/workflows/live-check.yml`) reads each curated
+  list's live page, so a site redesign shows up before it reaches a phone.

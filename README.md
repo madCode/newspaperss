@@ -58,13 +58,14 @@ Setup takes a couple of minutes, in four steps:
   language, and an end page with a question to think about. Preview any
   article in the app as your e-reader will show it, with a text size of
   your choice and pinch to zoom on comics.
-- **Delivered your way.** A notification with a Send button (Kindle app,
-  Dropbox for a Kobo, email), a synced folder (KOReader), or Open on a
-  Boox. After a send with the Kindle app, the edition reminds you it can
-  take a few minutes to show up. Articles are used up only once the
-  edition is delivered: saved to your folder, sent through an app you
-  pick, or opened on a Boox. If one never arrives, mark it as not sent and
-  its articles go back.
+- **Delivered your way.** Emailed straight to your Kindle (Send opens
+  your mail app with everything filled in), a notification with a Send
+  button (Kindle app, Dropbox for a Kobo, email), a synced folder
+  (KOReader), or Open on a Boox. After a send with the Kindle app, the
+  edition reminds you it can take a few minutes to show up. Articles are
+  used up only once the edition is delivered: saved to your folder, sent
+  through an app you pick, or opened on a Boox. If one never arrives, mark
+  it as not sent and its articles go back.
 - **Star what you want next.** Star an article in a source's list, or one
   from an edition you didn't finish, and it goes first into the next
   edition. Mark the rest as read. Each article says where it stands:
@@ -91,6 +92,7 @@ Setup takes a couple of minutes, in four steps:
 ## Documentation
 
 - [How it works](docs/DESIGN.md): the edition, delivery, what happens to articles, the architecture.
+- [Architecture](docs/ARCHITECTURE.md): how the code is built, with diagrams.
 - [Backlog](docs/BACKLOG.md): what's next, grouped by part of the app, and ideas not yet planned.
 - [Devlog](docs/DEVLOG.md): what changed each work cycle, and why.
 - Research: [persona audits](docs/research/personas.md) and

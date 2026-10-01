@@ -7,7 +7,16 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performTextInput
+import android.content.Intent
+import androidx.test.core.app.ApplicationProvider
+import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.KindleEmail
+import com.app.newspaperss.testutil.MAIL_APP
+import com.app.newspaperss.testutil.installApp
+import org.robolectric.Shadows.shadowOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -29,6 +38,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -80,10 +90,10 @@ class SettingsScreenTest {
 
     @Test
     fun screenReadersHearWhatTheStepperChangesAndTheNewNumber() {
-        compose.onNodeWithContentDescription("More from each site").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("More from each source").performScrollTo().performClick()
         idleUntil { runBlocking { store.current().edition.maxPerSource } == 2 }
-        compose.onNode(hasText("2 articles from each site", substring = true) and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
-        compose.onNodeWithContentDescription("Fewer from each site").assertIsEnabled()
+        compose.onNode(hasText("2 articles from each source", substring = true) and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
+        compose.onNodeWithContentDescription("Fewer from each source").assertIsEnabled()
     }
 
     @Test
@@ -102,13 +112,14 @@ class SettingsScreenTest {
     @Test
     fun notesCanBeSavedWhateverTheDeliveryAndTurnedOff() {
         // A Kindle reader shares each edition, and still gets notes in her vault.
+        grant("content://vault")
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.SHARE, notesFolderUri = "content://vault", notesFolderName = "Vault") } }
         waitFor("Saved to Vault when an edition is delivered.")
 
         compose.onNodeWithText("Save notes for each edition").performScrollTo().performClick()
 
         idleUntil { runBlocking { store.current().notesFolderUri } == null }
-        waitFor("Pick your vault or notes folder")
+        waitFor("You'll pick the folder.")
         assertEquals("the delivery folder is left alone", DeliveryMethod.SHARE, runBlocking { store.current().delivery })
     }
 
@@ -121,12 +132,30 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun withFolderDeliveryTheReaderTipSaysWhereEditionsGo() {
-        runBlocking {
-            store.update { it.copy(device = com.app.newspaperss.settings.Device.KINDLE, delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") }
+    fun theReaderTipIsAboutSharingSoOnlySharingShowsIt() {
+        runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.SHARE) } }
+        waitFor("tap Send and choose the Kindle app")
+        // Under the choice it belongs to, where the reader is looking when they pick it.
+        val (send, tip, folder) = listOf("Send it myself", "tap Send and choose the Kindle app", "Save to a folder").map {
+            compose.onNodeWithText(it, substring = true).fetchSemanticsNode().positionInRoot.y
         }
-        waitFor("Editions are saved to Books")
+        assertTrue(send < tip && tip < folder)
+
+        // A Kindle owner saving to a folder isn't told to wait for a Send.
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") } }
+        idleUntil { compose.onAllNodes(hasText("tap Send", substring = true)).fetchSemanticsNodes().isEmpty() }
+
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_42@kindle.com") } }
+        waitFor("Email it to your Kindle")
         compose.onNodeWithText("tap Send", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun theEReaderComesBeforeDeliveryWhichItsChoicesDependOn() {
+        val order = listOf("Your edition", "Schedule", "Your e-reader", "Delivery", "Reading notes").map {
+            compose.onNode(hasText(it) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).fetchSemanticsNode().positionInRoot.y
+        }
+        assertEquals(order.sorted(), order)
     }
 
     @Test
@@ -137,6 +166,107 @@ class SettingsScreenTest {
     @Test
     fun perSourceCapCanBeRaised() {
         compose.onNodeWithText("+").performClick()
-        waitFor("2 articles from each site, then more")
+        waitFor("2 articles from each source, then more")
+    }
+
+    @Test
+    fun aKindleReaderCanSwitchToEmailAndSetItUp() {
+        installApp(ApplicationProvider.getApplicationContext())
+        runBlocking { store.update { it.copy(device = Device.KINDLE) } }
+        waitFor("Email it to your Kindle")
+        compose.onNodeWithText("Arrives on your Kindle by itself.").assertExists()
+        compose.onNodeWithText("Kindle's email address").assertDoesNotExist()
+
+        compose.onNodeWithText("Email it to your Kindle").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
+        idleUntil { runBlocking { store.current().delivery } == DeliveryMethod.KINDLE_EMAIL }
+        waitFor("The address you send from must be on Amazon's approved list.")
+
+        compose.onNode(hasSetTextAction() and hasText("Kindle's email address")).performScrollTo().performTextInput("me_42@kindle.com")
+        idleUntil { runBlocking { store.current().kindleEmail } == "me_42@kindle.com" }
+        compose.onNodeWithText("Ask each time").performScrollTo().performClick()
+        compose.onNodeWithText("Example Mail").performClick()
+
+        idleUntil { runBlocking { store.current().kindleEmailTarget } == KindleEmail("me_42@kindle.com", MAIL_APP) }
+    }
+
+    @Test
+    fun emailToKindleIsOfferedOnlyToKindleReadersOrWhoeverAlreadyUsesIt() {
+        runBlocking { store.update { it.copy(device = Device.KOBO) } }
+        waitFor("Send it myself")
+        compose.onNodeWithText("Email it to your Kindle").assertDoesNotExist()
+
+        // Changed their e-reader after setting it up: the choice they made stays visible.
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_42@kindle.com") } }
+        waitFor("Email it to your Kindle")
+        compose.onNodeWithText("Email it to your Kindle").assertIsSelected()
+    }
+
+    @Test
+    fun withNotificationsOffEachDeliveryIsWarnedWhatItWontHear() {
+        shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>().getSystemService(android.app.NotificationManager::class.java)).setNotificationsEnabled(false)
+        runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_42@kindle.com", scheduleEnabled = true) } }
+        waitFor("Notifications are off")
+
+        waitFor("you won't hear when an edition is ready to send")
+
+        // A folder delivery that fails is only reported by notification.
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") } }
+        waitFor("Notifications are off, so you won't hear if an edition fails to arrive.")
+    }
+
+    @Test
+    fun emailDeliveryWithoutAnAddressSaysSendWillShareUntilOneIsAdded() {
+        val line = "Add your Kindle's email address; until then Send opens the share sheet."
+        runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = null) } }
+        waitFor(line)
+
+        compose.onNode(hasSetTextAction() and hasText("Kindle's email address")).performScrollTo().performTextInput("me_42@kindle.com")
+        idleUntil { compose.onAllNodes(hasText(line)).fetchSemanticsNodes().isEmpty() }
+
+        // Still said after the e-reader changes, with an address that doesn't work.
+        runBlocking { store.update { it.copy(device = Device.KOBO, kindleEmail = "me_42@kindle") } }
+        waitFor(line)
+    }
+
+    @Test
+    fun theTwoFolderButtonsSayWhichFolderAndLineUp() {
+        grant("content://tree")
+        grant("content://vault")
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books", notesFolderUri = "content://vault", notesFolderName = "Vault") } }
+        waitFor("Choose another notes folder")
+        val starts = listOf("Choose another delivery folder", "Choose another notes folder").map {
+            compose.onNodeWithText(it).fetchSemanticsNode().positionInRoot.x
+        }
+        assertEquals(starts[0], starts[1])
+    }
+
+    private fun grant(uri: String) = ApplicationProvider.getApplicationContext<android.app.Application>().contentResolver
+        .takePersistableUriPermission(android.net.Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+
+    @Test
+    fun aFolderTheAppCanNoLongerReachSaysSoInsteadOfSavingAutomatically() {
+        grant("content://tree/books")
+        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree/books", folderName = "Books", notesFolderUri = "content://tree/gone", notesFolderName = "Vault") } }
+        waitFor("Saved automatically to Books.")
+        // The notes folder's grant is gone (its app uninstalled, say): every save there would fail.
+        compose.onNodeWithText("Can't reach Vault. Tap to choose it again.").performScrollTo().assertExists()
+        compose.onNodeWithText("Choose another notes folder").assertExists()
+
+        // Tapping the row, as the line says, picks a folder again rather than turning notes off.
+        compose.onNodeWithText("Save notes for each edition").performClick()
+        assertEquals(Intent.ACTION_OPEN_DOCUMENT_TREE, shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>()).nextStartedActivity.action)
+        assertEquals("content://tree/gone", runBlocking { store.current().notesFolderUri })
+
+        compose.onNodeWithText("Turn off").performScrollTo().performClick()
+        idleUntil { runBlocking { store.current().notesFolderUri } == null }
+    }
+
+    /** At 200% the per-source count keeps the width; − and + go on the line below. */
+    @Test
+    @Config(application = TestApp::class, fontScale = 2f)
+    fun atLargeFontSizesTheCountButtonsGoBelowItsWords() {
+        val words = compose.onNodeWithText("from each source", substring = true).fetchSemanticsNode().boundsInRoot
+        val fewer = compose.onNodeWithContentDescription("Fewer from each source").fetchSemanticsNode().boundsInRoot
+        assertTrue("below", fewer.top >= words.bottom)
     }
 }

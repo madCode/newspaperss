@@ -7,6 +7,7 @@ import com.app.newspaperss.data.EditionContent
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.delivery.KindleSend
 import com.app.newspaperss.edition.EditionNotes
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,12 +44,12 @@ class EditionDetailViewModel(
     private val editions: EditionRepository,
     private val id: Long,
     private val notes: EditionNotes,
-    sentToKindle: Flow<Set<Long>> = flowOf(emptySet()),
+    sentToKindle: Flow<Map<Long, KindleSend>> = flowOf(emptyMap()),
     /** Takes down this edition's notification once it's deleted. */
     private val dismissNotification: (Long) -> Unit,
 ) : ViewModel() {
-    /** Just sent with the Kindle app, which can take a few minutes to put it in the library. */
-    val sentToKindle: StateFlow<Boolean> = sentToKindle.map { id in it }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    /** How it was just sent to a Kindle, if it was: Amazon can take a few minutes to deliver it. */
+    val sentToKindle: StateFlow<KindleSend?> = sentToKindle.map { it[id] }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val detail: StateFlow<EditionDetail?> = combine(editions.observe(id), editions.observeContents(id)) { edition, contents ->
         EditionDetail(edition, contents, edition?.let(editions::fileOf))
@@ -95,6 +96,11 @@ class EditionDetailViewModel(
 
     fun markSent() {
         viewModelScope.launch { editions.markSent(id) }
+    }
+
+    /** The mail app was opened to email this edition to the reader's Kindle, which counts as sent. */
+    fun markEmailed() {
+        viewModelScope.launch { editions.markEmailedToKindle(id) }
     }
 
     fun markNotSent() {

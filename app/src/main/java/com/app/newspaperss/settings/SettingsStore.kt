@@ -26,6 +26,21 @@ enum class DeliveryMethod {
     SHARE,
     /** Saved into a folder the reader picked, e.g. one their Kobo or KOReader syncs. */
     FOLDER,
+    /** Emailed to the Kindle's own Send-to-Kindle address from the reader's mail app; see [Settings.kindleEmailTarget]. */
+    KINDLE_EMAIL,
+}
+
+/** Where Send emails an edition: a Kindle's own address, from [mailApp] or, if null, whichever mail app the reader picks each time. */
+data class KindleEmail(val address: String, val mailApp: String?)
+
+object KindleAddress {
+    // Light on purpose: only catching a half-typed or pasted-wrong address, not policing the format.
+    private val shape = Regex("^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$")
+
+    fun isValid(address: String): Boolean = shape.matches(address.trim())
+
+    /** Amazon's addresses end in kindle.com (kindle.cn in China); anything else is likely the wrong address, though not certainly. */
+    fun looksLikeKindle(address: String): Boolean = address.trim().lowercase().let { it.endsWith("@kindle.com") || it.endsWith("@kindle.cn") }
 }
 
 /** The reader's e-reader, chosen during onboarding; it decides the default delivery and the tips shown. */
@@ -66,7 +81,18 @@ data class Settings(
     val notesFolderUri: String? = null,
     val notesFolderName: String? = null,
     val previewTextSize: PreviewTextSize = PreviewTextSize.DEFAULT,
-)
+    /** The Kindle's Send-to-Kindle address, for [DeliveryMethod.KINDLE_EMAIL]. */
+    val kindleEmail: String? = null,
+    /** The package of the mail app Send opens for [DeliveryMethod.KINDLE_EMAIL]; null asks each time. */
+    val mailApp: String? = null,
+) {
+    /**
+     * Where Send emails editions, or null to share them as usual: email delivery is chosen and has
+     * a usable address. Without one (cleared in Settings), Send falls back to the share sheet.
+     */
+    val kindleEmailTarget: KindleEmail?
+        get() = kindleEmail?.takeIf { delivery == DeliveryMethod.KINDLE_EMAIL && KindleAddress.isValid(it) }?.let { KindleEmail(it.trim(), mailApp) }
+}
 
 // A corrupt settings file resets to defaults rather than crashing every launch.
 private val Context.dataStore by preferencesDataStore(
@@ -93,6 +119,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val notesFolderUri = stringPreferencesKey("notes_folder_uri")
         val notesFolderName = stringPreferencesKey("notes_folder_name")
         val previewTextSize = stringPreferencesKey("preview_text_size")
+        val kindleEmail = stringPreferencesKey("kindle_email")
+        val mailApp = stringPreferencesKey("kindle_email_mail_app")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
@@ -119,6 +147,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             if (s.notesFolderUri != null) prefs[Keys.notesFolderUri] = s.notesFolderUri else prefs.remove(Keys.notesFolderUri)
             if (s.notesFolderName != null) prefs[Keys.notesFolderName] = s.notesFolderName else prefs.remove(Keys.notesFolderName)
             prefs[Keys.previewTextSize] = s.previewTextSize.name
+            if (s.kindleEmail != null) prefs[Keys.kindleEmail] = s.kindleEmail else prefs.remove(Keys.kindleEmail)
+            if (s.mailApp != null) prefs[Keys.mailApp] = s.mailApp else prefs.remove(Keys.mailApp)
             prefs.remove(Keys.legacyNotesWithEdition)
         }
     }
@@ -148,6 +178,8 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             notesFolderUri = p[Keys.notesFolderUri] ?: p[Keys.folderUri]?.takeIf { legacyNotes },
             notesFolderName = p[Keys.notesFolderName] ?: p[Keys.folderName]?.takeIf { legacyNotes },
             previewTextSize = p[Keys.previewTextSize]?.let { runCatching { PreviewTextSize.valueOf(it) }.getOrNull() } ?: d.previewTextSize,
+            kindleEmail = p[Keys.kindleEmail],
+            mailApp = p[Keys.mailApp],
         )
     }
 }
