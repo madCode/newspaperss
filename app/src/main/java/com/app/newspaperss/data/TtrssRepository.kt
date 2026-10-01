@@ -129,9 +129,10 @@ class TtrssRepository(
      * For a reader coming back to a big backlog: marks everything that reached tt-rss more than two
      * weeks ago read there, in the source's category if it has one. Null when done, else why not.
      *
-     * Articles already waiting here are left to expire as usual: tt-rss dates this by when it
-     * received each article, which isn't kept here, and matching by publication date instead
-     * would drop backdated articles tt-rss still has unread, where nothing would ever pick them up.
+     * Articles already waiting here aren't changed here: tt-rss dates this by when it received each
+     * article, which isn't kept here, and matching by publication date instead would drop
+     * backdated articles tt-rss still has unread. With read sync on, the next sync brings in what
+     * it marked read, as for anything read there.
      */
     suspend fun startFresh(sourceId: Long): String? {
         val source = db.sources().byId(sourceId) ?: return "This source has been removed."

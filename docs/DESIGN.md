@@ -265,7 +265,8 @@ allowed to read that edition's file until the phone restarts.
   - **Start fresh** ("Back after a break?" on the source's page), after a
     confirmation, marks everything that reached tt-rss more than two weeks
     ago read there (in the source's category, if it has one), starred ones
-    included. Articles already waiting in the app expire as usual. It
+    included. Articles already waiting in the app aren't touched by it;
+    with read sync on, any it marked read leave at the next sync. It
     needs tt-rss API level 15 (2020) or later: older servers ignore the two
     weeks and would mark everything read, so the app refuses and says so.
 - **Housekeeping.** Only the newest 14 editions keep their EPUB on the

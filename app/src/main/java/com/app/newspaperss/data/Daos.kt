@@ -369,6 +369,10 @@ interface ArticleDao {
     @Query("SELECT guid, originId FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL AND reportedRead = 0")
     suspend fun waitingUnread(sourceId: Long): List<TtrssRef>
 
+    /** Of [guids], a source's read or delivered articles tt-rss last confirmed as read. */
+    @Query("SELECT guid, originId FROM articles WHERE sourceId = :sourceId AND guid IN (:guids) AND state IN ('SKIPPED', 'DELIVERED') AND reportedRead = 1")
+    suspend fun confirmedReadAmong(sourceId: Long, guids: List<String>): List<TtrssRef>
+
     /** Read in tt-rss since the last sync, with nothing changed here: read here too. */
     @Query(
         """UPDATE articles SET state = 'SKIPPED', reportedRead = 1 WHERE sourceId = :sourceId AND guid IN (:guids)

@@ -527,17 +527,40 @@ class TtrssSyncTest {
         assertEquals(ArticleState.SKIPPED, stateOf(source, "ttrss:10"))
     }
 
+    /** One feed tt-rss can't serve neither makes its articles look read nor stops the others syncing. */
     @Test
-    fun aFeedThatFailsToFetchDoesntMakeItsArticlesLookRead() = runTest {
+    fun aFeedThatFailsToFetchDoesntMakeItsArticlesLookReadOrFailTheSync() = runTest {
         val source = connect()
         server.add(10, "One", feedId = 1, feedTitle = "A Blog")
         server.add(20, "Other", feedId = 2, feedTitle = "Example News")
         sync.syncAll()
 
         server.brokenFeed = 1
-        sync.syncAll()
+        server.add(21, "Newer", feedId = 2, feedTitle = "Example News")
+        assertEquals(1, sync.syncAll().newArticles)
 
         assertEquals(ArticleState.NEW, stateOf(source, "ttrss:10"))
+        assertNull(db.sources().byId(source.id)!!.lastError)
+    }
+
+    /** The delivery's own marking can land mid-sync, after the headlines showed the article unread: that isn't a change made in tt-rss. */
+    @Test
+    fun aDeliveryMarkedReadMidSyncIsntTakenForUnreadInTtrss() = runTest {
+        val source = connect()
+        server.add(10, "Sent", feedId = 1, feedTitle = "A Blog")
+        server.add(11, "Other", feedId = 1, feedTitle = "A Blog")
+        sync.syncAll()
+        val article = db.articles().allForSource(source.id).single { it.guid == "ttrss:10" }
+        db.articles().setDelivered(listOf(article.id))
+
+        server.afterUnreadHeadlines = {
+            server.readThere(10)
+            kotlinx.coroutines.runBlocking { db.articles().setReportedRead(source.id, listOf("ttrss:10")) }
+            server.afterUnreadHeadlines = null
+        }
+        sync.syncAll()
+
+        assertEquals(ArticleState.DELIVERED, stateOf(source, "ttrss:10"))
     }
 
     /** Off: tt-rss and the app keep their own read and unread. */

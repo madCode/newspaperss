@@ -30,6 +30,8 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     val read = mutableListOf<Item>()
     /** updateArticle calls that answer OK without changing anything, as a broken server might. */
     var ignoreUpdates = false
+    /** Run once a getHeadlines for unread articles has been answered: something else happening mid-sync. */
+    var afterUnreadHeadlines: (() -> Unit)? = null
     /** Subcategories, child id to parent id. */
     val subcategories = mutableMapOf<Int, Int>()
     /** A feed whose getHeadlines answers with an HTTP 500. */
@@ -129,7 +131,7 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                         )
                     }
                 },
-            )
+            ).also { if (str("view_mode") == "unread") afterUnreadHeadlines?.invoke() }
             "getCategories" -> ok(
                 buildJsonArray {
                     categories.forEach { (id, title) -> add(buildJsonObject { put("id", id.toString()); put("title", title) }) }

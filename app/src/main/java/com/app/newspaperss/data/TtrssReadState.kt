@@ -1,10 +1,14 @@
 package com.app.newspaperss.data
 
 import com.app.newspaperss.core.ttrss.TtrssClient
+import com.app.newspaperss.core.ttrss.TtrssException
+import kotlinx.coroutines.CancellationException
 
 /**
  * tt-rss's unread flag for each of [refs], by guid, asked one feed at a time. Missing where tt-rss
- * didn't say: the article is gone from it, or the guid or feed isn't one tt-rss gave.
+ * didn't say: the article is gone from it, the guid or feed isn't one tt-rss gave, or the feed
+ * couldn't be read. One feed tt-rss can't serve is passed over, as the sync's fetch passes it over,
+ * rather than failing the sync for every other feed.
  */
 internal suspend fun TtrssClient.unreadByGuid(refs: Collection<TtrssRef>): Map<String, Boolean> {
     val byFeed = refs.mapNotNull { ref ->
@@ -14,7 +18,16 @@ internal suspend fun TtrssClient.unreadByGuid(refs: Collection<TtrssRef>): Map<S
     }.groupBy { it.first }
     val states = mutableMapOf<String, Boolean>()
     for ((feed, articles) in byFeed) {
-        val unread = unreadStates(feed, sinceId = articles.minOf { it.second } - 1)
+        val unread = try {
+            unreadStates(feed, sinceId = articles.minOf { it.second } - 1)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TtrssException.HttpError) {
+            continue
+        } catch (e: TtrssException.ApiError) {
+            if (e.code == "NOT_LOGGED_IN") throw e
+            continue
+        }
         for ((_, id, guid) in articles) unread[id]?.let { states[guid] = it }
     }
     return states
