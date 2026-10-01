@@ -2,6 +2,7 @@ package com.app.newspaperss.ui.edition
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -42,6 +43,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withContext
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Entities
+import org.jsoup.parser.Parser
 import java.io.ByteArrayInputStream
 import java.io.File
 
@@ -140,7 +145,7 @@ internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: 
     val bytes = pages.entry(path) ?: return "text/plain" to ByteArray(0)
     val mime = EpubPages.mimeOf(path)
     // A page reached by a link in the book ("Next") comes this way, not through loadData.
-    if (mime == "application/xhtml+xml") return mime to forPreview(bytes.toString(Charsets.UTF_8), background, text).toByteArray()
+    if (mime == "application/xhtml+xml") return mime to forPreview(bytes.toString(Charsets.UTF_8), background, text, imageSizes(pages)).toByteArray()
     return mime to bytes
 }
 
@@ -179,7 +184,7 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
                         return true
                     }
                 }
-                loadDataWithBaseURL(BOOK_ORIGIN, forPreview(xhtml, background, text), "application/xhtml+xml", "utf-8", null)
+                loadDataWithBaseURL(BOOK_ORIGIN, forPreview(xhtml, background, text, imageSizes(pages)), "application/xhtml+xml", "utf-8", null)
             }
         },
     )
@@ -190,15 +195,45 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
  * them: a WebView has no margins, and would show the page black on white in the app's dark mode.
  * The book's links and rules take the text's colour, so they follow.
  *
- * Pictures that stand alone (in a figure, or an article that is just the image) fill the width:
- * a tall strip shrunk to fit the book's image size would otherwise sit narrow in the middle.
+ * A large picture that stands alone (alone in its figure, or an article that is just the image)
+ * fills the width: a tall strip shrunk to the book's image size would otherwise sit narrow in the
+ * middle. Small ones (a headshot, a logo, a row of icons) keep their size, as in the book.
+ *
+ * @param imageSize an image's width and height in pixels by its `src`, or null if unknown.
  */
-internal fun forPreview(xhtml: String, background: Int, text: Int): String =
-    xhtml.replaceFirst(
-        "</head>",
-        "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; } $FILL_WIDTH</style></head>",
-    )
+internal fun forPreview(xhtml: String, background: Int, text: Int, imageSize: (src: String) -> Pair<Int, Int>? = { null }): String {
+    val style = "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; } img.$FILL { width: 100%; }</style></head>"
+    return markLargeImages(xhtml, imageSize).replaceFirst("</head>", style)
+}
 
-private const val FILL_WIDTH = "figure img, div.article-body > img { width: 100%; }"
+private const val FILL = "preview-fill"
+// Wide enough to be the picture rather than an icon, or a strip shrunk by the book's 1200px limit.
+private const val FILL_MIN_WIDTH = 240
+private const val FILL_MIN_HEIGHT = 800
+
+private fun markLargeImages(xhtml: String, imageSize: (String) -> Pair<Int, Int>?): String {
+    if (!xhtml.contains("<img")) return xhtml
+    val doc = Jsoup.parse(xhtml, "", Parser.xmlParser())
+    val large = doc.select("img").filter { img ->
+        val parent = img.parent() ?: return@filter false
+        val alone = (parent.tagName() == "figure" && parent.select("img").size == 1) ||
+            (parent.tagName() == "div" && parent.hasClass("article-body"))
+        val size = if (alone) imageSize(img.attr("src")) else null
+        size != null && (size.first >= FILL_MIN_WIDTH || size.second >= FILL_MIN_HEIGHT)
+    }
+    if (large.isEmpty()) return xhtml
+    large.forEach { it.addClass(FILL) }
+    doc.outputSettings().prettyPrint(false).syntax(Document.OutputSettings.Syntax.xml).escapeMode(Entities.EscapeMode.xhtml)
+    return doc.outerHtml()
+}
+
+/** Reads each image's size from its header in the book, without decoding the picture. */
+internal fun imageSizes(pages: EpubPages): (String) -> Pair<Int, Int>? = { src ->
+    pages.entry("OEBPS/$src")?.let { bytes ->
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        (options.outWidth to options.outHeight).takeIf { options.outWidth > 0 && options.outHeight > 0 }
+    }
+}
 
 private fun css(argb: Int) = "#%06X".format(argb and 0xFFFFFF)

@@ -27,6 +27,8 @@ import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import com.app.newspaperss.ui.edition.EpubPages
 import com.app.newspaperss.ui.edition.forPreview
+import com.app.newspaperss.ui.edition.imageSizes
+import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.ui.edition.bookResponse
 import com.app.newspaperss.ui.edition.BOOK_ORIGIN
 import org.junit.Assert.assertTrue
@@ -94,8 +96,42 @@ class ArticlePreviewScreenTest {
             // The second article is reached by the first one's "Next" link, served page by page.
             val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, dark.first, dark.second).second.toString(Charsets.UTF_8)
             assertTrue(next.contains(style))
-            // A strip shrunk to the book's image size fills the width, on every page.
-            assertTrue(next, next.contains("figure img, div.article-body > img { width: 100%; }"))
+        }
+    }
+
+    private fun png(width: Int, height: Int): ByteArray =
+        java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", it) }.toByteArray()
+
+    @Test
+    fun onlyLargePicturesStandingAloneFillTheWidth() {
+        val file = tmp.newFile("i.epub")
+        val images = mapOf("strip" to png(300, 1000), "wide" to png(600, 200), "headshot" to png(120, 120), "a" to png(600, 400), "b" to png(600, 400))
+            .map { (name, bytes) -> EpubImage("images/$name.png", "image/png", bytes) }
+        val body = "<figure><img src=\"images/strip.png\" alt=\"\"/></figure>" +
+            "<figure><img src=\"images/headshot.png\" alt=\"\"/></figure>" +
+            "<figure><img src=\"images/a.png\" alt=\"\"/><img src=\"images/b.png\" alt=\"\"/></figure>" +
+            "<p>Inline <img src=\"images/wide.png\" alt=\"\"/> in a line.</p>"
+        val articles = listOf(
+            EditionArticle(title = "One", sourceTitle = "S", url = "https://a.example/1", bodyHtml = body, minutes = 1.0, images = images),
+            EditionArticle(title = "Two", sourceTitle = "S", url = "https://a.example/2", bodyHtml = "<img src=\"images/solo.png\" alt=\"\"/>", minutes = 1.0, images = listOf(EpubImage("images/solo.png", "image/png", png(600, 200)))),
+        )
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
+        }
+        EpubPages(file).use { pages ->
+            fun filled(xhtml: String): List<String> {
+                // Still XHTML a strict parser takes: the WebView loads it as application/xhtml+xml.
+                val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xhtml.byteInputStream())
+                val imgs = doc.getElementsByTagName("img")
+                return (0 until imgs.length).map { imgs.item(it) as org.w3c.dom.Element }
+                    .filter { it.getAttribute("class") == "preview-fill" }.map { it.getAttribute("src") }
+            }
+            val first = forPreview(pages.article(0)!!, 0, 0, imageSizes(pages))
+            assertEquals("a headshot, a row of pictures and an inline one keep their size", listOf("images/strip.png"), filled(first))
+            // A page reached by "Next": an article that is just the picture.
+            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, 0, 0).second.toString(Charsets.UTF_8)
+            assertEquals(listOf("images/solo.png"), filled(next))
+            assertTrue(next.contains("img.preview-fill { width: 100%; }"))
         }
     }
 
