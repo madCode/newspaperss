@@ -474,7 +474,7 @@ private fun CategoryChoice(label: String, selected: Boolean, onClick: () -> Unit
 }
 
 /** The font scale from which rows stack rather than squeeze. */
-private const val LARGE_TEXT = 1.3f
+internal const val LARGE_TEXT = 1.3f
 
 @Composable
 private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowDefault: () -> Unit) {

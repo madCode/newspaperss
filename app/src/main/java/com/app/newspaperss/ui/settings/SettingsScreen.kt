@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -60,6 +61,7 @@ import com.app.newspaperss.ui.components.CheckChip
 import com.app.newspaperss.ui.components.KindleEmailFields
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.ui.onboarding.DeviceTips
+import com.app.newspaperss.ui.sources.LARGE_TEXT
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Settings as AppSettings
 import java.time.DayOfWeek
@@ -117,12 +119,14 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
         steps = (SettingsViewModel.MAX_MINUTES - SettingsViewModel.MIN_MINUTES) / 5 - 1,
         modifier = Modifier.semantics { stateDescription = "${minutes.roundToInt()} minutes" },
     )
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val perSource = @Composable { modifier: Modifier ->
         // A live region, so pressing − or + is followed by the new number.
         Text(
             "${plural(s.edition.maxPerSource, "article")} from each source, then more if there's room",
-            Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
+    }
+    val buttons = @Composable {
         OutlinedButton(
             onClick = { vm.setMaxPerSource(s.edition.maxPerSource - 1) },
             enabled = s.edition.maxPerSource > 1,
@@ -133,6 +137,17 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
             enabled = s.edition.maxPerSource < SettingsViewModel.MAX_PER_SOURCE,
             modifier = Modifier.padding(start = 8.dp).semantics { contentDescription = "More from each source" },
         ) { Text("+") }
+    }
+    // At large text the buttons get their own line, as on a source's page: beside the words they
+    // squeezed them to a few words a line.
+    if (LocalDensity.current.fontScale >= LARGE_TEXT) {
+        perSource(Modifier)
+        Row(Modifier.padding(top = 8.dp)) { buttons() }
+    } else {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            perSource(Modifier.weight(1f))
+            buttons()
+        }
     }
     Text(
         "A source can have its own number: tap it in Sources.",

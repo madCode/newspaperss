@@ -38,6 +38,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -243,5 +244,14 @@ class SettingsScreenTest {
         // The notes folder's grant is gone (its app uninstalled, say): every save there would fail.
         compose.onNodeWithText("Can't reach Vault. Choose it again.").performScrollTo().assertExists()
         compose.onNodeWithText("Choose another notes folder").assertExists()
+    }
+
+    /** At 200% the per-source count keeps the width; − and + go on the line below. */
+    @Test
+    @Config(application = TestApp::class, fontScale = 2f)
+    fun atLargeFontSizesTheCountButtonsGoBelowItsWords() {
+        val words = compose.onNodeWithText("from each source", substring = true).fetchSemanticsNode().boundsInRoot
+        val fewer = compose.onNodeWithContentDescription("Fewer from each source").fetchSemanticsNode().boundsInRoot
+        assertTrue("below", fewer.top >= words.bottom)
     }
 }

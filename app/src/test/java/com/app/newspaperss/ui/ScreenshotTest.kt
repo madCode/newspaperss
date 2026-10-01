@@ -268,4 +268,11 @@ class ScreenshotTest {
         val vm = SettingsViewModel(store) {}
         shoot("07-settings", ready = { vm.settings.value != null }) { SettingsScreen(vm) }
     }
+
+    @Test
+    @Config(fontScale = 2f)
+    fun settingsAtLargeText() {
+        val vm = SettingsViewModel(store) {}
+        shoot("07b-settings-200", ready = { vm.settings.value != null }) { SettingsScreen(vm) }
+    }
 }
