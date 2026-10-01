@@ -115,6 +115,18 @@ class CuratedListSyncTest {
     }
 
     @Test
+    fun aListPageThatMovedDoesntAskTheReaderToAddItAgain() = runTest {
+        // Its address is built into the app, so adding the list again would fail the same way.
+        val id = repo.addList(ArtsAndLettersDaily)
+        http.page(ArtsAndLettersDaily.pageUrl, "", code = 404)
+        sync.syncAll()
+        assertEquals(
+            "The list's page isn't where newspapeRSS expects it any more (error 404). An update to newspapeRSS should fix it.",
+            db.sources().byId(id)!!.lastError,
+        )
+    }
+
+    @Test
     fun fetchFailuresAreRecordedAndClearedByTheNextSuccess() = runTest {
         val id = repo.addList(ArtsAndLettersDaily)
         http.page(ArtsAndLettersDaily.pageUrl, "", code = 503)

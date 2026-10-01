@@ -257,7 +257,7 @@ class FeedSync(
                     if (untitled.isNotEmpty()) runCatching { onUntitled(untitled) }
                     return added
                 }
-                ErrorAnswers.message(response.code)
+                ErrorAnswers.message(response.code, curatedList = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {

@@ -10,13 +10,18 @@ object ErrorAnswers {
      *
      * @param address the address someone is adding, named in the message, whose advice is about
      *   that address; null for a site already added, which is called "the site".
+     * @param curatedList the site is a curated list, whose page address is built into the app, so
+     *   the reader can't fix a moved page by adding it again.
      */
-    fun message(code: Int, address: String? = null): String {
+    fun message(code: Int, address: String? = null, curatedList: Boolean = false): String {
         val site = address ?: "The site"
         return when (code) {
-            404, 410 ->
-                if (address != null) "There's nothing at $address. Check the address."
-                else "There's nothing at the site's address any more (error $code). It may have moved: try adding it again."
+            404, 410 -> when {
+                address != null -> "There's nothing at $address. Check the address."
+                curatedList -> "The list's page isn't where newspapeRSS expects it any more (error $code). An update to newspapeRSS should fix it."
+                // Adding the same feed address again would fail the same way; the home page finds the new one.
+                else -> "The site's feed isn't there any more (error $code). It may have moved: add the site's home page again to find its new feed."
+            }
             in BLOCKED ->
                 "$site turned newspapeRSS away (error $code). Some sites block apps: " +
                     if (address != null) "try its feed or RSS link if it lists one, or try again later." else "try again later."

@@ -9,8 +9,13 @@ class ErrorAnswersTest {
     @Test
     fun aSiteAlreadyAddedGetsAdviceThatFitsItsPage() {
         assertEquals(
-            "There's nothing at the site's address any more (error 404). It may have moved: try adding it again.",
+            "The site's feed isn't there any more (error 404). It may have moved: add the site's home page again to find its new feed.",
             ErrorAnswers.message(404),
+        )
+        // A curated list's address is built in: adding it again can't help, so the reader isn't asked to.
+        assertEquals(
+            "The list's page isn't where newspapeRSS expects it any more (error 410). An update to newspapeRSS should fix it.",
+            ErrorAnswers.message(410, curatedList = true),
         )
         assertEquals("The site turned newspapeRSS away (error 429). Some sites block apps: try again later.", ErrorAnswers.message(429))
         assertEquals("The site isn't working right now (error 502). Try again later.", ErrorAnswers.message(502))
