@@ -23,15 +23,18 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 
 ### The book
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
+- [ ] A text size setting for the article preview *(your brother asked; medium priority)*
 
 ### Delivery and schedule
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; waiting on an app key ([#18](https://github.com/madCode/newspaperss/issues/18)) *(personas)*
 - [ ] Boox: offer folder delivery into the Books folder, so editions stay in the library *(personas)*
 - [ ] Folder delivery: tt-rss marks articles read as soon as the file is saved, before Syncthing has synced; old editions pile up in the folder *(personas)*
+- [ ] After a send to the Kindle app, say it can take a few minutes to show up in the library, so a slow arrival doesn't look like a failure *(device)*
 - [ ] Verify folder delivery and the chooser from the notification on a real device
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
+- [ ] Decide what tt-rss is as a source *(you asked; sitting with it for a week first)*. Is it one source by itself, as now, or a doorway to the feeds underneath it, each with its own controls? Your gut says the current simple approach is best. The per-feed cap below and "tt-rss categories as sections" in the proposals depend on the answer
 - [ ] Per-feed cap on the tt-rss source page ("two from Current Affairs"); leaving a feed out is done
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] A heart for "loved this / keep it", synced to tt-rss *(you asked)*. The ☆ stays "put it in my next edition": two different wishes, and tt-rss's own star already means "keep" (which is why its stars aren't synced as ☆ today). Things to settle first:

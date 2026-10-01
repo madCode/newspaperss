@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -136,7 +137,9 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
         NavHost(
             nav,
             startDestination = Tab.TODAY.route,
-            modifier = Modifier.padding(padding),
+            // Consumed as well as applied: otherwise each screen's own Scaffold and top bar pad
+            // for the status and navigation bars a second time.
+            modifier = Modifier.padding(padding).consumeWindowInsets(padding),
             enterTransition = { EnterTransition.None },
             exitTransition = { ExitTransition.None },
         ) {
