@@ -63,8 +63,8 @@ internal object PageExtractor {
         val doc = Jsoup.parse(html, url)
         val jsonLd = jsonLdObjects(doc)
         val siteName = doc.metaContent("og:site_name") ?: jsonLd.firstNotNullOfOrNull { (it["publisher"] as? JsonObject)?.string("name") }
-        val paywalled = jsonLd.any { (it["isAccessibleForFree"] as? JsonPrimitive)?.contentOrNull?.lowercase() == "false" } ||
-            doc.selectFirst(PAYWALL) != null
+        // Not schema.org's isAccessibleForFree: metered sites set it false and serve the whole story.
+        val paywalled = doc.selectFirst(PAYWALL) != null
         // Once JSON-LD is read, nothing needs these, and Readability clones the whole document:
         // on script-heavy sites inline scripts are most of the page, parsed and copied for nothing.
         // Declarative shadow DOM is shown on the page, so its templates stay.

@@ -80,12 +80,13 @@ module so it's all unit-tested without Android.
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
 - **Paid posts.** A post for paying subscribers goes in as its free part,
-  with a note saying so. It's known by what the platform puts in place of
-  the rest: schema.org's `isAccessibleForFree: false` (when what came is
-  preview-length; metered sites say it and serve the article), Ghost's
-  upgrade box, Substack's paywall, or Substack's feed ending the opening in
-  "Read more" back to the post. That link and the pitch over the paywall
-  are removed.
+  with a note saying so. It's known by what the platform puts on the page
+  in place of the rest: Ghost's upgrade box or Substack's paywall. Not
+  schema.org's `isAccessibleForFree`: metered news sites set it to false
+  and serve the whole story. A feed text ending in "Read more" back to the
+  post (Substack's paid openings, excerpt feeds) counts as an excerpt
+  however long, so the page is fetched; that link and the pitch over the
+  paywall are removed.
 - **Embeds.** A video can't play in a book: a video's poster frame stands
   in for it, and a YouTube or Vimeo player becomes a link to the video
   (with YouTube's thumbnail). tt-rss passes no players on, so a caption

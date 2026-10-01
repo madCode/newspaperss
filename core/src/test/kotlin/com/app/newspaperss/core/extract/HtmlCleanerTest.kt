@@ -347,8 +347,16 @@ class HtmlCleanerTest {
             "<em>The Marginalian</em> has a free weekly newsletter. It comes out on Sundays. Like? <a href=\"/newsletter/\">Sign up.</a>",
         )) assertFalse(pitch, clean("<p>$pitch</p><p>$longText</p>").contains("ubscri") || clean("<p>$pitch</p><p>$longText</p>").contains("Sign up"))
         assertEquals("", clean("<h5>Add a comment:</h5><h3>newsletter</h3>"))
-        val own = "If you're reading this on the web, you can subscribe here. Updates are once a week."
-        assertTrue(clean("<p>$own</p><p>$longText</p>").contains(own))
+        for (own in listOf(
+            "If you're reading this on the web, you can subscribe here. Updates are once a week.",
+            "Three newsletters I subscribe to and love:",
+            "As the banner put it, \"subscribe to The Atlantic to keep reading\", which I did not.",
+        )) assertTrue(own, clean("<p>$own</p><p>$longText</p>").contains(own.replace("\"", "&quot;")) || clean("<p>$own</p><p>$longText</p>").contains(own))
+        val micro = "Just launched my newsletter, go <a href=\"https://example.com/n\">sign up</a>."
+        assertTrue("a sign-up link mid-sentence is the author's", clean("<p>$micro</p>").contains("launched my newsletter"))
+        val shortPost = "<div><p>Worth reading: a fine essay on slowness.</p><p>Thanks for reading Foo! Subscribe for free to receive new posts and support my work.</p></div>"
+        assertTrue("a wrapper holding a pitch isn't one", clean(shortPost).contains("Worth reading"))
+        assertFalse(clean(shortPost).contains("Subscribe"))
     }
 
     @Test

@@ -184,8 +184,8 @@ class PlatformCorpusTest(private val post: Post, @Suppress("unused") private val
         @Parameterized.Parameters(name = "{1}")
         fun posts(): List<Array<Any>> {
             val root = File(PlatformCorpusTest::class.java.getResource("/platforms")!!.toURI())
-            return root.listFiles()!!.sorted().flatMap { platform ->
-                platform.listFiles()!!.sorted().flatMap { dir ->
+            return root.listFiles()!!.filter { it.isDirectory }.sorted().flatMap { platform ->
+                platform.listFiles()!!.filter { it.isDirectory }.sorted().flatMap { dir ->
                     listOf("feed", "tt-rss").map { via -> arrayOf<Any>(Post(dir, platform.name, via), "${platform.name}/${dir.name} via $via") }
                 }
             }

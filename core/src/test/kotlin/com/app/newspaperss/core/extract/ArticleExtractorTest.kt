@@ -398,9 +398,11 @@ class ArticleExtractorTest {
         assertNull(post.siteName)
     }
 
-    private fun paywalledPage(words: Int, marker: String = """<script type="application/ld+json">{"@type":"NewsArticle","isAccessibleForFree":false}</script>""") =
-        page("<html><head><title>The Quiet Joy of Reading Slowly</title>$marker</head><body><article><h1>The Quiet Joy of Reading Slowly</h1>" +
-            "<p>${sentence.repeat(words / 16 + 1)}</p></article></body></html>")
+    private val substackPaywall = """<div data-testid="paywall"><h2>Keep reading with a 7-day free trial</h2></div>"""
+
+    private fun paywalledPage(words: Int, marker: String = substackPaywall) =
+        page("<html><head><title>The Quiet Joy of Reading Slowly</title></head><body><article><h1>The Quiet Joy of Reading Slowly</h1>" +
+            "<p>${sentence.repeat(words / 16 + 1)}</p></article>$marker</body></html>")
 
     /** A paid post's free part says so, and with next to nothing free it's flagged for the source's skip setting. */
     @Test
@@ -409,25 +411,45 @@ class ArticleExtractorTest {
         assertTrue(preview.paidPost)
         assertEquals(ArticleExtractor.PAID_NOTE, preview.note)
         assertFalse(preview.nothingFree)
-        val ghost = """<div class="gh-post-upgrade-cta"><h2>This post is for paying subscribers only</h2></div>"""
+        val ghost = """<aside class="gh-post-upgrade-cta"><h2>This post is for paying subscribers only</h2></aside>"""
         val bare = ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(10, ghost)))).extract(input("<p>A sentence of preview.</p>"))
         assertTrue(bare.nothingFree)
     }
 
-    /** Metered sites mark their pages as not free but serve the article; a subscriber's own feed is whole too. */
+    /** Metered sites mark their pages as not free and serve the whole story; a subscriber's own feed is whole too. */
     @Test
     fun aWholeArticleIsntCalledPaidWhateverThePageSays() = runTest {
-        assertFalse(ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(3000)))).extract(input(teaser)).paidPost)
+        val metered = paywalledPage(400, """<script type="application/ld+json">{"@type":"NewsArticle","isAccessibleForFree":false}</script>""")
+        assertFalse(ArticleExtractor(FakeHttp(mapOf(url to metered))).extract(input(teaser)).paidPost)
         val whole = "<p>${sentence.repeat(30)}</p>"
         assertFalse(ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(200)))).extract(input(whole, ContentMode.PAGE)).paidPost)
     }
 
-    /** Substack's feed ends a paid post's opening with "Read more" back to the post: paid, even with the page unreachable. */
+    /**
+     * Substack ends a paid post's opening in its feed with "Read more" back to the post: however
+     * long the opening, it's an excerpt, so the page is fetched and its paywall seen.
+     */
     @Test
-    fun aFeedTeaserEndingInReadMoreIsAPaidPost() = runTest {
-        val opening = "<p>${sentence.repeat(10)}</p><p><a href=\"$url\">Read more</a></p>"
-        val article = ArticleExtractor(FakeHttp(emptyMap())).extract(input(opening))
+    fun aLongFeedTextEndingInReadMoreIsAnExcerpt() = runTest {
+        val opening = "<p>${sentence.repeat(30)}</p><p><a href=\"$url\">Read more</a></p>"
+        val http = FakeHttp(mapOf(url to paywalledPage(100)))
+        val article = ArticleExtractor(http).extract(input(opening))
+        assertEquals(listOf(url), http.requested)
         assertTrue(article.paidPost)
+        assertTrue(article.usedFeedContent)
         assertFalse(article.html.contains("Read more"))
+        val free = ArticleExtractor(FakeHttp(mapOf(url to page()))).extract(input(opening))
+        assertFalse("an excerpt feed's page is the whole post", free.paidPost)
+    }
+
+    /** A link post's pitch is the pitcher's own words, free whatever the story's site does. */
+    @Test
+    fun aLinkPostsPitchIsntAPaidPost() = runTest {
+        val story = "https://other.example.com/story"
+        val pitchHtml = "<p>${sentence.repeat(3)}</p>"
+        val article = ArticleExtractor(FakeHttp(mapOf(story to paywalledPage(20).let { HttpResponse(200, story, it.contentType, it.body) })))
+            .extract(ExtractInput(story, "The Quiet Joy of Reading Slowly", pitchHtml, null, feedUrl = url))
+        assertTrue(article.usedFeedContent)
+        assertFalse(article.paidPost)
     }
 }

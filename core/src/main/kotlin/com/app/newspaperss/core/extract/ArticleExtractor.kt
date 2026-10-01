@@ -99,12 +99,13 @@ class ArticleExtractor(private val http: HttpClient) {
         var page: PageResult.Fetched? = null
         var feedTeaser = false
         val article = extract(input, onPage = { page = it }, onFeedTeaser = { feedTeaser = true })
-        // Not when the whole text came anyway: in the page's JSON-LD, as paywalled sites' often is,
-        // or in a metered site's page, which says it isn't free but serves it all.
-        val paywalled = page?.let { it.content.paywalled && it.content.extractor != "json-ld" } == true && article.wordCount < PREVIEW_MAX_WORDS
+        // Not when the whole text came anyway, in the page's JSON-LD. A link post's pitch, used when
+        // its story's page wasn't the story or was too short, is the pitcher's own and free.
+        val paywalled = page?.let { it.content.paywalled && it.content.extractor != "json-ld" } == true &&
+            (input.feedUrl == null || !article.usedFeedContent)
         // A paywalled page beside a full-length feed text is a subscriber's own feed: the article is whole.
-        val paid = feedTeaser && article.usedFeedContent || paywalled && (!article.usedFeedContent || article.feedWordCount < FULL_TEXT_WORDS)
-        if (!paid) return article
+        val wholeFeed = article.usedFeedContent && article.feedWordCount >= FULL_TEXT_WORDS && !feedTeaser
+        if (!paywalled || wholeFeed) return article
         return article.copy(paidPost = true, note = article.note ?: PAID_NOTE)
     }
 
@@ -123,7 +124,8 @@ class ArticleExtractor(private val http: HttpClient) {
         ) = article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked, declaredLanguage, failure, siteName)
 
         // A FEED source's item with no content still gets its page fetched: better than an empty article.
-        if (feed != null && (input.mode == ContentMode.FEED || (input.mode == ContentMode.AUTO && feedWords >= FULL_TEXT_WORDS))) {
+        // Ending in "Read more" back to the post, it's an excerpt however long.
+        if (feed != null && (input.mode == ContentMode.FEED || (input.mode == ContentMode.AUTO && feedWords >= FULL_TEXT_WORDS && !feed.teaser))) {
             return fromFeed(feed, null, null)
         }
 
@@ -326,8 +328,6 @@ class ArticleExtractor(private val http: HttpClient) {
         const val PAID_NOTE = "A post for paying subscribers: this is the part that's free."
         /** Fewer words than this in a paid post's free part is next to nothing (see [ExtractedArticle.nothingFree]). */
         const val NOTHING_FREE_WORDS = 50
-        // Free previews run a few hundred words; past this a page that says it's paywalled served the article.
-        private const val PREVIEW_MAX_WORDS = 1000
         private const val KEEP_FEED_RATIO = 0.7
         private const val IMAGE_POST_MAX_WORDS = 150
         private const val IMAGE_CAPTION_WORDS = 25

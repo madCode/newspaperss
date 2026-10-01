@@ -22,8 +22,9 @@ data class CleanResult(
     /** Absolute http(s) URLs of the images left in [html], in document order, without duplicates. */
     val imageUrls: List<String>,
     /**
-     * It ended in a lone "Read more" link back to its own page, as a paid post's opening does in
-     * Substack's feed. The link itself is removed.
+     * It ended in a lone "Read more" link back to its own page, so it's an excerpt however long it
+     * is: Substack ends a paid post's opening that way, as excerpt feeds do every item. The link
+     * itself is removed.
      */
     val teaser: Boolean = false,
 )
@@ -49,9 +50,10 @@ object HtmlCleaner {
         val doc = Jsoup.parse(source, baseUrl)
         val body = doc.body()
         removeComments(body)
+        // Before players become links: a hidden player stays hidden.
+        removeHidden(body)
         keepVideosAsLinks(body)
         body.select(REMOVE_TAGS.joinToString(",")).remove()
-        removeHidden(body)
         expandSubstackNotes(body)
         removeScreenReaderOnly(body)
         removeJunk(body)
@@ -296,10 +298,21 @@ object HtmlCleaner {
             if (!el.isAttached()) continue
             val text = el.text().trim()
             val words = text.split(WHITESPACE).size
-            if (words <= BOILERPLATE_MAX_WORDS && BOILERPLATE.containsMatchIn(text) ||
-                words <= PITCH_MAX_WORDS && SUBSCRIBE_PITCH.containsMatchIn(text)
-            ) el.remove()
+            if (words <= BOILERPLATE_MAX_WORDS && BOILERPLATE.containsMatchIn(text) || words <= PITCH_MAX_WORDS && isPitch(el, text)) el.remove()
         }
+    }
+
+    /**
+     * A newsletter's pitch for subscribing: Substack's widget (its class is gone after tt-rss), the
+     * line over a paid post's paywall, a sign-up form's leftover label, or a box ending in its
+     * "Sign up" link. Only a block of its own, not one holding others: a short post can be one
+     * paragraph and a pitch in the same wrapper.
+     */
+    private fun isPitch(el: Element, text: String): Boolean {
+        if (el.children().any { it.tagName() in BLOCK_TAGS || it.tagName() == "li" }) return false
+        if (SUBSCRIBE_PITCH.containsMatchIn(text)) return true
+        val last = el.childNodes().lastOrNull { !(it is TextNode && it.isBlank) }
+        return "newsletter" in text.lowercase() && last is Element && last.tagName() == "a" && SIGN_UP.matches(last.text().trim())
     }
 
     /**
@@ -326,7 +339,8 @@ object HtmlCleaner {
             if (youtube != null) link.appendElement("img").attr("src", "https://i.ytimg.com/vi/$youtube/hqdefault.jpg").attr("alt", title.ifEmpty { "Video" })
             val text = Element("p").appendChild(Element("a").attr("href", watch).text(if (title.isEmpty()) "Watch on $label" else "Watch on $label: $title"))
             frame.replaceWith(link)
-            link.after(text)
+            // A paragraph can't hold another: WordPress puts its classic embeds inside one.
+            (link.closest("p") ?: link).after(text)
         }
     }
 
@@ -352,10 +366,11 @@ object HtmlCleaner {
      * nothing: the caption becomes a plain paragraph.
      */
     private fun unwrapCaptionsWithoutMedia(body: Element) {
-        for (figure in body.select("figure")) {
-            if (figure.selectFirst("img, table, pre, blockquote") != null) continue
-            val caption = figure.selectFirst("figcaption") ?: continue
-            if (caption.select("p").isEmpty()) caption.tagName("p") else caption.unwrap()
+        for (figure in body.select("figure").reversed()) {
+            // select() includes the figure itself, so one more figure is a nested one.
+            if (figure.selectFirst("img, table, pre, blockquote") != null || figure.select("figure").size > 1) continue
+            val caption = figure.children().firstOrNull { it.tagName() == "figcaption" } ?: continue
+            if (caption.children().any { it.tagName() in BLOCK_TAGS || it.tagName() == "li" }) caption.unwrap() else caption.tagName("p")
             figure.unwrap()
         }
     }
@@ -747,20 +762,20 @@ object HtmlCleaner {
         RegexOption.IGNORE_CASE,
     )
 
-    // A newsletter's pitch for subscribing, wherever it sits in a short block: Substack's widget (its
-    // class is gone after tt-rss) and the line over a paid post's paywall.
+    // Substack's own wording anywhere in the block; the rest only as the block's opening.
     private val SUBSCRIBE_PITCH = Regex(
         "consider becoming a (free or )?paid subscriber|is a reader-supported publication|" +
-            "subscribe (for free )?to receive new posts|subscribe to .{1,60} to keep reading|" +
-            "this post is for (paid |paying )?subscribers( only)?|" +
-            // The label left over a newsletter's sign-up form, and a box ending in its sign-up link.
-            "subscribe to [^.!?]{1,60}:$|newsletter\\b.{0,200}\\bsign up\\.?$",
+            "subscribe (for free )?to receive new posts and support|" +
+            "^(subscribe to .{1,60} to keep reading|this post is for (paid |paying )?subscribers|" +
+            "([^.!?]{1,30}[.!?] )?subscribe to [^.!?]{1,60}:$)",
         RegexOption.IGNORE_CASE,
     )
+    private val SIGN_UP = Regex("sign up\\.?", RegexOption.IGNORE_CASE)
     // Feeds' view counters, known by address: tt-rss strips the width="1" that gives them away.
     private val TRACKER = Regex("medium\\.com/_/stat\\?|pixel\\.wp\\.com/|stats\\.wordpress\\.com/|feeds\\.feedburner\\.com/~r/|feedproxy\\.google\\.com/~r/")
     private val READ_MORE = Regex("(read more|continue reading|keep reading)(…|\\.\\.\\.)?", RegexOption.IGNORE_CASE)
-    private val YOUTUBE_EMBED = Regex("youtube(?:-nocookie)?\\.com/embed/([A-Za-z0-9_-]{6,})")
+    // A video's id; "videoseries" is a playlist, which has no one video to link to.
+    private val YOUTUBE_EMBED = Regex("youtube(?:-nocookie)?\\.com/embed/(?!videoseries)([A-Za-z0-9_-]{6,})")
     private val VIMEO_EMBED = Regex("player\\.vimeo\\.com/video/(\\d+)")
 
     private val HTML_TAG = Regex("<\\s*[a-zA-Z!/]")
