@@ -2,6 +2,7 @@ package com.app.newspaperss.data
 
 import android.util.Log
 import androidx.room.withTransaction
+import com.app.newspaperss.delivery.KindleSend
 import com.app.newspaperss.delivery.KindleSends
 import kotlinx.coroutines.flow.Flow
 import java.io.File
@@ -14,7 +15,7 @@ import java.time.Clock
  * @param onTtrssChanged called with an edition's id once it's delivered, or marked as not sent,
  *   with tt-rss articles in it, to mark them read or unread on the server to match. It must
  *   return quickly and leave the work to run elsewhere: delivery doesn't wait for tt-rss.
- * @param kindleSends told how each edition was delivered, for the note after a send to Kindle.
+ * @param kindleSends told how each edition was delivered, for the note after a send to a Kindle.
  */
 class EditionRepository(
     private val db: AppDatabase,
@@ -46,6 +47,16 @@ class EditionRepository(
         markDelivered(id, onlyIfReady = true)
         // After markDelivered, which clears the note: a Send again with Kindle is noted too.
         if (sentWith != null) kindleSends.record(id, sentWith)
+    }
+
+    /**
+     * The reader's mail app was opened, or picked, to email an edition to their Kindle's own
+     * address. Like picking an app in the share sheet, that's as close as the app gets to knowing
+     * it was sent; see [markSent].
+     */
+    suspend fun markEmailedToKindle(id: Long) {
+        markDelivered(id, onlyIfReady = true)
+        kindleSends.record(id, KindleSend.EMAIL)
     }
 
     /** Delivery succeeded: only now are the edition's articles used up. */

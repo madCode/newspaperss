@@ -70,7 +70,7 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] `SettingsScreenTest` can fail under full-suite load (DataStore "Unable to rename …tmp", a write still running when the temp folder is deleted). Give test DataStores a scope that finishes before cleanup
 
 ### Later
-- [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
+- [ ] Send the email itself (SMTP, an app password), so a Kindle edition arrives with no tap and from a chosen account; email delivery through the mail app is done (#123)
 
 ## Feature proposals
 
@@ -218,6 +218,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Email editions straight to your Kindle: its own address, your mail app opened ready to send *(you asked, #123)*
 - [x] Paid posts say they're only the free part; a source can skip the ones with nothing free (a title and a picture), off by default, with a count on its page *(you asked)*
 - [x] After a send with the Kindle app, a line says it can take a few minutes to show up in the library *(device)*
 - [x] A text size setting for the article preview (Aa in its top bar) *(your brother asked)*

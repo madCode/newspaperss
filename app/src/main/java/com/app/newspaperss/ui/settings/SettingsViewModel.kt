@@ -38,6 +38,16 @@ class SettingsViewModel(
         it.copy(schedule = it.schedule.copy(days = days))
     }
     fun useShare() = update { it.copy(delivery = DeliveryMethod.SHARE) }
+    fun useKindleEmail() = update { it.copy(delivery = DeliveryMethod.KINDLE_EMAIL) }
+
+    // Saved as typed, without telling the timer: neither changes when editions are made.
+    fun setKindleEmail(address: String) {
+        viewModelScope.launch { store.update { it.copy(kindleEmail = address.trim().ifEmpty { null }) } }
+    }
+
+    fun setMailApp(packageName: String?) {
+        viewModelScope.launch { store.update { it.copy(mailApp = packageName) } }
+    }
     fun useFolder(uri: String, name: String) = update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = uri, folderName = name) }
     fun setNotesFolder(uri: String?, name: String?) = update { it.copy(notesFolderUri = uri, notesFolderName = name) }
     fun setDevice(device: Device) = update { it.copy(device = device) }

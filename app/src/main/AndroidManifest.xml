@@ -4,6 +4,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Mail apps, for emailing editions to a Kindle (MailApps): Android 11 and later hide
+         other apps unless asked for. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="application/epub+zip" />
+        </intent>
+    </queries>
+
     <!-- Cleartext is allowed on purpose: many small blogs still serve their feeds
          over plain http, and a reader that silently can't fetch them looks broken.
          Everything fetched is public; nothing private is sent. -->
@@ -42,6 +55,12 @@
         </activity>
         <activity
             android:name=".OpenEditionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
+            android:name=".SendEditionActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:noHistory="true"

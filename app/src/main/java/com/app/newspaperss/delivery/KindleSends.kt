@@ -10,32 +10,46 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 
+/** How an edition went to a Kindle, which decides what its note says. */
+enum class KindleSend {
+    /** Shared to the Kindle app, which puts it in the library. */
+    APP,
+    /** Emailed to the Kindle's own address, which delivers it to the device. */
+    EMAIL,
+}
+
 /**
- * Editions just sent with the Kindle app. Send to Kindle takes a few minutes to put a book in the
- * library, so for a while the edition says so, and a slow arrival doesn't look like a failure.
- * Kept in memory: it only matters for those minutes.
+ * Editions just sent to a Kindle. Amazon takes a few minutes to deliver a book, so for a while
+ * the edition says so, and a slow arrival doesn't look like a failure. Kept in memory: it only
+ * matters for those minutes.
  */
 class KindleSends(private val clock: Clock = Clock.systemUTC()) {
-    private val sent = MutableStateFlow<Map<Long, Instant>>(emptyMap())
+    private data class Sent(val at: Instant, val how: KindleSend)
+
+    private val sent = MutableStateFlow<Map<Long, Sent>>(emptyMap())
 
     /** [packageName] was picked to send [editionId]; any other app than Kindle clears its note. */
     fun record(editionId: Long, packageName: String) {
-        if (packageName == EditionIntents.KINDLE_PACKAGE) sent.update { it + (editionId to clock.instant()) } else clear(editionId)
+        if (packageName == EditionIntents.KINDLE_PACKAGE) record(editionId, KindleSend.APP) else clear(editionId)
     }
 
-    /** [editionId] went another way, or wasn't sent after all: there's nothing to wait for in the Kindle library. */
+    fun record(editionId: Long, how: KindleSend) {
+        sent.update { it + (editionId to Sent(clock.instant(), how)) }
+    }
+
+    /** [editionId] went another way, or wasn't sent after all: there's nothing to wait for from Amazon. */
     fun clear(editionId: Long) {
         sent.update { it - editionId }
     }
 
-    /** The editions sent with the Kindle app in the last [NOTE_FOR], updated as each one's time runs out. */
+    /** The editions sent to a Kindle in the last [NOTE_FOR], and how, updated as each one's time runs out. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val recent: Flow<Set<Long>> = sent.transformLatest { all ->
+    val recent: Flow<Map<Long, KindleSend>> = sent.transformLatest { all ->
         while (true) {
             val now = clock.instant()
-            val live = all.filterValues { Duration.between(it, now) < NOTE_FOR }
-            emit(live.keys)
-            val firstToGo = live.values.minOrNull() ?: break
+            val live = all.filterValues { Duration.between(it.at, now) < NOTE_FOR }
+            emit(live.mapValues { it.value.how })
+            val firstToGo = live.values.minOfOrNull { it.at } ?: break
             delay(Duration.between(now, firstToGo.plus(NOTE_FOR)).toMillis().coerceAtLeast(1))
         }
     }
