@@ -75,3 +75,18 @@ first, no edits. Verify each finding before acting on it, and say in the
 PR what the review found and what was fixed or deliberately left. Docs-,
 comment- and config-only changes can skip this; after fixing the
 findings, a short second look at just the new diff is enough.
+
+A PR that changes how a screen looks shows it: before and after images in
+the description, one pair per screen or state that changes (only "after"
+for a new screen).
+
+- Render both with `ScreenshotTest` (`./gradlew :app:testDebugUnitTest
+  --tests '*ScreenshotTest'`, PNGs in `app/build/screenshots`): "before"
+  from `origin/main`, "after" from the branch. A changed screen the test
+  doesn't shoot yet gets a shot added, which also guards it.
+- Sample data only, never anyone's own: the repo is public.
+- Open the PR, then commit the PNGs to the `claude/screenshots` branch
+  (never merged) under `pr-<N>/` as `<screen>-before.png` and
+  `<screen>-after.png`, and edit them into the description with
+  `![<screen>, before](https://github.com/madCode/newspaperss/blob/claude/screenshots/pr-<N>/<screen>-before.png?raw=true)`.
+- If they can't be rendered (no Android SDK), say so in the PR.

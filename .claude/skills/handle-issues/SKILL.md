@@ -124,7 +124,8 @@ show what they described.
   If the Android SDK is missing and Gradle can't configure, say so in the
   PR and rely on CI.
 - PR body says `Fixes #<N>`, what changed, how it was tested, and what the
-  review found.
+  review found, with before and after screenshots of any screen it changes
+  (see CLAUDE.md, "Pull requests").
 - After opening it, subscribe to the PR's activity and drive it to green
   CI. Don't merge.
 - On the issue, link the PR. For a bug fix, ask the reporter to validate
