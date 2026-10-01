@@ -37,6 +37,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
@@ -49,6 +50,7 @@ import org.jsoup.nodes.Entities
 import org.jsoup.parser.Parser
 import java.io.ByteArrayInputStream
 import java.io.File
+import kotlin.math.roundToInt
 
 // Pages are served under a made-up https origin so the book's relative links (style.css,
 // images/…, the "Next" link) resolve against it; nothing is fetched from the network.
@@ -110,7 +112,10 @@ fun ArticlePreviewScreen(
             // Keyed: the WebView is built once, so a new article needs a new one.
             is Preview.Ready -> key(p) {
                 val colors = MaterialTheme.colorScheme
-                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textSize.percent, Modifier.fillMaxSize().padding(padding))
+                // Setting textZoom replaces the WebView's own scaling by Android's font size, so apply
+                // that here: someone who reads with large system text gets it at "Default" too.
+                val textZoom = (textSize.percent * LocalDensity.current.fontScale).roundToInt()
+                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, Modifier.fillMaxSize().padding(padding))
             }
         }
     }
