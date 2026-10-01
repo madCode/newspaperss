@@ -127,6 +127,56 @@ class FeedSync(
         return headlines
     }
 
+    /**
+     * Keeps read and unread the same here and in tt-rss, the newest change winning. tt-rss doesn't say
+     * when a flag changed, so "newest" is told by what changed since the last sync: the app's own
+     * changes are sent first and read back, and a flag that differs from what tt-rss last confirmed
+     * was changed in tt-rss. Changed on both sides between two syncs, the app's change wins. A star
+     * here beats a read in tt-rss, which is often just opening it; an article in an unsent edition is
+     * left alone. [fetched] are this sync's unread headlines and the articles made of them.
+     */
+    private suspend fun syncReadState(
+        client: TtrssClient,
+        source: SourceEntity,
+        fetched: List<Pair<TtrssHeadline, ArticleEntity>>,
+        now: Instant,
+    ) {
+        val articles = db.articles()
+        fun ids(refs: List<TtrssRef>) = refs.mapNotNull { it.guid.removePrefix(TTRSS_GUID_PREFIX).toLongOrNull() }
+        val toRead = articles.unreportedRead(source.id, limit = 500)
+        val toUnread = articles.unreportedUnread(source.id, limit = 500)
+        client.markRead(ids(toRead))
+        client.markUnread(ids(toUnread))
+
+        // Waiting here and unread in tt-rss at the last sync: missing from this sync's few unread
+        // headlines per feed, it may have been read there, or just not be among the newest. Asked,
+        // not inferred: the headlines don't say how many unread a feed has left.
+        val unreadNow = fetched.map { it.second.guid }.toSet()
+        val unsure = articles.waitingUnread(source.id).filter { it.guid !in unreadNow }
+        // Read here and unread in this sync's headlines: marked unread in tt-rss since, unless the
+        // delivery's own marking landed after the headlines were fetched. Asked again below, with
+        // everything else, after the headlines.
+        val unreadThere = unreadNow.toList().chunked(500).flatMap { articles.confirmedReadAmong(source.id, it) }
+        val states = client.readStates(toRead + toUnread + unsure + unreadThere)
+        // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
+        states.confirmed(toRead, read = true).chunked(500).forEach { articles.setReportedRead(source.id, it, read = true) }
+        states.confirmed(toUnread, read = false).chunked(500).forEach { articles.setReportedRead(source.id, it, read = false) }
+        unsure.filter { states.unread[it.guid] == false }.map { it.guid }.chunked(500).forEach { articles.readOnServer(source.id, it) }
+        // Only from this sync's few unread per feed: one marked unread in tt-rss further back waits
+        // until it's among them.
+        unreadThere.filter { states.unread[it.guid] == true }.map { it.guid }.chunked(500).forEach { articles.unreadOnServer(source.id, it, now) }
+
+        // A link already delivered (from a feed, or before the account was reconnected) is skipped
+        // like any other, and tt-rss is told it's read: otherwise it would sit unread there for good.
+        // Not one unread here: it may be one the reader marked unread after it went out. The
+        // headline's own link as well as the stored one (a link post's story, tracking removed):
+        // delivered_urls holds whichever went out.
+        fun linksOf(h: TtrssHeadline, a: ArticleEntity) = listOf(h.link, a.url)
+        val delivered = fetched.flatMap { (h, a) -> linksOf(h, a) }.distinct().chunked(500).flatMap { articles.deliveredAmong(it) }.toSet()
+        val unreadHere = fetched.map { it.second.guid }.chunked(500).flatMap { articles.unreadGuids(source.id, it) }.toSet()
+        client.markRead(fetched.filter { (h, a) -> a.guid !in unreadHere && linksOf(h, a).any { it in delivered } }.map { it.first.id })
+    }
+
     private suspend fun syncTtrss(source: SourceEntity): Int? {
         val now = clock.instant()
         val account = (ttrssAccounts?.load() as? StoredAccount.Ready)?.account
@@ -139,7 +189,8 @@ class FeedSync(
                 // A few from each feed rather than the newest 200 overall: busy news feeds would
                 // fill those 200, and a feed that posts monthly would never reach the paper.
                 val leftOut = db.sources().allLeftOut().filter { it.sourceId == source.id }.map { it.originId }.toSet()
-                val headlines = fromEachFeed(client, client.unreadFeeds(category).filter { it.unread > 0 && it.id.toString() !in leftOut })
+                val unreadFeeds = client.unreadFeeds(category).filter { it.unread > 0 && it.id.toString() !in leftOut }
+                val headlines = fromEachFeed(client, unreadFeeds)
                 val articles = headlines.map {
                     it to ArticleEntity(
                         sourceId = source.id, guid = "$TTRSS_GUID_PREFIX${it.id}", url = it.link, title = it.title,
@@ -147,25 +198,7 @@ class FeedSync(
                         discoveredAt = now, originId = it.feedId, originTitle = it.feedTitle,
                     ).linkedToStory(siteUrl = null)
                 }
-                // A link already delivered (from a feed, or before the account was reconnected) is
-                // skipped like any other, and tt-rss is told it's read unless the reader said not to:
-                // otherwise it would sit unread there for good. Articles the reader marked read in
-                // the app are told here too, rather than when marked, so Undo never reaches the server.
-                // They're taken from the database, not these headlines: a few per feed may no longer
-                // include them.
-                if (source.markReadOnServer) {
-                    // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
-                    // The headline's own link as well as the stored one (a link post's story, tracking
-                    // removed): delivered_urls holds whichever went out.
-                    fun linksOf(h: TtrssHeadline, a: ArticleEntity) = listOf(h.link, a.url)
-                    val delivered = articles.flatMap { (h, a) -> linksOf(h, a) }.distinct().chunked(500).flatMap { db.articles().deliveredAmong(it) }.toSet()
-                    val markedRead = db.articles().unreportedRead(source.id, limit = 500)
-                    client.markRead(
-                        (articles.filter { (h, a) -> linksOf(h, a).any { it in delivered } }.map { it.first.id } +
-                            markedRead.mapNotNull { it.removePrefix(TTRSS_GUID_PREFIX).toLongOrNull() }).distinct(),
-                    )
-                    if (markedRead.isNotEmpty()) db.articles().setReportedRead(source.id, markedRead)
-                }
+                if (source.markReadOnServer) syncReadState(client, source, articles, now)
                 val added = db.articles().insertFetched(articles.map { (h, a) -> a to h.link })
                 // tt-rss answers a deleted (or another user's) category with no articles and no error.
                 if (headlines.isEmpty() && category != null && client.categories().none { it.id == category }) {

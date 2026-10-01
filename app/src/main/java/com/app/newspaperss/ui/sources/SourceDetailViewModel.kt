@@ -171,7 +171,10 @@ class SourceDetailViewModel(
         _notice.value = null
     }
 
-    fun markRead(articleId: Long) = markRead(listOf(articleId))
+    /** No Undo: tapping again undoes it. */
+    fun toggleRead(articleId: Long) {
+        viewModelScope.launch { if (repository.toggleRead(articleId) == SourceRepository.Toggled.HELD) _notice.value = HELD_NOTICE }
+    }
 
     fun markRead(articleIds: Collection<Long>) {
         viewModelScope.launch {

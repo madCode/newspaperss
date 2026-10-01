@@ -369,6 +369,238 @@ class TtrssSyncTest {
         assertEquals(ArticleState.SKIPPED, db.articles().byId(byGuid.getValue("ttrss:10").id)!!.state)
     }
 
+    /** The read toggle reaches tt-rss at the next sync, both ways, and only the last of a change of mind. */
+    @Test
+    fun theReadToggleReachesTtrssAtTheNextSyncBothWays() = runTest {
+        val source = connect()
+        server.add(10, "Toggled", feedId = 1, feedTitle = "Example News")
+        server.add(11, "Changed my mind", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        val byGuid = db.articles().allForSource(source.id).associateBy { it.guid }
+        val toggled = byGuid.getValue("ttrss:10").id
+        val changedMind = byGuid.getValue("ttrss:11").id
+
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(toggled))
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(changedMind))
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(changedMind))
+        sync.syncAll()
+        assertEquals(listOf(10L), server.markedRead)
+
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(toggled))
+        assertEquals(ArticleState.NEW, db.articles().byId(toggled)!!.state)
+        sync.syncAll()
+        assertEquals(listOf(10L), server.markedUnread)
+
+        sync.syncAll()
+        assertEquals("each told once", listOf(10L) to listOf(10L), server.markedRead to server.markedUnread)
+    }
+
+    /**
+     * A delivered article marked unread is unread in tt-rss again and waits for an edition, even one
+     * found weeks ago, which would otherwise expire at the next sync.
+     */
+    @Test
+    fun aDeliveredArticleMarkedUnreadIsUnreadInTtrssAndDoesntExpire() = runTest {
+        val source = connect()
+        db.articles().insertNew(
+            listOf(ArticleEntity(sourceId = source.id, guid = "ttrss:20", url = "https://news.example/20", title = "Old", discoveredAt = now.minus(Duration.ofDays(20)))),
+        )
+        val editionId = editionWith(source.id, "ttrss:20")
+        tmp.newFile("old.epub")
+        db.editions().update(db.editions().byId(editionId)!!.copy(fileName = "old.epub"))
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionId)
+        assertTrue(ttrss.syncRead(editionId))
+        val article = db.articles().allForSource(source.id).single()
+
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(article.id))
+        sync.syncAll()
+
+        assertEquals(listOf(20L), server.markedUnread)
+        assertEquals(ArticleState.NEW, db.articles().byId(article.id)!!.state)
+        assertEquals("delivery told tt-rss; the sync doesn't again", listOf(20L), server.markedRead)
+
+        // Unread there now, so tt-rss offers it again: its link went out, but the app has it waiting.
+        server.add(20, "Old", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        assertEquals("not marked read again for its delivered link", listOf(20L), server.markedRead)
+    }
+
+    /** A delivered article tt-rss still has unread (its marking failed, say) is marked read at the next sync. */
+    @Test
+    fun aDeliveredArticleTtrssStillHasUnreadIsMarkedReadAtTheNextSync() = runTest {
+        val source = connect()
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = source.id, guid = "ttrss:30", url = "https://news.example/30", title = "Sent")))
+        val article = db.articles().allForSource(source.id).single()
+        db.articles().setDelivered(listOf(article.id))
+        db.articles().rememberDelivered(listOf(article.id), now)
+        server.add(30, "Sent", feedId = 1, feedTitle = "Example News")
+
+        sync.syncAll()
+
+        assertEquals(listOf(30L), server.markedRead)
+    }
+
+    private suspend fun stateOf(source: SourceEntity, guid: String) = db.articles().allForSource(source.id).single { it.guid == guid }.state
+
+    /** Read on the laptop, so it stays out of the paper: from a quiet feed, and from a busy one where it's asked about. */
+    @Test
+    fun anArticleReadInTtrssWhileWaitingHereIsReadHereAtTheNextSync() = runTest {
+        val source = connect()
+        server.add(10, "Quiet feed", feedId = 1, feedTitle = "A Blog")
+        server.add(11, "Quiet, still unread", feedId = 1, feedTitle = "A Blog")
+        (20L..27L).forEach { server.add(it, "Busy $it", feedId = 2, feedTitle = "Example News") }
+        sync.syncAll()
+        // Fetched last time; this time the busy feed's newest five no longer include them.
+        (28L..32L).forEach { server.add(it, "Busy $it", feedId = 2, feedTitle = "Example News") }
+
+        server.readThere(10)
+        server.readThere(23)
+        sync.syncAll()
+
+        assertEquals(ArticleState.SKIPPED, stateOf(source, "ttrss:10"))
+        assertEquals(ArticleState.SKIPPED, stateOf(source, "ttrss:23"))
+        assertEquals(ArticleState.NEW, stateOf(source, "ttrss:11"))
+        assertEquals("unread there, just not among the newest five", ArticleState.NEW, stateOf(source, "ttrss:24"))
+        assertTrue("nothing written back to tt-rss", server.markedRead.isEmpty())
+    }
+
+    /** A star is a deliberate wish for the paper; a read in tt-rss may just be opening it. Nor does an unsent edition change. */
+    @Test
+    fun aStarredOrAlreadyPlannedArticleReadInTtrssStaysAsItIs() = runTest {
+        val source = connect()
+        server.add(10, "Starred", feedId = 1, feedTitle = "A Blog")
+        server.add(11, "In an edition", feedId = 1, feedTitle = "A Blog")
+        sync.syncAll()
+        val byGuid = db.articles().allForSource(source.id).associateBy { it.guid }
+        assertTrue(sources.setStarred(byGuid.getValue("ttrss:10").id, true))
+        editionWith(source.id, "ttrss:11")
+        db.articles().setState(listOf(byGuid.getValue("ttrss:11").id), ArticleState.IN_EDITION)
+
+        server.readThere(10)
+        server.readThere(11)
+        sync.syncAll()
+
+        assertEquals(ArticleState.NEW, stateOf(source, "ttrss:10"))
+        assertTrue(db.articles().byId(byGuid.getValue("ttrss:10").id)!!.starredAt != null)
+        assertEquals(ArticleState.IN_EDITION, stateOf(source, "ttrss:11"))
+    }
+
+    /** Marked unread on the laptop after it went out: back with the waiting ones here too. */
+    @Test
+    fun aDeliveredArticleMarkedUnreadInTtrssWaitsAgainHere() = runTest {
+        val source = connect()
+        server.add(10, "Sent", feedId = 1, feedTitle = "A Blog")
+        sync.syncAll()
+        val editionId = editionWith(source.id, "ttrss:10")
+        tmp.newFile("sent.epub")
+        db.editions().update(db.editions().byId(editionId)!!.copy(fileName = "sent.epub"))
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)).markDelivered(editionId)
+        assertTrue(ttrss.syncRead(editionId))
+        sync.syncAll()
+        assertEquals("still delivered while tt-rss agrees", ArticleState.DELIVERED, stateOf(source, "ttrss:10"))
+
+        server.unreadThere(10)
+        sync.syncAll()
+
+        assertEquals(ArticleState.NEW, stateOf(source, "ttrss:10"))
+        assertEquals("not marked read again", listOf(10L), server.markedRead)
+    }
+
+    /** A change tt-rss answered OK to but didn't make isn't taken on trust: it's sent again, and not mistaken for a change made there. */
+    @Test
+    fun aChangeTtrssDidntTakeIsSentAgainAtTheNextSync() = runTest {
+        val source = connect()
+        server.add(10, "Read here", feedId = 1, feedTitle = "A Blog")
+        sync.syncAll()
+        val article = db.articles().allForSource(source.id).single()
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(article.id))
+
+        server.ignoreUpdates = true
+        sync.syncAll()
+        assertEquals(ArticleState.SKIPPED, stateOf(source, "ttrss:10"))
+        assertFalse(db.articles().byId(article.id)!!.reportedRead)
+
+        server.ignoreUpdates = false
+        sync.syncAll()
+        assertEquals(listOf(10L, 10L), server.markedRead)
+        assertTrue(db.articles().byId(article.id)!!.reportedRead)
+        assertEquals(ArticleState.SKIPPED, stateOf(source, "ttrss:10"))
+    }
+
+    /** A read-back that fails confirms nothing: the change stays to be checked at the next sync. */
+    @Test
+    fun aChangeWhoseFeedCantBeReadBackIsntTakenAsConfirmed() = runTest {
+        val source = connect()
+        server.add(10, "Read here", feedId = 1, feedTitle = "A Blog")
+        server.add(20, "Other", feedId = 2, feedTitle = "Example News")
+        sync.syncAll()
+        val article = db.articles().allForSource(source.id).single { it.guid == "ttrss:10" }
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(article.id))
+
+        server.brokenFeed = 1
+        sync.syncAll()
+        assertFalse(db.articles().byId(article.id)!!.reportedRead)
+
+        server.brokenFeed = null
+        sync.syncAll()
+        assertTrue(db.articles().byId(article.id)!!.reportedRead)
+        assertEquals(ArticleState.SKIPPED, stateOf(source, "ttrss:10"))
+    }
+
+    /** One feed tt-rss can't serve neither makes its articles look read nor stops the others syncing. */
+    @Test
+    fun aFeedThatFailsToFetchDoesntMakeItsArticlesLookReadOrFailTheSync() = runTest {
+        val source = connect()
+        server.add(10, "One", feedId = 1, feedTitle = "A Blog")
+        server.add(20, "Other", feedId = 2, feedTitle = "Example News")
+        sync.syncAll()
+
+        server.brokenFeed = 1
+        server.add(21, "Newer", feedId = 2, feedTitle = "Example News")
+        assertEquals(1, sync.syncAll().newArticles)
+
+        assertEquals(ArticleState.NEW, stateOf(source, "ttrss:10"))
+        assertNull(db.sources().byId(source.id)!!.lastError)
+    }
+
+    /** The delivery's own marking can land mid-sync, after the headlines showed the article unread: that isn't a change made in tt-rss. */
+    @Test
+    fun aDeliveryMarkedReadMidSyncIsntTakenForUnreadInTtrss() = runTest {
+        val source = connect()
+        server.add(10, "Sent", feedId = 1, feedTitle = "A Blog")
+        server.add(11, "Other", feedId = 1, feedTitle = "A Blog")
+        sync.syncAll()
+        val article = db.articles().allForSource(source.id).single { it.guid == "ttrss:10" }
+        db.articles().setDelivered(listOf(article.id))
+
+        server.afterUnreadHeadlines = {
+            server.readThere(10)
+            kotlinx.coroutines.runBlocking { db.articles().setReportedRead(source.id, listOf("ttrss:10")) }
+            server.afterUnreadHeadlines = null
+        }
+        sync.syncAll()
+
+        assertEquals(ArticleState.DELIVERED, stateOf(source, "ttrss:10"))
+    }
+
+    /** Off: tt-rss and the app keep their own read and unread. */
+    @Test
+    fun withSyncOffNothingFlowsEitherWay() = runTest {
+        val source = connect()
+        ttrss.setMarkRead(source.id, false)
+        server.add(10, "Read there", feedId = 1, feedTitle = "A Blog")
+        server.add(11, "Read here", feedId = 1, feedTitle = "A Blog")
+        sync.syncAll()
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(db.articles().allForSource(source.id).single { it.guid == "ttrss:11" }.id))
+
+        server.readThere(10)
+        server.ops.clear()
+        sync.syncAll()
+
+        assertEquals(ArticleState.NEW, stateOf(source, "ttrss:10"))
+        assertFalse(server.ops.contains("updateArticle"))
+    }
+
     @Test
     fun anArticleMarkedReadReachesTtrssEvenOncePushedOutOfItsFeedsFewNewestAndOnlyOnce() = runTest {
         val source = connect()

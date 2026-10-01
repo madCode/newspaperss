@@ -131,6 +131,23 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
         if (changed == 0) MarkReadBatch(emptyList(), waiting.size) else MarkReadBatch(waiting.map { MarkedRead(it.id, it.starredAt) }, 0)
     }
 
+    /**
+     * The read toggle on an article: a waiting one is marked read (see [markRead]); a read, expired
+     * or delivered one goes back to waiting, keeping any star. tt-rss hears of either at the next
+     * sync.
+     */
+    suspend fun toggleRead(articleId: Long): Toggled {
+        val article = db.articles().byId(articleId) ?: return Toggled.UNCHANGED
+        return when (article.state) {
+            ArticleState.NEW -> markRead(listOf(articleId)).let { if (it.marked.isNotEmpty()) Toggled.CHANGED else if (it.heldBack > 0) Toggled.HELD else Toggled.UNCHANGED }
+            ArticleState.IN_EDITION -> Toggled.UNCHANGED
+            else -> if (db.articles().markUnread(articleId, clock.instant()) > 0) Toggled.CHANGED else Toggled.UNCHANGED
+        }
+    }
+
+    /** What [toggleRead] did. HELD: an edition being made holds a waiting article. */
+    enum class Toggled { CHANGED, HELD, UNCHANGED }
+
     /** Puts a marked-read article back to waiting, with its star, unless something has moved it on since. */
     suspend fun undoMarkRead(marked: MarkedRead): Boolean = db.articles().undoMarkRead(marked.articleId, marked.starredAt) > 0
 

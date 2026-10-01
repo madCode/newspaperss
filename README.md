@@ -44,7 +44,8 @@ who'd rather not set up Python, a server and a scheduler.
   your folder, sent through an app you pick, or opened on a Boox.
 - **Star what you want next.** Star an article in a source's list, or one
   from an edition you didn't finish, and it goes first into the next
-  edition. Mark the rest as read (for tt-rss too).
+  edition. Mark the rest as read. With tt-rss, read and unread stay in
+  step both ways.
 - **Take notes.** A Markdown notes file per edition for Obsidian, Logseq or
   any notes app: properties Obsidian understands, the end page's question, a
   few reflection prompts, and a citation and room for notes under each

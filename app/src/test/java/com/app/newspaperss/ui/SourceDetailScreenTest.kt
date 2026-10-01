@@ -12,7 +12,6 @@ import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.getOrNull
@@ -28,11 +27,16 @@ import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertHasClickAction
 import android.content.Intent
 import android.app.Application
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.isDialog
@@ -52,6 +56,7 @@ import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.sources.SourceDetailScreen
+import com.app.newspaperss.ui.sources.HELD_NOTICE
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.failingLine
 import com.app.newspaperss.ui.sources.lastCheckedLine
@@ -207,8 +212,8 @@ class SourceDetailScreenTest {
         idleUntil { compose.waitForIdle(); syncs == 1 && visible("Tech") }
         assertEquals(5, runBlocking { db.sources().byId(id)!!.ttrssCategoryId })
 
-        compose.onNodeWithText("Mark as read in tt-rss").performClick()
-        idleUntil { compose.waitForIdle(); visible("left unread in tt-rss") }
+        compose.onNodeWithText("Sync read status with tt-rss").performClick()
+        idleUntil { compose.waitForIdle(); visible("keep their own read and unread") }
         assertEquals(false, runBlocking { db.sources().byId(id)!!.markReadOnServer })
     }
 
@@ -311,8 +316,9 @@ class SourceDetailScreenTest {
     /** The row itself: its title and details, merged, and what a tap on it does. */
     private fun row(title: String) = compose.onNode(hasText(title) and hasClickAction())
 
-    private fun markReadAction(title: String) =
-        row(title).fetchSemanticsNode().config.getOrNull(SemanticsActions.CustomActions).orEmpty().singleOrNull { it.label == "Mark as read" }
+    private fun markRead(title: String) = compose.onNodeWithContentDescription("Mark $title as read")
+
+    private fun markUnread(title: String) = compose.onNodeWithContentDescription("Mark $title as unread")
 
     private fun state(id: Long) = runBlocking { db.articles().byId(id)!!.state }
 
@@ -320,7 +326,7 @@ class SourceDetailScreenTest {
 
     @Test
     @Config(qualifiers = "w411dp-h1600dp")
-    fun eachRowHasTheStarAndOnlyWaitingRowsCanBeMarkedRead() {
+    fun eachRowHasTheStarAndTheReadToggleExceptInAnUnsentEdition() {
         val (id, ids) = sourceWithArticles()
         show(id)
 
@@ -329,10 +335,11 @@ class SourceDetailScreenTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Not starred"))
         star("Article unsent").assertDoesNotExist()
-        assertTrue(markReadAction("Article waiting") != null)
-        assertNull(markReadAction("Article delivered"))
-        assertNull(markReadAction("Article unsent"))
-        compose.onNodeWithText("Tap ☆ to put one in your next edition. Tap Select to mark some as read.").assertExists()
+        markRead("Article waiting").assertHasClickAction()
+        markUnread("Article delivered").assertHasClickAction()
+        markRead("Article unsent").assertDoesNotExist()
+        markUnread("Article unsent").assertDoesNotExist()
+        compose.onNodeWithText("Tap ● to mark one read or unread, and ☆ to put it in your next edition.").assertExists()
 
         star("Article delivered").performClick()
         settle { visible("Starred for your next edition") }
@@ -359,34 +366,63 @@ class SourceDetailScreenTest {
         assertEquals(ArticleState.NEW, state(ids.getValue("waiting")))
     }
 
-    /** TalkBack's one-step way to mark a single article read, with the same Undo as a batch. */
+    /** The status mark is a toggle: a second tap undoes the first, and the rows never move, so e-ink doesn't redraw the list. */
     @Test
     @Config(qualifiers = "w411dp-h1600dp")
-    fun theRowsMarkAsReadActionStaysInPlaceAndUndoBringsBackItsStateAndStar() {
+    fun theReadToggleMarksAWaitingArticleReadAndATapBackBringsItBack() {
         val (id, ids) = sourceWithArticles()
         val waiting = ids.getValue("waiting")
         runBlocking { repo.setStarred(waiting, true) }
-        val starredAt = runBlocking { db.articles().byId(waiting)!!.starredAt }
         show(id)
         val top = compose.onNodeWithText("Article waiting").fetchSemanticsNode().boundsInRoot.top
 
-        markReadAction("Article waiting")!!.action()
+        markRead("Article waiting").performClick()
 
-        settle { visible("Undo") }
-        assertEquals("the row and the snackbar", 2, compose.onAllNodes(hasText("Marked as read", substring = true)).fetchSemanticsNodes().size)
+        settle { state(waiting) == ArticleState.SKIPPED }
+        settle { visible("Marked as read") }
         assertEquals("the row doesn't move", top, compose.onNodeWithText("Article waiting").fetchSemanticsNode().boundsInRoot.top)
-        compose.onNodeWithText("Tap ☆ to put one in your next edition.").assertExists()
-        assertFalse("nothing left to mark read, so Select isn't suggested for it", visible("Tap Select"))
-        assertEquals(ArticleState.SKIPPED, state(waiting))
         assertNull("marking read clears the star", runBlocking { db.articles().byId(waiting)!!.starredAt })
-        assertNull(markReadAction("Article waiting"))
-        star("Article waiting").assertIsOff()
+        assertFalse("a second tap undoes it, so no snackbar", visible("Undo"))
 
-        compose.onNodeWithText("Undo").performClick()
+        markUnread("Article waiting").performClick()
 
         settle { state(waiting) == ArticleState.NEW }
-        assertEquals(starredAt, runBlocking { db.articles().byId(waiting)!!.starredAt })
-        settle { visible("Starred for your next edition") }
+        settle { compose.onAllNodes(hasContentDescription("Mark Article waiting as read")).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    /** The mark is narrow so titles line up, but a tap near it still lands on it rather than opening the article. */
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun aTapJustBesideTheMarkStillTogglesIt() {
+        val (id, ids) = sourceWithArticles()
+        show(id)
+        val mark = markRead("Article waiting").fetchSemanticsNode().boundsInRoot
+        val nudge = with(compose.density) { 10.dp.toPx() }
+
+        compose.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(mark.right + nudge, mark.center.y)) }
+
+        settle { state(ids.getValue("waiting")) == ArticleState.SKIPPED }
+        assertNull(shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity)
+    }
+
+    /** "Unread" on a sent article: back with the waiting ones, not ahead of them like a star. */
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun aDeliveredArticleMarkedUnreadWaitsAgainAndATapBackMarksItRead() {
+        val (id, ids) = sourceWithArticles()
+        val delivered = ids.getValue("delivered")
+        show(id)
+
+        markUnread("Article delivered").performClick()
+
+        settle { state(delivered) == ArticleState.NEW }
+        assertNull("not starred: it waits its turn", runBlocking { db.articles().byId(delivered)!!.starredAt })
+        assertTrue(runBlocking { db.articles().candidates() }.any { it.id == delivered })
+        settle { compose.onAllNodes(hasContentDescription("Mark Article delivered as read")).fetchSemanticsNodes().isNotEmpty() }
+
+        markRead("Article delivered").performClick()
+
+        settle { state(delivered) == ArticleState.SKIPPED }
     }
 
     /**
@@ -441,7 +477,6 @@ class SourceDetailScreenTest {
         compose.onNodeWithText("Select").performClick()
         settle { visible("0 selected") }
         compose.onNodeWithText("Tap articles to choose them.").assertExists()
-        compose.onNodeWithText("Tap ☆ to put one in your next edition. Tap articles to choose them.").assertExists()
         row("Article waiting").performClick()
         row("Article delivered").performClick()
         compose.onNodeWithContentDescription("Put 2 articles in your next edition").performClick()
@@ -535,7 +570,10 @@ class SourceDetailScreenTest {
         show(id)
 
         settle { visible(BUILDING_NOTE) }
-        assertNull("no Mark as read action while it's held", markReadAction("Article waiting"))
+        markRead("Article waiting").performClick()
+        settle { visible(HELD_NOTICE) }
+        assertEquals("held, and the tap doesn't open the article instead", ArticleState.NEW, state(ids.getValue("waiting")))
+        assertNull(shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity)
         star("Article delivered").assertIsNotEnabled()
         row("Article waiting").performTouchInput { longClick() }
         row("Article delivered").performClick()
@@ -660,7 +698,8 @@ class SourceDetailScreenTest {
     fun theSnackbarSitsAboveTheSelectionBar() {
         val (id, ids) = sourceWithArticles(moreWaiting = 1)
         show(id)
-        markReadAction("Article waiting")!!.action()
+        row("Article waiting").performTouchInput { longClick() }
+        compose.onNodeWithText("Mark 1 as read").performClick()
         settle { visible("Undo") }
 
         row("Article more1").performTouchInput { longClick() }
@@ -682,7 +721,8 @@ class SourceDetailScreenTest {
         compose.setContent { if (shown) SourceDetailScreen(vm, onBack = {}) }
         idleUntil { visible("Article waiting") }
 
-        markReadAction("Article waiting")!!.action()
+        row("Article waiting").performTouchInput { longClick() }
+        compose.onNodeWithText("Mark 1 as read").performClick()
         settle { visible("Undo") }
         shown = false
         settle { vm.undoOffer.value == null }
@@ -691,8 +731,9 @@ class SourceDetailScreenTest {
         compose.waitForIdle()
         assertFalse("no stale Undo when coming back", visible("Undo"))
         runBlocking { repo.undoMarkRead(MarkedRead(ids.getValue("waiting"), null)) }
-        settle { markReadAction("Article waiting") != null }
-        markReadAction("Article waiting")!!.action()
+        settle { state(ids.getValue("waiting")) == ArticleState.NEW }
+        row("Article waiting").performTouchInput { longClick() }
+        compose.onNodeWithText("Mark 1 as read").performClick()
         settle { visible("Undo") }
     }
 

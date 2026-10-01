@@ -48,7 +48,8 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
   - Offline: queue the change and send it at the next sync, as Mark as read does, so Undo never has to reach the server.
 - [ ] Articles that expire in the app stay unread in tt-rss: an opt-in "mark read when they expire here"
 - [ ] Delay tt-rss mark-read a little after sharing, so a quick "Mark as not sent" doesn't flip articles read and then unread again on the server
-- [ ] Read/unread control that reaches tt-rss *(you asked)*. **Mark as not sent** on a sent edition marks its tt-rss articles unread again; otherwise the app only ever marks articles read there (on delivery, or Mark as read): Undo after Mark as read, and starring a delivered article to bring it back, change the app only. Things to settle: whether Undo and bringing an article back mark it unread in tt-rss, whether a "Mark unread" is offered on delivered articles, and what happens when tt-rss has marked it read since (the last change wins, as for Mark as read)
+- [ ] Read/unread, after trying the toggle *(you asked)*. The status mark on a source's page now marks read and unread, reaching tt-rss at the next sync. If the two toggles don't feel right on the phone, the one-button cycle (option A in the mockups) is the alternative
+- [ ] Read sync: an article marked unread in tt-rss further back than its feed's newest five unread only comes back here once it's among them. Ask tt-rss about delivered articles directly if that turns out to matter
 
 ### From the UX pass *(ux)*
 - [ ] Sync errors on a source's page still read "The site answered with error 403"; give them the plain words the add dialog now uses ("turned newspapeRSS away… try again later")

@@ -129,9 +129,10 @@ class TtrssRepository(
      * For a reader coming back to a big backlog: marks everything that reached tt-rss more than two
      * weeks ago read there, in the source's category if it has one. Null when done, else why not.
      *
-     * Articles already waiting here are left to expire as usual: tt-rss dates this by when it
-     * received each article, which isn't kept here, and matching by publication date instead
-     * would drop backdated articles tt-rss still has unread, where nothing would ever pick them up.
+     * Articles already waiting here aren't changed here: tt-rss dates this by when it received each
+     * article, which isn't kept here, and matching by publication date instead would drop
+     * backdated articles tt-rss still has unread. With read sync on, the next sync brings in what
+     * it marked read, as for anything read there.
      */
     suspend fun startFresh(sourceId: Long): String? {
         val source = db.sources().byId(sourceId) ?: return "This source has been removed."
@@ -186,13 +187,13 @@ class TtrssRepository(
      * way that may pass (the server unreachable), after noting the problem on the source.
      */
     suspend fun markRead(editionId: Long): Boolean =
-        update(db.articles().ttrssInEdition(editionId), "Delivered articles weren't marked read in tt-rss.") { markRead(it) }
+        update(db.articles().ttrssInEdition(editionId), read = true, "Delivered articles weren't marked read in tt-rss.") { markRead(it) }
 
     /** Marks the tt-rss articles of an edition marked as not sent unread again, like [markRead]. */
     suspend fun markUnread(editionId: Long): Boolean =
-        update(db.articles().ttrssUnsentInEdition(editionId), "Articles from an edition that wasn't sent weren't marked unread in tt-rss.") { markUnread(it) }
+        update(db.articles().ttrssUnsentInEdition(editionId), read = false, "Articles from an edition that wasn't sent weren't marked unread in tt-rss.") { markUnread(it) }
 
-    private suspend fun update(articles: List<ArticleEntity>, failed: String, call: suspend TtrssClient.(List<Long>) -> Unit): Boolean {
+    private suspend fun update(articles: List<ArticleEntity>, read: Boolean, failed: String, call: suspend TtrssClient.(List<Long>) -> Unit): Boolean {
         if (articles.isEmpty()) return true
         val sourceIds = articles.map { it.sourceId }.distinct()
         val account = (accounts.load() as? StoredAccount.Ready)?.account
@@ -204,6 +205,11 @@ class TtrssRepository(
         val client = account.client(http)
         val (problem, retry) = try {
             client.call(ids)
+            // Only what tt-rss confirms: one it didn't take stays as the app last knew it, for the
+            // next sync to put right.
+            val confirmed = client.confirmed(articles.map { TtrssRef(it.guid, it.originId) }, read).toSet()
+            articles.filter { it.guid in confirmed }.groupBy { it.sourceId }
+                .forEach { (sourceId, its) -> its.map { it.guid }.chunked(500).forEach { db.articles().setReportedRead(sourceId, it, read) } }
             sourceIds.forEach { db.sources().setServerNote(it, null) }
             return true
         } catch (e: CancellationException) {

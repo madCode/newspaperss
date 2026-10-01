@@ -239,6 +239,27 @@ class TtrssClientTest {
     }
 
     @Test
+    fun unreadStatesReadsEachArticlesFlagWithoutItsTextAcrossPages() = runTest {
+        server.reply(loggedIn)
+        val full = (1..200).joinToString(",", "[", "]") { """{"id":$it,"unread":${it % 2 == 0}}""" }
+        server.reply(ok(full))
+        server.reply(ok("""[{"id":"201","unread":"t"},{"id":202,"unread":"0"},{"id":203}]"""))
+
+        val states = client().unreadStates(feedId = 7, sinceId = 0)
+
+        assertEquals(202, states.size)
+        assertEquals(true, states[2])
+        assertEquals(false, states[1])
+        assertEquals("older servers' t", true, states[201])
+        assertEquals(false, states[202])
+        assertEquals("no flag, no answer", null, states[203])
+        assertEquals(
+            Json.parseToJsonElement("""{"sid":"sid-1","op":"getHeadlines","feed_id":7,"view_mode":"all_articles","show_content":false,"limit":200,"skip":200,"since_id":0}"""),
+            server.sent[2],
+        )
+    }
+
+    @Test
     fun markingNothingSendsNothing() = runTest {
         client().markRead(emptyList())
         client().markUnread(emptyList())
