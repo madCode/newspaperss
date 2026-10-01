@@ -23,6 +23,7 @@ import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.edition.EditionRun
 import com.app.newspaperss.edition.NotesSaver
 import com.app.newspaperss.delivery.FolderDelivery
+import com.app.newspaperss.delivery.KindleSends
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
@@ -52,6 +53,7 @@ class AppContainer(
     val readingList = ReadingListRepository(db, onUntitled = fetchReadingListTitles)
     val readingListTitles = ReadingListTitles(db, http)
     val notifier = Notifier(context)
+    val kindleSends = KindleSends()
     // A sent edition's Ready notification comes down: its Send would offer an edition already sent.
     val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead)
     val feedFinder = FeedFinder(http)

@@ -1,5 +1,6 @@
 package com.app.newspaperss.delivery
 
+import android.content.ComponentName
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -9,6 +10,7 @@ import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.clearFileProviderCache
 import com.app.newspaperss.testutil.idleUntil
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -48,6 +50,25 @@ class EditionSentTest {
         idleUntil { statusOf(ready) == EditionStatus.DELIVERED }
         // A shared edition's notes are saved.
         idleUntil { app.notesRequested == listOf(ready) }
+    }
+
+    @Test
+    fun pickingTheKindleAppIsRememberedForTheNoteAndAnotherAppClearsIt() {
+        val ready = edition(EditionStatus.READY)
+        val file = File(app.filesDir, "editions/k.epub").apply { parentFile!!.mkdirs(); writeText("epub") }
+        val extras = EditionIntents.share(app, file, "Tuesday Morning Edition", ready).extras!!
+        val callback = extras.keySet().map { extras.get(it) }.filterIsInstance<android.content.IntentSender>().single()
+        fun pick(packageName: String) = callback.sendIntent(
+            app, 0, Intent().putExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName(packageName, "$packageName.Share")), null, null,
+        )
+        val recent = app.container.kindleSends.recent
+
+        pick(EditionIntents.KINDLE_PACKAGE)
+        idleUntil { runBlocking { recent.first() } == setOf(ready) }
+
+        // Send again, this time by email: no Kindle library to wait for.
+        pick("com.example.mail")
+        idleUntil { runBlocking { recent.first() }.isEmpty() }
     }
 
     @Test

@@ -201,6 +201,12 @@ too); or opening it on a Boox. **I've sent it** covers any other route, and
 when the next one is built was never sent: it's marked not sent and its
 articles go back, keeping their stars, before the new one is planned.
 
+**Send to Kindle is slow.** A book can take a few minutes to reach the
+Kindle library, so for half an hour after a send with the Kindle app, the
+edition (on Today and its own page) says "Sent to Kindle. It can take a few
+minutes to show up in your library." Sending it with another app takes the
+note away. It's only remembered while the app is running.
+
 **A send that didn't arrive can be undone.** A failed Send to Kindle still
 counts as sent, because Android only reports the app you chose.
 **Didn't arrive? Mark as not sent** on a sent edition (while its file is

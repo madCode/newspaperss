@@ -23,6 +23,7 @@ class EditionSentReceiver : BroadcastReceiver() {
         if (chosen != null && file != null) EditionIntents.grantRead(context, chosen.packageName, file)
         val id = intent.getLongExtra(EXTRA_EDITION_ID, 0L).takeIf { it > 0 } ?: return
         val app = context.applicationContext as NewspaperssApp
+        if (chosen != null) app.container.kindleSends.record(id, chosen.packageName)
         val pending = goAsync()
         app.container.appScope.launch {
             try {

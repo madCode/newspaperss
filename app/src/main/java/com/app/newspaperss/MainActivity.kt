@@ -147,12 +147,12 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
         ) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }) { EditionWorker.buildNow(context) } }
+                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }, sentToKindle = container.kindleSends.recent) { EditionWorker.buildNow(context) } }
                 TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes, container.notifier::dismissFor) }
+                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes, container.kindleSends.recent, container.notifier::dismissFor) }
                 EditionDetailScreen(
                     vm,
                     preferOpen = preferOpen,

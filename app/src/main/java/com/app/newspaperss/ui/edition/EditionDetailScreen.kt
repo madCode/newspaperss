@@ -70,6 +70,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
     val detail by viewModel.detail.collectAsState()
     val message by viewModel.message.collectAsState()
     val building by viewModel.building.collectAsState()
+    val sentToKindle by viewModel.sentToKindle.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     fun launch(intent: Intent): Boolean = try {
@@ -148,6 +149,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                 Header(
                     edition,
                     fileMissing = current.file == null,
+                    sentToKindle = sentToKindle,
                     onSend = { current.file?.let { launch(EditionIntents.share(context, it, edition.title, edition.id)) } },
                     onOpen = if (offerOpen) {
                         { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } }
@@ -195,7 +197,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
 }
 
 @Composable
-private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> Unit, onOpen: (() -> Unit)?, onSent: () -> Unit, onNotSent: () -> Unit) {
+private fun Header(edition: EditionEntity, fileMissing: Boolean, sentToKindle: Boolean, onSend: () -> Unit, onOpen: (() -> Unit)?, onSent: () -> Unit, onNotSent: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(edition.title, style = MaterialTheme.typography.headlineSmall)
         Text(dateOf(edition.createdAt), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
@@ -207,6 +209,7 @@ private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> U
             val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"
             Text("$articles · about ${minutes(edition.minutes)} min", style = MaterialTheme.typography.bodyMedium)
         }
+        if (edition.status == EditionStatus.DELIVERED && sentToKindle) KindleNote()
         if (edition.status == EditionStatus.READY || edition.status == EditionStatus.DELIVERED) {
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (edition.status == EditionStatus.READY) {

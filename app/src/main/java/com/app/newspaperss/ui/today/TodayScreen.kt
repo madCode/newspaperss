@@ -38,6 +38,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.delivery.EditionIntents
+import com.app.newspaperss.ui.edition.KindleNote
 import com.app.newspaperss.ui.edition.MarkNotSent
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -113,6 +114,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                     deviceName = state.deviceName,
                     preferOpen = state.preferOpen,
                     offerOpen = state.offerOpen,
+                    sentToKindle = latest.id in state.sentToKindle,
                     onRetry = viewModel::makeOneNow,
                     onDetails = { onOpenEdition(latest.id) },
                     onSend = { viewModel.fileOf(latest)?.let { launch(EditionIntents.share(context, it, latest.title, latest.id)) } },
@@ -238,6 +240,7 @@ private fun LatestEdition(
     deviceName: String,
     preferOpen: Boolean,
     offerOpen: Boolean,
+    sentToKindle: Boolean,
     onRetry: () -> Unit,
     onDetails: () -> Unit,
     onSend: () -> Unit,
@@ -288,6 +291,7 @@ private fun LatestEdition(
                     TextButton(onClick = onSent, contentPadding = PaddingValues(end = 12.dp)) { Text("I've sent it") }
                 }
                 EditionStatus.DELIVERED -> {
+                    if (sentToKindle) KindleNote()
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = onSend) { Text("Send again") }
                         if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }

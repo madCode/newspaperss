@@ -47,6 +47,7 @@ import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.clearFileProviderCache
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.EditionDetailScreen
+import com.app.newspaperss.ui.edition.KINDLE_NOTE
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
@@ -546,6 +547,41 @@ class EditionDetailScreenTest {
 
         idleUntil { statusOf(id) == EditionStatus.READY }
         waitFor("I've sent it")
+    }
+
+    @Test
+    fun afterASendWithTheKindleAppTodaySaysItCanTakeAFewMinutes() {
+        val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"))
+        val kindle = MutableStateFlow(emptySet<Long>())
+        val vm = TodayViewModel(repo, flowOf(null), sentToKindle = kindle) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        waitFor("Didn't arrive? Mark as not sent")
+        compose.onNodeWithText(KINDLE_NOTE).assertDoesNotExist()
+
+        kindle.value = setOf(id)
+        waitFor(KINDLE_NOTE)
+
+        // Marked as not sent, it's waiting to be sent again: the note would contradict that.
+        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
+        compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
+        waitFor("I've sent it")
+        compose.onNodeWithText(KINDLE_NOTE).assertDoesNotExist()
+    }
+
+    @Test
+    fun anEditionJustSentWithTheKindleAppSaysItCanTakeAFewMinutes() {
+        val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"))
+        // Another edition sent with Kindle says nothing about this one.
+        val kindle = MutableStateFlow(setOf(id + 1))
+        val vm = EditionDetailViewModel(repo, id, notes, sentToKindle = kindle) {}
+        compose.setContent { EditionDetailScreen(vm, onBack = {}) }
+        idleUntil { vm.detail.value?.contents?.isNotEmpty() == true }
+        compose.waitForIdle()
+        compose.onNodeWithText(KINDLE_NOTE).assertDoesNotExist()
+
+        kindle.value = setOf(id)
+        waitFor(KINDLE_NOTE)
+        compose.onNodeWithText(KINDLE_NOTE).assertIsDisplayed()
     }
 
     private val dismissed = mutableListOf<Long>()
