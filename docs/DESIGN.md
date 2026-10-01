@@ -86,7 +86,15 @@ module so it's all unit-tested without Android.
   and serve the whole story. A feed text ending in "Read more" back to the
   post (Substack's paid openings, excerpt feeds) counts as an excerpt
   however long, so the page is fetched; that link and the pitch over the
-  paywall are removed.
+  paywall are removed. One with next to nothing free (under 50 words: a
+  title and a picture) can be left out instead, per source, with **Skip
+  paid posts with nothing free** on its page. That switch shows once the
+  source has had one, is off until turned on, and says how many it has
+  skipped (on a tt-rss account, for every feed in it). Only a first find
+  is skipped: it counts as not picked ("Skipped: a paid post") and isn't
+  fetched again. Starring it or marking it unread asks for it, so it goes
+  in. An edition whose every new article was skipped is nothing new, not
+  a failure.
 - **Embeds.** A video can't play in a book: a video's poster frame stands
   in for it, and a YouTube or Vimeo player becomes a link to the video
   (with YouTube's thumbnail). tt-rss passes no players on, so a caption
@@ -364,8 +372,8 @@ allowed to read that edition's file until the phone restarts.
   left" (it expires 7 days after it was found; curated lists and saved
   links just say "Waiting"), "In your next edition" (starred; "Starred,
   source paused" while paused), "In Thursday's edition", "Sent Wednesday"
-  (when its link last went out), "Read", or "Not picked" (it waited a
-  week, or the list moved on).
+  (when its link last went out), "Read", "Not picked" (it waited a
+  week, or the list moved on), or "Skipped: a paid post".
   - **Select** (or pressing and holding a row) enters selection mode:
     checkboxes take the status marks' place, the top bar says "N
     selected", and a bar at the bottom has **☆ Next edition** and

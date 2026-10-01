@@ -17,7 +17,7 @@ class Converters {
 
 @Database(
     entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class, LeftOutFeedEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -97,7 +97,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sources ADD COLUMN skipPaidPosts INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE articles ADD COLUMN paidOnly INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE articles ADD COLUMN paidSkipped INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun open(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
     }
 }

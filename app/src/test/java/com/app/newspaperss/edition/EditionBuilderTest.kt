@@ -13,6 +13,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.MarkReadBatch
+import com.app.newspaperss.data.PaidOnlyCount
 import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.testutil.DbRule
@@ -901,7 +902,7 @@ class EditionBuilderTest {
     @Test
     fun oneMorningOfBotChecksDoesntSettleASite() = runTest {
         val http = FakeHttp()
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), sources::recordFullText)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onEvidence = sources::recordFullText)
         val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
         val id = sources.addFeed("https://blocked.example/feed", "Blocked")
         db.articles().insertNew(
@@ -934,5 +935,83 @@ class EditionBuilderTest {
         }
 
         assertEquals(ContentMode.PAGE, db.sources().byId(id)!!.contentMode)
+    }
+
+    /**
+     * A paid post that's only a title and a picture doesn't take a place once its source skips
+     * them, and isn't fetched again; one the reader starred still goes in. With skipping off it
+     * goes in, noted, and the source page learns the source has them.
+     */
+    @Test
+    fun paidPostsWithNothingFreeAreSkippedWhereTheSourceSaysSo() = runTest {
+        val http = FakeHttp()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly, onEvidence = sources::recordFullText)
+        val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
+        val id = sources.addFeed("https://paid.example/feed", "Paid")
+        val words = (1..400).joinToString(" ") { "word$it" }
+        val paywall = """<div data-testid="paywall"><h2>Keep reading with a 7-day free trial</h2></div>"""
+        fun post(g: String, paid: Boolean) = ArticleEntity(sourceId = id, guid = g, url = "https://paid.example/$g", title = "Post $g", feedHtml = "<p>A line.</p>").also {
+            http.page(it.url, if (paid) "<html><body><article><h1>Post $g</h1><p>A line.</p></article>$paywall</body></html>" else "<html><body><article><h1>Post $g</h1><p>$words</p></article></body></html>")
+        }
+        db.articles().insertNew(listOf(post("paid", true), post("starred", true), post("free", false)))
+        sources.setStarred(idOf("starred"), true)
+        db.sources().setSkipPaidPosts(id, true)
+
+        val built = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals(setOf("Post starred", "Post free"), editions.observeArticles(built.editionId).first().map { it.title }.toSet())
+        val skipped = db.articles().byId(idOf("paid"))!!
+        assertEquals(ArticleState.EXPIRED, skipped.state)
+        assertTrue(skipped.paidOnly)
+        assertEquals(PaidOnlyCount(found = 2, skipped = 1), sources.observePaidOnly(id).first())
+
+        editions.markDelivered(built.editionId)
+        db.sources().setSkipPaidPosts(id, false)
+        db.articles().insertNew(listOf(post("kept", true)))
+        val next = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+        assertEquals(listOf("Post kept"), editions.observeArticles(next.editionId).first().map { it.title })
+        assertTrue(db.articles().byId(idOf("kept"))!!.paidOnly)
+        db.articles().setState(listOf(idOf("kept")), ArticleState.EXPIRED)
+        assertEquals("one let in that then got old wasn't skipped", 1, sources.observePaidOnly(id).first().skipped)
+    }
+
+    /** Marking a skipped paid post unread is asking for it: the next edition takes it. */
+    @Test
+    fun aSkippedPaidPostMarkedUnreadIsntSkippedAgain() = runTest {
+        val (tuned, id, post) = paidSource()
+        db.articles().insertNew(listOf(post("paid", true), post("free", false)))
+        val first = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        assertEquals(ArticleState.EXPIRED, db.articles().byId(idOf("paid"))!!.state)
+
+        db.articles().markUnread(idOf("paid"), clock.instant())
+        assertEquals(0, sources.observePaidOnly(id).first().skipped)
+        val next = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+        assertEquals(listOf("Post paid"), editions.observeArticles(next.editionId).first().map { it.title })
+    }
+
+    /** All that's new being skipped paid posts is nothing new, not a failed edition. */
+    @Test
+    fun anEditionOfOnlySkippedPaidPostsIsNothingNew() = runTest {
+        val (tuned, _, post) = paidSource()
+        db.articles().insertNew(listOf(post("a", true), post("b", true)))
+
+        assertEquals(BuildResult.NothingNew, tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)))
+        assertEquals("no failed edition left behind", 0, db.editions().count())
+    }
+
+    private suspend fun paidSource(): Triple<EditionBuilder, Long, (String, Boolean) -> ArticleEntity> {
+        val http = FakeHttp()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly, onEvidence = sources::recordFullText)
+        val id = sources.addFeed("https://paid.example/feed", "Paid")
+        db.sources().setSkipPaidPosts(id, true)
+        val words = (1..400).joinToString(" ") { "word$it" }
+        val paywall = """<div data-testid="paywall"><h2>Keep reading with a 7-day free trial</h2></div>"""
+        val post = { g: String, paid: Boolean ->
+            ArticleEntity(sourceId = id, guid = g, url = "https://paid.example/$g", title = "Post $g", feedHtml = "<p>A line.</p>").also {
+                http.page(it.url, if (paid) "<html><body><article><h1>Post $g</h1><p>A line.</p></article>$paywall</body></html>" else "<html><body><article><h1>Post $g</h1><p>$words</p></article></body></html>")
+            }
+        }
+        return Triple(EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC), id, post)
     }
 }

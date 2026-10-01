@@ -109,6 +109,13 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
 
     suspend fun setPaused(id: Long, paused: Boolean) = sources.setPaused(id, paused)
 
+    suspend fun setSkipPaidPosts(id: Long, skip: Boolean) = sources.setSkipPaidPosts(id, skip)
+
+    fun observePaidOnly(id: Long): Flow<PaidOnlyCount> = db.articles().observePaidOnly(id)
+
+    /** See [ArticleDao.markPaidOnly]. */
+    suspend fun markPaidOnly(articleId: Long, skip: Boolean) = db.articles().markPaidOnly(articleId, skip)
+
     suspend fun setMaxArticles(id: Long, max: Int?) = sources.setMaxArticles(id, max)
 
     suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int) = sources.stepMaxArticles(id, delta, default, limit)

@@ -794,4 +794,24 @@ class SourceDetailScreenTest {
         assertEquals("the phone's 24-hour setting wins", "Last checked today at 18:02", lastCheckedLine(evening, Locale.US, is24Hour = true, now = later, zone = utc))
         assertEquals("Last checked Sep 27", lastCheckedLine(Instant.parse("2026-09-27T06:02:00Z"), Locale.US, is24Hour = false, now = now, zone = utc))
     }
+
+    /** The paid-posts switch only shows on a source that's had one, and says how many it left out. */
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun aSourceWithPaidPostsCanSkipTheOnesWithNothingFree() {
+        val (id, ids) = sourceWithArticles()
+        show(id)
+        assertFalse("not on a source that's never had one", visible("Skip paid posts"))
+
+        runBlocking { repo.markPaidOnly(ids.getValue("delivered"), skip = false) }
+        idleUntil { compose.waitForIdle(); visible("Skip paid posts with nothing free") }
+        assertTrue(visible("Some of its posts are for paying subscribers"))
+        compose.onNodeWithText("Skip paid posts with nothing free").performClick()
+        idleUntil { runBlocking { db.sources().byId(id)!!.skipPaidPosts } }
+
+        runBlocking { repo.markPaidOnly(ids.getValue("waiting"), skip = true) }
+        idleUntil { compose.waitForIdle(); visible("1 paid post skipped so far") }
+        assertTrue(visible("Skipped: a paid post"))
+        assertEquals(ArticleState.EXPIRED, state(ids.getValue("waiting")))
+    }
 }

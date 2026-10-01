@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleHistory
+import com.app.newspaperss.data.PaidOnlyCount
 import com.app.newspaperss.data.MarkedRead
 import com.app.newspaperss.data.StarBatch
 import com.app.newspaperss.core.plural
@@ -35,6 +36,8 @@ data class SourceDetail(
     val defaultMax: Int,
     /** When each delivered article went out, and which edition holds each one in an unsent edition. */
     val history: Map<Long, ArticleHistory> = emptyMap(),
+    /** Its paid posts with next to nothing free so far, and how many were left out. */
+    val paidOnly: PaidOnlyCount = PaidOnlyCount(0, 0),
 )
 
 /** The tt-rss category chooser: loading, the choices, or why they couldn't be loaded. */
@@ -56,8 +59,10 @@ class SourceDetailViewModel(
 ) : ViewModel() {
     /** Null until loaded. */
     val detail: StateFlow<SourceDetail?> =
-        combine(repository.observe(id), repository.observeRecentArticles(id), defaultMax, repository.observeHistory(id)) { source, articles, max, history ->
-            SourceDetail(source, articles, max, history)
+        combine(
+            repository.observe(id), repository.observeRecentArticles(id), defaultMax, repository.observeHistory(id), repository.observePaidOnly(id),
+        ) { source, articles, max, history, paidOnly ->
+            SourceDetail(source, articles, max, history, paidOnly)
         }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -78,6 +83,10 @@ class SourceDetailViewModel(
     fun togglePaused() {
         val source = detail.value?.source ?: return
         viewModelScope.launch { repository.setPaused(source.id, !source.paused) }
+    }
+
+    fun setSkipPaidPosts(skip: Boolean) {
+        viewModelScope.launch { repository.setSkipPaidPosts(id, skip) }
     }
 
     fun chooseContentMode(mode: ContentMode) {

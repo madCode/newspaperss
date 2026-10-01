@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
@@ -176,5 +176,26 @@ class MigrationTest {
 
     private companion object {
         const val DB = "migration-test.db"
+    }
+
+    @Test
+    fun version5SourcesDontSkipPaidPostsAndNoArticleIsOne() {
+        helper.createDatabase(DB, 5).use { db ->
+            db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt) " +
+                    "VALUES (1, 'FEED', 'https://a.example/feed', 'A', 0, 'AUTO', 0, 0, 0, 1, 0)",
+            )
+            db.execSQL("INSERT INTO articles (id, sourceId, guid, url, title, discoveredAt, state, reportedRead) VALUES (7, 1, 'g', 'https://a.example/1', 'Kept', 0, 'NEW', 0)")
+        }
+
+        helper.runMigrationsAndValidate(DB, 6, true, AppDatabase.MIGRATION_5_6).use { db ->
+            db.query("SELECT skipPaidPosts FROM sources WHERE id = 1").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+            db.query("SELECT paidOnly, paidSkipped, state FROM articles WHERE id = 7").use { c ->
+                c.moveToFirst()
+                assertEquals(0, c.getInt(0))
+                assertEquals(0, c.getInt(1))
+                assertEquals("NEW", c.getString(2))
+            }
+        }
     }
 }

@@ -79,7 +79,8 @@ class EditionBuilder(
         val editionId = db.editions().insert(EditionEntity(title = title, createdAt = clock.instant()))
         // Whatever goes wrong from here, the edition must not stay BUILDING: the Today screen
         // would show it as being made forever. Its articles only change state in the final
-        // transaction, so a failed edition leaves them all for the next one.
+        // transaction, so a failed edition leaves them all for the next one, except paid posts
+        // with nothing free that their source skips: those stay skipped.
         return try {
             // Read only once the edition is BUILDING, which holds off "Mark as read" and unstarring
             // (see ArticleDao.markReadAll): the articles picked here are written into the book, so a
@@ -135,6 +136,7 @@ class EditionBuilder(
             rotation = db.editions().countDelivered(),
         )
         var fetched = 0
+        val tried = mutableListOf<Long>()
         val allowance = ImageAllowance(imageBudgetBytes)
         fun minutesOf(c: ArticleContent) = ReadingTime.minutes(c.wordCount, settings.wordsPerMinute)
         // tt-rss candidates are keyed by publication, so an account-wide cap wouldn't match any of them.
@@ -142,6 +144,7 @@ class EditionBuilder(
         val rules = settings.rules.copy(sourceCaps = caps)
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, rules, { minutesOf(it.second) }) { c ->
             val article = byId.getValue(c.id.toLong())
+            tried += article.id
             val result = try {
                 content.contentFor(article, sourcesById.getValue(article.sourceId), allowance)?.let { article to it }
             } catch (e: CancellationException) {
@@ -155,7 +158,14 @@ class EditionBuilder(
             onProgress(++fetched)
             result
         }
-        if (picked.isEmpty()) return fail(editionId, "None of the articles could be read.")
+        if (picked.isEmpty()) {
+            // Nothing new worth reading isn't a failure: every one was a paid post its source skips.
+            if (db.articles().countPaidSkipped(tried) == tried.size) {
+                db.editions().deleteEmpty(editionId)
+                return BuildResult.NothingNew
+            }
+            return fail(editionId, "None of the articles could be read.")
+        }
 
         // Which articles made it is the planner's call; reading order is the reader's
         // own: sections in the order they first appear, sources in list order within them.
