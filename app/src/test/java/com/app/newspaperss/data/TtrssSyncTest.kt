@@ -527,6 +527,26 @@ class TtrssSyncTest {
         assertEquals(ArticleState.SKIPPED, stateOf(source, "ttrss:10"))
     }
 
+    /** A read-back that fails confirms nothing: the change stays to be checked at the next sync. */
+    @Test
+    fun aChangeWhoseFeedCantBeReadBackIsntTakenAsConfirmed() = runTest {
+        val source = connect()
+        server.add(10, "Read here", feedId = 1, feedTitle = "A Blog")
+        server.add(20, "Other", feedId = 2, feedTitle = "Example News")
+        sync.syncAll()
+        val article = db.articles().allForSource(source.id).single { it.guid == "ttrss:10" }
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(article.id))
+
+        server.brokenFeed = 1
+        sync.syncAll()
+        assertFalse(db.articles().byId(article.id)!!.reportedRead)
+
+        server.brokenFeed = null
+        sync.syncAll()
+        assertTrue(db.articles().byId(article.id)!!.reportedRead)
+        assertEquals(ArticleState.SKIPPED, stateOf(source, "ttrss:10"))
+    }
+
     /** One feed tt-rss can't serve neither makes its articles look read nor stops the others syncing. */
     @Test
     fun aFeedThatFailsToFetchDoesntMakeItsArticlesLookReadOrFailTheSync() = runTest {

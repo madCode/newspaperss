@@ -148,26 +148,23 @@ class FeedSync(
         client.markRead(ids(toRead))
         client.markUnread(ids(toUnread))
 
-        // Waiting here and unread in tt-rss at the last sync: missing from this sync's unread
-        // headlines, it may have been read there. A feed that gave fewer headlines than asked for
-        // gave all its unread, which settles that without asking; any other is asked. Not the
-        // feed list's unread counts: they're a separate request, and may be stale.
+        // Waiting here and unread in tt-rss at the last sync: missing from this sync's few unread
+        // headlines per feed, it may have been read there, or just not be among the newest. Asked,
+        // not inferred: the headlines don't say how many unread a feed has left.
         val unreadNow = fetched.map { it.second.guid }.toSet()
-        val allFetched = fetched.groupingBy { it.first.feedId }.eachCount().filterValues { it < TTRSS_PER_FEED }.keys
-        val (settled, unsure) = articles.waitingUnread(source.id).filter { it.guid !in unreadNow }.partition { it.originId in allFetched }
+        val unsure = articles.waitingUnread(source.id).filter { it.guid !in unreadNow }
         // Read here and unread in this sync's headlines: marked unread in tt-rss since, unless the
         // delivery's own marking landed after the headlines were fetched. Asked again below, with
         // everything else, after the headlines.
         val unreadThere = unreadNow.toList().chunked(500).flatMap { articles.confirmedReadAmong(source.id, it) }
-        val states = client.unreadByGuid(toRead + toUnread + unsure + unreadThere)
-        fun confirmed(refs: List<TtrssRef>, read: Boolean) = refs.map { it.guid }.filter { guid -> states[guid]?.let { it != read } ?: true }
+        val states = client.readStates(toRead + toUnread + unsure + unreadThere)
         // Chunked: SQLite before 3.32 (Android before 11) allows at most 999 query parameters.
-        confirmed(toRead, read = true).chunked(500).forEach { articles.setReportedRead(source.id, it, read = true) }
-        confirmed(toUnread, read = false).chunked(500).forEach { articles.setReportedRead(source.id, it, read = false) }
-        (settled.map { it.guid } + unsure.filter { states[it.guid] == false }.map { it.guid }).chunked(500).forEach { articles.readOnServer(source.id, it) }
+        states.confirmed(toRead, read = true).chunked(500).forEach { articles.setReportedRead(source.id, it, read = true) }
+        states.confirmed(toUnread, read = false).chunked(500).forEach { articles.setReportedRead(source.id, it, read = false) }
+        unsure.filter { states.unread[it.guid] == false }.map { it.guid }.chunked(500).forEach { articles.readOnServer(source.id, it) }
         // Only from this sync's few unread per feed: one marked unread in tt-rss further back waits
         // until it's among them.
-        unreadThere.filter { states[it.guid] == true }.map { it.guid }.chunked(500).forEach { articles.unreadOnServer(source.id, it, now) }
+        unreadThere.filter { states.unread[it.guid] == true }.map { it.guid }.chunked(500).forEach { articles.unreadOnServer(source.id, it, now) }
 
         // A link already delivered (from a feed, or before the account was reconnected) is skipped
         // like any other, and tt-rss is told it's read: otherwise it would sit unread there for good.
