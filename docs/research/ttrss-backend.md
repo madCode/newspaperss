@@ -224,3 +224,86 @@ tt-rss, its old articles (starred ones are kept in Archived, worth checking on t
 reader who's done with a site can unsubscribe in tt-rss; the lifecycle check in section 2 then
 removes it here. If it's added later: on the feed's own page only, below "Leave out", behind a
 dialog that names what goes.
+
+## 4. Recommendation
+
+### What the phone shows today
+
+On a real setup: Sources has the reading list and three rows, one of them tt-rss. The tt-rss
+page has Pause, "Articles from", "Mark as read in tt-rss", "Feeds in your paper · All 58",
+"Back after a break?" and Recent articles. In that list one busy local-news feed takes six of
+the first eleven rows. The planner still gives it one turn in the paper, but the page reads as
+that one feed, and there's nowhere to say "only one a day from this one" or "this one's a teaser".
+
+Three things follow:
+
+- **The Sources list is right as it is.** 58 feeds as rows would turn three rows into sixty.
+  Your gut, "one source", is right *for that screen*.
+- **What's missing is one level down.** Per-feed controls, and a way to see one feed's articles.
+- **"Feeds in your paper" is already the doorway.** It just ends at a checkbox.
+
+### Recommended path
+
+Separate the two questions. In the list, tt-rss stays one source. Underneath, each feed becomes
+a source of its own. Then write-back comes later, one feed at a time.
+
+1. **Feeds become sources, folded under the account (B1, grouped and folded).**
+   "Feeds in your paper" becomes a list of feeds; each opens a page like any feed's: cap,
+   Article text, section, Leave out, its own recent articles. The Sources list doesn't change.
+   This also delivers the backlog's per-feed cap.
+2. **Categories as sections (opt-in).** On the account page: "Use your tt-rss categories as
+   sections". Each feed's section follows its category unless set on the feed. This is the
+   backlog proposal, and with step 1 it's a default rather than a feature.
+3. **Several categories** (backlog) become choosing which feeds are in, by category, on the
+   same list: no separate setting to keep in step.
+4. **Ask when adding (W1)**, for readers with an account. Try it on the phone for a few weeks
+   and see which way you usually answer.
+5. **Move to tt-rss (W2)** if step 4 shows feeds you added here before you'd now want there.
+6. **Not planned:** W3 ("tt-rss is my subscription list") and unsubscribing from here.
+
+The account page after step 1:
+
+```
+Tiny Tiny RSS
+  example.org · Last checked 10:21 PM
+  Articles from            All your unread articles     Change
+  Mark as read in tt-rss                                  [on]
+  Use categories as sections                              [off]
+  Back after a break?                               Start fresh
+
+Feeds in your paper · 54 of 58
+  Local news (busy)          at most 1 · Feed's text        ›
+  A newsletter                                              ›
+  A music blog               left out                       ›
+  …
+Recent articles · 30
+```
+
+### Why this order
+
+- **Step 1 is worth it alone**, with no write-back ever: per-feed controls for the reader the
+  app already serves. It's also what makes write-back lossless later.
+- **The risky part is internal** (the migration and the account/feed split), and it's testable
+  against a real database. The screens change in one place, the account page.
+- **Write-back is reversible as an experiment.** W1 is one choice in one dialog; if it clutters
+  tt-rss, it goes, and nothing else depended on it.
+- **It keeps other servers possible.** "An account whose feeds are sources" fits FreshRSS or
+  Miniflux later, as well as tt-rss. With tt-rss now living on a fork, that's worth keeping open,
+  so step 1 shouldn't build tt-rss into the names it doesn't need to.
+
+### Open questions for you
+
+1. **New feeds in tt-rss:** in the paper straight away (as today), or waiting for you to tick?
+2. **Recent articles on the account page:** keep the mixed list, or group by feed now that each
+   feed has its own page?
+3. **Categories as sections:** off by default, or on when a category tree exists?
+4. **Write-back default:** when adding a feed with an account, "just for the paper" or "in your
+   tt-rss too" first?
+5. **Is a heart (backlog) per article enough "keep this" for tt-rss**, or would you also want
+   "Move to tt-rss" for a feed you came to love in the paper?
+
+### To try on the phone before deciding
+
+- Use "Feeds in your paper" for a week and note each time you wanted to set something on one
+  feed (cap, text, section). If it's rare, step 1 can wait.
+- When you add a site here, note whether you'd have wanted it in tt-rss too. That's W1's answer.
