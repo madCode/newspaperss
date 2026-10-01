@@ -24,7 +24,8 @@ Setup takes a couple of minutes, in four steps:
 
 1. **Where do you read?** Kindle, Kobo, Boox (or another Android e-reader),
    PocketBook, KOReader, or just the file. Each gets a tip on how editions
-   reach it; KOReader asks for a folder that syncs to the device.
+   reach it; KOReader asks for a folder that syncs to the device, and a
+   Kindle can have editions emailed to its own address instead.
 2. **What do you like to read?** Pick sites from starter packs (News,
    Science, Technology, Essays & ideas, Culture & curiosities), paste any
    website, import an OPML file or connect tt-rss. Leaving Pocket or
