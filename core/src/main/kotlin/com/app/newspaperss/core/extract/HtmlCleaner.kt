@@ -1,6 +1,10 @@
 package com.app.newspaperss.core.extract
 
 import com.app.newspaperss.core.ReadingTime
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Comment
 import org.jsoup.nodes.Document
@@ -42,6 +46,7 @@ object HtmlCleaner {
         removeComments(body)
         body.select(REMOVE_TAGS.joinToString(",")).remove()
         removeHidden(body)
+        expandSubstackNotes(body)
         removeScreenReaderOnly(body)
         removeJunk(body)
         removeRelatedLinks(body)
@@ -355,7 +360,79 @@ object HtmlCleaner {
         }
     }
 
+    /**
+     * Substack embeds a Note as an empty element its page script fills in from `data-attrs`. Read
+     * without the script, it's an empty div that goes (its class, "comment", reads as a comments
+     * box, and tt-rss strips classes anyway), leaving the sentence that introduced it hanging. Its
+     * text and author make a quote instead.
+     */
+    private fun expandSubstackNotes(body: Element) {
+        // The last quote placed after each paragraph, so several from one paragraph keep their order.
+        val placedAfter = mutableMapOf<Element, Element>()
+        for (el in body.select("[data-attrs]")) {
+            if (!el.isAttached()) continue
+            val comment = runCatching { Json.parseToJsonElement(el.attr("data-attrs")) as? JsonObject }.getOrNull()?.get("comment") as? JsonObject ?: continue
+            val text = (comment["body"] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+            val quote = Element("blockquote")
+            text.split(NEWLINES).map { it.trim() }.filter { it.isNotEmpty() }.forEach { quote.appendElement("p").text(it) }
+            (comment["name"] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }?.let { quote.appendElement("p").text("— $it") }
+            // A quote can't sit inside a paragraph in XHTML: one embedded in one goes after it.
+            val paragraph = el.parents().firstOrNull { it.tagName() == "p" }
+            if (paragraph != null) {
+                el.remove()
+                (placedAfter[paragraph] ?: paragraph).after(quote)
+                placedAfter[paragraph] = quote
+            } else {
+                el.replaceWith(quote)
+            }
+        }
+    }
+
+    /**
+     * Gets footnote links working again after tt-rss, which strips ids and resolves "#footnote-4"
+     * against the site's address (which may have a path, like a blog's). A footnote's missing target
+     * is found from its other link, the one with the same number whose fragment is named alike
+     * ("footnote-4" and "footnote-anchor-4", "fn1" and "fnref1"), which links back; only short link
+     * texts count, as footnote markers are. A link to this page or its site plus a fragment then
+     * becomes an in-book link, but only when something in the book has that id: otherwise it may be
+     * a real link to the site's front page, and it stays one.
+     */
+    private fun repairFragmentLinks(body: Element, baseUrl: String) {
+        val page = comparable(baseUrl.substringBefore('#'))
+        fun fragmentOf(link: Element): String? {
+            val href = link.attr("href").trim()
+            val hash = href.indexOf('#')
+            if (hash < 0 || hash == href.length - 1) return null
+            val address = comparable(href.substring(0, hash))
+            return if (hash == 0 || page.startsWith(address)) href.substring(hash + 1) else null
+        }
+        val links = body.select("a[href]").mapNotNull { link -> fragmentOf(link)?.let { link to it } }
+        val ids = body.select("[id]").map { it.id() }.toMutableSet()
+        val markers = links.filter { (link, _) -> link.text().trim().length <= FOOTNOTE_MARKER_MAX }
+        val byNumber = markers.groupBy { (_, fragment) -> TRAILING_NUMBER.find(fragment)?.value }
+        for ((link, target) in markers) {
+            if (target in ids) continue
+            val number = TRAILING_NUMBER.find(target)?.value ?: continue
+            val stem = target.removeSuffix(number)
+            val back = byNumber[number].orEmpty().singleOrNull { (other, fragment) ->
+                val otherStem = fragment.removeSuffix(number)
+                other !== link && !other.hasAttr("id") && otherStem != stem && otherStem.commonPrefixWith(stem).length >= STEM_PREFIX_MIN
+            } ?: continue
+            back.first.id(target)
+            ids += target
+        }
+        for ((link, fragment) in links) if (fragment in ids) link.attr("href", "#$fragment")
+    }
+
+    /**
+     * An address with what tt-rss and sites vary dropped: the scheme, "www.", a query and a trailing
+     * slash. Ending in "/", so "blog/" isn't taken as the start of "blog-2/".
+     */
+    private fun comparable(url: String): String =
+        url.trim().substringAfter("://").removePrefix("www.").substringBefore('?').trimEnd('/') + "/"
+
     private fun fixLinks(body: Element, baseUrl: String) {
+        repairFragmentLinks(body, baseUrl)
         val ids = mutableMapOf<String, String>()
         for (el in body.select("[id]")) {
             val old = el.id()
@@ -529,6 +606,10 @@ object HtmlCleaner {
     private val HTML_TAG = Regex("<\\s*[a-zA-Z!/]")
     private val WHITESPACE = Regex("\\s+")
     private val BLANK_LINE = Regex("\\n\\s*\\n")
+    private val NEWLINES = Regex("\\n+")
+    private val TRAILING_NUMBER = Regex("\\d+$")
+    private const val FOOTNOTE_MARKER_MAX = 4
+    private const val STEM_PREFIX_MIN = 2
     private val TOKEN_SEPARATOR = Regex("[\\s_\\-]+")
     private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
     private val INVALID_ID_CHARS = Regex("[^A-Za-z0-9_.\\-]")

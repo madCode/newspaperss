@@ -215,12 +215,13 @@ class EpubWriterTest {
         val nav = epub.navHrefs()
         assertEquals(nav, epub.ncxHrefs())
         val articleHrefs = epub.articleHrefs()
-        // Every entry after Contents is in reading order: a section opens at its first article.
-        assertEquals(articleHrefs, nav.drop(1).distinct())
-        assertEquals(nav.drop(1), nav.drop(1).sortedBy { articleHrefs.indexOf(it) })
+        // Every entry after Contents is in reading order: a section opens at its first article, and the
+        // closing page is a chapter of its own, last.
+        assertEquals(articleHrefs + "end.xhtml", nav.drop(1).distinct())
+        assertEquals(nav.drop(1), nav.drop(1).sortedBy { (articleHrefs + "end.xhtml").indexOf(it) })
 
         val labels = epub.xml("OEBPS/toc.ncx").elements("text").drop(1).map { it.textContent } // skip docTitle
-        assertEquals(listOf("Contents", "Lead story", "World", "W1", "W2", "Science", "S1"), labels)
+        assertEquals(listOf("Contents", "Lead story", "World", "W1", "W2", "Science", "S1", "That's all for today"), labels)
     }
 
     @Test
@@ -235,7 +236,7 @@ class EpubWriterTest {
         val topLevel = (tocNav.elements("ol").first().childNodes).let { nodes ->
             (0 until nodes.length).map { nodes.item(it) }.filterIsInstance<Element>()
         }
-        assertEquals(listOf("Contents", "World", "Loose"), topLevel.map { it.elements("a").first().textContent })
+        assertEquals(listOf("Contents", "World", "Loose", "That's all for today"), topLevel.map { it.elements("a").first().textContent })
         assertEquals(listOf("World", "W1", "W2"), topLevel[1].elements("a").map { it.textContent })
 
         val ncx = epub.xml("OEBPS/toc.ncx")
@@ -244,7 +245,7 @@ class EpubWriterTest {
         assertEquals("2", ncx.elements("meta").single { it.getAttribute("name") == "dtb:depth" }.getAttribute("content"))
         // "World" and W1 open the same page, so they share a playOrder.
         val playOrders = ncx.elements("navPoint").map { it.getAttribute("playOrder").toInt() }
-        assertEquals(listOf(1, 2, 2, 3, 4), playOrders)
+        assertEquals(listOf(1, 2, 2, 3, 4, 5), playOrders)
     }
 
     @Test
@@ -316,7 +317,7 @@ class EpubWriterTest {
             unsectioned(
                 article(
                     title = "First", source = "Alpha", author = "Ada Lovelace", published = LocalDate.of(2026, 9, 28),
-                    minutes = 4.6, note = "Couldn't fetch the full article; showing the feed's version",
+                    minutes = 6.6, note = "Couldn't fetch the full article; showing the feed's version",
                     url = "https://example.com/first",
                 ),
                 article(title = "Second", url = "https://example.com/second"),
@@ -326,7 +327,7 @@ class EpubWriterTest {
         val page = epub.xml("OEBPS/$first")
         val paragraphs = page.elements("p").associateBy { it.getAttribute("class") }
         assertEquals("Alpha", paragraphs.getValue("kicker").textContent)
-        assertEquals("By Ada Lovelace · Sep 28, 2026 · 5 min read", paragraphs.getValue("byline").textContent)
+        assertEquals("By Ada Lovelace · Sep 28, 2026 · 7 min read", paragraphs.getValue("byline").textContent)
         assertEquals("Couldn't fetch the full article; showing the feed's version", paragraphs.getValue("note").textContent)
         val original = paragraphs.getValue("source-link").elements("a").single()
         assertEquals("https://example.com/first", original.getAttribute("href"))
@@ -360,7 +361,7 @@ class EpubWriterTest {
     fun blankTitlesGetAPlaceholder() {
         val epub = write(unsectioned(article(title = "  ")))
         assertEquals("Article 1", epub.xml("OEBPS/" + epub.articleHrefs().single()).elements("h1").single().textContent)
-        assertEquals("Article 1", epub.xml("OEBPS/toc.ncx").elements("text").last().textContent)
+        assertEquals("Article 1", epub.xml("OEBPS/toc.ncx").elements("text").dropLast(1).last().textContent)
     }
 
     @Test
@@ -386,7 +387,7 @@ class EpubWriterTest {
         assertEquals(nasty, epub.xml("OEBPS/$articleHref").elements("h1").single().textContent)
         assertEquals(nasty, epub.xml("OEBPS/$articleHref").elements("title").single().textContent)
         assertTrue(epub.xml("OEBPS/$articleHref").elements("p").first().textContent.startsWith(nasty))
-        assertEquals(listOf("Contents", nasty, nasty), epub.xml("OEBPS/toc.ncx").elements("text").drop(1).map { it.textContent })
+        assertEquals(listOf("Contents", nasty, nasty, "That's all for today"), epub.xml("OEBPS/toc.ncx").elements("text").drop(1).map { it.textContent })
         assertTrue(epub.xml("OEBPS/nav.xhtml").elements("a").any { it.textContent == nasty })
         assertTrue(epub.xml("OEBPS/cover.xhtml").documentElement.textContent.contains(nasty))
         assertTrue(epub.xml("OEBPS/contents.xhtml").elements("h2").single().textContent.startsWith(nasty))
@@ -675,7 +676,7 @@ class EpubWriterTest {
     fun theKickerNamesTheSectionAndTheNextLinkTheSourceAndTime() {
         val epub = write(
             doc(
-                EditionSection("Long reads", listOf(article(source = "Aeon"), article(title = "Second", source = "Quanta", minutes = 9.0))),
+                EditionSection("Long reads", listOf(article(source = "Aeon", minutes = 12.0), article(title = "Second", source = "Quanta", minutes = 9.0))),
                 EditionSection(null, listOf(article(source = "Loose"))),
             ),
         )
@@ -684,6 +685,30 @@ class EpubWriterTest {
         assertEquals("Loose", pages[2].getValue("kicker").textContent)
         assertEquals("Next: Second · Quanta · 9 min", pages[0].getValue("article-nav").textContent)
         assertEquals("Second", pages[0].getValue("article-nav").elements("a").single().textContent)
+    }
+
+    /** A long read ends with a pause naming the next; after a short one, turning the page is enough. */
+    @Test
+    fun onlyALongReadIsFollowedByTheNextArticlesName() {
+        val epub = write(
+            unsectioned(
+                article(title = "Short", minutes = EpubWriter.NEXT_AFTER_MINUTES - 0.5),
+                article(title = "Long", minutes = EpubWriter.NEXT_AFTER_MINUTES),
+                article(title = "After"),
+            ),
+        )
+        val classes = epub.articleHrefs().map { href -> epub.xml("OEBPS/$href").elements("p").map { it.getAttribute("class") } }
+        assertFalse("article-nav" in classes[0])
+        assertTrue("article-nav" in classes[1])
+    }
+
+    /** The closing page is in the contents, so the wrap-up can be reached from it. */
+    @Test
+    fun theClosingPageIsAChapterAndABackmatterLandmark() {
+        val epub = write(unsectioned(article(title = "Only")))
+        assertEquals("end.xhtml", epub.navHrefs().last())
+        val landmarks = epub.xml("OEBPS/nav.xhtml").elements("nav").single { it.getAttributeNS(EPUB_NS, "type") == "landmarks" }
+        assertTrue(landmarks.elements("a").any { it.getAttributeNS(EPUB_NS, "type") == "backmatter" && it.getAttribute("href") == "end.xhtml" })
     }
 
     @Test

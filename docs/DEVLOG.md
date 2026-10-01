@@ -14,6 +14,10 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
+### Cycle 68: what reading an edition on the Kindle turned up (20:10–21:00)
+- **From you:** a quote missing after "…from *South Park*:", footnotes that don't work, "Next" feeling unneeded between short articles, and the closing page hard to reach.
+- **Found:** the quote was a Substack Note, an embed the page fills in with script, dropped as an empty "comment" box. Footnotes broke in tt-rss, which strips ids and points "#footnote-4" at the site's address.
+- **Shipped:** Notes become quotes with their author (from Substack's feed; tt-rss strips their text, now in the backlog), footnotes are paired up again by number so they work, "Next" only after reads of 5 minutes or more, and "That's all for today" is a chapter in the contents.
 ### Cycle 67: read and unread in step with tt-rss (19:00–19:45)
 - **From you:** the newest change should win, checked by reading back from tt-rss; a star here should win over a read in tt-rss (your tt-rss marks read on opening); one switch, "Sync read status with tt-rss".
 - **Shipped:** each sync sends the app's changes, reads them back, then brings in what changed in tt-rss: read there while waiting here leaves the paper, unread there after it went out comes back. Stars and unsent editions aren't touched. Off, nothing flows either way.

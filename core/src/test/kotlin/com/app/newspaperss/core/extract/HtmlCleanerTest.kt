@@ -12,6 +12,78 @@ class HtmlCleanerTest {
     private fun clean(html: String, title: String? = null) = HtmlCleaner.clean(html, base, title).html
     private val longText = "word ".repeat(100)
 
+    /** A Substack Note is filled in by the page's script; without it the sentence introducing it would hang. */
+    @Test
+    fun aSubstackNoteBecomesAQuoteWithItsAuthor() {
+        val attrs = """{"url":"https://open.substack.com/","comment":{"id":1,"body":"Quixote vomits in Sancho's face \"more vigorously than if he were firing a musket.\"","name":"Lincoln Michel"}}"""
+            .replace("\"", "&quot;")
+        val note = """<p>gross-out comedy you might expect from <em>South Park</em>:</p>"""
+        // As the feed has it, and as tt-rss passes it on, with the class stripped.
+        for (embed in listOf("""<div class="comment" data-attrs="$attrs"></div>""", """<div data-attrs="$attrs"></div>""")) {
+            val html = clean("$note$embed<p>$longText</p>")
+            assertTrue(html, html.contains("<blockquote><p>Quixote vomits in Sancho's face \"more vigorously than if he were firing a musket.\"</p><p>— Lincoln Michel</p></blockquote>"))
+        }
+        assertFalse("other data-attrs are left alone", clean("""<div data-attrs="{&quot;src&quot;:&quot;x&quot;}"></div><p>$longText</p>""").contains("blockquote"))
+        assertFalse("a hidden one stays hidden", clean("""<div hidden data-attrs="$attrs"></div><p>$longText</p>""").contains("blockquote"))
+        val second = attrs.replace("Lincoln Michel", "Someone Else")
+        val inline = clean("""<p>As I wrote: <span data-attrs="$attrs"></span> and <span data-attrs="$second"></span></p><p>$longText</p>""")
+        assertTrue("a quote can't sit inside a paragraph", inline.contains("</p><blockquote>"))
+        assertTrue("several keep their order", inline.indexOf("Lincoln Michel") < inline.indexOf("Someone Else"))
+    }
+
+    /** tt-rss strips ids and resolves "#footnote-4" against the site; the book's footnotes must still work. */
+    @Test
+    fun footnotesSurviveTtrssStrippingTheirIdsAndResolvingTheirLinks() {
+        val html = clean(
+            """<p>Like Shakespeare.<a href="https://example.com#footnote-4">4</a> Quite true.</p>
+               <p>$longText</p>
+               <div><a href="https://example.com#footnote-anchor-4">4</a><div><p>The note itself.</p></div></div>""",
+        )
+        val doc = Jsoup.parse(html)
+        val forward = doc.select("a[href=#footnote-4]").single()
+        assertEquals("footnote-anchor-4", forward.id())
+        val back = doc.select("a[href=#footnote-anchor-4]").single()
+        assertEquals("footnote-4", back.id())
+    }
+
+    @Test
+    fun aLinkToThisPagePlusAFragmentBecomesAnInBookLink() {
+        val html = clean("""<p id="part-two">Part two.</p><p><a href="$base#part-two">back to part two</a> $longText</p>""")
+        assertTrue(html, html.contains("""<a href="#part-two">back to part two</a>"""))
+        val tracked = HtmlCleaner.clean("""<p id="part-two">Part two.</p><p><a href="$base#part-two">back</a> $longText</p>""", "$base?utm_source=rss", null).html
+        assertTrue("a tracking query on the page's address doesn't matter", tracked.contains("""<a href="#part-two">back</a>"""))
+    }
+
+    @Test
+    fun aFootnoteIsntPairedWithAnUnrelatedNumberedLink() {
+        // A numbered contents entry beside a footnote whose back-link is long: no pair to make.
+        val html = clean(
+            """<p><a href="https://example.com#part-1">1</a> Part one. Text.<a href="https://example.com#fn-1">1</a></p>
+               <p>$longText</p><p id="part-1">Part one</p><p>The note. <a href="https://example.com#fnref-1">Back to the text</a></p>""",
+        )
+        val doc = Jsoup.parse(html)
+        assertEquals("the contents entry still finds its part", "#part-1", doc.select("a").first()!!.attr("href"))
+        assertTrue("and isn't given the footnote's id", doc.select("#fn-1").isEmpty())
+    }
+
+    @Test
+    fun aSiteUnderAPathCountsAsTheArticlesOwn() {
+        val html = HtmlCleaner.clean(
+            """<p>Text.<a href="http://blog.example.com/notes/#footnote-1">1</a></p><p>$longText</p>
+               <div><a href="http://blog.example.com/notes/#footnote-anchor-1">1</a> The note.</div>""",
+            "https://www.blog.example.com/notes/2026/a-post", null,
+        ).html
+        assertTrue(html, html.contains("""href="#footnote-1""""))
+        assertTrue(html, html.contains("""id="footnote-1""""))
+    }
+
+    /** With nothing in the book to land on, a link to the site's front page stays one. */
+    @Test
+    fun aLinkToTheSitesFrontPageWithAFragmentStaysALink() {
+        val html = clean("""<p><a href="https://example.com/#subscribe">Subscribe to the newsletter</a> $longText</p>""")
+        assertTrue(html, html.contains("""href="https://example.com/#subscribe""""))
+    }
+
     @Test
     fun plainTextBecomesParagraphs() {
         assertEquals("<p>first para still first</p><p>second &lt;3</p>", clean("first para\nstill first\n\nsecond <3"))
