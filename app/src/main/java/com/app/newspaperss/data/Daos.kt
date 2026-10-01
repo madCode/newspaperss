@@ -220,7 +220,8 @@ interface ArticleDao {
 
     /**
      * What a source's page says happened to its articles: when a delivered one's link went out,
-     * and which unsent edition holds one that's in an edition.
+     * and which unsent edition holds one that's in an edition. An article can sit in two unsent
+     * editions (see [release]); the newest is named.
      */
     @Query(
         """SELECT a.id AS articleId, d.deliveredAt AS sentAt, NULL AS editionTitle
@@ -229,7 +230,10 @@ interface ArticleDao {
            UNION ALL
            SELECT ea.articleId AS articleId, NULL AS sentAt, e.title AS editionTitle
            FROM edition_articles ea JOIN editions e ON e.id = ea.editionId JOIN articles a ON a.id = ea.articleId
-           WHERE a.sourceId = :sourceId AND a.state = 'IN_EDITION' AND e.status IN ('READY', 'BUILDING')""",
+           WHERE a.sourceId = :sourceId AND a.state = 'IN_EDITION' AND e.status IN ('READY', 'BUILDING')
+             AND e.id = (SELECT e2.id FROM edition_articles ea2 JOIN editions e2 ON e2.id = ea2.editionId
+                         WHERE ea2.articleId = ea.articleId AND e2.status IN ('READY', 'BUILDING')
+                         ORDER BY e2.createdAt DESC, e2.id DESC LIMIT 1)""",
     )
     fun observeHistory(sourceId: Long): Flow<List<ArticleHistory>>
 

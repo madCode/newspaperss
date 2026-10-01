@@ -252,6 +252,19 @@ class EditionBuilderTest {
         assertNull(sent.editionTitle)
     }
 
+    /** Starred from a sent edition that's then marked not sent, an article is in two unsent ones: name the newer. */
+    @Test
+    fun anArticleInTwoUnsentEditionsNamesTheNewer() = runTest {
+        val id = source("a", null, "a1")
+        val first = builder.build(EditionSettings()) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        editions.setStarred(idOf("a1"), true)
+        val second = builder.build(EditionSettings()) as BuildResult.Built
+        assertTrue(editions.markNotSent(first.editionId))
+
+        assertEquals(db.editions().byId(second.editionId)!!.title, sources.observeHistory(id).first().getValue(idOf("a1")).editionTitle)
+    }
+
     @Test
     fun articlesAreOnlyUsedUpOnceDelivered() = runTest {
         source("a", null, "a1")

@@ -20,7 +20,7 @@ class HistoryLineTest {
     )
 
     private fun line(article: ArticleEntity, history: ArticleHistory? = null, expires: Boolean = true) =
-        historyLine(article, history, expires, now, ZoneOffset.UTC, Locale.ENGLISH)
+        historyLine(article, history, expires, now = now, zone = ZoneOffset.UTC, locale = Locale.ENGLISH)
 
     /** Days left count down the week a waiting article has, so the reader can star it before it goes. */
     @Test
@@ -36,6 +36,12 @@ class HistoryLineTest {
     fun aStarIsTheNextEditionWhateverElseHappened() {
         assertEquals("In your next edition", line(article(ArticleState.DELIVERED, starred = true)))
         assertEquals("In your next edition", line(article(ArticleState.NEW, starred = true)))
+    }
+
+    /** Editions leave paused sources out, so a star there mustn't promise the next one. */
+    @Test
+    fun aStarOnAPausedSourceWaits() {
+        assertEquals("Starred, source paused", historyLine(article(ArticleState.NEW, starred = true), null, expires = true, paused = true, now = now))
     }
 
     @Test

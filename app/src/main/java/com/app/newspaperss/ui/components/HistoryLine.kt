@@ -15,17 +15,21 @@ import java.util.Locale
 /**
  * The few words under an article's title saying what has happened to it: waiting (and for how
  * long more, if it [expires]), in the next edition, in an unsent edition, sent when, read, or not
- * picked. [history] names the day it went out or the edition holding it, where known.
+ * picked. [history] names the day it went out or the edition holding it, where known. A star on
+ * a [paused] source's article waits, since editions leave paused sources out.
  */
 fun historyLine(
     article: ArticleEntity,
     history: ArticleHistory?,
     expires: Boolean,
+    paused: Boolean = false,
     now: Instant = Instant.now(),
     zone: ZoneId = ZoneId.systemDefault(),
     locale: Locale = Locale.getDefault(),
 ): String {
-    if (article.starredAt != null && article.state != ArticleState.IN_EDITION) return "In your next edition"
+    if (article.starredAt != null && article.state != ArticleState.IN_EDITION) {
+        return if (paused) "Starred, source paused" else "In your next edition"
+    }
     return when (article.state) {
         ArticleState.NEW -> if (expires) "Waiting, ${timeLeft(article.discoveredAt, now)}" else "Waiting"
         ArticleState.IN_EDITION -> editionDay(history?.editionTitle)?.let { "In $it's edition" } ?: "In an unsent edition"
@@ -47,14 +51,14 @@ private fun timeLeft(discoveredAt: Instant, now: Instant): String {
 private fun editionDay(title: String?): String? =
     title?.substringBefore(' ')?.takeIf { word -> DayOfWeek.entries.any { it.getDisplayName(TextStyle.FULL, Locale.ENGLISH) == word } }
 
-/** "today", "yesterday", a weekday within the last week, else a short date. */
+/** "today", "yesterday", a weekday within the last week, else a short date. The weekday is English, like the rest of the line. */
 private fun dayOf(at: Instant, now: Instant, zone: ZoneId, locale: Locale): String {
     val date = at.atZone(zone).toLocalDate()
     val today = now.atZone(zone).toLocalDate()
     return when {
         date == today -> "today"
         date == today.minusDays(1) -> "yesterday"
-        date.isAfter(today.minusDays(7)) -> date.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
+        date.isAfter(today.minusDays(7)) -> date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
         else -> DateTimeFormatter.ofPattern("MMM d", locale).format(date)
     }
 }

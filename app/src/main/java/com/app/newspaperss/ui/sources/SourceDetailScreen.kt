@@ -240,7 +240,13 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 items(articles, key = { it.id }) { article ->
                     RecentArticle(
                         article,
-                        historyLine(article, detail?.history?.get(article.id), expires = source.kind != SourceKind.READING_LIST),
+                        historyLine(
+                            article,
+                            detail?.history?.get(article.id),
+                            // A curated list expires by count (its newest 12), so no day count there.
+                            expires = source.kind == SourceKind.FEED || source.kind == SourceKind.TTRSS,
+                            paused = source.paused,
+                        ),
                         locale,
                         building,
                         selection = if (selecting) article.id in selected else null,
