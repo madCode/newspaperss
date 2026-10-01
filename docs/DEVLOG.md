@@ -14,6 +14,10 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
+### Cycle 69: read rows step back (21:50–22:05)
+- **From you:** after the read/unread mockups ([#111](https://github.com/madCode/newspaperss/issues/111)), dim the rows already read.
+- **Shipped:** on a source's page, read, delivered and too-old titles are dimmed, lighter in weight as well as colour so it shows on e-ink. Starred ones stay full strength.
+
 ### Cycle 68: what reading an edition on the Kindle turned up (20:10–21:00)
 - **From you:** a quote missing after "…from *South Park*:", footnotes that don't work, "Next" feeling unneeded between short articles, and the closing page hard to reach.
 - **Found:** the quote was a Substack Note, an embed the page fills in with script, dropped as an empty "comment" box. Footnotes broke in tt-rss, which strips ids and points "#footnote-4" at the site's address.
