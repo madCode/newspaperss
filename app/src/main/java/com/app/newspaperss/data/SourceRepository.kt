@@ -11,6 +11,7 @@ import com.app.newspaperss.core.lists.CuratedLists
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -45,6 +46,9 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
 
     /** The source's newest articles, newest first, whatever their state. */
     fun observeRecentArticles(id: Long, limit: Int = 30): Flow<List<ArticleEntity>> = db.articles().observeRecentForSource(id, limit)
+
+    /** See [ArticleDao.observeHistory], by article. */
+    fun observeHistory(id: Long): Flow<Map<Long, ArticleHistory>> = db.articles().observeHistory(id).map { rows -> rows.associateBy { it.articleId } }
 
     /**
      * An aggregator's feeds seen in the last month, by name, and every left-out one: a feed outside

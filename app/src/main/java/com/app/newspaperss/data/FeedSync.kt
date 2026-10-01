@@ -36,7 +36,7 @@ class FeedSync(
     private val http: HttpClient,
     private val clock: Clock = Clock.systemUTC(),
     /** Unpicked feed articles older than this expire, so there's never a backlog to feel behind on. */
-    private val keepFor: Duration = Duration.ofDays(7),
+    private val keepFor: Duration = KEEP_WAITING,
     private val ttrssAccounts: TtrssAccountStore? = null,
     /** How many unpicked links a curated list keeps; older ones expire as new ones arrive. */
     private val listKeep: Int = 12,
@@ -275,6 +275,9 @@ class FeedSync(
 
     companion object {
         private val UNTITLED_LOOKUP_FOR: Duration = Duration.ofDays(2)
+
+        /** How long an unpicked article waits, from when it was found, before it expires. */
+        val KEEP_WAITING: Duration = Duration.ofDays(7)
 
         const val LIST_LAYOUT_CHANGED =
             "This page has changed its layout, so newspapeRSS can't tell which links are new and took none. An app update should fix it."

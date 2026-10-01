@@ -2,6 +2,7 @@ package com.app.newspaperss.ui.readinglist
 
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.ReadingTime
+import com.app.newspaperss.ui.components.historyLine
 import androidx.compose.foundation.clickable
 import android.net.Uri
 import android.app.Activity
@@ -55,7 +56,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.data.ArticleEntity
-import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.SourceRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -164,12 +164,8 @@ private fun AddLink(viewModel: ReadingListViewModel) {
 
 @Composable
 private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
-    val status = if (article.starredAt != null && article.state != ArticleState.IN_EDITION) "Starred for your next edition" else when (article.state) {
-        ArticleState.NEW -> "Waiting for an edition"
-        ArticleState.IN_EDITION -> "In an edition you haven't sent yet"
-        ArticleState.DELIVERED -> "Delivered"
-        ArticleState.SKIPPED, ArticleState.EXPIRED -> "Skipped"
-    }
+    // Saved links never expire, so no days left.
+    val status = historyLine(article, history = null, expires = false)
     val context = LocalContext.current
     val site = listOfNotNull(
         // An untitled row's stand-in title already names the site.

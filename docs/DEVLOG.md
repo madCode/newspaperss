@@ -12,6 +12,12 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
+## Day 4 · Thu 1 Oct
+
+### Cycle 70: each article says where it stands
+- **From you:** option B's plain lines from the read/unread mockups ([#111](https://github.com/madCode/newspaperss/issues/111)), with days left on waiting ones.
+- **Shipped:** a source's rows end with "Waiting, 3 days left", "In your next edition", "In Thursday's edition", "Sent Wednesday", "Read" or "Not picked". The reading list uses the same words, without days left.
+
 ## Day 3 · Wed 30 Sep
 
 ### Cycle 69: read rows step back (21:50–22:05)

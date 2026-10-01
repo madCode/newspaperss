@@ -235,6 +235,36 @@ class EditionBuilderTest {
         assertTrue(d !in db.editions().lastFeatured().map { it.sourceId })
     }
 
+    /** A source's page names the edition holding an article, then the day it went out. */
+    @Test
+    fun anArticlesHistoryNamesItsUnsentEditionThenWhenItWentOut() = runTest {
+        val id = source("a", null, "a1")
+        val built = builder.build(EditionSettings()) as BuildResult.Built
+        val title = db.editions().byId(built.editionId)!!.title
+
+        val planned = sources.observeHistory(id).first().getValue(idOf("a1"))
+        assertEquals(title, planned.editionTitle)
+        assertNull(planned.sentAt)
+
+        editions.markDelivered(built.editionId)
+        val sent = sources.observeHistory(id).first().getValue(idOf("a1"))
+        assertEquals(clock.instant(), sent.sentAt)
+        assertNull(sent.editionTitle)
+    }
+
+    /** Starred from a sent edition that's then marked not sent, an article is in two unsent ones: name the newer. */
+    @Test
+    fun anArticleInTwoUnsentEditionsNamesTheNewer() = runTest {
+        val id = source("a", null, "a1")
+        val first = builder.build(EditionSettings()) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        editions.setStarred(idOf("a1"), true)
+        val second = builder.build(EditionSettings()) as BuildResult.Built
+        assertTrue(editions.markNotSent(first.editionId))
+
+        assertEquals(db.editions().byId(second.editionId)!!.title, sources.observeHistory(id).first().getValue(idOf("a1")).editionTitle)
+    }
+
     @Test
     fun articlesAreOnlyUsedUpOnceDelivered() = runTest {
         source("a", null, "a1")
