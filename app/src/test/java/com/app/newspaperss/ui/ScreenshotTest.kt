@@ -61,7 +61,11 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * Renders each main screen with real graphics. It catches screens that crash
@@ -175,7 +179,7 @@ class ScreenshotTest {
         shoot("06-sources", ready = { vm.rows.value?.isNotEmpty() == true }) { SourcesScreen(vm) }
     }
 
-    /** A source with a row in each state the design shows: waiting, starred, marked read, in an unsent edition, delivered, got old. */
+    /** A source with a row in each state the design shows: waiting, starred, marked read, in an unsent edition, delivered (two days ago), got old. */
     private fun sourceWithArticles(): SourceDetailViewModel {
         val repo = SourceRepository(db)
         val id = runBlocking {
@@ -193,7 +197,11 @@ class ScreenshotTest {
             repo.setStarred(ids[1], true)
             db.articles().setState(listOf(ids[2]), ArticleState.SKIPPED)
             db.articles().setState(listOf(ids[3]), ArticleState.IN_EDITION)
+            val today = LocalDate.now().dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+            val edition = db.editions().insert(EditionEntity(title = "$today Morning Edition", status = EditionStatus.READY))
+            db.editions().insertArticles(listOf(EditionArticleEntity(editionId = edition, articleId = ids[3], position = 0, title = titles[3], sourceTitle = "The Guardian: World", minutes = 6.0)))
             db.articles().setState(listOf(ids[4]), ArticleState.DELIVERED)
+            db.articles().rememberDelivered(listOf(ids[4]), Instant.now().minus(Duration.ofDays(2)))
             db.articles().setState(listOf(ids[5]), ArticleState.EXPIRED)
             db.sources().recordSuccess(id, Instant.now(), null, "https://www.theguardian.com", "")
             db.sources().setFullText(id, ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3, null)
