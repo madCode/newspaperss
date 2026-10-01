@@ -686,7 +686,18 @@ private fun RecentArticle(
                 ReadToggle(title, article, onToggleRead)
             }
         },
-        title = { Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium) },
+        title = {
+            // Lighter weight as well as colour: on e-ink a muted colour alone can be hard to tell apart.
+            val done = looksRead(article)
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = if (done) FontWeight.Normal else FontWeight.Medium,
+                color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+            )
+        },
         details = { Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         // Nothing to change on an article already in an unsent edition: it's going out. Its slot
         // stays empty so the titles line up.
@@ -699,6 +710,10 @@ private fun RecentArticle(
 
 /** A star counts unless the article is already in an unsent edition, where it can't change. */
 private fun isStarred(article: ArticleEntity) = article.starredAt != null && article.state != ArticleState.IN_EDITION
+
+/** Dimmed in the list: read, delivered or too old, so what's still to come stands out. Not if starred: it's going out again. */
+internal fun looksRead(article: ArticleEntity): Boolean =
+    article.state in setOf(ArticleState.SKIPPED, ArticleState.DELIVERED, ArticleState.EXPIRED) && article.starredAt == null
 
 /**
  * The read toggle: the article's status mark, which marks a waiting article read and brings back

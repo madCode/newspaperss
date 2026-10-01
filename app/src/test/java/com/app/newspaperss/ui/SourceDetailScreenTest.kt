@@ -60,6 +60,7 @@ import com.app.newspaperss.ui.sources.HELD_NOTICE
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.failingLine
 import com.app.newspaperss.ui.sources.lastCheckedLine
+import com.app.newspaperss.ui.sources.looksRead
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -350,6 +351,18 @@ class SourceDetailScreenTest {
 
         star("Article delivered").performClick()
         settle { runBlocking { db.articles().byId(ids.getValue("delivered"))!!.starredAt } == null }
+    }
+
+    /** Read rows are dimmed so what's still to come stands out; a star brings one back to full strength. */
+    @Test
+    fun readDeliveredAndExpiredRowsLookReadUnlessStarred() {
+        fun article(state: ArticleState, starred: Boolean = false) =
+            ArticleEntity(sourceId = 1, guid = "g", url = "https://example.com", title = "t", state = state, starredAt = if (starred) Instant.now() else null)
+        assertEquals(
+            listOf(false, false, true, true, true),
+            listOf(ArticleState.NEW, ArticleState.IN_EDITION, ArticleState.SKIPPED, ArticleState.DELIVERED, ArticleState.EXPIRED).map { looksRead(article(it)) },
+        )
+        assertFalse("starred again, it's going out", looksRead(article(ArticleState.DELIVERED, starred = true)))
     }
 
     @Test

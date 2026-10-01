@@ -333,6 +333,9 @@ allowed to read that edition's file until the phone restarts.
     turns into **★** on an outlined disc.
   A row already in an unsent edition can't change: its mark doesn't
   respond, and it has no star but keeps the slot so titles line up.
+  Read, delivered and too-old rows have a dimmed title, in a lighter weight
+  as well as a muted colour so it shows on e-ink, so what's still to come
+  stands out. A starred one isn't dimmed: it's going out again.
   - **Select** (or pressing and holding a row) enters selection mode:
     checkboxes take the status marks' place, the top bar says "N
     selected", and a bar at the bottom has **☆ Next edition** and
