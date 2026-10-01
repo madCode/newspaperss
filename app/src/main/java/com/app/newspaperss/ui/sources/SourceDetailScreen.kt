@@ -488,7 +488,7 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
             )
             Text(
                 if (own == null) "Your edition setting. Choose fewer or more to give this site a firm limit."
-                else "Your edition setting: ${plural(default, "article")} from each site, then more if there's room",
+                else "Your edition setting: ${plural(default, "article")} from each source, then more if there's room",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
