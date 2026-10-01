@@ -37,7 +37,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
-- [ ] Decide what tt-rss is as a source *(you asked; sitting with it for a week first)*. Is it one source by itself, as now, or a doorway to the feeds underneath it, each with its own controls? Your gut says the current simple approach is best. The per-feed cap below and "tt-rss categories as sections" in the proposals depend on the answer
+- [ ] Decide what tt-rss is as a source *(you asked; sitting with it for a week first)*. Is it one source by itself, as now, or a doorway to the feeds underneath it, each with its own controls? Your gut says the current simple approach is best. The per-feed cap below and "tt-rss categories as sections" in the proposals depend on the answer. Options, trade-offs and a recommendation: [research/ttrss-backend.md](research/ttrss-backend.md)
 - [ ] Per-feed cap on the tt-rss source page ("two from Current Affairs"); leaving a feed out is done
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] A heart for "loved this / keep it", synced to tt-rss *(you asked)*. The ☆ stays "put it in my next edition": two different wishes, and tt-rss's own star already means "keep" (which is why its stars aren't synced as ☆ today). Things to settle first:
