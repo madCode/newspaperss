@@ -397,5 +397,37 @@ class ArticleExtractorTest {
         assertNull(post.note)
         assertNull(post.siteName)
     }
-}
 
+    private fun paywalledPage(words: Int, marker: String = """<script type="application/ld+json">{"@type":"NewsArticle","isAccessibleForFree":false}</script>""") =
+        page("<html><head><title>The Quiet Joy of Reading Slowly</title>$marker</head><body><article><h1>The Quiet Joy of Reading Slowly</h1>" +
+            "<p>${sentence.repeat(words / 16 + 1)}</p></article></body></html>")
+
+    /** A paid post's free part says so, and with next to nothing free it's flagged for the source's skip setting. */
+    @Test
+    fun aPaywalledPageIsThePaidPostsFreePart() = runTest {
+        val preview = ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(200)))).extract(input(teaser))
+        assertTrue(preview.paidPost)
+        assertEquals(ArticleExtractor.PAID_NOTE, preview.note)
+        assertFalse(preview.nothingFree)
+        val ghost = """<div class="gh-post-upgrade-cta"><h2>This post is for paying subscribers only</h2></div>"""
+        val bare = ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(10, ghost)))).extract(input("<p>A sentence of preview.</p>"))
+        assertTrue(bare.nothingFree)
+    }
+
+    /** Metered sites mark their pages as not free but serve the article; a subscriber's own feed is whole too. */
+    @Test
+    fun aWholeArticleIsntCalledPaidWhateverThePageSays() = runTest {
+        assertFalse(ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(3000)))).extract(input(teaser)).paidPost)
+        val whole = "<p>${sentence.repeat(30)}</p>"
+        assertFalse(ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(200)))).extract(input(whole, ContentMode.PAGE)).paidPost)
+    }
+
+    /** Substack's feed ends a paid post's opening with "Read more" back to the post: paid, even with the page unreachable. */
+    @Test
+    fun aFeedTeaserEndingInReadMoreIsAPaidPost() = runTest {
+        val opening = "<p>${sentence.repeat(10)}</p><p><a href=\"$url\">Read more</a></p>"
+        val article = ArticleExtractor(FakeHttp(emptyMap())).extract(input(opening))
+        assertTrue(article.paidPost)
+        assertFalse(article.html.contains("Read more"))
+    }
+}

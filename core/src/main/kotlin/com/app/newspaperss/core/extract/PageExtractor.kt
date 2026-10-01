@@ -31,6 +31,8 @@ internal data class PageContent(
     val language: String? = null,
     /** The site's own name (`og:site_name`, else the JSON-LD publisher). */
     val siteName: String? = null,
+    /** The page says the post is for paying subscribers, so what's on it is only the free part. */
+    val paywalled: Boolean = false,
 )
 
 /**
@@ -50,6 +52,10 @@ internal object PageExtractor {
     // Where webcomic engines put the comic: ComicControl (Hiveworks sites), xkcd and similar.
     private const val COMIC_IMAGE = "img#cc-comic, #cc-comicbody img, #comic img, img#comic, #comic-image img"
 
+    // What platforms put in place of the rest of a paid post: Ghost's upgrade box (from its
+    // {{content}} helper, so every theme has it) and Substack's paywall.
+    private const val PAYWALL = ".gh-post-upgrade-cta, [data-testid=paywall]"
+
     private val NOT_MAIN_IMAGE = setOf("logo", "avatar", "headshot", "author", "profile", "icon", "icons")
     private const val JSON_LD_PREFERENCE_RATIO = 1.5
 
@@ -57,6 +63,8 @@ internal object PageExtractor {
         val doc = Jsoup.parse(html, url)
         val jsonLd = jsonLdObjects(doc)
         val siteName = doc.metaContent("og:site_name") ?: jsonLd.firstNotNullOfOrNull { (it["publisher"] as? JsonObject)?.string("name") }
+        val paywalled = jsonLd.any { (it["isAccessibleForFree"] as? JsonPrimitive)?.contentOrNull?.lowercase() == "false" } ||
+            doc.selectFirst(PAYWALL) != null
         // Once JSON-LD is read, nothing needs these, and Readability clones the whole document:
         // on script-heavy sites inline scripts are most of the page, parsed and copied for nothing.
         // Declarative shadow DOM is shown on the page, so its templates stay.
@@ -107,6 +115,7 @@ internal object PageExtractor {
             language = doc.selectFirst("html")?.let { html -> html.attr("lang").ifBlank { html.attr("xml:lang") } }?.ifBlank { null }
                 ?: doc.metaContent("og:locale"),
             siteName = siteName?.trim()?.ifBlank { null },
+            paywalled = paywalled,
         )
     }
 

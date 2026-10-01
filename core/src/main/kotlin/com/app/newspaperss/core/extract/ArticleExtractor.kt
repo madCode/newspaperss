@@ -67,7 +67,15 @@ data class ExtractedArticle(
      * belongs to the item's own page.
      */
     val notTheStory: Boolean = false,
-)
+    /**
+     * A post for paying subscribers, of which [html] is only the free part: the page said so, or the
+     * feed's text ended in Substack's "Read more" back to the post.
+     */
+    val paidPost: Boolean = false,
+) {
+    /** A paid post with next to nothing free: a title and a picture, a sentence of preview. */
+    val nothingFree: Boolean get() = paidPost && wordCount < ArticleExtractor.NOTHING_FREE_WORDS
+}
 
 /** Why a page couldn't be read, when the site didn't turn the app away. */
 enum class PageFailure {
@@ -88,10 +96,24 @@ enum class PageFailure {
 class ArticleExtractor(private val http: HttpClient) {
 
     suspend fun extract(input: ExtractInput): ExtractedArticle {
+        var page: PageResult.Fetched? = null
+        var feedTeaser = false
+        val article = extract(input, onPage = { page = it }, onFeedTeaser = { feedTeaser = true })
+        // Not when the whole text came anyway: in the page's JSON-LD, as paywalled sites' often is,
+        // or in a metered site's page, which says it isn't free but serves it all.
+        val paywalled = page?.let { it.content.paywalled && it.content.extractor != "json-ld" } == true && article.wordCount < PREVIEW_MAX_WORDS
+        // A paywalled page beside a full-length feed text is a subscriber's own feed: the article is whole.
+        val paid = feedTeaser && article.usedFeedContent || paywalled && (!article.usedFeedContent || article.feedWordCount < FULL_TEXT_WORDS)
+        if (!paid) return article
+        return article.copy(paidPost = true, note = article.note ?: PAID_NOTE)
+    }
+
+    private suspend fun extract(input: ExtractInput, onPage: (PageResult.Fetched) -> Unit, onFeedTeaser: () -> Unit): ExtractedArticle {
         val feed = input.feedHtml?.takeIf { it.isNotBlank() }
             ?.let { HtmlCleaner.clean(it, input.feedUrl ?: input.url, input.feedTitle) }
             // An image with no text is still content: a webcomic's feed item is often just the comic.
             ?.takeIf { it.wordCount > 0 || it.imageUrls.isNotEmpty() }
+        if (feed?.teaser == true) onFeedTeaser()
         val feedWords = feed?.wordCount ?: 0
         val feedAuthor = PageExtractor.cleanAuthor(input.feedAuthor)
 
@@ -105,7 +127,7 @@ class ArticleExtractor(private val http: HttpClient) {
             return fromFeed(feed, null, null)
         }
 
-        return when (val page = fetchPage(input)) {
+        return when (val page = fetchPage(input).also { if (it is PageResult.Fetched) onPage(it) }) {
             is PageResult.Failed ->
                 if (feed != null) fromFeed(feed, "Couldn't fetch the full article (${page.reason}); showing the feed's version.", null, page.blocked, failure = page.failure)
                 else failed(input, page.reason, page.blocked, page.failure)
@@ -301,6 +323,11 @@ class ArticleExtractor(private val http: HttpClient) {
         /** Feed content with at least this many words is taken as the full text in [ContentMode.AUTO]. */
         const val FULL_TEXT_WORDS = 300
         const val SHORT_STORY_NOTE = "Only the summary: the story's own page had little more to read."
+        const val PAID_NOTE = "A post for paying subscribers: this is the part that's free."
+        /** Fewer words than this in a paid post's free part is next to nothing (see [ExtractedArticle.nothingFree]). */
+        const val NOTHING_FREE_WORDS = 50
+        // Free previews run a few hundred words; past this a page that says it's paywalled served the article.
+        private const val PREVIEW_MAX_WORDS = 1000
         private const val KEEP_FEED_RATIO = 0.7
         private const val IMAGE_POST_MAX_WORDS = 150
         private const val IMAGE_CAPTION_WORDS = 25

@@ -295,6 +295,62 @@ class HtmlCleanerTest {
         assertNull(HtmlCleaner.bestSrcsetCandidate(""))
     }
 
+    /** tt-rss joins the candidates it passes on with bare commas; a CDN's commas inside URLs mustn't split them. */
+    @Test
+    fun srcsetJoinedWithBareCommasStillOffersEveryCandidate() {
+        assertEquals(
+            "https://img.example.com/w_1200,q_80/x.jpg",
+            HtmlCleaner.bestSrcsetCandidate("https://img.example.com/w_400,q_80/x.jpg 400w,https://img.example.com/w_1200,q_80/x.jpg 1200w"),
+        )
+        assertEquals("b.jpg", HtmlCleaner.bestSrcsetCandidate("a.jpg 1x,b.jpg 2x"))
+        assertEquals("b.jpg", HtmlCleaner.bestSrcsetCandidate("a.jpg 1.5x,b.jpg 2x"))
+    }
+
+    /** A video can't play in a book; its poster can show, so its caption still has something to describe. */
+    @Test
+    fun aVideoBecomesItsPosterAndAPlayerALink() {
+        val video = clean("""<figure><video src="/v.mp4" poster="/v.jpg"></video><figcaption>The robot prison</figcaption></figure><p>$longText</p>""")
+        assertTrue(video, video.contains("""<figure><img src="https://example.com/v.jpg" alt="Video" /><figcaption>The robot prison</figcaption></figure>"""))
+        val player = clean("""<iframe src="https://www.youtube.com/embed/6PkAr_RKzlY?feature=oembed" title="How I grew a newsletter"></iframe><p>$longText</p>""")
+        assertTrue(player, player.contains("""<a href="https://www.youtube.com/watch?v=6PkAr_RKzlY"><img src="https://i.ytimg.com/vi/6PkAr_RKzlY/hqdefault.jpg" alt="How I grew a newsletter" /></a>"""))
+        assertTrue(player, player.contains("""<p><a href="https://www.youtube.com/watch?v=6PkAr_RKzlY">Watch on YouTube: How I grew a newsletter</a></p>"""))
+        assertTrue(clean("""<iframe src="https://player.vimeo.com/video/123456"></iframe><p>$longText</p>""").contains("""<a href="https://vimeo.com/123456">Watch on Vimeo</a>"""))
+        assertFalse("other players still go", clean("""<iframe src="https://ads.example.com/x"></iframe><p>$longText</p>""").contains("iframe"))
+    }
+
+    /** tt-rss passes no iframes on: the caption left behind becomes a paragraph rather than captioning nothing. */
+    @Test
+    fun aCaptionWhoseVideoIsGoneBecomesAParagraph() {
+        assertEquals("<p>The robot prison</p><p>$longText</p>".trim(), clean("""<figure><figcaption>The robot prison</figcaption></figure><p>$longText</p>""").trim())
+        assertEquals("<p>Two</p><p>lines</p>", clean("""<figure><figcaption><p>Two</p><p>lines</p></figcaption></figure>"""))
+    }
+
+    /** Substack ends a paid post's opening in its feed with "Read more" back to the post; the book links to it anyway. */
+    @Test
+    fun aClosingReadMoreToThePostItselfGoes() {
+        val result = HtmlCleaner.clean("""<p>$longText</p><p> <a href="$base"> Read more </a> </p>""", base, null)
+        assertTrue(result.teaser)
+        assertFalse(result.html, result.html.contains("Read more"))
+        val elsewhere = HtmlCleaner.clean("""<p>$longText</p><p><a href="https://other.example.com/story">Read more</a></p>""", base, null)
+        assertFalse("a link to another page is the author's", elsewhere.teaser)
+        assertTrue(elsewhere.html.contains("Read more"))
+        val midway = HtmlCleaner.clean("""<p><a href="$base">Read more</a></p><p>$longText</p>""", base, null)
+        assertFalse("only at the very end", midway.teaser)
+    }
+
+    @Test
+    fun newsletterPitchesGoButAnAuthorsOwnLineStays() {
+        for (pitch in listOf(
+            "Countercraft is a reader-supported publication. To receive new posts and support my work, consider becoming a free or paid subscriber.",
+            "Subscribe to Slow Boring to keep reading this post and get 7 days of free access to the full post archives.",
+            "Don't miss what's next. Subscribe to Computer Things:",
+            "<em>The Marginalian</em> has a free weekly newsletter. It comes out on Sundays. Like? <a href=\"/newsletter/\">Sign up.</a>",
+        )) assertFalse(pitch, clean("<p>$pitch</p><p>$longText</p>").contains("ubscri") || clean("<p>$pitch</p><p>$longText</p>").contains("Sign up"))
+        assertEquals("", clean("<h5>Add a comment:</h5><h3>newsletter</h3>"))
+        val own = "If you're reading this on the web, you can subscribe here. Updates are once a week."
+        assertTrue(clean("<p>$own</p><p>$longText</p>").contains(own))
+    }
+
     @Test
     fun removesLeadingTitleAndDemotesHeadings() {
         assertEquals("<p>Intro</p><h2>Section</h2><h4>Sub</h4>", clean("<h1>The Title!</h1><p>Intro</p><h1>Section</h1><h3>Sub</h3>", "The title"))
