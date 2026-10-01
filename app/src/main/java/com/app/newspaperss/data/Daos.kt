@@ -365,8 +365,9 @@ interface ArticleDao {
     @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND reportedRead = 1 ORDER BY id LIMIT :limit")
     suspend fun unreportedUnread(sourceId: Long, limit: Int): List<String>
 
-    @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND guid IN (:guids)")
-    suspend fun knownGuids(sourceId: Long, guids: List<String>): List<String>
+    /** Of [guids], those of the source's articles waiting or in an unsent edition: unread here. */
+    @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND state IN ('NEW', 'IN_EDITION') AND guid IN (:guids)")
+    suspend fun unreadGuids(sourceId: Long, guids: List<String>): List<String>
 
     @Query("UPDATE articles SET reportedRead = :read WHERE sourceId = :sourceId AND guid IN (:guids)")
     suspend fun setReportedRead(sourceId: Long, guids: List<String>, read: Boolean = true)

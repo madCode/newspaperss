@@ -380,13 +380,13 @@ class TtrssSyncTest {
         val toggled = byGuid.getValue("ttrss:10").id
         val changedMind = byGuid.getValue("ttrss:11").id
 
-        assertTrue(sources.toggleRead(toggled))
-        assertTrue(sources.toggleRead(changedMind))
-        assertTrue(sources.toggleRead(changedMind))
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(toggled))
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(changedMind))
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(changedMind))
         sync.syncAll()
         assertEquals(listOf(10L), server.markedRead)
 
-        assertTrue(sources.toggleRead(toggled))
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(toggled))
         assertEquals(ArticleState.NEW, db.articles().byId(toggled)!!.state)
         sync.syncAll()
         assertEquals(listOf(10L), server.markedUnread)
@@ -412,7 +412,7 @@ class TtrssSyncTest {
         assertTrue(ttrss.syncRead(editionId))
         val article = db.articles().allForSource(source.id).single()
 
-        assertTrue(sources.toggleRead(article.id))
+        assertEquals(SourceRepository.Toggled.CHANGED, sources.toggleRead(article.id))
         sync.syncAll()
 
         assertEquals(listOf(20L), server.markedUnread)
@@ -423,6 +423,21 @@ class TtrssSyncTest {
         server.add(20, "Old", feedId = 1, feedTitle = "Example News")
         sync.syncAll()
         assertEquals("not marked read again for its delivered link", listOf(20L), server.markedRead)
+    }
+
+    /** A delivered article tt-rss still has unread (its marking failed, say) is marked read at the next sync. */
+    @Test
+    fun aDeliveredArticleTtrssStillHasUnreadIsMarkedReadAtTheNextSync() = runTest {
+        val source = connect()
+        db.articles().insertNew(listOf(ArticleEntity(sourceId = source.id, guid = "ttrss:30", url = "https://news.example/30", title = "Sent")))
+        val article = db.articles().allForSource(source.id).single()
+        db.articles().setDelivered(listOf(article.id))
+        db.articles().rememberDelivered(listOf(article.id), now)
+        server.add(30, "Sent", feedId = 1, feedTitle = "Example News")
+
+        sync.syncAll()
+
+        assertEquals(listOf(30L), server.markedRead)
     }
 
     @Test

@@ -171,9 +171,9 @@ class SourceDetailViewModel(
         _notice.value = null
     }
 
-    /** No Undo: tapping again undoes it. Refused only for a waiting article while an edition is being made. */
+    /** No Undo: tapping again undoes it. */
     fun toggleRead(articleId: Long) {
-        viewModelScope.launch { if (!repository.toggleRead(articleId)) _notice.value = HELD_NOTICE }
+        viewModelScope.launch { if (repository.toggleRead(articleId) == SourceRepository.Toggled.HELD) _notice.value = HELD_NOTICE }
     }
 
     fun markRead(articleIds: Collection<Long>) {
