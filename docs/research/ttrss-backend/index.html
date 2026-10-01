@@ -1,7 +1,7 @@
 <title>tt-rss in newspapeRSS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;600;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,700&family=Noto+Serif:wght@400;600;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap">
 <style>
 /* Layout: a newsprint review folder. Tabs across the top; each proposal pairs its notes with a live phone. */
 :root {
@@ -154,12 +154,42 @@ details summary { cursor: pointer; font-weight: 500 }
 .phone .seg { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; flex: none }
 .phone .seg button { border: 0; background: none; color: var(--fg); font: 500 12px var(--sans); padding: 6px 10px; cursor: pointer }
 .phone .seg button + button { border-left: 1px solid var(--line) }
-.phone .seg button.on { background: var(--accent-soft); color: var(--on-accent-soft) }
+.phone .seg button.on, .phone .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--on-accent-soft) }
 .hot .phone [data-go], .hot .phone [data-dlg], .hot .phone [data-act] { outline: 2px dashed var(--accent); outline-offset: -2px }
 .stagebar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center }
 .stagebar button { font: 500 12px var(--sans); border: 1px solid var(--line-soft); background: var(--bg); color: var(--fg); padding: 4px 10px; border-radius: 999px; cursor: pointer }
 .stagebar button.on { background: var(--accent-soft); color: var(--on-accent-soft); border-color: transparent }
 .caption { font-size: 13px; color: var(--muted); text-align: center; max-width: 340px; min-height: 2.6em }
+
+/* ---------- the e-reader: grey e-ink page, the EPUB's own conventions ---------- */
+.phone.ereader { --ink: #1a1a1a; --paper: #efede7; --grey: #555; background: var(--paper); color: var(--ink); border-color: #3a3a3a; border-width: 14px 14px 30px; border-radius: 10px; height: 640px; font-family: "Literata", "Noto Serif", Georgia, serif }
+.ereader .screen { padding: 18px 20px 8px; overflow: hidden }
+.ereader .page { flex: 1; overflow-y: auto; min-height: 0; font-size: 14px; line-height: 1.45 }
+.ereader .foot { display: flex; justify-content: space-between; font: 11px var(--sans); color: var(--grey); padding-top: 6px; border-top: 1px solid #c9c6bd }
+.ereader .foot span { cursor: pointer }
+.ereader h1 { font: 700 21px/1.2 "Literata", "Noto Serif", serif; margin: 4px 0 6px }
+.ereader h2 { font: 600 11px var(--sans); letter-spacing: .12em; border-bottom: 1px solid var(--ink); padding-bottom: 2px; margin: 14px 0 6px }
+.ereader h2 span { letter-spacing: 0; font-weight: 400 }
+.ereader ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px }
+.ereader ol.secs { list-style: none; padding: 0; gap: 10px }
+.ereader li { cursor: pointer }
+.ereader li span, .ereader .tot, .ereader .by, .ereader .sitem span, .ereader .lead span { font: 12px var(--sans); color: var(--grey) }
+.ereader .dl, .ereader .kick { font: 600 10.5px var(--sans); letter-spacing: .12em; color: var(--grey); margin: 0 }
+.ereader hr { border: 0; border-top: 1px solid var(--ink); margin: 8px 0 }
+.ereader p { margin: 0 0 8px }
+.ereader .ph { height: 9px; background: #cfccc3; border-radius: 2px; margin: 0 0 9px }
+.ereader .ph.short { width: 60% }
+.ereader .end { text-align: center; font-size: 10px }
+.ereader .cover { height: 100%; display: grid; align-content: center; justify-items: center; text-align: center; gap: 6px; cursor: pointer }
+.ereader .mast { font: 600 11px var(--sans); letter-spacing: .3em; text-transform: uppercase; border-bottom: 2px solid var(--ink); padding-bottom: 4px }
+.ereader .etitle { font: 700 26px/1.15 "Literata", "Noto Serif", serif; max-width: 14ch }
+.ereader .edate { font-size: 40px; font-weight: 700 }
+.ereader .leads { font-size: 12.5px; display: grid; gap: 4px; border-top: 1px solid var(--ink); padding-top: 8px; margin-top: 6px }
+.ereader .tap { font: 11px var(--sans); color: var(--grey); margin-top: 10px }
+.ereader .sfront { padding-top: 20% }
+.ereader .sname { font: 700 34px/1.1 "Literata", "Noto Serif", serif }
+.ereader .sitem { margin: 12px 0; cursor: pointer } .ereader .sitem b { font-size: 15px } .ereader .sitem p { margin: 2px 0 }
+.ereader .lead { border-top: 1px solid #b9b6ad; padding: 8px 0 } .ereader .lead.first b { font-size: 18px } .ereader .lead b { cursor: pointer; display: block; font-size: 14.5px; line-height: 1.25 } .ereader .lead p { font-size: 12.5px; margin: 3px 0 } .ereader .lead span { cursor: pointer }
 @media (prefers-reduced-motion: reduce) { .phone .sw::after { transition: none } }
 </style>
 
@@ -434,6 +464,165 @@ details summary { cursor: pointer; font-weight: 500 }
     <div class="stage" data-flow="d"></div>
   </div>
 </section>
+<section class="tab" id="paper" data-label="Sections in the paper">
+  <div class="lede">
+    <span class="kicker">Your question · what would sections of a newspaper look like?</span>
+    <h2>Sections in the paper</h2>
+    <p class="dek">A section is a heading the paper's articles are grouped under: Front page, Long reads, Science. Today they come from OPML folders, and the reading list is always "Saved for later". tt-rss has none yet: all of it lands in one section. Below, three ways the book itself could show them, on an e-reader page. Tap the contents entries and the page edges to turn pages.</p>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">S1 · today</span>
+      <h3>Headings in the contents, the section in each kicker</h3>
+      <ul>
+        <li><b>Contents</b> ("In this edition") lists articles under small uppercase headings, each with its minutes.</li>
+        <li><b>Each article</b> starts with a kicker: "Long reads · A Working Library".</li>
+        <li><b>No section pages:</b> turning from the last Science article lands straight on the first Arts one; the kicker is the only sign.</li>
+        <li>Kindle's Go To menu lists sections and their articles.</li>
+      </ul>
+      <p class="dek">Cheapest, already built. Works well when sections are few and short.</p>
+    </div>
+    <div class="stage" data-flow="s1"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">S4 · recommended · S1, plus two signposts</span>
+      <h3>Today's book, with the section said where it changes</h3>
+      <ul>
+        <li><b>A section flag</b> on the first article of each section: the section's name, large, above the kicker. No extra page, so no extra page turn or e-ink refresh.</li>
+        <li><b>"Next, in Science: Tagging shorebirds at dawn · 4 min"</b> when the next article starts a new section, on the "Next" line that already follows long reads.</li>
+        <li><b>Contents, kicker and Go To</b> stay as today: Kindle opens at the contents, and each section's entry already points at its first article.</li>
+      </ul>
+      <p class="dek">The cheapest way to make sections felt while reading. Try the section's first article, then the end of a long read.</p>
+    </div>
+    <div class="stage" data-flow="s4"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">S2 · section fronts · only for big sections</span>
+      <h3>A short page opens each section</h3>
+      <ul>
+        <li><b>The section's name, large</b>, its article count and minutes, and its headlines with one line each: a pause and a menu, as a print section's front does.</li>
+        <li><b>Contents</b> gets shorter: sections with their minutes; tap one for its front.</li>
+        <li><b>Kicker</b> keeps only the source, since the front says where you are.</li>
+        <li>Costs one page per section: five page turns in a 30-minute paper. On e-ink, each is a full refresh.</li>
+      </ul>
+      <p class="dek">Feels most like a newspaper, but in a 7-article paper most fronts would open a one-article section and repeat its headline a page later. If kept: a front only for a section with 3 or more articles, and the section stays in the kicker for readers who jump in from Go To.</p>
+    </div>
+    <div class="stage" data-flow="s2"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">S3 · a front page · not recommended</span>
+      <h3>One page with the lead of every section</h3>
+      <ul>
+        <li><b>The first page after the cover</b> is a front page: each section's lead headline, its first two lines, and "Long reads · 2 articles · 19 min →".</li>
+        <li><b>Then the articles</b>, with section headings in the contents as today (S1).</li>
+        <li>The cover image already shows first headlines, so this is a richer version of something that exists.</li>
+        <li>Fitting five leads on a small e-reader screen means short teasers; on a 6" Kindle at large type, it scrolls to a second page.</li>
+      </ul>
+      <p class="dek">Kindle opens the book at the contents, after this page, so it would be skipped; KOReader and Boox open at the cover, which already lists six headlines. A third list of the same leads.</p>
+    </div>
+    <div class="stage" data-flow="s3"></div>
+  </div>
+  <div class="critique"><h3>Critique · personas on a Kindle, a Boox and KOReader</h3><ul>
+    <li><span class="who">Owner, Kindle:</span> S3's front page sits before the contents, where Kindle opens the book, so it's skipped; the cover already lists six headlines. <b>Not recommended.</b></li>
+    <li><span class="who">Boox:</span> S2 adds five page turns, each a full refresh, and three of its fronts open one-article sections. <b>Reduced:</b> fronts only for sections of 3+, section kept in the kicker.</li>
+    <li><span class="who">Owner:</span> S1's real gap is the silent change between sections. <b>New:</b> S4, a section flag and a section-aware "Next", at no page cost.</li>
+  </ul></div>
+  <div class="notes">
+    <h3>Where the sections themselves would come from</h3>
+    <ul>
+      <li><b>OPML folders</b> (today): a folder's name becomes the section.</li>
+      <li><b>tt-rss categories</b> (the "categories as sections" switch from A): Essays &amp; ideas, News, Tech… as they're named in tt-rss.</li>
+      <li><b>The reading list</b> is always "Saved for later".</li>
+      <li><b>Renamed or merged here</b> for a newspaper's voice: News → "Front page", Essays and Newsletters → "Long reads". That's a small extra: a name per section, kept in the app.</li>
+      <li><b>No section</b> (starter feeds): no heading, as today. A paper with one section shows no headings at all.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="tab" id="allfeeds" data-label="All feeds in Sources">
+  <div class="lede">
+    <span class="kicker">Your question · what if every tt-rss feed showed on the Sources page?</span>
+    <h2>All feeds in Sources</h2>
+    <p class="dek">Three layouts that put all 58 tt-rss feeds on Sources, built with what B's critiques taught: every row keeps its freshness line, left-out feeds go out of the way, the account's settings keep a home, and a reader without tt-rss sees exactly today's list. None needs feeds to become sources in the database: the per-feed table from A1 can supply the rows.</p>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F1 · by account</span>
+      <h3>"On this phone" and "Tiny Tiny RSS", as NetNewsWire does it</h3>
+      <ul>
+        <li><b>Two groups:</b> your phone's sources, then tt-rss with its feeds under their tt-rss categories.</li>
+        <li><b>The tt-rss heading is a row</b>: tap it for the account (sign-in, Articles from, read sync, Start fresh).</li>
+        <li><b>Categories fold</b>; all open here, so every feed shows. On TalkBack that's about 70 stops, and on e-ink every fold redraws the list.</li>
+        <li><b>Freshness from tt-rss itself</b> ("newest in tt-rss: today"): the app only fetches unread, so its own "last new article" would call a feed you read on the laptop dead.</li>
+        <li><b>Left out</b> folds at the end of the tt-rss group.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Matches how tt-rss itself and most readers show an account.</li><li>Clear where a feed lives and where its settings are.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Your three phone sources sit above 58 rows; the reading list is easy to scroll past.</li><li>Says nothing about the paper's sections.</li></ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="f1"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F2 · by the paper's sections · not recommended</span>
+      <h3>Sources laid out like the paper's contents</h3>
+      <ul>
+        <li><b>Grouped by section</b>, in the paper's order: Front page, Long reads, Science… Each lists its phone feeds and its tt-rss feeds together; tt-rss ones carry a small "tt-rss" label.</li>
+        <li><b>The account</b> is one row at the top, "Tiny Tiny RSS · connected".</li>
+        <li><b>No section</b> gets its own group; <b>Left out</b> folds at the bottom.</li>
+        <li><b>Only when you have tt-rss or two real sections</b>; otherwise today's list.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>What you see is how the paper is put together.</li><li>Pairs with D: each group could show its share (More, Normal, Less).</li></ul></div>
+        <div><h3>Against</h3><ul><li>This is B again: an OPML import with folders rearranges Sources by surprise.</li><li>Changing a feed's section moves its row; with sections off, it's one long group.</li><li>A second place deciding the paper's order, which D avoids.</li></ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="f2"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F3 · one list, with filters</span>
+      <h3>Everything A to Z, with a search box and filter chips</h3>
+      <ul>
+        <li><b>One alphabetical list</b> of every source; tt-rss feeds say "From your tt-rss" under the name. A–Z puts "The Morning Wire" on the phone right next to "Morning Wire" in tt-rss: the only layout that shows duplicates.</li>
+        <li><b>Chips:</b> All · On this phone · tt-rss · Left out. <b>Search</b> finds a feed by name.</li>
+        <li><b>The account</b> is a row pinned at the top.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Fastest way to find one feed you remember by name.</li><li>No structure to keep in sync with tt-rss.</li></ul></div>
+        <div><h3>Against</h3><ul><li>A list of 61 says nothing about the paper; it reads like a feed reader's sidebar.</li><li>Search and chips are more to learn for a non-coder (hidden without tt-rss).</li></ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="f3"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F4 · recommended · the full list, one tap down</span>
+      <h3>Sources keeps one tt-rss row; the account page lists all 58</h3>
+      <ul>
+        <li><b>Sources is today's</b>, for everyone. The reader with five starter feeds never sees any of this.</li>
+        <li><b>The account page</b>: its settings, then every feed A to Z, a search box, and chips for In your paper and Left out. Settings and feeds on one page.</li>
+        <li><b>Each row</b> says its tt-rss category and how fresh it is in tt-rss, and opens the feed's own page.</li>
+        <li><b>A–Z</b> shows a feed you have both here and in tt-rss, and says so.</li>
+      </ul>
+      <p class="dek">This answers "can I see all my tt-rss feeds?" without making Sources a feed reader's sidebar. It's A's account page with a flat, searchable list instead of folded categories.</p>
+    </div>
+    <div class="stage" data-flow="f4"></div>
+  </div>
+  <div class="critique"><h3>Critique · personas with 58 feeds and with 5</h3><ul>
+    <li><span class="who">Owner:</span> freshness lines would be false: the app only fetches unread, so a feed read on the laptop looks dead. <b>Fixed:</b> taken from tt-rss's own feed list.</li>
+    <li><span class="who">Kindle reader:</span> F2 is B again, rearranging Sources after an OPML import. <b>Not recommended.</b></li>
+    <li><span class="who">TalkBack, Boox:</span> F1 open is about 70 swipe stops and a long e-ink scroll; folds redraw the screen. <b>Said;</b> F4 keeps it off Sources.</li>
+    <li><span class="who">TalkBack:</span> a "tt-rss" tag glued to the title reads as part of the name, and the counts disagreed across options. <b>Fixed:</b> "From your tt-rss" as a subtitle; counts agree.</li>
+    <li><span class="who">Owner:</span> the same site on the phone and in tt-rss sat 60 rows apart in F1. <b>Kept in F4:</b> A–Z puts them side by side.</li>
+    <li><span class="who">Everyone:</span> <b>New:</b> F4, the full list on the account page.</li>
+  </ul></div>
+</section>
+
 <section class="tab" id="compare" data-label="Compare &amp; recommend">
   <div class="split">
     <div class="notes">
@@ -748,6 +937,138 @@ FLOWS.d = {
   chips: ["settings", "balance", "preview", "sec", "order"],
 };
 
+/* ---------- e-reader pages: sections in the paper ---------- */
+const PAPER = [
+  ["Front page", [["Council delays vote on the waterfront plan", "Harbour Ledger", 3, "The vote, expected Tuesday, now waits for a traffic study the council asked for in June."], ["A school board weighs a new lottery", "The Bay Dispatch", 4, "Families would rank schools once, and siblings would no longer be guaranteed a place."]]],
+  ["Long reads", [["On rereading old notebooks", "A Working Library", 12, "What I wrote at twenty-five reads like a letter from someone I'd like to meet again."], ["17 small observations on patience", "Slow Thoughts", 7, "Patience isn't waiting. It's what you do while you wait."]]],
+  ["Science", [["Tagging shorebirds at dawn", "Field Station", 4, "The birds arrive before the light does, and so must we."]]],
+  ["Arts & music", [["A gallery walk in the rain", "Colour & Form", 3, "Six rooms, two umbrellas and one painting I can't stop thinking about."]]],
+  ["Saved for later", [["Distributed databases, an interview", "The Pragmatic Builder", 5, "Why consensus is the easy part, and naming things is still hard."]]],
+];
+const pmin = a => a.reduce((n, x) => n + x[2], 0);
+const ALLART = PAPER.flatMap(([s, as]) => as.map(a => [s, ...a]));
+const ep = (inner, foot = "") => `<div class="page">${inner}</div><div class="foot">${foot}</div>`;
+const cover = () => ep(`<div class="cover" data-go="contents"><div class="mast">newspapeRSS</div><div class="etitle">Thursday Morning Edition</div><div class="edate">October 1</div><div class="tot">7 articles · 38 min</div><div class="leads">${PAPER.slice(0, 3).map(([, as]) => `<div>${as[0][0]}</div>`).join("")}</div><div class="tap">Tap to open ›</div></div>`, "Cover");
+const articlePage = (i, kickerSection = true) => { const [s, t, src, m, dek] = ALLART[i]; return ep(`<p class="kick">${kickerSection ? `${s.toUpperCase()} · ` : ""}${src.toUpperCase()}</p><h1>${t}</h1><p class="by">By A. Writer · Sep 30 · ${m} min read</p><hr><p>${dek}</p><p class="ph"></p><p class="ph short"></p><p class="ph"></p><p class="end">■</p>`, `<span data-back>‹ Back</span><span data-go="end">Skip to the end ›</span>`); };
+const endPage = () => ep(`<h1 style="margin-top:40%">That's all for today</h1><p>7 articles, about 38 minutes. The next edition is ready by 6:30 tomorrow.</p>`, `<span data-back>‹ Back</span>`);
+FLOWS.s1 = { device: "ereader", start: "cover", screens: {
+  cover: { label: "Cover", note: "Tap the cover.", html: cover },
+  contents: { label: "Contents", note: "Today: headings with minutes; articles numbered right through. Tap a headline.", path: ["cover", "contents"], html: () => ep(`<p class="dl">THURSDAY, OCTOBER 1</p><h1>In this edition</h1><p class="tot">7 articles · 38 min</p>${PAPER.map(([s, as]) => `<h2>${s.toUpperCase()} <span>· ${pmin(as)} min</span></h2><ol>${as.map(a => `<li data-go="art"><b>${a[0]}</b><br><span>${a[1]} · ${a[2]} min</span></li>`).join("")}</ol>`).join("")}`, `<span data-back>‹ Cover</span>`) },
+  art: { label: "An article", note: "The section is in the kicker, the only sign of where you are.", path: ["cover", "contents", "art"], html: () => articlePage(2) },
+  end: { label: "The end", note: "", path: ["cover", "contents", "end"], html: endPage },
+}, chips: ["cover", "contents", "art"] };
+FLOWS.s2 = { device: "ereader", start: "cover", screens: {
+  cover: { label: "Cover", note: "Tap the cover.", html: cover },
+  contents: { label: "Contents", note: "Sections only, with their size. Tap Long reads.", path: ["cover", "contents"], html: () => ep(`<p class="dl">THURSDAY, OCTOBER 1</p><h1>In this edition</h1><p class="tot">7 articles · 38 min</p><ol class="secs">${PAPER.map(([s, as]) => `<li ${s === "Long reads" ? 'data-go="front"' : ""}><b>${s}</b><br><span>${as.length} article${as.length > 1 ? "s" : ""} · ${pmin(as)} min</span></li>`).join("")}</ol>`, `<span data-back>‹ Cover</span>`) },
+  front: { label: "Section front", note: "A page that opens the section: what's in it, at a glance. Tap the first headline.", path: ["cover", "contents", "front"], html: () => ep(`<div class="sfront"><p class="kick">SECTION 2 OF 5</p><div class="sname">Long reads</div><p class="tot">2 articles · 19 min</p><hr>${PAPER[1][1].map(a => `<div class="sitem" data-go="art"><b>${a[0]}</b><p>${a[3]}</p><span>${a[1]} · ${a[2]} min</span></div>`).join("")}</div>`, `<span data-back>‹ Contents</span><span data-go="art">Begin ›</span>`) },
+  art: { label: "An article", note: "The kicker keeps only the source: the front already said which section.", path: ["cover", "contents", "front", "art"], html: () => articlePage(2, false) },
+  end: { label: "The end", note: "", path: ["cover", "contents", "end"], html: endPage },
+}, chips: ["cover", "contents", "front", "art"] };
+FLOWS.s3 = { device: "ereader", start: "cover", screens: {
+  cover: { label: "Cover", note: "Tap the cover.", html: () => cover().replace('data-go="contents"', 'data-go="fp"') },
+  fp: { label: "Front page", note: "Each section's lead, with its first lines. Tap a lead or a section's arrow.", path: ["cover", "fp"], html: () => ep(`<p class="dl">THURSDAY, OCTOBER 1 · 7 ARTICLES · 38 MIN</p>${PAPER.map(([s, as], i) => `<div class="lead ${i === 0 ? "first" : ""}"><p class="kick">${s.toUpperCase()}</p><b data-go="art">${as[0][0]}</b><p>${as[0][3]}</p><span data-go="contents">${as.length > 1 ? `${as.length} articles · ${pmin(as)} min →` : `${pmin(as)} min →`}</span></div>`).join("")}`, `<span data-back>‹ Cover</span><span data-go="contents">Contents ›</span>`) },
+  contents: { label: "Contents", note: "As today, after the front page.", path: ["cover", "fp", "contents"], html: () => FLOWS.s1.screens.contents.html() },
+  art: { label: "An article", note: "", path: ["cover", "fp", "art"], html: () => articlePage(0) },
+  end: { label: "The end", note: "", path: ["cover", "fp", "end"], html: endPage },
+}, chips: ["cover", "fp", "contents"] };
+
+/* ---------- every tt-rss feed on Sources ---------- */
+const FRESH = ["Newest in tt-rss: today", "Newest in tt-rss: yesterday", "Newest in tt-rss: 3 days ago", "Newest in tt-rss: today", "Newest in tt-rss: 2 weeks ago"];
+const fresh = t => OWN[t] && OWN[t] !== "New from tt-rss" && !LEFT(t) ? `${OWN[t]} · ${FRESH[t.length % 5]}` : (OWN[t] === "New from tt-rss" ? "New from tt-rss · today" : FRESH[t.length % 5]);
+const fold = (label, n, body, open = true, lvl = 3) => `<h${lvl} style="margin:0"><button class="sec" data-act="fold" aria-expanded="${open}">${label}<span class="n">${n}</span></button></h${lvl}><div class="secbody" ${open ? "" : "hidden"}>${body}</div>`;
+const ttRow = t => H.row(t, fresh(t), { go: "feed" });
+const ttLabel = t => t;
+const LOCALS = [["Field Station", "Science"], ["Arts &amp; Letters Daily", "Front page"], ["The Morning Wire", null]];
+const feedScreen = { label: "A feed", note: "Every row opens a feed's page (A's).", html: () => feedPage({ crumb: `<div class="crumb">From <b data-go="acct">Tiny Tiny RSS</b> · category News</div>` }) };
+const acctScreen = { label: "Account", note: "The account's own settings, one tap from Sources.", html: () =>
+  H.bar("Tiny Tiny RSS") + `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>Signed in · last checked 10:21 PM</span></div>
+  <div class="btns"><button class="ob">Pause tt-rss</button></div>
+  ${H.set("Articles from", "All your unread articles", H.tb("Change"))}${H.set("Sync read status with tt-rss", "Read and unread show in both.", H.sw(true))}
+  ${H.set("Use tt-rss categories as sections", "Each feed's category is its section in the paper", H.sw(true))}${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss.", H.tb("Start fresh"))}
+  ${H.row("All recent articles", "30 waiting, from every feed", { right: I.chev })}</div>` + H.nav() };
+const leftBody = () => ALL.filter(f => LEFT(f.t)).map(f => H.row(ttLabel(f.t), `Left out · ${f.c}`, { go: "feed" })).join("");
+FLOWS.f1 = { start: "sources", screens: {
+  sources: { label: "Sources", note: "Phone sources first, then tt-rss by its categories, all open. Fold any heading.", html: () =>
+    H.bar("Sources", { big: true, refresh: true }) + `<div class="body">
+    ${fold("On this phone", "4", H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" }) + LOCALS.map(([t]) => H.row(t, "New articles today")).join(""))}
+    <button class="row" data-go="acct" style="border-top:2px solid var(--line)"><span class="ic">${I.rss}</span><span class="main"><span class="ti" style="font-weight:600">Tiny Tiny RSS</span><span class="su">54 feeds in your paper, 4 left out · Account settings ›</span></span>${I.chev}</button>
+    ${Object.entries(CATS).map(([c, fs]) => fold(c, `${fs.filter(t => !LEFT(t)).length}`, fs.filter(t => !LEFT(t)).map(ttRow).join(""), true, 4)).join("")}
+    ${fold("Left out", "4", leftBody(), false, 4)}</div>` + H.fab() + H.nav() },
+  feed: { ...feedScreen, path: ["sources", "feed"] },
+  acct: { ...acctScreen, path: ["sources", "acct"] },
+  leave: { dialog: true, over: ["sources", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "feed", "acct"] };
+const SEC_OF = { "News": "Front page", "Essays & ideas": "Long reads", "Newsletters": "Long reads", "Science": "Science", "Tech": "Tech", "Arts & music": "Arts & music", "Uncategorized": null };
+FLOWS.f2 = { start: "sources", screens: {
+  sources: { label: "Sources", note: "The paper's sections, in the paper's order; phone and tt-rss feeds together.", html: () => {
+    const groups = {}; ALL.filter(f => !LEFT(f.t)).forEach(f => { const s = SEC_OF[f.c] ?? "No section"; (groups[s] ||= []).push(ttRow(ttLabel(f.t)).replace(fresh(ttLabel(f.t)), fresh(f.t))); });
+    LOCALS.forEach(([t, s]) => (groups[s ?? "No section"] ||= []).unshift(H.row(t, "On this phone · New articles today")));
+    const order = ["Front page", "Long reads", "Science", "Tech", "Arts & music", "No section"];
+    return H.bar("Sources", { big: true, refresh: true }) + `<div class="body">
+    ${H.row("Tiny Tiny RSS", "Connected · 54 feeds in your paper · Account settings", { go: "acct", icon: I.rss })}
+    ${fold("Saved for later", "1", H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" }))}
+    ${order.map(s => fold(s, `${groups[s].length}`, groups[s].join(""))).join("")}
+    ${fold("Left out", "4", leftBody(), false)}</div>` + H.fab() + H.nav(); } },
+  feed: { ...feedScreen, path: ["sources", "feed"] },
+  acct: { ...acctScreen, path: ["sources", "acct"] },
+  leave: { dialog: true, over: ["sources", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "feed", "acct"] };
+const f3list = (filter) => {
+  const rows = [...LOCALS.map(([t]) => ({ t, local: true })), ...ALL].filter(f => filter === "left" ? LEFT(f.t) : filter === "tt" ? !f.local && !LEFT(f.t) : filter === "phone" ? f.local : !LEFT(f.t));
+  rows.sort((a, b) => a.t.replace(/^(The|A) /, "").localeCompare(b.t.replace(/^(The|A) /, "")));
+  const chip = (k, l) => `<button class="${filter === k ? "on" : ""}" data-go="${k === "all" ? "sources" : "f_" + k}" aria-pressed="${filter === k}">${l}</button>`;
+  return H.bar("Sources", { big: true, refresh: true }) + `<div class="body">
+  <div style="padding:0 16px 8px;display:grid;gap:8px"><div class="field" style="margin:0;color:var(--muted)">⌕ Find a source</div><div class="seg" style="align-self:start;flex-wrap:wrap">${chip("all", "All 58")}${chip("phone", "Phone 4")}${chip("tt", "tt-rss 54")}${chip("left", "Left out 4")}</div></div>
+  ${filter === "all" || filter === "phone" ? H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" }) : ""}
+  ${filter !== "phone" ? H.row("Tiny Tiny RSS account", "Connected · settings", { go: "acct", icon: I.rss }) : ""}
+  ${rows.map(f => H.row(f.t, f.local ? "On this phone · New articles today" : (LEFT(f.t) ? "From your tt-rss · left out" : "From your tt-rss · " + fresh(f.t).replace("Newest in tt-rss: ", "newest ")), { go: f.local ? undefined : "feed" })).join("")}</div>` + H.fab() + H.nav();
+};
+FLOWS.f3 = { start: "sources", screens: {
+  sources: { label: "All", note: "Everything A to Z. Try the chips.", html: () => f3list("all") },
+  f_phone: { label: "Phone", note: "Only what's on the phone: today's list.", path: ["f_phone"], html: () => f3list("phone") },
+  f_tt: { label: "tt-rss", note: "Only tt-rss feeds in the paper.", path: ["f_tt"], html: () => f3list("tt") },
+  f_left: { label: "Left out", note: "The four left out, to bring back.", path: ["f_left"], html: () => f3list("left") },
+  feed: { ...feedScreen, path: ["sources", "feed"] },
+  acct: { ...acctScreen, path: ["sources", "acct"] },
+  leave: { dialog: true, over: ["sources", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "f_phone", "f_tt", "f_left", "feed"] };
+
+/* ---------- S4: today's book with two signposts ---------- */
+FLOWS.s4 = { device: "ereader", start: "cover", screens: {
+  cover: { label: "Cover", note: "Tap the cover.", html: cover },
+  contents: { label: "Contents", note: "As today. Tap the first Science article.", path: ["cover", "contents"], html: () => FLOWS.s1.screens.contents.html().replace('<li data-go="art"><b>Tagging', '<li data-go="flag"><b>Tagging').replace(/<li data-go="art"><b>On rereading/, '<li data-go="long"><b>On rereading') },
+  flag: { label: "First in a section", note: "The section's name, large, on its first article. No extra page.", path: ["cover", "contents", "flag"], html: () => { const [s, t, src, m, dek] = ALLART[4]; return ep(`<div style="border-top:3px solid var(--ink);border-bottom:1px solid var(--ink);padding:6px 0;margin:6% 0 14px"><div class="sname" style="font-size:28px">Science</div><span style="font:12px var(--sans);color:var(--grey)">1 article · 4 min</span></div><p class="kick">${src.toUpperCase()}</p><h1>${t}</h1><p class="by">By A. Writer · Sep 30 · ${m} min read</p><hr><p>${dek}</p><p class="ph"></p><p class="ph short"></p>`, `<span data-back>‹ Back</span>`); } },
+  long: { label: "End of a long read", note: "The Next line already follows long reads; now it names the section it leads into.", path: ["cover", "contents", "long"], html: () => ep(`<p class="kick">LONG READS · A WORKING LIBRARY</p><p class="ph"></p><p class="ph"></p><p class="ph short"></p><p>…and that, I think, is why I keep them.</p><p class="end">■</p><p style="font:12px var(--sans);color:var(--grey)">Read the original at aworkinglibrary.example</p><hr><p data-go="flag" style="cursor:pointer"><span style="font:600 10.5px var(--sans);letter-spacing:.12em;color:var(--grey)">NEXT, IN SCIENCE</span><br><b>Tagging shorebirds at dawn</b><br><span style="font:12px var(--sans);color:var(--grey)">Field Station · 4 min</span></p>`, `<span data-back>‹ Back</span>`) },
+}, chips: ["cover", "contents", "long", "flag"] };
+
+/* ---------- F4: Sources unchanged; the full list on the account page ---------- */
+const f4acct = (filter) => {
+  const rows = ALL.filter(f => filter === "left" ? LEFT(f.t) : !LEFT(f.t)).sort((a, b) => a.t.replace(/^(The|A) /, "").localeCompare(b.t.replace(/^(The|A) /, "")));
+  const chip = (k, l) => `<button class="${filter === k ? "on" : ""}" aria-pressed="${filter === k}" data-go="${k === "in" ? "acct" : "acct_left"}">${l}</button>`;
+  return H.bar("Tiny Tiny RSS") + `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>Signed in · last checked 10:21 PM</span></div>
+  <div class="btns"><button class="ob">Pause tt-rss</button></div>
+  ${H.set("Articles from", "All your unread articles", H.tb("Change"))}${H.set("Sync read status with tt-rss", "Read and unread show in both.", H.sw(true))}
+  ${H.set("Use tt-rss categories as sections", "Each feed's category is its section in the paper", H.sw(false))}${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss.", H.tb("Start fresh"))}
+  <hr><div class="h2">Your 58 feeds</div>
+  <div style="padding:0 16px 8px;display:grid;gap:8px"><div class="field" style="margin:0;color:var(--muted)">⌕ Find a feed</div><div class="seg" style="align-self:start">${chip("in", "In your paper 54")}${chip("left", "Left out 4")}</div></div>
+  ${rows.map(f => H.row(f.t, `${f.c} · ${LEFT(f.t) ? "left out" : fresh(f.t).replace("Newest in tt-rss: ", "newest ")}${f.t === "Morning Wire" ? " · also on this phone" : ""}`, { go: "feed" })).join("")}</div>` + H.nav();
+};
+FLOWS.f4 = { start: "sources", screens: {
+  sources: { label: "Sources", note: "Unchanged. Tap Tiny Tiny RSS.", html: () => H.bar("Sources", { big: true, refresh: true }) + `<div class="body">${H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" })}${LOCALS.map(([t]) => H.row(t, "New articles today")).join("")}${H.row("Tiny Tiny RSS", "54 feeds in your paper, 4 left out · New articles today", { go: "acct", icon: I.rss })}</div>` + H.fab() + H.nav() },
+  acct: { label: "All 58, A to Z", note: "Settings, then every feed: search, two chips, A–Z. \"Morning Wire\" says it's also on the phone.", path: ["sources", "acct"], html: () => f4acct("in") },
+  acct_left: { label: "Left out", note: "The four left out, to bring back.", path: ["sources", "acct_left"], html: () => f4acct("left") },
+  feed: { ...feedScreen, path: ["sources", "acct", "feed"] },
+  leave: { dialog: true, over: ["sources", "acct", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "acct", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "acct", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "acct", "acct_left", "feed"] };
+
 /* ---------- the recommended path, end to end ---------- */
 FLOWS.rec = {
   start: "sources",
@@ -778,7 +1099,7 @@ FLOWS.rec = {
 /* ---------- engine ---------- */
 function mountPhone(stage) {
   const flow = FLOWS[stage.dataset.flow];
-  stage.innerHTML = `<div class="phone"><div class="status"><span>10:21</span><span>▾ ▴ ▮</span></div><div class="screen"></div></div><div class="caption"></div><div class="stagebar"></div><label class="caption" style="min-height:0"><input type="checkbox" class="hl"> Show what's clickable</label>`;
+  stage.innerHTML = `<div class="phone${flow.device === "ereader" ? " ereader" : ""}">${flow.device === "ereader" ? "" : '<div class="status"><span>10:21</span><span>▾ ▴ ▮</span></div>'}<div class="screen"></div></div><div class="caption"></div><div class="stagebar"></div><label class="caption" style="min-height:0"><input type="checkbox" class="hl"> Show what's clickable</label>`;
   const scr = stage.querySelector(".screen"), cap = stage.querySelectorAll(".caption")[0], bar = stage.querySelector(".stagebar");
   let stack = [flow.start], overlay = null, menu = null;
   function render() {
@@ -835,8 +1156,10 @@ const PLAN = [
   ["D2", "D's second critique round", "D v3", "done"],
   ["12", "Compare and recommend", "Compare tab", "done"],
   ["13", "Critique of compare and recommend, then the final version", "Compare, final", "done"],
+  ["14", "Your follow-ups: sections in the paper; every tt-rss feed on Sources", "S1–S4 and F1–F4, one critique round", "done"],
 ];
 const LOG = [
+  ["Cycle 14 · your follow-ups", "Sections in the paper: three ways the book could show them (today's headings, section fronts, a front page). Every tt-rss feed on Sources: by account, by the paper's sections, one A–Z list. A critic read them on a Kindle, a Boox and KOReader, with 58 feeds and with 5.", "Changed: S4 added and recommended (today's book plus a section flag and a section-aware Next). S3 isn't recommended (Kindle opens past it). S2 only for big sections. F4 added and recommended (all 58 A–Z on the account page). F2 isn't recommended (B again). F1 and F3 now take freshness from tt-rss itself, because the app only fetches unread."],
   ["Cycles 12–13 · compare, critique, final", "Compared A1, A2, C and D (B dropped) on what each fixes for the owner, who sees it, what code it touches and cost. Then a critic read the comparison as the owner and as a senior engineer.", "Changed: the recommendation now opens with where your gut is right, builds only A1 now (re-rated: it needs a table), puts categories-as-sections and D after living with it, A2 only if missed, and points to OPML export instead of C. Stale lines across tabs fixed."],
   ["Round D2 · does balance deliver?", "Worked the owner's numbers through the real planner (rotation by featured-longest-ago, caps, one budget).", "Changed: D v3 replaces weights with one rule: one article per section, then More, then Normal, Less if room. Off by default, Take turns only, stars count as their section's one, and the contents say when only one section had news."],
   ["Round 2 · cycles 5, 8, 11 and D1", "This round read the real code: sync, read sync, mark-read, the planner, the add flow, and the tt-rss API's answers.", "Changed: A keeps articles on the account and stores per-feed settings in a table keyed like the planner's feed key, so sync and delivery stay untouched (this reverses the first doc's storage choice). B is dropped and folded into D. C becomes a second button, \"Add to tt-rss instead\", trimming back issues at the first sync that sees the feed. D moves from minutes to Less / Normal / More shares that weight the turns, with stars exempt (replaced in D2 by a rule)."],
