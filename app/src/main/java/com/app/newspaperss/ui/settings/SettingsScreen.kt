@@ -174,8 +174,7 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
         Switch(checked = s.scheduleEnabled, onCheckedChange = null)
     }
     if (!s.scheduleEnabled) return
-    // Folder delivery needs no one; otherwise the notification is where a timed edition's Send is.
-    if (s.delivery != DeliveryMethod.FOLDER) NotificationsOffWarning()
+    NotificationsOffWarning(s.delivery)
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
         Text("Ready by", Modifier.weight(1f))
         OutlinedButton(onClick = {
@@ -351,9 +350,12 @@ private fun DeliveryOption(selected: Boolean, title: String, detail: String, onC
     }
 }
 
-/** Without notifications a scheduled shared edition is made but nobody hears about it. */
+/**
+ * Without notifications a timed edition is made but nobody hears about it: a shared or emailed
+ * one's Send is in its notification, and a folder delivery that fails says so only there.
+ */
 @Composable
-private fun NotificationsOffWarning() {
+private fun NotificationsOffWarning(delivery: DeliveryMethod) {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
     LifecycleResumeEffect(Unit) {
@@ -363,7 +365,8 @@ private fun NotificationsOffWarning() {
     if (enabled) return
     Column(Modifier.padding(vertical = 8.dp)) {
         Text(
-            "Notifications are off, so you won't hear when an edition is ready to send.",
+            if (delivery == DeliveryMethod.FOLDER) "Notifications are off, so you won't hear if an edition fails to arrive."
+            else "Notifications are off, so you won't hear when an edition is ready to send.",
             color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodyMedium,
         )

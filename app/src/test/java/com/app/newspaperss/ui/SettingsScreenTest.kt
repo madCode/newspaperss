@@ -194,13 +194,16 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun withNotificationsOffEmailReadersAreWarnedTheirSendWontShowUp() {
+    fun withNotificationsOffEachDeliveryIsWarnedWhatItWontHear() {
         shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>().getSystemService(android.app.NotificationManager::class.java)).setNotificationsEnabled(false)
         runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_42@kindle.com", scheduleEnabled = true) } }
         waitFor("Notifications are off")
 
+        waitFor("you won't hear when an edition is ready to send")
+
+        // A folder delivery that fails is only reported by notification.
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") } }
-        idleUntil { compose.onAllNodes(hasText("Notifications are off", substring = true)).fetchSemanticsNodes().isEmpty() }
+        waitFor("Notifications are off, so you won't hear if an edition fails to arrive.")
     }
 
     @Test
