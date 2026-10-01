@@ -296,7 +296,7 @@ details summary { cursor: pointer; font-weight: 500 }
     <div class="notes">
       <span class="kicker">Cycles 3–5 · <span class="pill v">v3</span></span>
       <h2>A. Each feed opens up, folded under the account</h2>
-      <p>Sources doesn't change: tt-rss is still one row. On the account page, "Feeds in your paper" becomes the list of feeds, folded by tt-rss category, each opening a page of its own.</p>
+      <p><i>Cycle 16: the list of feeds now sits on Sources, inset under the tt-rss row (F5); see All feeds in Sources.</i> Sources doesn't change: tt-rss is still one row. On the account page, "Feeds in your paper" becomes the list of feeds, folded by tt-rss category, each opening a page of its own.</p>
       <h3>What the reader gets</h3>
       <ul>
         <li><b>Article text learned per feed, with no new screen.</b> This alone fixes tt-rss's teaser and stripped feeds.</li>
@@ -606,7 +606,7 @@ details summary { cursor: pointer; font-weight: 500 }
   </div>
   <div class="split">
     <div class="notes">
-      <span class="kicker">F4 · recommended · the full list, one tap down</span>
+      <span class="kicker">F4 · optional · the full list, one tap down</span>
       <h3>Sources keeps one tt-rss row; the account page lists all 58</h3>
       <ul>
         <li><b>Sources is today's</b>, for everyone. The reader with five starter feeds never sees any of this.</li>
@@ -653,11 +653,11 @@ details summary { cursor: pointer; font-weight: 500 }
         <tr><td><b>F1</b> by account</td><td>Yes, under categories</td><td>1</td><td>~70</td><td>Scroll</td><td>Yes</td><td>No</td><td>Unchanged</td><td>Works; heavy</td></tr>
         <tr><td><b>F2</b> by section</td><td>Yes, mixed with phone</td><td>1</td><td>~70</td><td>Scroll</td><td>As sections</td><td>No</td><td>Can change after an OPML import</td><td class="n">Not recommended</td></tr>
         <tr><td><b>F3</b> A–Z, filters</td><td>Yes, mixed with phone</td><td>1</td><td>~60</td><td>Search, chips</td><td>No</td><td>Side by side</td><td>Unchanged</td><td>Works; reads like a sidebar</td></tr>
-        <tr><td><b>F4</b> account page</td><td>No: one row</td><td>2</td><td>5</td><td>Search, chips</td><td>Per row</td><td>Said</td><td>Unchanged</td><td class="y">Safest default</td></tr>
-        <tr><td><b>F5</b> inset</td><td>Yes, under the tt-rss row</td><td>1</td><td>~60, or 5 folded</td><td>Scroll</td><td>No</td><td>Said</td><td>Unchanged</td><td class="y">Best if you want them on Sources</td></tr>
+        <tr><td><b>F4</b> account page</td><td>No: one row</td><td>2</td><td>5</td><td>Search, chips</td><td>Per row</td><td>Said</td><td>Unchanged</td><td>Optional, if scrolling gets slow</td></tr>
+        <tr><td><b>F5</b> inset</td><td>Yes, under the tt-rss row</td><td>1</td><td>~60, or 5 folded</td><td>Scroll</td><td>No</td><td>Said</td><td>Unchanged</td><td class="y">Recommended</td></tr>
       </tbody>
     </table></div>
-    <p class="dek">F4 and F5 aren't rivals: the account page can have F4's searchable list while Sources has F5's inset list, folded until you open it. That gives you every feed on Sources, search one tap down, and a five-feed reader sees no change.</p>
+    <p class="dek">F5 is the pick: every feed on Sources, folded until you open it, and a five-feed reader sees no change. F4's searchable list can be added to the account page later if scrolling 54 rows gets slow; it doesn't compete with F5.</p>
   </div>
   <div class="critique"><h3>Critique · personas with 58 feeds and with 5</h3><ul>
     <li><span class="who">Owner:</span> freshness lines would be false: the app only fetches unread, so a feed read on the laptop looks dead. <b>Fixed:</b> taken from tt-rss's own feed list.</li>
@@ -672,47 +672,58 @@ details summary { cursor: pointer; font-weight: 500 }
 <section class="tab" id="compare" data-label="Compare &amp; recommend">
   <div class="split">
     <div class="notes">
-      <span class="kicker">Cycles 12–13 · <span class="pill v">final</span></span>
+      <span class="kicker">Cycles 12–13, redone in 16 after F and S · <span class="pill v">v3</span></span>
       <h2>Compare and recommend</h2>
-      <p style="border-left:3px solid var(--accent);padding-left:12px"><b>Your gut is right for Sources: tt-rss stays one row.</b> One thing can't wait: tt-rss feeds don't learn their article text, and nothing you can set fixes that today. Build that now, live with it, and only then decide on the rest.</p>
-      <h3>Your three questions</h3>
+      <p style="border-left:3px solid var(--accent);padding-left:12px"><b>Keep tt-rss as one row in Sources, with its feeds listed just beneath it, folded until you open them (F5).</b> Cycle 13 held feed pages back "until missed"; you then asked to see every feed on Sources and proposed F5, which is that signal, so feed pages move up to Next. Build the invisible part first: tt-rss feeds learning their article text.</p>
+      <h3>Your questions</h3>
       <ul>
-        <li><b>Each tt-rss feed as its own source?</b> Not in Sources: spreading 58 feeds there (B) buried everyone else's rows and was dropped. Underneath, yes, in steps: first an invisible per-feed record for article text, and feed pages (A2) only if you find you miss them.</li>
-        <li><b>Add what you subscribe to here back to tt-rss?</b> You can already: Sources › ⋮ › Export your sites (OPML), then import in tt-rss, or subscribe in tt-rss itself. C, a second button when adding, is designed and ready if that turns out to be a chore.</li>
-        <li><b>Cluttered or not?</b> It depends on the feed. A blog you'd read on the laptop anyway belongs in tt-rss. A feed that exists for the paper becomes an unread count there. So the app should never send feeds to tt-rss by default, and never on import.</li>
+        <li><b>Each tt-rss feed as its own source?</b> Shown as its own source, yes: inset under the tt-rss row on Sources (F5), each opening its own page. Stored as its own source, no: a per-feed record under the account, so sync, read sync and delivery stay as they are. Spreading feeds among the others by section (B, F2) was dropped twice: it rearranges Sources for readers who never asked.</li>
+        <li><b>Add what you subscribe to here back to tt-rss?</b> You can already: Sources › ⋮ › Export your sites (OPML), then import in tt-rss, or subscribe in tt-rss itself. C, a second button when adding, is designed if that becomes a chore.</li>
+        <li><b>Cluttered or not?</b> It depends on the feed. A blog you'd read on the laptop anyway belongs in tt-rss; a feed that exists for the paper becomes an unread count there. So never by default, never on import.</li>
+        <li><b>What would sections look like?</b> Today's contents headings, plus two signposts in the book (S4): the section's name on its first article, and "Next, in Science: …". No extra pages.</li>
       </ul>
       <h3>In order</h3>
       <ol style="margin:0;padding-left:1.3em;display:grid;gap:6px">
-        <li><b>Now · A1: article text learned per tt-rss feed.</b> No screen. A small per-feed table (feed id, address, category, learned text) with a migration, because today the learning lives on the source row and skips tt-rss.</li>
-        <li><b>After living with A1 · categories as sections, then D.</b> A1's table already knows each feed's category, so "Use tt-rss categories as sections" is one switch on the account page. D then balances the paper by section: one from each, then More. Both only if the paper still isn't varied enough.</li>
-        <li><b>Only if missed · A2: feed pages.</b> Leave out, an article text override, a cap and a section per feed, one tap below the account. It also changes sync: a daily full feed list, and choosing a category expires only the feeds outside it.</li>
-        <li><b>Only if OPML and tt-rss's own subscribe feel like a chore · C.</b></li>
+        <li><b>Now · A1: article text learned per tt-rss feed.</b> No screen. A small per-feed table keyed by feed id, holding the learned text, with a migration. Every later step adds to this table. <b>Any time · S4:</b> the two signposts in the book; it only touches the EPUB writer and already helps OPML-folder users.</li>
+        <li><b>Next · your feeds on Sources (F5 + feed pages).</b> The inset list under the tt-rss row, folded until opened, each row opening the feed's page (Leave out, article text, its own articles). It's the biggest step: a daily full feed list from tt-rss (addresses, categories, quiet feeds, "No longer in your tt-rss"), the left-out list moving into the per-feed table (a migration), duplicate matching and re-keying on sign-in. This is what A2 was, now with a place on Sources.</li>
+        <li><b>When you want a more varied paper · sections, then D.</b> "Use tt-rss categories as sections" on the account page, a section per feed on its page, then D's balance (one from each section, then More).</li>
+        <li><b>Only if needed:</b> F4's searchable A–Z list on the account page, if scrolling 54 rows on Sources gets slow; C, if OPML is a chore.</li>
       </ol>
       <div class="tablewrap"><table>
         <thead><tr><th></th><th>What it fixes</th><th>Who sees it</th><th>Touches</th><th>Cost</th><th>When</th></tr></thead>
         <tbody>
-          <tr><td><b>A1</b></td><td>Teaser and stripped tt-rss feeds stay short in the paper</td><td>No one: automatic</td><td>Full-text check, a new table</td><td>Small–medium; migration</td><td class="y">Now</td></tr>
-          <tr><td><b>Categories as sections</b></td><td>All of tt-rss is one section of the contents</td><td>tt-rss users who switch it on</td><td>How sections are chosen</td><td>Small, on A1's table</td><td>After A1</td></tr>
-          <tr><td><b>D</b></td><td>No way to say "less news, more essays"</td><td>Anyone with two or more sections who turns it on</td><td>The planner's core (pure JVM, testable)</td><td>Medium</td><td>After A1, if needed</td></tr>
-          <tr><td><b>A2</b></td><td>No per-feed control; one busy feed fills the Recent articles list (the paper already takes turns)</td><td>tt-rss users, one tap below the account</td><td>Sync, category choice, text, caps, sections</td><td>Medium</td><td class="n">If missed</td></tr>
+          <tr><td><b>A1</b></td><td>Teaser and stripped tt-rss feeds stay short in the paper</td><td>No one: automatic</td><td>Full-text check, a new table keyed by feed id</td><td>Small–medium; migration</td><td class="y">Now</td></tr>
+          <tr><td><b>F5 + feed pages</b></td><td>You can't see or set anything per feed; one busy feed fills Recent articles</td><td>tt-rss users; folded until opened</td><td>Sources list, a feed page, sync (a daily full feed list), category choice</td><td>Medium–large; migration</td><td class="y">Next</td></tr>
+          <tr><td><b>Sections for tt-rss</b></td><td>All of tt-rss is one section</td><td>tt-rss users who switch it on</td><td>How sections are chosen: text, caps and sections look up the feed</td><td>Small–medium, after F5's feed list</td><td>For variety</td></tr>
+          <tr><td><b>S4</b></td><td>Sections are silent while reading</td><td>Everyone with two or more sections</td><td>The EPUB writer only</td><td>Small</td><td class="y">Any time</td></tr>
+          <tr><td><b>D</b></td><td>No way to say "less news, more essays"</td><td>Anyone with two or more sections who turns it on</td><td>The planner's core (pure JVM, testable)</td><td>Medium</td><td>After sections</td></tr>
+          <tr><td><b>F4</b></td><td>Finding one feed among 54</td><td>tt-rss users, on the account page</td><td>The account page</td><td>Small, once F5 exists</td><td class="n">If needed</td></tr>
           <tr><td><b>C</b></td><td>Adding to tt-rss from the phone</td><td>tt-rss users adding one feed</td><td>Add flow, a stored pending state</td><td>Medium; migration</td><td class="n">If OPML is a chore</td></tr>
         </tbody>
       </table></div>
-      <p class="dek"><b>If you want every tt-rss feed on Sources:</b> F5, the feeds inset under the tt-rss row, folded until you open it, with F4's searchable list on the account page (see All feeds in Sources). It needs the same per-feed record as step 1, nothing more.</p>
-      <p class="dek">In the backlog, this settles "Decide what tt-rss is as a source", folds "several categories" and "categories as sections" into the steps above, and suggests dropping the per-feed cap: in a 30-minute paper from 54 feeds it rarely bites.</p>
+      <p class="dek">Dropped along the way: B and F2 (feeds spread through Sources by section), S3 (a front page Kindle opens past), and the per-feed cap from the backlog (in a 30-minute paper from 54 feeds it rarely bites).</p>
       <h3>For you to decide</h3>
       <ol style="margin:0;padding-left:1.3em;display:grid;gap:4px">
-        <li>Is A1 enough for now?</li>
+        <li>Is A1 enough for a while, before F5?</li>
+        <li>Feeds on Sources: F5 inset (the recommendation), or only on the account page (F4)?</li>
+        <li>A feed's section: always its tt-rss category, or settable per feed?</li>
         <li>Do you add feeds in your other tt-rss apps at all? That's C's premise; if not, C can go.</li>
-        <li>D's rule, "one from each section, then More": does it match how you'd edit the paper by hand?</li>
-        <li>Should balance be on for you from the start, and should Saved for later count as a section (a saved link most days)?</li>
-        <li>Drop the per-feed cap from the backlog?</li>
+        <li>D's rule, "one from each section, then More": does it match how you'd edit the paper by hand? And should Saved for later count as a section?</li>
       </ol>
       <div id="compare-crit" class="log">
+        <div class="critique"><h3>Critique · cycle 16 · the redone recommendation</h3><ul>
+          <li><span class="who">Engineer:</span> A1's table held addresses and categories, which only the full feed list in step 2 provides. <b>Fixed:</b> A1 keys on feed id; step 2 adds the rest.</li>
+          <li><span class="who">Owner:</span> F4 was "recommended" on one tab and "only if needed" here. <b>Fixed:</b> optional everywhere.</li>
+          <li><span class="who">Owner:</span> the reversal from "only if missed" wasn't explained. <b>Fixed:</b> you asking is that signal; old lines marked superseded.</li>
+          <li><span class="who">Engineer:</span> step 2 was costed "Medium" but is the biggest: sync, a migration, matching, re-keying. <b>Fixed:</b> Medium–large; per-feed sections moved to step 3.</li>
+          <li><span class="who">Engineer:</span> S4 only touches the book and helps OPML users now. <b>Fixed:</b> any time.</li>
+          <li><span class="who">Both:</span> the click-through showed the dropped cap and numbered steps wrong; the decide list lost "is A1 enough?". <b>Fixed.</b></li>
+        </ul></div>
+
         <div class="critique"><h3>Critique · cycle 13 · the recommendation itself</h3><ul>
           <li><span class="who">Owner:</span> v1 never mentioned your gut or the week you wanted to sit with it, then recommended four builds. <b>Fixed:</b> opens with where it agrees, and builds one thing now.</li>
           <li><span class="who">Engineer:</span> A1 was rated "low, small", but learning lives on the source row and skips tt-rss: it needs a table and a migration. A2 was said to leave sync alone; it doesn't. <b>Fixed:</b> re-rated.</li>
-          <li><span class="who">Engineer:</span> too much for one persona. <b>Reduced:</b> A1 now; categories as sections and D after living with it; feed pages only if missed.</li>
+          <li><span class="who">Engineer:</span> too much for one persona. <b>Reduced:</b> A1 now; categories as sections and D after living with it; feed pages only if missed. <i>(Superseded in cycle 16: you asked for feeds on Sources, so feed pages moved up.)</i></li>
           <li><span class="who">Owner:</span> OPML export and tt-rss's own subscribe already add feeds to tt-rss. <b>Reduced:</b> stated as the zero-code answer; C waits.</li>
           <li><span class="who">Engineer:</span> "every section, every day" overclaimed; the preview's 33 minutes was unexplained. <b>Fixed:</b> "when the budget allows", and the preview says it went over by one article.</li>
           <li><span class="who">Engineer:</span> stale lines across tabs (D's shares, a switch drawn on with "Off" text, unqualified claims). <b>Fixed</b> and marked superseded where kept for the record.</li>
@@ -848,7 +859,8 @@ const acctPage = (o = {}) => {
   </div>` + H.nav();
 };
 const capBlock = H.set("1 article from this feed, then more if there's room", "Your edition setting. Choose fewer or more to give it a firm limit.", "") + `<div class="stepper"><button class="ob" aria-label="Fewer articles from this feed">−</button><button class="ob" aria-label="More articles from this feed">+</button></div>`;
-const feedPage = (o = {}) =>
+const feedPage = (o = {}) => o.noCap ? feedPageFull(o).replace(capBlock, "") : feedPageFull(o);
+const feedPageFull = (o = {}) =>
   H.bar(o.name || "Harbour Ledger · Local News") +
   `<div class="body">${o.crumb ?? `<div class="crumb">In <b data-back>Tiny Tiny RSS</b> · category News</div>`}
   ${o.left ? `<div class="note"><b>Left out of the paper.</b> It stays in your tt-rss and isn't fetched. Starred articles from it still go in.</div><div class="btns"><button class="ob">Bring back</button></div><div class="h2">Starred · 1</div>${H.art(["★", "How we rebuilt the build farm", "Sep 22 · Starred for your next edition"])}` :
@@ -1148,18 +1160,18 @@ FLOWS.f5 = { start: "sources", screens: {
 FLOWS.rec = {
   start: "sources",
   screens: {
-    sources: { label: "1 · Sources", note: "Unchanged for everyone. Tap tt-rss.", html: () => FLOWS.a.screens.sources.html() },
-    acct: { label: "2 · Account", note: "After A1: the account page gains \"Use tt-rss categories as sections\". The feed list below it is A2, only if missed.", path: ["sources", "acct"], html: () => acctPage() },
-    afeed: { label: "If missed · A feed", note: "A2, only if missed: one feed's page. Article text is already learned per feed by A1; this only overrides.", path: ["sources", "acct", "afeed"], html: () => feedPage() },
-    balance: { label: "3 · Balance", note: "D, after A1 and categories as sections: one per section, then More.", path: ["settings", "balance"], html: () => FLOWS.d.screens.balance.html() },
-    preview: { label: "4 · What would go in", note: "D: the rule, visible in tomorrow's contents.", path: ["settings", "balance", "preview"], html: () => FLOWS.d.screens.preview.html() },
+    sources: { label: "2 · Sources", note: "Step 2: tt-rss is one row; its feeds sit inset beneath it (shown open). Tap a feed, or Settings.", html: () => FLOWS.f5.screens.sources.html() },
+    closed: { label: "Folded", note: "Folded is today's Sources.", path: ["closed"], html: () => FLOWS.f5.screens.closed.html() },
+    feed: { label: "2 · A feed", note: "Step 2: a feed's page. Article text is already learned per feed by step 1; this only overrides. No cap: dropped.", path: ["sources", "feed"], html: () => feedPage({ noCap: true, crumb: `<div class="crumb">From <b data-go="acct">Tiny Tiny RSS</b> · category News</div>` }) },
+    acct: { label: "3 · Sections", note: "Step 3 adds \"Use tt-rss categories as sections\" here.", path: ["sources", "acct"], html: () => acctScreen.html() },
+    balance: { label: "3 · Balance", note: "Step 3: D, one from each section, then More.", path: ["settings", "balance"], html: () => FLOWS.d.screens.balance.html() },
+    preview: { label: "3 · What would go in", note: "D's rule, visible in tomorrow's contents. For the book's signposts (S4), see Sections in the paper.", path: ["settings", "balance", "preview"], html: () => FLOWS.d.screens.preview.html() },
     found: { dialog: true, over: ["sources"], label: "If needed · C", note: "C, only if OPML export and tt-rss's own subscribe feel like a chore.", html: () => FLOWS.c.screens.found.html() },
+    left: { label: "Left out", note: "", path: ["sources", "left"], html: () => FLOWS.f5.screens.left.html() },
     settings: { label: "Settings", note: "", path: ["settings"], html: () => FLOWS.d.screens.settings.html() },
-    leave: { dialog: true, over: ["sources", "acct", "afeed"], label: "Leave out", note: "", html: () => FLOWS.a.screens.leave.html() },
-    atext: { dialog: true, over: ["sources", "acct", "afeed"], label: "Article text", note: "", html: () => textDlg },
-    section: { dialog: true, over: ["sources", "acct", "afeed"], label: "Section", note: "", html: () => sectionDlg },
-    lfeed: { label: "Left out", note: "", path: ["sources", "acct", "lfeed"], html: () => FLOWS.a.screens.lfeed.html() },
-    recent: { label: "Recent", note: "", path: ["sources", "acct", "recent"], html: () => FLOWS.a.screens.recent.html() },
+    leave: { dialog: true, over: ["sources", "feed"], label: "Leave out", note: "", html: () => FLOWS.a.screens.leave.html() },
+    atext: { dialog: true, over: ["sources", "feed"], label: "Article text", note: "", html: () => textDlg },
+    section: { dialog: true, over: ["sources", "feed"], label: "Section", note: "", html: () => sectionDlg },
     sec: { label: "Section", note: "", path: ["settings", "balance", "sec"], html: () => FLOWS.d.screens.sec.html() },
     where: { dialog: true, over: ["sources"], label: "Add to tt-rss", note: "", html: () => FLOWS.c.screens.where.html() },
     cat: { dialog: true, over: ["sources"], then: "where", label: "Category", note: "", html: () => FLOWS.c.screens.cat.html() },
@@ -1168,7 +1180,7 @@ FLOWS.rec = {
     undo: { dialog: true, over: ["added"], label: "Undo", note: "", html: () => FLOWS.c.screens.undo.html() },
   },
   menus: { acctmenu: [["Sign in again"], ["Remove tt-rss"]] },
-  chips: ["sources", "acct", "balance", "preview", "afeed", "found"],
+  chips: ["sources", "closed", "feed", "acct", "balance", "preview", "found"],
 };
 
 /* ---------- engine ---------- */
@@ -1233,9 +1245,11 @@ const PLAN = [
   ["13", "Critique of compare and recommend, then the final version", "Compare, final", "done"],
   ["14", "Your follow-ups: sections in the paper; every tt-rss feed on Sources", "S1–S4 and F1–F4, one critique round", "done"],
   ["15", "Your idea: tt-rss feeds inset under the tt-rss row on Sources", "F5 v1, a critique, F5 v2, and a five-way comparison", "done"],
+  ["16", "Redo compare and recommend with F and S, then a critique", "Compare v3", "done"],
 ];
 const LOG = [
-  ["Cycle 15 · feeds inset under the tt-rss row", "Mocked your idea as F5 and had a critic walk it as the owner, the Kindle reader, TalkBack and Boox.", "Changed: the tt-rss group stays last, a separate fold button and Settings link, folded until opened, lines only for quiet feeds and duplicates, a plain Left-out list. Added a comparison of F1–F5. F5 with F4's list on the account page is the pick if you want every feed on Sources."],
+  ["Cycle 16 · compare and recommend, redone", "After F5 and S4 came in, the comparison had only a paragraph bolted on, contradicting its own first answer. Rewrote it, then a critic checked it against every tab and the code.", "Changed: F5 with feed pages moves to Next (you asked, which is the signal cycle 13 waited for), costed as the biggest step. A1 keys on feed id only, since addresses and categories need the full feed list in step 2. S4 can ship any time. F4 is optional everywhere on the page. Superseded lines marked."],
+  ["Cycle 15 · feeds inset under the tt-rss row", "Mocked your idea as F5 and had a critic walk it as the owner, the Kindle reader, TalkBack and Boox.", "Changed: the tt-rss group stays last, a separate fold button and Settings link, folded until opened, lines only for quiet feeds and duplicates, a plain Left-out list. Added a comparison of F1–F5. F5 is the pick; F4's searchable list is optional, later."],
   ["Cycle 14 · your follow-ups", "Sections in the paper: three ways the book could show them (today's headings, section fronts, a front page). Every tt-rss feed on Sources: by account, by the paper's sections, one A–Z list. A critic read them on a Kindle, a Boox and KOReader, with 58 feeds and with 5.", "Changed: S4 added and recommended (today's book plus a section flag and a section-aware Next). S3 isn't recommended (Kindle opens past it). S2 only for big sections. F4 added and recommended (all 58 A–Z on the account page). F2 isn't recommended (B again). F1 and F3 now take freshness from tt-rss itself, because the app only fetches unread."],
   ["Cycles 12–13 · compare, critique, final", "Compared A1, A2, C and D (B dropped) on what each fixes for the owner, who sees it, what code it touches and cost. Then a critic read the comparison as the owner and as a senior engineer.", "Changed: the recommendation now opens with where your gut is right, builds only A1 now (re-rated: it needs a table), puts categories-as-sections and D after living with it, A2 only if missed, and points to OPML export instead of C. Stale lines across tabs fixed."],
   ["Round D2 · does balance deliver?", "Worked the owner's numbers through the real planner (rotation by featured-longest-ago, caps, one budget).", "Changed: D v3 replaces weights with one rule: one article per section, then More, then Normal, Less if room. Off by default, Take turns only, stars count as their section's one, and the contents say when only one section had news."],

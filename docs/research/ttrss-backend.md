@@ -241,17 +241,18 @@ dialog that names what goes.
 
 ## 4. Recommendation (final, after critique)
 
-Your gut is right for Sources: tt-rss stays one row. One thing can't wait: tt-rss feeds don't
-learn their article text, and nothing the reader can set fixes it today.
+Keep tt-rss as one row in Sources, with its feeds listed just beneath it, folded until opened.
 
-1. **Now: article text learned per tt-rss feed.** No screen. A small per-feed table (feed id,
-   address, category, learned text) and a migration.
-2. **After living with it: tt-rss categories as sections, then balance by section** (one article
-   from each section, then More sections take the next turns), if the paper still isn't varied
-   enough.
-3. **Only if missed: feed pages** under the account (Leave out, text override, cap, section).
-4. **Adding feeds to tt-rss:** OPML export and tt-rss's own subscribe already do it. A second
-   "Add to tt-rss instead" button is designed, if that turns out to be a chore. Never by
+1. **Now: article text learned per tt-rss feed.** No screen. A small per-feed table keyed by
+   feed id, with a migration. **Any time:** section signposts in the book (the section's name
+   on its first article, and "Next, in Science: …"); it only touches the EPUB writer.
+2. **Next: your feeds on Sources.** The inset list under the tt-rss row, each opening the feed's
+   page (Leave out, article text, its own articles). The biggest step: a daily full feed list
+   from tt-rss, the left-out list moving into the per-feed table, duplicate matching.
+3. **For a more varied paper:** tt-rss categories as sections, then balance by section (one
+   article from each section, then More sections take the next turns).
+4. **Only if needed:** a searchable feed list on the account page; an "Add to tt-rss instead"
+   button. OPML export and tt-rss's own subscribe already add feeds to tt-rss. Never by
    default, never on import: a feed that exists for the paper becomes an unread count there.
 
 Spreading every tt-rss feed through Sources was tried and dropped. The details, mockups and
