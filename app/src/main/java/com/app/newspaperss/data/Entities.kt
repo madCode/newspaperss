@@ -166,6 +166,10 @@ data class EditionEntity(
     val fileName: String? = null,
     val articleCount: Int = 0,
     val minutes: Double = 0.0,
+    /**
+     * When it was last delivered. Kept when it's marked as not sent: sending it again then knows
+     * the work done on first delivery, like saving its notes, is done.
+     */
     val deliveredAt: Instant? = null,
     val error: String? = null,
 )

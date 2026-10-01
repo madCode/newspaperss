@@ -517,6 +517,10 @@ class TtrssSyncTest {
         assertEquals(listOf(10L, 11L), server.markedUnread.sorted())
         assertEquals("not marked read again", 2, server.markedRead.size)
         assertNull(db.sources().byId(source.id)!!.serverNote)
+
+        editions.markSent(editionId)
+        assertTrue(ttrss.syncRead(editionId))
+        assertEquals("sent again, read again", listOf(10L, 10L, 11L, 11L), server.markedRead.sorted())
     }
 
     @Test

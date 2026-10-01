@@ -18,7 +18,8 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun MarkNotSent(title: String, onConfirm: () -> Unit) {
-    var asking by rememberSaveable { mutableStateOf(false) }
+    // Keyed by the edition: a newer one can take its place on Today while the dialog is open.
+    var asking by rememberSaveable(title) { mutableStateOf(false) }
     // No start padding, so it lines up with the text and buttons above rather than sitting indented.
     TextButton(onClick = { asking = true }, contentPadding = PaddingValues(end = 12.dp)) { Text("Didn't arrive? Mark as not sent") }
     if (asking) {

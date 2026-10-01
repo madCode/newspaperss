@@ -124,7 +124,9 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                     },
                     onSent = { viewModel.markSent(latest) },
                     // Only while its book is still here to send again.
-                    onNotSent = if (viewModel.fileOf(latest) != null) { { viewModel.markNotSent(latest.id) } } else null,
+                    onNotSent = if (remember(latest.fileName, latest.status) { viewModel.fileOf(latest) != null }) {
+                        { viewModel.markNotSent(latest.id) }
+                    } else null,
                 )
             }
         }

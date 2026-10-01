@@ -750,7 +750,6 @@ class EditionBuilderTest {
 
         val edition = db.editions().byId(built.editionId)!!
         assertEquals(EditionStatus.READY, edition.status)
-        assertNull(edition.deliveredAt)
         assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
         assertEquals(ArticleState.IN_EDITION, stateOf("a2"))
         assertTrue("it went in starred, so it keeps its star", starredAt("a2") != null)
@@ -804,6 +803,39 @@ class EditionBuilderTest {
 
         assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
         assertFalse("not offered to a third edition", db.articles().candidates().any { it.guid == "a1" })
+    }
+
+    /** An article that went out again in a newer edition was delivered: marking the old one as not sent mustn't send it a third time. */
+    @Test
+    fun anArticleDeliveredAgainInANewerEditionStaysDeliveredWhenTheOldOneIsMarkedAsNotSent() = runTest {
+        source("a", null, "a1")
+        editions.setStarred(idOf("a1"), true)
+        val first = builder.build(EditionSettings()) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        editions.setStarred(idOf("a1"), true)
+        val later = EditionRepository(db, tmp.root, Clock.offset(clock, Duration.ofHours(1)))
+        val second = builder.build(EditionSettings()) as BuildResult.Built
+        later.markDelivered(second.editionId)
+
+        assertTrue(editions.markNotSent(first.editionId))
+
+        assertEquals(ArticleState.DELIVERED, stateOf("a1"))
+        assertNull("its star isn't brought back either", starredAt("a1"))
+    }
+
+    /** Sending again after marking as not sent is the same delivery: its notes are saved once. */
+    @Test
+    fun sendingAgainAfterMarkingAsNotSentDoesntRepeatTheWorkOfDelivery() = runTest {
+        val followUps = mutableListOf<Long>()
+        val delivering = EditionRepository(db, tmp.root, clock, onDelivered = { followUps += it })
+        source("a", null, "a1")
+        val built = builder.build(EditionSettings()) as BuildResult.Built
+        delivering.markSent(built.editionId)
+        delivering.markNotSent(built.editionId)
+        delivering.markSent(built.editionId)
+
+        assertEquals(EditionStatus.DELIVERED, db.editions().byId(built.editionId)!!.status)
+        assertEquals(listOf(built.editionId), followUps)
     }
 
     @Test

@@ -276,17 +276,20 @@ interface ArticleDao {
 
     /**
      * Puts a delivered edition's articles back in it, with the stars they went in with: delivery
-     * cleared them. Ones taken into a newer edition since, or starred again, are left as they are.
+     * cleared them. Not ones taken into a newer edition since: still unsent they aren't delivered,
+     * and delivered they went out with it.
      */
     @Query(
         """UPDATE articles SET starredAt = COALESCE(starredAt, :at) WHERE state = 'DELIVERED'
-           AND id IN (SELECT articleId FROM edition_articles WHERE editionId = :editionId AND starred = 1)""",
+           AND id IN (SELECT articleId FROM edition_articles WHERE editionId = :editionId AND starred = 1)
+           AND id NOT IN ($DELIVERED_SINCE)""",
     )
     suspend fun restoreStars(editionId: Long, at: Instant)
 
     @Query(
         """UPDATE articles SET state = 'IN_EDITION' WHERE state = 'DELIVERED'
-           AND id IN (SELECT articleId FROM edition_articles WHERE editionId = :editionId)""",
+           AND id IN (SELECT articleId FROM edition_articles WHERE editionId = :editionId)
+           AND id NOT IN ($DELIVERED_SINCE)""",
     )
     suspend fun undeliver(editionId: Long)
 
@@ -417,6 +420,11 @@ interface ArticleDao {
     )
     suspend fun ttrssUnsentInEdition(editionId: Long): List<ArticleEntity>
 }
+
+/** Articles of edition :editionId delivered again in an edition sent after it. */
+private const val DELIVERED_SINCE = """SELECT ea.articleId FROM edition_articles ea JOIN editions e ON e.id = ea.editionId
+    WHERE ea.editionId != :editionId AND ea.articleId IS NOT NULL AND e.status = 'DELIVERED'
+    AND e.deliveredAt > COALESCE((SELECT deliveredAt FROM editions WHERE id = :editionId), 0)"""
 
 data class EditionContent(
     @Embedded val entry: EditionArticleEntity,
