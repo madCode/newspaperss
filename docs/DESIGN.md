@@ -121,7 +121,9 @@ module so it's all unit-tested without Android.
 - **Comics and image posts.** A feed item that's just an image counts as
   content. When a page's text is clearly not the article, the page's main
   image is used, and a webcomic's own comic (all its panels) beats the
-  feed's thumbnail.
+  feed's thumbnail. An image's title text (xkcd's hover joke) becomes a
+  caption under it, unless it only repeats the image's description or file
+  name, or the article already shows it.
 - **Which text to use, per source.** Each article is evidence: a page with
   twice the feed's words means the feed is a teaser; a feed of 300+ words,
   or a site that blocks fetching, means the feed is enough. Three days

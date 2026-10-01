@@ -4,6 +4,7 @@ import com.app.newspaperss.core.net.HttpBytes
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.net.HttpResponse
 import kotlinx.coroutines.test.runTest
+import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -76,6 +77,19 @@ class ArticleExtractorTest {
 
         assertEquals(listOf("https://example.com/comics/1-page.png"), article.imageUrls)
         assertTrue("the feed's words are the caption", "Edith has ideas" in article.html)
+    }
+
+    @Test
+    fun xkcdsHoverTextGoesUnderTheComicOnce() = runTest {
+        val hover = "Proper User Policy apparently means Simon Says."
+        val comic = "<img src=\"https://imgs.xkcd.com/comics/sandwich.png\" title=\"$hover\" alt=\"Sandwich\" />"
+        val page = "<html><body><div id=\"ctitle\">Sandwich</div><div id=\"comic\">$comic</div>$footer</body></html>"
+
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(comic, feedTitle = "Sandwich"))
+
+        assertEquals(listOf("https://imgs.xkcd.com/comics/sandwich.png"), article.imageUrls)
+        val captions = Jsoup.parse(article.html).select("figure > figcaption")
+        assertEquals(listOf(hover), captions.map { it.text() })
     }
 
     @Test

@@ -331,6 +331,44 @@ class HtmlCleanerTest {
         assertEquals(4, result.wordCount)
     }
 
+    private val xkcd = "<img src=\"https://imgs.xkcd.com/comics/sandwich.png\" title=\"Proper User Policy apparently means Simon Says.\" alt=\"Sandwich\" />"
+
+    /** A webcomic's hover text is often its second joke, and e-readers have no hover. */
+    @Test
+    fun anImagesTitleTextBecomesItsCaption() {
+        val result = HtmlCleaner.clean(xkcd, base)
+        assertEquals(
+            "<figure><img src=\"https://imgs.xkcd.com/comics/sandwich.png\" alt=\"Sandwich\" />" +
+                "<figcaption>Proper User Policy apparently means Simon Says.</figcaption></figure>",
+            result.html,
+        )
+        // Still a picture with no words, so the rules for comics treat it as one.
+        assertEquals(0, result.wordCount)
+        // Linked, and alone in a paragraph, as feeds often wrap a comic: the figure takes their place.
+        val linked = clean("<p><a href=\"https://xkcd.com/149/\">$xkcd</a></p>")
+        assertEquals("<figure><p><a href=\"https://xkcd.com/149/\"><img", linked.substringBefore(" src="))
+        assertTrue(linked, linked.endsWith("</a></p><figcaption>Proper User Policy apparently means Simon Says.</figcaption></figure>"))
+        // A figure of its own gets the caption, unless it has one.
+        assertTrue(clean("<figure>$xkcd</figure>").endsWith("<figcaption>Proper User Policy apparently means Simon Says.</figcaption></figure>"))
+        assertEquals(1, Jsoup.parse(clean("<figure>$xkcd<figcaption>By Randall</figcaption></figure>")).select("figcaption").size)
+    }
+
+    @Test
+    fun aTitleThatAddsNothingIsNoCaption() {
+        val titles = listOf("", "  ", "Sandwich", "sandwich.png", "sandwich", "IMG 1234")
+        for (title in titles) {
+            val src = if (title == "IMG 1234") "https://example.com/IMG_1234.jpg" else "https://example.com/sandwich.png"
+            val html = clean("<img src=\"$src\" title=\"$title\" alt=\"Sandwich\"><p>$longText</p>")
+            assertFalse("\"$title\": $html", html.contains("figcaption"))
+        }
+        // Already on the page under the image: not said twice.
+        val shown = clean("$xkcd<p>Proper User Policy apparently means Simon Says.</p>")
+        assertFalse(shown, shown.contains("figcaption"))
+        // An image within a line of text can't take a figure there; the text is left as it is.
+        val inline = clean("<p>Here it is $xkcd in the middle.</p>")
+        assertFalse(inline, inline.contains("figure"))
+    }
+
     @Test
     fun outputIsXhtml() {
         assertEquals("<p>a<br />b &amp; c&#xa0;d</p><hr />", clean("<p>a<br>b &amp; c&nbsp;d</p><hr>"))
