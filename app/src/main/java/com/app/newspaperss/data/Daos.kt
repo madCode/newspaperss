@@ -106,6 +106,9 @@ interface SourceDao {
     @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")
     suspend fun setMarkReadOnServer(id: Long, markRead: Boolean)
 
+    @Query("UPDATE sources SET skipPaidPosts = :skip WHERE id = :id")
+    suspend fun setSkipPaidPosts(id: Long, skip: Boolean)
+
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 
@@ -236,6 +239,24 @@ interface ArticleDao {
                          ORDER BY e2.createdAt DESC, e2.id DESC LIMIT 1)""",
     )
     fun observeHistory(sourceId: Long): Flow<List<ArticleHistory>>
+
+    /**
+     * A paid post an edition found next to nothing free in; [skip] leaves it out for good, as one
+     * that waited too long. Not a starred one, nor one that's already left the waiting articles.
+     */
+    @Query(
+        """UPDATE articles SET paidOnly = 1,
+               state = CASE WHEN :skip AND state = 'NEW' AND starredAt IS NULL THEN 'EXPIRED' ELSE state END
+           WHERE id = :id""",
+    )
+    suspend fun markPaidOnly(id: Long, skip: Boolean)
+
+    /** How many of a source's articles were paid posts with nothing free, and how many of them were left out. */
+    @Query(
+        """SELECT COUNT(*) AS found, COALESCE(SUM(CASE WHEN state = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS skipped
+           FROM articles WHERE sourceId = :sourceId AND paidOnly = 1""",
+    )
+    fun observePaidOnly(sourceId: Long): Flow<PaidOnlyCount>
 
     /** Newest first by the date a source's page shows ([ArticleEntity.shownDate]). */
     @Query(
@@ -491,6 +512,8 @@ private const val DELIVERED_SINCE = """SELECT ea.articleId FROM edition_articles
     AND e.deliveredAt > COALESCE((SELECT deliveredAt FROM editions WHERE id = :editionId), 0)"""
 
 /** One fact about what happened to an article: when it went out, or which unsent edition holds it. */
+data class PaidOnlyCount(val found: Int, val skipped: Int)
+
 data class ArticleHistory(val articleId: Long, val sentAt: Instant?, val editionTitle: String?)
 
 /** A tt-rss article's guid and the tt-rss feed it came from. */

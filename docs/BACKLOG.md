@@ -17,7 +17,6 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 ### Sources and fetching
 - [ ] **Platform pass** *(you asked)*: a test corpus of real posts from the big blog and newsletter platforms, from their own feeds and through tt-rss, checked for footnotes, embeds, captions, paywall teasers and link posts; what breaks gets fixed and the corpus keeps it fixed (`PlatformCorpusTest`). Round 1 covered Substack, Ghost, WordPress, Medium, Blogger, Buttondown and Micro.blog. Still to add: Tumblr (it answers 429 to the collector), beehiiv, posts with galleries, tweets and Bluesky embeds, and more footnote styles
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
-- [ ] **Empty premium posts** *(you asked)*: some feeds list paid-only articles with a title and no content at all, and the page behind them is a paywall. Detect them (no body in the feed and nothing usable fetched, or a premium marker like Substack's paid audience tag), and let a source opt in to skipping them so they never take a slot. Off by default; the source page says how many it skipped
 - [ ] "No feed found" in onboarding: offer the reading list there too (done in Sources) *(personas)*
 - [ ] Page cleanup's furniture patterns ("Recommended stories", "Subscribe to", "Read more:") are English only, so "Lire aussi", "Mehr zum Thema" and "Lee también" slip into French, German and Spanish articles. Key them by the article's language *(live)*
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
@@ -219,6 +218,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Paid posts say they're only the free part; a source can skip the ones with nothing free (a title and a picture), off by default, with a count on its page *(you asked)*
 - [x] After a send with the Kindle app, a line says it can take a few minutes to show up in the library *(device)*
 - [x] A text size setting for the article preview (Aa in its top bar) *(your brother asked)*
 - [x] Comics in the preview: large pictures standing alone fill the width, and the page can be pinched to zoom *(you asked)*

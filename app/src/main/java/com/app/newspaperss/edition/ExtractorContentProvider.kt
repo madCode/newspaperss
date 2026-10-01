@@ -26,6 +26,8 @@ import java.io.IOException
  * Extracts each article and embeds its images. The edition-wide image size budget is applied
  * later by [EditionBuilder], in reading order.
  *
+ * @param onPaidOnly told of each paid post with next to nothing free, and whether it was left out
+ *   for its source's [SourceEntity.skipPaidPosts], for [com.app.newspaperss.data.SourceRepository.markPaidOnly].
  * @param onEvidence receives what each article showed about where its source's full text is,
  *   for [com.app.newspaperss.data.SourceRepository.recordFullText].
  */
@@ -33,6 +35,7 @@ class ExtractorContentProvider(
     private val extractor: ArticleExtractor,
     private val http: HttpClient,
     private val encoder: ImageEncoder,
+    private val onPaidOnly: suspend (articleId: Long, skipped: Boolean) -> Unit = { _, _ -> },
     private val onEvidence: suspend (sourceId: Long, FullTextEvidence) -> Unit,
 ) : ArticleContentProvider {
     // Downloads overlap but decoding doesn't: a decoded photo can take tens of MB of heap.
@@ -54,6 +57,12 @@ class ExtractorContentProvider(
         // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
         // reader saved on purpose waits for the next edition instead of being used up as a stub.
         if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
+        if (extracted.nothingFree) {
+            // A star asks for this article whatever it turns out to be.
+            val skip = source.skipPaidPosts && article.starredAt == null
+            onPaidOnly(article.id, skip)
+            if (skip) return null
+        }
         val encoded = download(ArticleImages.wanted(extracted.imageUrls), refererFor(article.url), images)
         val embedded = ArticleImages.embed(extracted.html, "a${article.id}", encoded)
         return ArticleContent(

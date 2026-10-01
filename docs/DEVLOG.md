@@ -14,6 +14,10 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 4 · Thu 1 Oct
 
+### Cycle 73: skipping paid posts with nothing free
+- **From you:** detect premium posts with no content at all, and let a source opt in to skipping them.
+- **Shipped:** a paid post with under 50 words free (a title and a picture) is remembered when an edition tries it. Its source's page then offers "Skip paid posts with nothing free", off until you turn it on. Skipped posts read "Skipped: a paid post", aren't fetched again, and are counted on the page. A starred one still goes in.
+
 ### Cycle 72: the platform pass, round 1
 - **From you:** test against the big blog and newsletter platforms, from their own feeds and through tt-rss.
 - **Built:** a corpus of 40 real posts from Substack, Ghost, WordPress, Medium, Blogger, Buttondown and Micro.blog, with their words scrambled. Each one is run through tt-rss's own sanitizer as well. A test runs the extractor over every post both ways.

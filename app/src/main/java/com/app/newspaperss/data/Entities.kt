@@ -59,6 +59,11 @@ data class SourceEntity(
      * back succeeds.
      */
     val serverNote: String? = null,
+    /**
+     * Leave out paid posts with next to nothing free (see
+     * [com.app.newspaperss.core.extract.ExtractedArticle.nothingFree]) instead of giving them a place.
+     */
+    @ColumnInfo(defaultValue = "0") val skipPaidPosts: Boolean = false,
 )
 
 /** Stored by name, and the DAO queries spell names out as SQL strings ('NEW'): renaming one breaks them. */
@@ -115,6 +120,11 @@ data class ArticleEntity(
      * [com.app.newspaperss.core.feed.LinkPosts]); null for an ordinary article.
      */
     val viaUrl: String? = null,
+    /**
+     * A paid post that turned out, when an edition tried it, to have next to nothing free. With its
+     * source's [SourceEntity.skipPaidPosts] on it was left out, as EXPIRED.
+     */
+    @ColumnInfo(defaultValue = "0") val paidOnly: Boolean = false,
 ) {
     /**
      * When it was published, for showing: a date more than a day after it was fetched is a
