@@ -3,7 +3,8 @@
 An Android app that makes a personal, finite newspaper from your RSS feeds
 and saved links and delivers it to your e-reader as an EPUB. It brings the
 ideas of [rss-to-e-reader](https://github.com/madCode/rss-to-e-reader) to
-people who don't code. Read `docs/DESIGN.md` before changing behaviour;
+people who don't code. Read `docs/DESIGN.md` before changing behaviour
+and `docs/ARCHITECTURE.md` for how the code fits together;
 `docs/BACKLOG.md` is the running plan and `docs/DEVLOG.md` the log of what
 changed and why.
 

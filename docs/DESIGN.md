@@ -406,6 +406,8 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 
 ## 10. Architecture
 
+How the code is built, with diagrams, is in [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ```
 :core  (Kotlin/JVM, no Android)          :app  (Android, Compose)
 ├─ feed/     parsing, feed discovery,    ├─ data/      Room database, repositories
