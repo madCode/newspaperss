@@ -26,6 +26,10 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     var password = "secret"
     var apiEnabled = true
     val unread = mutableListOf<Item>()
+    /** Articles tt-rss still has but as read: marked read through the API, or by [readThere]. */
+    val read = mutableListOf<Item>()
+    /** updateArticle calls that answer OK without changing anything, as a broken server might. */
+    var ignoreUpdates = false
     /** Subcategories, child id to parent id. */
     val subcategories = mutableMapOf<Int, Int>()
     /** A feed whose getHeadlines answers with an HTTP 500. */
@@ -47,6 +51,16 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
 
     fun add(id: Long, title: String, feedId: Int, feedTitle: String, categoryId: Int = 0) {
         unread += Item(id, title, feedId, feedTitle, categoryId = categoryId)
+    }
+
+    /** The reader reads [id] in tt-rss itself. */
+    fun readThere(id: Long) {
+        unread.filter { it.id == id }.forEach { unread -= it; read += it }
+    }
+
+    /** The reader marks [id] unread in tt-rss itself. */
+    fun unreadThere(id: Long) {
+        read.filter { it.id == id }.forEach { read -= it; unread += it }
     }
 
     init {
@@ -88,25 +102,29 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                     val feed = str("feed_id")!!.toInt()
                     val isCategory = str("is_cat") == "true"
                     val limit = str("limit")?.toInt() ?: 200
+                    val all = str("view_mode") == "all_articles"
+                    val since = str("since_id")?.toLong() ?: 0
+                    val skip = str("skip")?.toInt() ?: 0
+                    val withContent = str("show_content") != "false"
                     // Newest first, as tt-rss sorts them; a higher id is newer here.
-                    unread.filter {
+                    (if (all) unread + read else unread).filter { it.id > since }.filter {
                         when {
                             isCategory -> it.categoryId == feed
                             feed > 0 -> it.feedId == feed
                             else -> true
                         }
-                    }.sortedByDescending { it.id }.take(limit).forEach { item ->
+                    }.sortedByDescending { it.id }.drop(skip).take(limit).forEach { item ->
                         add(
                             buildJsonObject {
                                 put("id", item.id)
                                 put("title", item.title)
                                 put("link", item.link)
-                                put("content", item.content)
+                                if (withContent) put("content", item.content)
                                 put("author", "")
                                 put("updated", 1_759_125_600L)
                                 put("feed_id", item.feedId)
                                 put("feed_title", item.feedTitle)
-                                put("unread", true)
+                                put("unread", item in unread)
                             },
                         )
                     }
@@ -125,9 +143,10 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                 val ids = str("article_ids")!!.split(",").map { it.toLong() }
                 if (mode == "0") {
                     markedRead += ids
-                    unread.removeAll { it.id in ids }
+                    if (!ignoreUpdates) ids.forEach(::readThere)
                 } else {
                     markedUnread += ids
+                    if (!ignoreUpdates) ids.forEach(::unreadThere)
                 }
                 ok(buildJsonObject { put("status", "OK"); put("updated", ids.size) })
             }

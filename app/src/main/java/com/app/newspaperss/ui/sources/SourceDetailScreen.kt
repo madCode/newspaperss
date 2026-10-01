@@ -310,9 +310,13 @@ private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onM
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Mark as read in tt-rss")
+            Text("Sync read status with tt-rss")
             Text(
-                if (source.markReadOnServer) "Articles are marked read once they're delivered or you mark them read" else "Articles are left unread in tt-rss",
+                if (source.markReadOnServer) {
+                    "What you read or mark unread here or in tt-rss shows in both. Delivered articles count as read."
+                } else {
+                    "tt-rss and this app keep their own read and unread"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
             )

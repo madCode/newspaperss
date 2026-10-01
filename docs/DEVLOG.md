@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
+### Cycle 67: read and unread in step with tt-rss (19:00–19:45)
+- **From you:** the newest change should win, checked by reading back from tt-rss; a star here should win over a read in tt-rss (your tt-rss marks read on opening); one switch, "Sync read status with tt-rss".
+- **Shipped:** each sync sends the app's changes, reads them back, then brings in what changed in tt-rss: read there while waiting here leaves the paper, unread there after it went out comes back. Stars and unsent editions aren't touched. Off, nothing flows either way.
+- **Cost:** a light headline list per feed only where the regular fetch can't tell, without article text.
+
 ### Cycle 66: read and unread, one tap each (18:15–18:45, mockups then option B)
 - **From you:** three states in a row (★, ●, ○) and a wish to mark one unread, including a sent one, without putting it first in line. You compared mockups: one button that cycles (A), two toggles (B), or words in a menu; you picked B to try, without outlines.
 - **Shipped:** on a source's page the status mark is a toggle. ● → ○ marks read; ○ or ✓ → ● marks unread, which puts it back with the waiting ones (★ is still "next edition"). A second tap undoes it, so there's no Undo. tt-rss hears of both at the next sync. An article marked unread counts as found again, so it isn't expired at the next sync.

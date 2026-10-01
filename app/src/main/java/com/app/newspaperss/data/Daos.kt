@@ -354,16 +354,37 @@ interface ArticleDao {
     )
     suspend fun markUnread(id: Long, now: Instant): Int
 
-    /** Guids of a source's articles the reader marked read (and hasn't starred since) that the server hasn't been told of. */
+    /** A source's articles the reader marked read (and hasn't starred since) that the server hasn't confirmed. */
     @Query(
-        """SELECT guid FROM articles WHERE sourceId = :sourceId AND state = 'SKIPPED' AND starredAt IS NULL
+        """SELECT guid, originId FROM articles WHERE sourceId = :sourceId AND state = 'SKIPPED' AND starredAt IS NULL
            AND reportedRead = 0 ORDER BY id LIMIT :limit""",
     )
-    suspend fun unreportedRead(sourceId: Long, limit: Int): List<String>
+    suspend fun unreportedRead(sourceId: Long, limit: Int): List<TtrssRef>
 
-    /** Guids of a source's waiting articles the server still has as read: marked unread here since. */
-    @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND reportedRead = 1 ORDER BY id LIMIT :limit")
-    suspend fun unreportedUnread(sourceId: Long, limit: Int): List<String>
+    /** A source's waiting articles the server last had as read: marked unread here since. */
+    @Query("SELECT guid, originId FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND reportedRead = 1 ORDER BY id LIMIT :limit")
+    suspend fun unreportedUnread(sourceId: Long, limit: Int): List<TtrssRef>
+
+    /** A source's waiting articles the server last had as unread, to check whether they've been read there since. Not starred ones: a star wins. */
+    @Query("SELECT guid, originId FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND starredAt IS NULL AND reportedRead = 0")
+    suspend fun waitingUnread(sourceId: Long): List<TtrssRef>
+
+    /** Read in tt-rss since the last sync, with nothing changed here: read here too. */
+    @Query(
+        """UPDATE articles SET state = 'SKIPPED', reportedRead = 1 WHERE sourceId = :sourceId AND guid IN (:guids)
+           AND state = 'NEW' AND starredAt IS NULL AND reportedRead = 0""",
+    )
+    suspend fun readOnServer(sourceId: Long, guids: List<String>)
+
+    /**
+     * Marked unread in tt-rss since the last sync, with nothing changed here: waiting again, and found
+     * again [now] so it doesn't expire at once, as when marked unread here.
+     */
+    @Query(
+        """UPDATE articles SET state = 'NEW', reportedRead = 0, discoveredAt = :now WHERE sourceId = :sourceId AND guid IN (:guids)
+           AND state IN ('SKIPPED', 'DELIVERED') AND reportedRead = 1""",
+    )
+    suspend fun unreadOnServer(sourceId: Long, guids: List<String>, now: Instant)
 
     /** Of [guids], those of the source's articles waiting or in an unsent edition: unread here. */
     @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND state IN ('NEW', 'IN_EDITION') AND guid IN (:guids)")
@@ -445,6 +466,9 @@ interface ArticleDao {
 private const val DELIVERED_SINCE = """SELECT ea.articleId FROM edition_articles ea JOIN editions e ON e.id = ea.editionId
     WHERE ea.editionId != :editionId AND ea.articleId IS NOT NULL AND e.status = 'DELIVERED'
     AND e.deliveredAt > COALESCE((SELECT deliveredAt FROM editions WHERE id = :editionId), 0)"""
+
+/** A tt-rss article's guid and the tt-rss feed it came from. */
+data class TtrssRef(val guid: String, val originId: String?)
 
 data class EditionContent(
     @Embedded val entry: EditionArticleEntity,

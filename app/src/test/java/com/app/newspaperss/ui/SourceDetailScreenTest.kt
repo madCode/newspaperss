@@ -212,8 +212,8 @@ class SourceDetailScreenTest {
         idleUntil { compose.waitForIdle(); syncs == 1 && visible("Tech") }
         assertEquals(5, runBlocking { db.sources().byId(id)!!.ttrssCategoryId })
 
-        compose.onNodeWithText("Mark as read in tt-rss").performClick()
-        idleUntil { compose.waitForIdle(); visible("left unread in tt-rss") }
+        compose.onNodeWithText("Sync read status with tt-rss").performClick()
+        idleUntil { compose.waitForIdle(); visible("keep their own read and unread") }
         assertEquals(false, runBlocking { db.sources().byId(id)!!.markReadOnServer })
     }
 

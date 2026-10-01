@@ -240,11 +240,23 @@ allowed to read that edition's file until the phone restarts.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
   read on the server once delivered (and unread again if the edition is
-  marked as not sent). What you mark read or unread here reaches the server
-  at the next sync, so a change of mind before then never does. A source can turn that off, or
-  take one category instead of all unread; adding the account asks which,
-  before the first sync. tt-rss's own stars aren't synced: there a star
-  usually means "keep this", not "for tomorrow".
+  marked as not sent). One category can be taken instead of all unread;
+  adding the account asks which, before the first sync. tt-rss's own stars
+  aren't synced: there a star usually means "keep this", not "for tomorrow".
+  - **Sync read status with tt-rss** (on by default) keeps read and unread
+    the same in both, the newest change winning. tt-rss doesn't say when a
+    flag changed, so each sync works it out from what changed since the
+    last one:
+    - Changes made here go out first and are read back from tt-rss; only
+      what it confirms counts as done. A change of mind before the sync
+      never reaches it.
+    - Read in tt-rss while waiting here: read here too, so it stays out of
+      the paper. Not if it's starred here (a star is deliberate; a read in
+      tt-rss may just be opening it), nor if it's in an unsent edition.
+    - Marked unread in tt-rss after it went out: waiting here again, once
+      it's among that feed's newest five unread.
+    - Changed on both sides between two syncs: the change made here wins.
+    - Off, nothing flows either way: tt-rss and the app keep their own.
   - **Feeds in your paper** (on the source's page) lists the account's feeds
     seen in the last month, with a checkbox each. A feed left out isn't
     fetched, and its waiting articles go too, except starred ones. It stays

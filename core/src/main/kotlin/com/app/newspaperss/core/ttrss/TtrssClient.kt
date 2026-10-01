@@ -163,6 +163,39 @@ class TtrssClient(
         }
     }
 
+    /**
+     * Whether each of a feed's articles with an id above [sinceId] is unread, read or not: id to
+     * unread. Headlines without their text, so checking a few dozen costs little. Up to [pages]
+     * pages of [MAX_LIMIT]; an article past them, or gone from tt-rss, is missing from the map.
+     */
+    suspend fun unreadStates(feedId: Int, sinceId: Long, pages: Int = 5): Map<Long, Boolean> {
+        val states = mutableMapOf<Long, Boolean>()
+        for (page in 0 until pages) {
+            val content = withSession { sid ->
+                post(buildJsonObject {
+                    put("sid", sid)
+                    put("op", "getHeadlines")
+                    put("feed_id", feedId)
+                    put("view_mode", "all_articles")
+                    put("show_content", false)
+                    put("limit", MAX_LIMIT)
+                    put("skip", page * MAX_LIMIT)
+                    put("since_id", sinceId)
+                })
+            }
+            val items = content as? JsonArray ?: throw TtrssException.NotTtrss()
+            for (item in items) {
+                val o = item as? JsonObject ?: continue
+                val id = (o["id"] as? JsonPrimitive)?.let { it.longOrNull ?: it.contentOrNull?.toLongOrNull() } ?: continue
+                // A boolean, or "t"/"1" from older versions on PostgreSQL or MySQL.
+                val unread = (o["unread"] as? JsonPrimitive)?.contentOrNull ?: continue
+                states[id] = unread == "true" || unread == "t" || unread == "1"
+            }
+            if (items.size < MAX_LIMIT) break
+        }
+        return states
+    }
+
     /** Marks [ids] as read. */
     suspend fun markRead(ids: Collection<Long>) = setUnread(ids, false)
 

@@ -204,7 +204,11 @@ class TtrssRepository(
         val client = account.client(http)
         val (problem, retry) = try {
             client.call(ids)
-            articles.groupBy { it.sourceId }.forEach { (sourceId, its) -> db.articles().setReportedRead(sourceId, its.map { it.guid }, read) }
+            // Only what tt-rss confirms: one it didn't take stays as the app last knew it, for the
+            // next sync to put right.
+            val confirmed = client.confirmed(articles.map { TtrssRef(it.guid, it.originId) }, read).toSet()
+            articles.filter { it.guid in confirmed }.groupBy { it.sourceId }
+                .forEach { (sourceId, its) -> its.map { it.guid }.chunked(500).forEach { db.articles().setReportedRead(sourceId, it, read) } }
             sourceIds.forEach { db.sources().setServerNote(it, null) }
             return true
         } catch (e: CancellationException) {
