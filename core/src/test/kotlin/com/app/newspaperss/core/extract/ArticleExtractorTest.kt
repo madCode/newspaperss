@@ -93,6 +93,23 @@ class ArticleExtractorTest {
     }
 
     @Test
+    fun hoverTextOnBothTheThumbnailAndTheComicGoesUnderTheComic() = runTest {
+        val hover = "The building was never finished."
+        val feedItem = "<p><img src=\"https://example.com/comicsthumbs/1-page.png\" title=\"$hover\" /></p><p>New comic!</p>"
+        val page = "<html><body><div id=\"cc-comicbody\"><img title=\"$hover\" src=\"https://example.com/comics/1-page.png\" id=\"cc-comic\"/></div>" +
+            "$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(feedItem))
+
+        assertEquals(listOf("https://example.com/comics/1-page.png"), article.imageUrls)
+        val figures = Jsoup.parse(article.html).select("figure")
+        assertEquals(article.html, 1, figures.size)
+        assertEquals("https://example.com/comics/1-page.png", figures.single().selectFirst("img")!!.attr("src"))
+        assertEquals(hover, figures.single().selectFirst("figcaption")!!.text())
+        assertEquals("said once", 1, Regex(Regex.escape(hover)).findAll(article.html).count())
+        assertTrue("the feed's own words stay", "New comic!" in article.html)
+    }
+
+    @Test
     fun aComicsCaptionAndEveryPanelSurvive() = runTest {
         val feedItem = "<figure><img src=\"https://example.com/thumbs/strip.png\"><figcaption>The joke, told in the caption.</figcaption></figure>"
         val page = "<html><body><div id=\"comic\"><img src=\"https://example.com/strips/panel-1.png\"><img src=\"https://example.com/strips/panel-2.png\"></div>" +

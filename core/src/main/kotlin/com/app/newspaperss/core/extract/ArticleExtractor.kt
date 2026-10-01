@@ -260,9 +260,15 @@ class ArticleExtractor(private val http: HttpClient) {
         feedImagesAreThumbnails: Boolean = false,
     ): ExtractedArticle? {
         val fromFeed = feed?.html?.let { html ->
-            if (!feedImagesAreThumbnails) html
+            if (!feedImagesAreThumbnails) return@let html
             // Only the images: a <figcaption> is often the joke. HtmlCleaner drops what's left empty.
-            else Jsoup.parseBodyFragment(html).body().apply { select("img, picture").remove() }.html()
+            // Not a caption the feed made from the thumbnail's hover text that the comic has too:
+            // left here, it would sit apart from the comic, which then wouldn't get its own.
+            val comicTitles = Jsoup.parseBodyFragment(image).select("img[title]").map { normalized(it.attr("title")) }.toSet()
+            Jsoup.parseBodyFragment(html).body().apply {
+                select("img, picture").remove()
+                select("figcaption").filter { normalized(it.text()) in comicTitles }.forEach { it.remove() }
+            }.html()
         }?.takeIf { Jsoup.parse(it).text().isNotBlank() || !feedImagesAreThumbnails }
         val caption = fromFeed ?: page.content.description?.let { "<p>${Entities.escape(it)}</p>" }.orEmpty()
         val title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) }

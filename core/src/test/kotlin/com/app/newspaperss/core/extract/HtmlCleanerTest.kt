@@ -367,6 +367,23 @@ class HtmlCleanerTest {
         // An image within a line of text can't take a figure there; the text is left as it is.
         val inline = clean("<p>Here it is $xkcd in the middle.</p>")
         assertFalse(inline, inline.contains("figure"))
+        for (line in listOf(
+            "<ul><li><img src=\"https://example.com/pdf.png\" title=\"PDF document\"> Download the report</li></ul>",
+            "<div>Text <a href=\"https://example.com/x\"><img src=\"https://example.com/i.png\" title=\"A picture\"></a> more</div>",
+            "Before $xkcd after",
+        )) {
+            val html = clean("$line<p>$longText</p>")
+            assertFalse(html, html.contains("figure"))
+        }
+    }
+
+    @Test
+    fun panelsSharingOneTitleAreCaptionedOnce() {
+        // As PageExtractor gives a comic's panels, each in its own figure.
+        val panels = (1..3).joinToString("") { "<figure><img src=\"https://example.com/strip-$it.png\" title=\"One joke for the strip\" alt=\"\"></figure>" }
+        val html = clean("<div>$panels</div>")
+        assertEquals(html, 1, Jsoup.parse(html).select("figcaption").size)
+        assertEquals(3, Jsoup.parse(html).select("img").size)
     }
 
     @Test

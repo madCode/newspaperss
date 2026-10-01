@@ -354,11 +354,12 @@ object HtmlCleaner {
      * Puts each image's title text in a `<figcaption>` under it: in its own figure if it has one
      * without a caption, else in a new figure around the image (and the link or paragraph holding
      * only it). An image inside a line of text is left alone, since a figure can't go there, and
-     * so is text the article already shows, such as a caption repeating the hover text.
+     * so is text the article already shows, such as a caption repeating the hover text or the
+     * same title on an earlier image.
      */
     private fun addTitleCaptions(body: Element, titles: Map<Element, String>) {
         if (titles.isEmpty()) return
-        val shown = body.text().replace(WHITESPACE, " ").lowercase()
+        var shown = body.text().replace(WHITESPACE, " ").lowercase()
         for ((img, title) in titles) {
             if (img.root() !== body.root() || title.lowercase() in shown) continue
             var block: Element = img
@@ -369,20 +370,27 @@ object HtmlCleaner {
                 block = parent
             }
             val parent = block.parent() ?: continue
-            when {
-                parent.tagName() == "figure" -> {
-                    if (parent.select("img").size == 1 && parent.children().none { it.tagName() == "figcaption" }) {
-                        parent.appendElement("figcaption").text(title)
-                    }
-                }
-                parent === body || parent.tagName() in FIGURE_PARENTS -> {
-                    val figure = Element("figure")
-                    block.replaceWith(figure)
-                    figure.appendChild(block)
-                    figure.appendElement("figcaption").text(title)
-                }
-            }
+            val figure = when {
+                parent.tagName() == "figure" ->
+                    parent.takeIf { it.select("img").size == 1 && it.children().none { c -> c.tagName() == "figcaption" } }
+                (parent === body || parent.tagName() in FIGURE_PARENTS) && onItsOwnLine(block) ->
+                    Element("figure").also { block.replaceWith(it); it.appendChild(block) }
+                else -> null
+            } ?: continue
+            figure.appendElement("figcaption").text(title)
+            shown += " " + title.lowercase()
         }
+    }
+
+    /** Nothing but blocks, or nothing at all, either side of [element]: it isn't part of a line of text. */
+    private fun onItsOwnLine(element: Element): Boolean {
+        fun isBlock(node: Node?): Boolean = node == null || (node is Element && node.tagName() in BLOCK_TAGS)
+        fun neighbour(step: (Node) -> Node?): Node? {
+            var node = step(element)
+            while (node is TextNode && node.isBlank) node = step(node)
+            return node
+        }
+        return isBlock(neighbour { it.previousSibling() }) && isBlock(neighbour { it.nextSibling() })
     }
 
     private fun isLayoutTable(table: Element): Boolean {
@@ -654,6 +662,9 @@ object HtmlCleaner {
     // Wrappers that can hold just an image, and blocks a <figure> may go in.
     private val SOLE_IMAGE_WRAPPERS = setOf("a", "p", "div")
     private val FIGURE_PARENTS = setOf("div", "blockquote", "li", "dd", "td", "th")
+    private val BLOCK_TAGS = setOf(
+        "p", "div", "figure", "ul", "ol", "dl", "blockquote", "pre", "table", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+    )
     private val FILE_NAME_SEPARATORS = Regex("[-_+\\s]+")
 
     private val BOILERPLATE = Regex(
