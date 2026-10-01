@@ -21,19 +21,15 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] "No feed found" in onboarding: offer the reading list there too (done in Sources) *(personas)*
 - [ ] Page cleanup's furniture patterns ("Recommended stories", "Subscribe to", "Read more:") are English only, so "Lire aussi", "Mehr zum Thema" and "Lee también" slip into French, German and Spanish articles. Key them by the article's language *(live)*
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
-- [ ] Webcomic title text (xkcd's hover text) is dropped; show it as a caption *(device)*
 
 ### The book
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
-- [ ] A text size setting for the article preview *(your brother asked; medium priority)*
-- [ ] Comics in the article preview: let a strip fill the page width, and allow pinch to zoom *(you asked)*
 - [ ] Substack Notes embedded in posts that come through tt-rss: tt-rss strips the Note's text, so the sentence introducing it hangs. Fetching the post's page would bring it back (the full post is in the page's data), at one page fetch per Substack article *(device)*
 
 ### Delivery and schedule
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; waiting on an app key ([#18](https://github.com/madCode/newspaperss/issues/18)) *(personas)*
 - [ ] Boox: offer folder delivery into the Books folder, so editions stay in the library *(personas)*
 - [ ] Folder delivery: tt-rss marks articles read as soon as the file is saved, before Syncthing has synced; old editions pile up in the folder *(personas)*
-- [ ] After a send to the Kindle app, say it can take a few minutes to show up in the library, so a slow arrival doesn't look like a failure *(device)*
 - [ ] Verify folder delivery and the chooser from the notification on a real device
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
@@ -53,7 +49,6 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Read sync: an article marked unread in tt-rss further back than its feed's newest five unread only comes back here once it's among them. Ask tt-rss about delivered articles directly if that turns out to matter
 
 ### From the UX pass *(ux)*
-- [ ] Sync errors on a source's page still read "The site answered with error 403"; give them the plain words the add dialog now uses ("turned newspapeRSS away… try again later")
 - [ ] An edition released because another was made by hand keeps its Ready notification (with Send) until the next timed one replaces it
 - [ ] Boox: consider turning off ripples on e-ink (they cause partial refreshes); Boox's own refresh modes may make it moot
 
@@ -224,6 +219,11 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] After a send with the Kindle app, a line says it can take a few minutes to show up in the library *(device)*
+- [x] A text size setting for the article preview (Aa in its top bar) *(your brother asked)*
+- [x] Comics in the preview: large pictures standing alone fill the width, and the page can be pinched to zoom *(you asked)*
+- [x] A webcomic's hover text (xkcd's title text) is a caption under the image in the book *(device)*
+- [x] Sync errors on a source's page use the add dialog's plain words, with advice that fits a source already added *(ux)*
 - [x] A tt-rss timeout says the server took too long, not that it couldn't be reached *(personas)*
 - [x] tt-rss: leave a feed out of the paper from the source's page; it isn't fetched, and its waiting articles go except starred ones *(personas)*
 - [x] No Open for Kindle and Kobo readers, who send the book rather than open it on the phone *(personas)*

@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 4 · Thu 1 Oct
 
+### Cycle 71: five small asks
+- **From you:** the backlog's quick ones, after the README catch-up.
+- **Shipped:** "It can take a few minutes to show up" after a send with the Kindle app; a text size for the article preview; comics in the preview fill the width and pinch to zoom; xkcd's hover text as a caption in the book; sync errors on a source's page in plain words.
+- **Review caught:** captions put in the middle of a line of text, every figure stretched in the preview, advice to re-add a built-in list, and the Kindle note coming back after Mark as not sent. All fixed.
+
 ### Cycle 70: each article says where it stands
 - **From you:** option B's plain lines from the read/unread mockups ([#111](https://github.com/madCode/newspaperss/issues/111)), with days left on waiting ones.
 - **Shipped:** a source's rows end with "Waiting, 3 days left", "In your next edition", "In Thursday's edition", "Sent Wednesday", "Read" or "Not picked". The reading list uses the same words, without days left.

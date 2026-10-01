@@ -121,7 +121,9 @@ module so it's all unit-tested without Android.
 - **Comics and image posts.** A feed item that's just an image counts as
   content. When a page's text is clearly not the article, the page's main
   image is used, and a webcomic's own comic (all its panels) beats the
-  feed's thumbnail.
+  feed's thumbnail. An image's title text (xkcd's hover joke) becomes a
+  caption under it, unless it only repeats the image's description or file
+  name, or the article already shows it.
 - **Which text to use, per source.** Each article is evidence: a page with
   twice the feed's words means the feed is a teaser; a feed of 300+ words,
   or a site that blocks fetching, means the feed is enough. Three days
@@ -198,6 +200,12 @@ too); or opening it on a Boox. **I've sent it** covers any other route, and
 **Send again** is there if a send didn't arrive. An edition still "ready"
 when the next one is built was never sent: it's marked not sent and its
 articles go back, keeping their stars, before the new one is planned.
+
+**Send to Kindle is slow.** A book can take a few minutes to reach the
+Kindle library, so for half an hour after a send with the Kindle app, the
+edition (on Today and its own page) says "Sent to Kindle. It can take a few
+minutes to show up in your library." Any other delivery, or marking it as
+not sent, takes the note away. It's only remembered while the app is running.
 
 **A send that didn't arrive can be undone.** A failed Send to Kindle still
 counts as sent, because Android only reports the app you chose.
@@ -311,7 +319,11 @@ allowed to read that edition's file until the phone restarts.
 - **Edition:** the same buttons as Today's card, including **Mark as not sent**,
   and its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
-  network). **Notes** exports a Markdown file for a notes app: front matter
+  network). **Aa** in the preview's top bar sets its text size (Small,
+  Default, Large, Larger), kept for next time. Large pictures that stand
+  alone fill the width (small ones keep their size), and the page can be
+  pinched to zoom into a comic. **Notes** exports a Markdown file for a
+  notes app: front matter
   (date, edition, sources, a tag) for Obsidian, the closing page's question and
   a few reflection prompts at the top, then per article its source, author, date, link, a citation and room for notes.
   **Delete edition** is in the ⋮ menu, and asks by name, saying what happens

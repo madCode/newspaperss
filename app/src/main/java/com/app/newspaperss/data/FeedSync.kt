@@ -6,6 +6,7 @@ import com.app.newspaperss.core.feed.LinkPosts
 import com.app.newspaperss.core.net.withoutTracking
 import com.app.newspaperss.core.lists.CuratedLists
 import com.app.newspaperss.core.lists.ListLayoutChangedException
+import com.app.newspaperss.core.net.ErrorAnswers
 import com.app.newspaperss.core.net.HttpClient
 import androidx.room.withTransaction
 import org.jsoup.nodes.Entities
@@ -80,7 +81,7 @@ class FeedSync(
                 db.sources().recordSuccess(source.id, now, feed.title, feed.siteUrl, SourceRepository.hostOf(source.url))
                 return added
             }
-            "The site answered with error ${response.code}."
+            ErrorAnswers.message(response.code)
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
@@ -256,7 +257,7 @@ class FeedSync(
                     if (untitled.isNotEmpty()) runCatching { onUntitled(untitled) }
                     return added
                 }
-                "The site answered with error ${response.code}."
+                ErrorAnswers.message(response.code, curatedList = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {

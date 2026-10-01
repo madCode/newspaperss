@@ -8,7 +8,10 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.edition.EditionNotes
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,9 +43,13 @@ class EditionDetailViewModel(
     private val editions: EditionRepository,
     private val id: Long,
     private val notes: EditionNotes,
+    sentToKindle: Flow<Set<Long>> = flowOf(emptySet()),
     /** Takes down this edition's notification once it's deleted. */
     private val dismissNotification: (Long) -> Unit,
 ) : ViewModel() {
+    /** Just sent with the Kindle app, which can take a few minutes to put it in the library. */
+    val sentToKindle: StateFlow<Boolean> = sentToKindle.map { id in it }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     val detail: StateFlow<EditionDetail?> = combine(editions.observe(id), editions.observeContents(id)) { edition, contents ->
         EditionDetail(edition, contents, edition?.let(editions::fileOf))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

@@ -4,6 +4,7 @@ import com.app.newspaperss.core.net.HttpBytes
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.net.HttpResponse
 import kotlinx.coroutines.test.runTest
+import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -76,6 +77,36 @@ class ArticleExtractorTest {
 
         assertEquals(listOf("https://example.com/comics/1-page.png"), article.imageUrls)
         assertTrue("the feed's words are the caption", "Edith has ideas" in article.html)
+    }
+
+    @Test
+    fun xkcdsHoverTextGoesUnderTheComicOnce() = runTest {
+        val hover = "Proper User Policy apparently means Simon Says."
+        val comic = "<img src=\"https://imgs.xkcd.com/comics/sandwich.png\" title=\"$hover\" alt=\"Sandwich\" />"
+        val page = "<html><body><div id=\"ctitle\">Sandwich</div><div id=\"comic\">$comic</div>$footer</body></html>"
+
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(comic, feedTitle = "Sandwich"))
+
+        assertEquals(listOf("https://imgs.xkcd.com/comics/sandwich.png"), article.imageUrls)
+        val captions = Jsoup.parse(article.html).select("figure > figcaption")
+        assertEquals(listOf(hover), captions.map { it.text() })
+    }
+
+    @Test
+    fun hoverTextOnBothTheThumbnailAndTheComicGoesUnderTheComic() = runTest {
+        val hover = "The building was never finished."
+        val feedItem = "<p><img src=\"https://example.com/comicsthumbs/1-page.png\" title=\"$hover\" /></p><p>New comic!</p>"
+        val page = "<html><body><div id=\"cc-comicbody\"><img title=\"$hover\" src=\"https://example.com/comics/1-page.png\" id=\"cc-comic\"/></div>" +
+            "$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(feedItem))
+
+        assertEquals(listOf("https://example.com/comics/1-page.png"), article.imageUrls)
+        val figures = Jsoup.parse(article.html).select("figure")
+        assertEquals(article.html, 1, figures.size)
+        assertEquals("https://example.com/comics/1-page.png", figures.single().selectFirst("img")!!.attr("src"))
+        assertEquals(hover, figures.single().selectFirst("figcaption")!!.text())
+        assertEquals("said once", 1, Regex(Regex.escape(hover)).findAll(article.html).count())
+        assertTrue("the feed's own words stay", "New comic!" in article.html)
     }
 
     @Test

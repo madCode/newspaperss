@@ -52,7 +52,7 @@ object HtmlCleaner {
         removeRelatedLinks(body)
         removeBoilerplate(body)
         fixPictures(body)
-        fixImages(body, baseUrl)
+        val titleTexts = fixImages(body, baseUrl)
         body.select("source").remove()
         flattenLayoutTables(body)
         stripTagsAndAttributes(body)
@@ -62,6 +62,10 @@ object HtmlCleaner {
         removeEmpty(body)
         collapseBlankLines(body)
         demoteStrayCaptions(body)
+        // Counted before the captions go in: hover text isn't article text, and a comic's feed item
+        // would otherwise read as a short text post to the rules that tell the two apart.
+        val wordCount = countWords(body)
+        addTitleCaptions(body, titleTexts)
 
         doc.outputSettings()
             .prettyPrint(false)
@@ -69,7 +73,7 @@ object HtmlCleaner {
             .escapeMode(Entities.EscapeMode.xhtml)
         return CleanResult(
             html = body.html().trim(),
-            wordCount = countWords(body),
+            wordCount = wordCount,
             imageUrls = body.select("img").map { it.attr("src") }.distinct(),
         )
     }
@@ -313,7 +317,9 @@ object HtmlCleaner {
         }
     }
 
-    private fun fixImages(body: Element, baseUrl: String) {
+    /** Returns the images whose `title` is worth keeping (see [titleText]), with that title. */
+    private fun fixImages(body: Element, baseUrl: String): Map<Element, String> {
+        val titles = LinkedHashMap<Element, String>()
         for (img in body.select("img")) {
             val isTrackingPixel = listOf("width", "height").any { dim ->
                 img.attr(dim).trim().removeSuffix("px").toIntOrNull()?.let { it <= 2 } == true
@@ -324,9 +330,67 @@ object HtmlCleaner {
                 continue
             }
             val alt = img.attr("alt").trim()
+            titleText(img.attr("title"), alt, src)?.let { titles[img] = it }
             img.clearAttributes()
             img.attr("src", src).attr("alt", alt)
         }
+        return titles
+    }
+
+    /**
+     * An image's `title` as a caption: a webcomic's hover text (xkcd's second joke). Not when it
+     * only repeats the alt text or names the file, as CMSs fill it in by default.
+     */
+    private fun titleText(title: String, alt: String, src: String): String? {
+        val text = title.replace(WHITESPACE, " ").trim()
+        if (text.isEmpty() || text.equals(alt, ignoreCase = true)) return null
+        val file = src.substringBefore('?').substringBefore('#').substringAfterLast('/')
+        val fileWords = file.substringBeforeLast('.').replace(FILE_NAME_SEPARATORS, " ").trim()
+        if (text.equals(file, ignoreCase = true) || text.replace(FILE_NAME_SEPARATORS, " ").equals(fileWords, ignoreCase = true)) return null
+        return text
+    }
+
+    /**
+     * Puts each image's title text in a `<figcaption>` under it: in its own figure if it has one
+     * without a caption, else in a new figure around the image (and the link or paragraph holding
+     * only it). An image inside a line of text is left alone, since a figure can't go there, and
+     * so is text the article already shows, such as a caption repeating the hover text or the
+     * same title on an earlier image.
+     */
+    private fun addTitleCaptions(body: Element, titles: Map<Element, String>) {
+        if (titles.isEmpty()) return
+        var shown = body.text().replace(WHITESPACE, " ").lowercase()
+        for ((img, title) in titles) {
+            if (img.root() !== body.root() || title.lowercase() in shown) continue
+            var block: Element = img
+            while (true) {
+                val parent = block.parent() ?: break
+                if (parent === body || parent.tagName() !in SOLE_IMAGE_WRAPPERS || parent.text().isNotBlank()) break
+                if (parent.childNodes().any { it !== block && !(it is TextNode && it.isBlank) }) break
+                block = parent
+            }
+            val parent = block.parent() ?: continue
+            val figure = when {
+                parent.tagName() == "figure" ->
+                    parent.takeIf { it.select("img").size == 1 && it.children().none { c -> c.tagName() == "figcaption" } }
+                (parent === body || parent.tagName() in FIGURE_PARENTS) && onItsOwnLine(block) ->
+                    Element("figure").also { block.replaceWith(it); it.appendChild(block) }
+                else -> null
+            } ?: continue
+            figure.appendElement("figcaption").text(title)
+            shown += " " + title.lowercase()
+        }
+    }
+
+    /** Nothing but blocks, or nothing at all, either side of [element]: it isn't part of a line of text. */
+    private fun onItsOwnLine(element: Element): Boolean {
+        fun isBlock(node: Node?): Boolean = node == null || (node is Element && node.tagName() in BLOCK_TAGS)
+        fun neighbour(step: (Node) -> Node?): Node? {
+            var node = step(element)
+            while (node is TextNode && node.isBlank) node = step(node)
+            return node
+        }
+        return isBlock(neighbour { it.previousSibling() }) && isBlock(neighbour { it.nextSibling() })
     }
 
     private fun isLayoutTable(table: Element): Boolean {
@@ -595,6 +659,13 @@ object HtmlCleaner {
         "blockquote", "em", "i", "strong", "b", "u", "small", "table", "tr", "td", "th", "tbody", "thead",
     )
     private val CELL_TAGS = setOf("td", "th")
+    // Wrappers that can hold just an image, and blocks a <figure> may go in.
+    private val SOLE_IMAGE_WRAPPERS = setOf("a", "p", "div")
+    private val FIGURE_PARENTS = setOf("div", "blockquote", "li", "dd", "td", "th")
+    private val BLOCK_TAGS = setOf(
+        "p", "div", "figure", "ul", "ol", "dl", "blockquote", "pre", "table", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+    )
+    private val FILE_NAME_SEPARATORS = Regex("[-_+\\s]+")
 
     private val BOILERPLATE = Regex(
         "^(listen to (this|the) (article|essay|story|episode)|\\d+[ -]min(ute)?s? (read|listen)|share (this|on)\\b|" +

@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.epub
 
+import com.app.newspaperss.core.extract.HtmlCleaner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -154,6 +155,20 @@ class EpubWriterTest {
         val zipFiles = epub.files.keys - setOf("mimetype", "META-INF/container.xml", "OEBPS/content.opf")
         assertEquals(zipFiles, manifestFiles)
         assertEquals(epub.entries.size, epub.files.size) // no duplicate entry names
+    }
+
+    @Test
+    fun aComicsHoverTextCaptionReachesTheBook() {
+        val cleaned = HtmlCleaner.clean(
+            "<img src=\"https://imgs.xkcd.com/comics/sandwich.png\" title=\"Proper User Policy apparently means Simon Says.\" alt=\"Sandwich\" />",
+            "https://xkcd.com/149/",
+        ).html.replace("https://imgs.xkcd.com/comics/sandwich.png", "images/a1-0.png")
+        val epub = write(unsectioned(article(body = cleaned, images = listOf(EpubImage("images/a1-0.png", "image/png", byteArrayOf(1))))))
+
+        val page = epub.xml("OEBPS/" + epub.articleHrefs().single())
+        val figure = page.documentElement.elements("figure").single()
+        assertEquals(listOf("figure", "img", "figcaption"), figure.elements("*").map { it.localName })
+        assertEquals("Proper User Policy apparently means Simon Says.", figure.elements("figcaption").single().textContent)
     }
 
     @Test

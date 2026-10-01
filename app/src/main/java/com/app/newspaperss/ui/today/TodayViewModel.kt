@@ -49,6 +49,8 @@ data class TodayState(
     val deviceName: String = "e-reader",
     /** Starred articles not yet in an edition, from sources that aren't paused. */
     val starredWaiting: Int = 0,
+    /** Editions just sent with the Kindle app, which can take a few minutes to arrive. */
+    val sentToKindle: Set<Long> = emptySet(),
 )
 
 class TodayViewModel(
@@ -58,11 +60,15 @@ class TodayViewModel(
     online: Flow<Boolean> = flowOf(true),
     private val now: () -> ZonedDateTime = { ZonedDateTime.now() },
     private val lastDue: () -> Long = { 0L },
+    sentToKindle: Flow<Set<Long>> = flowOf(emptySet()),
     private val startBuild: () -> Unit,
 ) : ViewModel() {
-    val state: StateFlow<TodayState> = combine(editions.observeAll(), work, settings, online, editions.observeStarredWaiting()) { list, info, s, isOnline, starred ->
+    private val editionsAndKindle = combine(editions.observeAll(), sentToKindle, ::Pair)
+
+    val state: StateFlow<TodayState> = combine(editionsAndKindle, work, settings, online, editions.observeStarredWaiting()) { (list, kindle), info, s, isOnline, starred ->
         TodayState(
             editions = list,
+            sentToKindle = kindle,
             build = buildStateOf(info, isOnline),
             next = nextEdition(s, now(), lastDue()),
             preferOpen = s.device == Device.BOOX,

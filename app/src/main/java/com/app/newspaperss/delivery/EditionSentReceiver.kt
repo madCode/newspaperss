@@ -26,7 +26,7 @@ class EditionSentReceiver : BroadcastReceiver() {
         val pending = goAsync()
         app.container.appScope.launch {
             try {
-                app.container.editions.markSent(id)
+                app.container.editions.markSent(id, chosen?.packageName)
             } finally {
                 pending.finish()
             }

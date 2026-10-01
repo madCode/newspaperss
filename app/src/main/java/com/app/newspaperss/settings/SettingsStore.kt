@@ -44,6 +44,14 @@ enum class Device(val label: String) {
  */
 val Device?.offersOpen: Boolean get() = this != Device.KINDLE && this != Device.KOBO
 
+/** How large the in-app article preview sets its text, as a percentage of the WebView's default. */
+enum class PreviewTextSize(val label: String, val percent: Int) {
+    SMALL("Small", 85),
+    DEFAULT("Default", 100),
+    LARGE("Large", 120),
+    LARGER("Larger", 145),
+}
+
 data class Settings(
     val onboarded: Boolean = false,
     val device: Device? = null,
@@ -57,6 +65,7 @@ data class Settings(
     /** A persisted SAF tree URI where each delivered edition's Markdown reading notes are saved, whatever [delivery] is. */
     val notesFolderUri: String? = null,
     val notesFolderName: String? = null,
+    val previewTextSize: PreviewTextSize = PreviewTextSize.DEFAULT,
 )
 
 // A corrupt settings file resets to defaults rather than crashing every launch.
@@ -83,6 +92,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val folderName = stringPreferencesKey("delivery_folder_name")
         val notesFolderUri = stringPreferencesKey("notes_folder_uri")
         val notesFolderName = stringPreferencesKey("notes_folder_name")
+        val previewTextSize = stringPreferencesKey("preview_text_size")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
@@ -108,6 +118,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             if (s.folderName != null) prefs[Keys.folderName] = s.folderName else prefs.remove(Keys.folderName)
             if (s.notesFolderUri != null) prefs[Keys.notesFolderUri] = s.notesFolderUri else prefs.remove(Keys.notesFolderUri)
             if (s.notesFolderName != null) prefs[Keys.notesFolderName] = s.notesFolderName else prefs.remove(Keys.notesFolderName)
+            prefs[Keys.previewTextSize] = s.previewTextSize.name
             prefs.remove(Keys.legacyNotesWithEdition)
         }
     }
@@ -136,6 +147,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             folderName = p[Keys.folderName],
             notesFolderUri = p[Keys.notesFolderUri] ?: p[Keys.folderUri]?.takeIf { legacyNotes },
             notesFolderName = p[Keys.notesFolderName] ?: p[Keys.folderName]?.takeIf { legacyNotes },
+            previewTextSize = p[Keys.previewTextSize]?.let { runCatching { PreviewTextSize.valueOf(it) }.getOrNull() } ?: d.previewTextSize,
         )
     }
 }

@@ -132,7 +132,7 @@ internal object PageExtractor {
     private fun figureOf(img: Element): String {
         val figure = Element("figure")
         val copy = figure.appendElement("img")
-        for (name in listOf("src", "srcset", "data-src", "data-srcset", "alt")) img.attr(name).takeIf { it.isNotBlank() }?.let { copy.attr(name, it) }
+        for (name in listOf("src", "srcset", "data-src", "data-srcset", "alt", "title")) img.attr(name).takeIf { it.isNotBlank() }?.let { copy.attr(name, it) }
         return figure.outerHtml()
     }
 

@@ -1,6 +1,8 @@
 package com.app.newspaperss
 
 import com.app.newspaperss.settings.offersOpen
+import com.app.newspaperss.settings.PreviewTextSize
+import androidx.compose.runtime.remember
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.ComponentActivity
@@ -145,12 +147,12 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
         ) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }) { EditionWorker.buildNow(context) } }
+                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }, sentToKindle = container.kindleSends.recent) { EditionWorker.buildNow(context) } }
                 TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes, container.notifier::dismissFor) }
+                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes, container.kindleSends.recent, container.notifier::dismissFor) }
                 EditionDetailScreen(
                     vm,
                     preferOpen = preferOpen,
@@ -167,11 +169,14 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                 val position = entry.arguments?.getInt("position") ?: 0
                 val contents by container.editions.observeContents(id).collectAsState(initial = emptyList())
                 val editionTitle by produceState<String?>(null, id) { value = container.editions.byId(id)?.title }
+                val textSize by remember { container.settings.settings.map { it.previewTextSize } }.collectAsState(initial = null)
                 ArticlePreviewScreen(
                     loadFile = { container.editions.byId(id)?.let(container.editions::fileOf) },
                     position = position,
                     title = contents.getOrNull(position)?.entry?.title ?: editionTitle.orEmpty(),
                     onBack = { nav.navigateUp() },
+                    textSize = textSize ?: PreviewTextSize.DEFAULT,
+                    onTextSize = { size -> container.appScope.launch { container.settings.update { it.copy(previewTextSize = size) } } },
                 )
             }
             composable(Tab.SOURCES.route) {
