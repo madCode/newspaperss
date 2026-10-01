@@ -367,6 +367,8 @@ object HtmlCleaner {
      * text and author make a quote instead.
      */
     private fun expandSubstackNotes(body: Element) {
+        // The last quote placed after each paragraph, so several from one paragraph keep their order.
+        val placedAfter = mutableMapOf<Element, Element>()
         for (el in body.select("[data-attrs]")) {
             if (!el.isAttached()) continue
             val comment = runCatching { Json.parseToJsonElement(el.attr("data-attrs")) as? JsonObject }.getOrNull()?.get("comment") as? JsonObject ?: continue
@@ -378,7 +380,8 @@ object HtmlCleaner {
             val paragraph = el.parents().firstOrNull { it.tagName() == "p" }
             if (paragraph != null) {
                 el.remove()
-                paragraph.after(quote)
+                (placedAfter[paragraph] ?: paragraph).after(quote)
+                placedAfter[paragraph] = quote
             } else {
                 el.replaceWith(quote)
             }
@@ -401,7 +404,7 @@ object HtmlCleaner {
             val hash = href.indexOf('#')
             if (hash < 0 || hash == href.length - 1) return null
             val address = comparable(href.substring(0, hash))
-            return if (hash == 0 || (address.contains('/') && page.startsWith(address))) href.substring(hash + 1) else null
+            return if (hash == 0 || page.startsWith(address)) href.substring(hash + 1) else null
         }
         val links = body.select("a[href]").mapNotNull { link -> fragmentOf(link)?.let { link to it } }
         val ids = body.select("[id]").map { it.id() }.toMutableSet()
@@ -421,8 +424,12 @@ object HtmlCleaner {
         for ((link, fragment) in links) if (fragment in ids) link.attr("href", "#$fragment")
     }
 
-    /** An address with what tt-rss and sites vary dropped: the scheme, "www." and a trailing slash. */
-    private fun comparable(url: String): String = url.trim().substringAfter("://").removePrefix("www.").trimEnd('/') + "/"
+    /**
+     * An address with what tt-rss and sites vary dropped: the scheme, "www.", a query and a trailing
+     * slash. Ending in "/", so "blog/" isn't taken as the start of "blog-2/".
+     */
+    private fun comparable(url: String): String =
+        url.trim().substringAfter("://").removePrefix("www.").substringBefore('?').trimEnd('/') + "/"
 
     private fun fixLinks(body: Element, baseUrl: String) {
         repairFragmentLinks(body, baseUrl)

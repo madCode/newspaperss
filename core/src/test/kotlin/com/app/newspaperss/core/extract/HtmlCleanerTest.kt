@@ -25,8 +25,10 @@ class HtmlCleanerTest {
         }
         assertFalse("other data-attrs are left alone", clean("""<div data-attrs="{&quot;src&quot;:&quot;x&quot;}"></div><p>$longText</p>""").contains("blockquote"))
         assertFalse("a hidden one stays hidden", clean("""<div hidden data-attrs="$attrs"></div><p>$longText</p>""").contains("blockquote"))
-        val inline = clean("""<p>As I wrote: <span data-attrs="$attrs"></span></p><p>$longText</p>""")
+        val second = attrs.replace("Lincoln Michel", "Someone Else")
+        val inline = clean("""<p>As I wrote: <span data-attrs="$attrs"></span> and <span data-attrs="$second"></span></p><p>$longText</p>""")
         assertTrue("a quote can't sit inside a paragraph", inline.contains("</p><blockquote>"))
+        assertTrue("several keep their order", inline.indexOf("Lincoln Michel") < inline.indexOf("Someone Else"))
     }
 
     /** tt-rss strips ids and resolves "#footnote-4" against the site; the book's footnotes must still work. */
@@ -48,6 +50,8 @@ class HtmlCleanerTest {
     fun aLinkToThisPagePlusAFragmentBecomesAnInBookLink() {
         val html = clean("""<p id="part-two">Part two.</p><p><a href="$base#part-two">back to part two</a> $longText</p>""")
         assertTrue(html, html.contains("""<a href="#part-two">back to part two</a>"""))
+        val tracked = HtmlCleaner.clean("""<p id="part-two">Part two.</p><p><a href="$base#part-two">back</a> $longText</p>""", "$base?utm_source=rss", null).html
+        assertTrue("a tracking query on the page's address doesn't matter", tracked.contains("""<a href="#part-two">back</a>"""))
     }
 
     @Test
