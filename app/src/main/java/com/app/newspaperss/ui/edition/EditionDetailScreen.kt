@@ -153,6 +153,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                         { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } }
                     } else null,
                     onSent = viewModel::markSent,
+                    onNotSent = viewModel::markNotSent,
                 )
             }
             if (current.contents.isNotEmpty()) {
@@ -194,7 +195,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
 }
 
 @Composable
-private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> Unit, onOpen: (() -> Unit)?, onSent: () -> Unit) {
+private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> Unit, onOpen: (() -> Unit)?, onSent: () -> Unit, onNotSent: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(edition.title, style = MaterialTheme.typography.headlineSmall)
         Text(dateOf(edition.createdAt), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
@@ -222,6 +223,8 @@ private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> U
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = 8.dp),
                 )
+            } else if (edition.status == EditionStatus.DELIVERED) {
+                MarkNotSent(edition.title, onNotSent)
             }
         }
         if (edition.status == EditionStatus.READY) {

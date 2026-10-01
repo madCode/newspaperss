@@ -89,4 +89,8 @@ class EditionDetailViewModel(
     fun markSent() {
         viewModelScope.launch { editions.markSent(id) }
     }
+
+    fun markNotSent() {
+        viewModelScope.launch { editions.markNotSent(id) }
+    }
 }

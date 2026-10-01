@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
+### Cycle 65: a send that didn't arrive can be undone (17:15–18:10)
+- **From you:** a Send to Kindle that failed still marked the edition sent, so its articles were used up and marked read in tt-rss, with no way back.
+- **Shipped:** **Didn't arrive? Mark as not sent** on a sent edition, on Today and its page, after a dialog that names it. It's ready to send again: its articles go back into it with the stars they went in with, its links stop counting as delivered, and its tt-rss articles are marked unread on the server. Send it again, or the next edition takes them.
+- **tt-rss:** the mark-read work now looks at the edition when it runs and marks read or unread to match, so a late retry can't undo a newer change.
+
 ### UX pass (13:00–15:00, afternoon)
 UX design only, no new features. Twelve patterns listed, four research sweeps (onboarding, delivery and hand-off, lists and destructive actions, settings with accessibility and e-ink), then one PR per fix, each reviewed. The options considered and what was decided for every pattern are in the session's UX report page. Pattern by pattern:
 - **Today** ([#81](https://github.com/madCode/newspaperss/pull/81)): once an edition exists, "Make another edition" is a quiet link, not the filled button; a failure reads before its Try again, and there's one retry per failure; "N starred articles are waiting for your next edition". Review caught two retry buttons in the most common failure, a retry beside Send, and a first fix that would have told TalkBack "Your edition is ready." for a failure.

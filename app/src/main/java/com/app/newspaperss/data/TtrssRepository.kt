@@ -170,11 +170,29 @@ class TtrssRepository(
     }
 
     /**
+     * Brings the server in line with the edition: its tt-rss articles read once it's delivered,
+     * unread again once it's marked as not sent. Decided when this runs rather than when it was
+     * asked for, so a late retry can't undo a newer change. Returns false if it failed in a way
+     * that may pass.
+     */
+    suspend fun syncRead(editionId: Long): Boolean = when (db.editions().byId(editionId)?.status) {
+        EditionStatus.DELIVERED -> markRead(editionId)
+        EditionStatus.READY, EditionStatus.FAILED -> markUnread(editionId)
+        else -> true
+    }
+
+    /**
      * Marks the edition's tt-rss articles read on the server. Returns false if it failed in a
      * way that may pass (the server unreachable), after noting the problem on the source.
      */
-    suspend fun markRead(editionId: Long): Boolean {
-        val articles = db.articles().ttrssInEdition(editionId)
+    suspend fun markRead(editionId: Long): Boolean =
+        update(db.articles().ttrssInEdition(editionId), "Delivered articles weren't marked read in tt-rss.") { markRead(it) }
+
+    /** Marks the tt-rss articles of an edition marked as not sent unread again, like [markRead]. */
+    suspend fun markUnread(editionId: Long): Boolean =
+        update(db.articles().ttrssUnsentInEdition(editionId), "Articles from an edition that wasn't sent weren't marked unread in tt-rss.") { markUnread(it) }
+
+    private suspend fun update(articles: List<ArticleEntity>, failed: String, call: suspend TtrssClient.(List<Long>) -> Unit): Boolean {
         if (articles.isEmpty()) return true
         val sourceIds = articles.map { it.sourceId }.distinct()
         val account = (accounts.load() as? StoredAccount.Ready)?.account
@@ -185,7 +203,7 @@ class TtrssRepository(
         val ids = articles.mapNotNull { it.guid.removePrefix(FeedSync.TTRSS_GUID_PREFIX).toLongOrNull() }
         val client = account.client(http)
         val (problem, retry) = try {
-            client.markRead(ids)
+            client.call(ids)
             sourceIds.forEach { db.sources().setServerNote(it, null) }
             return true
         } catch (e: CancellationException) {
@@ -197,7 +215,7 @@ class TtrssRepository(
         } finally {
             logOut(client)
         }
-        sourceIds.forEach { db.sources().setServerNote(it, "Delivered articles weren't marked read in tt-rss. $problem") }
+        sourceIds.forEach { db.sources().setServerNote(it, "$failed $problem") }
         return !retry
     }
 }

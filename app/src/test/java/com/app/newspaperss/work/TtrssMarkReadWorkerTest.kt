@@ -40,7 +40,7 @@ class TtrssMarkReadWorkerTest {
         val db = container.db
         val source = db.sources().ofKind(SourceKind.TTRSS).single()
         val article = db.articles().allForSource(source.id).single()
-        val editionId = db.editions().insert(EditionEntity(title = "Tuesday", status = EditionStatus.READY))
+        val editionId = db.editions().insert(EditionEntity(title = "Tuesday", status = EditionStatus.DELIVERED))
         db.editions().insertArticles(listOf(EditionArticleEntity(editionId = editionId, articleId = article.id, position = 0, title = "One", sourceTitle = "Example News", minutes = 1.0)))
 
         app.http.unreachable += server.apiUrl

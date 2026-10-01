@@ -164,14 +164,19 @@ class TtrssClient(
     }
 
     /** Marks [ids] as read. */
-    suspend fun markRead(ids: Collection<Long>) {
+    suspend fun markRead(ids: Collection<Long>) = setUnread(ids, false)
+
+    /** Marks [ids] as unread. */
+    suspend fun markUnread(ids: Collection<Long>) = setUnread(ids, true)
+
+    private suspend fun setUnread(ids: Collection<Long>, unread: Boolean) {
         if (ids.isEmpty()) return
         withSession { sid ->
             post(buildJsonObject {
                 put("sid", sid)
                 put("op", "updateArticle")
                 put("article_ids", ids.joinToString(","))
-                put("mode", 0)
+                put("mode", if (unread) 1 else 0)
                 put("field", FIELD_UNREAD)
             })
         }

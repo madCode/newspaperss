@@ -38,6 +38,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.delivery.EditionIntents
+import com.app.newspaperss.ui.edition.MarkNotSent
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -122,6 +123,8 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                         }
                     },
                     onSent = { viewModel.markSent(latest) },
+                    // Only while its book is still here to send again.
+                    onNotSent = if (viewModel.fileOf(latest) != null) { { viewModel.markNotSent(latest.id) } } else null,
                 )
             }
         }
@@ -238,6 +241,7 @@ private fun LatestEdition(
     onSend: () -> Unit,
     onOpen: () -> Unit,
     onSent: () -> Unit,
+    onNotSent: (() -> Unit)?,
 ) {
     // An outline as well as the tint, which is almost white on e-ink.
     Card(Modifier.fillMaxWidth().padding(top = 16.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
@@ -281,9 +285,12 @@ private fun LatestEdition(
                     // No start padding, so it lines up with the text above rather than sitting indented.
                     TextButton(onClick = onSent, contentPadding = PaddingValues(end = 12.dp)) { Text("I've sent it") }
                 }
-                EditionStatus.DELIVERED -> Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onSend) { Text("Send again") }
-                    if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }
+                EditionStatus.DELIVERED -> {
+                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onSend) { Text("Send again") }
+                        if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }
+                    }
+                    if (onNotSent != null) MarkNotSent(edition.title, onNotSent)
                 }
                 EditionStatus.FAILED -> {
                     val error = edition.error ?: "This edition couldn't be made."

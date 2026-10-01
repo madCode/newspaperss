@@ -505,6 +505,49 @@ class EditionDetailScreenTest {
         assertEquals(latest, opened)
     }
 
+    private fun statusOf(id: Long) = runBlocking { db.editions().byId(id) }?.status
+
+    @Test
+    fun aSentEditionThatNeverArrivedCanBeMarkedAsNotSentAfterAsking() {
+        val (id, articles) = edition(EditionStatus.DELIVERED, listOf("A story"))
+        show(id)
+
+        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
+        compose.onNodeWithText("Mark “Tuesday Morning Edition” as not sent?").assertExists()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.waitForIdle()
+        assertEquals("cancelling changes nothing", EditionStatus.DELIVERED, statusOf(id))
+
+        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
+        compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
+
+        idleUntil { statusOf(id) == EditionStatus.READY }
+        assertEquals(ArticleState.IN_EDITION, runBlocking { db.articles().byId(articles[0]) }?.state)
+        waitFor("I've sent it")
+        compose.onNodeWithText("Send").assertExists()
+    }
+
+    @Test
+    fun aSentEditionWhoseFileIsGoneCantBeMarkedAsNotSent() {
+        val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"), withFile = false)
+        show(id)
+        compose.onNodeWithText("Didn't arrive? Mark as not sent").assertDoesNotExist()
+    }
+
+    @Test
+    fun todaysSentEditionCanBeMarkedAsNotSentAndSentAgain() {
+        val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"))
+        val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(Settings(device = Device.KINDLE))) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        waitFor("Didn't arrive? Mark as not sent")
+
+        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
+        compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
+
+        idleUntil { statusOf(id) == EditionStatus.READY }
+        waitFor("I've sent it")
+    }
+
     private val dismissed = mutableListOf<Long>()
 
     private fun deleteFromTheScreen(id: Long) {
