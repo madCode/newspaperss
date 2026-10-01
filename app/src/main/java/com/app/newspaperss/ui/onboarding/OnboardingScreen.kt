@@ -190,6 +190,7 @@ private fun KindleEmailSetup(s: OnboardingState, vm: OnboardingViewModel) {
         onMailApp = vm::chooseMailApp,
         label = "Your Kindle's email address",
         hint = "Find it on Amazon: Content & Devices \u203a Devices \u203a your Kindle.",
+        required = true,
     )
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,

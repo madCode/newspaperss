@@ -1,6 +1,7 @@
 package com.app.newspaperss.delivery
 
 import android.Manifest
+import android.app.Activity
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
@@ -14,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.SendEditionActivity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.KindleEmail
 import com.app.newspaperss.testutil.MAIL_APP
 import com.app.newspaperss.testutil.TestApp
@@ -34,6 +36,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowToast
 import java.io.File
 
 /** Send under "Email it to your Kindle": an email to the Kindle's own address with the edition attached. */
@@ -143,44 +146,90 @@ class KindleEmailTest {
         assertEquals(listOf(MailApp(MAIL_APP, "Example Mail"), MailApp("com.example.zmail", "zMail")), MailApps.installed(app))
     }
 
-    private fun notificationSend(email: KindleEmail): Intent {
+    private fun useEmail(email: KindleEmail?) = runBlocking {
+        app.container.settings.update {
+            it.copy(delivery = if (email != null) DeliveryMethod.KINDLE_EMAIL else DeliveryMethod.SHARE, kindleEmail = email?.address, mailApp = email?.mailApp)
+        }
+    }
+
+    private fun shownNotifications() = shadowOf(app.getSystemService(NotificationManager::class.java)).allNotifications
+
+    /** Posts the "ready" notification for email delivery and returns what its Send opens. */
+    private fun notificationSend(): Intent {
         shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         app.container.notifier.createChannels()
         val file = editionFile()
         val id = readyEdition(file)
-        app.container.notifier.editionReady(runBlocking { db.editions().byId(id)!! }, file, kindleEmail = email)
-        val shown = shadowOf(app.getSystemService(NotificationManager::class.java)).allNotifications.single()
-        val action = shown.actions.single()
+        app.container.notifier.editionReady(runBlocking { db.editions().byId(id)!! }, file, byEmail = true)
+        val action = shownNotifications().single().actions.single()
         assertEquals("Send", action.title)
         return shadowOf(action.actionIntent).savedIntent
     }
 
+    private fun tapSend(intent: Intent): Pair<Activity, Intent> {
+        val activity = Robolectric.buildActivity(SendEditionActivity::class.java, intent).create().get()
+        idleUntil { shadowOf(app).peekNextStartedActivity() != null }
+        return activity to shadowOf(app).nextStartedActivity
+    }
+
     @Test
-    fun theNotificationsSendOpensTheMailAppAndCountsAsSent() {
+    fun theNotificationsSendOpensTheMailAppCountsAsSentAndComesDown() {
         installApp(app)
-        val intent = notificationSend(kindle)
+        useEmail(kindle)
+        val intent = notificationSend()
         assertEquals("an activity of ours, which may start another from a notification", SendEditionActivity::class.java.name, intent.component?.className)
         val id = intent.getLongExtra(SendEditionActivity.EXTRA_EDITION_ID, 0L)
 
-        val activity = Robolectric.buildActivity(SendEditionActivity::class.java, intent).create().get()
+        val (activity, started) = tapSend(intent)
 
-        val started = shadowOf(app).nextStartedActivity
         assertEquals(Intent.ACTION_SEND, started.action)
         assertEquals(MAIL_APP, started.`package`)
         assertArrayEquals(arrayOf("me_42@kindle.com"), started.getStringArrayExtra(Intent.EXTRA_EMAIL))
-        assertTrue(activity.isFinishing)
+        idleUntil { activity.isFinishing }
         idleUntil { statusOf(id) == EditionStatus.DELIVERED }
         idleUntil { recent() == mapOf(id to KindleSend.EMAIL) }
+        assertEquals("its Send would offer an edition already sent", 0, shownNotifications().size)
+    }
+
+    @Test
+    fun theNotificationsSendUsesTheAddressAsItIsWhenTapped() {
+        installApp(app)
+        useEmail(kindle.copy(address = "typo@kindle.con"))
+        val intent = notificationSend()
+
+        useEmail(kindle)
+        val (_, started) = tapSend(intent)
+
+        assertArrayEquals(arrayOf("me_42@kindle.com"), started.getStringArrayExtra(Intent.EXTRA_EMAIL))
+    }
+
+    @Test
+    fun switchedToSharingSinceTheNotificationItsSendSharesAndWaitsForAPick() {
+        installApp(app)
+        useEmail(kindle)
+        val intent = notificationSend()
+        val id = intent.getLongExtra(SendEditionActivity.EXTRA_EDITION_ID, 0L)
+
+        useEmail(null)
+        val (_, started) = tapSend(intent)
+
+        assertEquals(Intent.ACTION_CHOOSER, started.action)
+        assertNull(started.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)!!.getStringArrayExtra(Intent.EXTRA_EMAIL))
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals("nothing was picked yet", EditionStatus.READY, statusOf(id))
+        assertTrue(recent().isEmpty())
     }
 
     @Test
     fun withTheMailAppGoneTheNotificationsSendOffersTheShareSheetAndWaitsForAPick() {
-        val intent = notificationSend(kindle)
+        useEmail(kindle)
+        val intent = notificationSend()
         val id = intent.getLongExtra(SendEditionActivity.EXTRA_EDITION_ID, 0L)
 
-        Robolectric.buildActivity(SendEditionActivity::class.java, intent).create()
+        val (_, started) = tapSend(intent)
 
-        assertEquals(Intent.ACTION_CHOOSER, shadowOf(app).nextStartedActivity.action)
+        assertEquals(Intent.ACTION_CHOOSER, started.action)
+        assertArrayEquals(arrayOf("me_42@kindle.com"), started.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)!!.getStringArrayExtra(Intent.EXTRA_EMAIL))
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertEquals("nothing was picked yet", EditionStatus.READY, statusOf(id))
     }
@@ -188,14 +237,52 @@ class KindleEmailTest {
     @Test
     fun anEditionWhoseFileIsGoneIsntSent() {
         installApp(app)
-        val intent = notificationSend(kindle)
+        useEmail(kindle)
+        val intent = notificationSend()
         File(app.filesDir, "editions/e.epub").delete()
 
         val activity = Robolectric.buildActivity(SendEditionActivity::class.java, intent).create().get()
 
-        assertNull(shadowOf(app).nextStartedActivity)
         assertTrue(activity.isFinishing)
         shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertNull(shadowOf(app).nextStartedActivity)
         assertEquals(EditionStatus.READY, statusOf(intent.getLongExtra(SendEditionActivity.EXTRA_EDITION_ID, 0L)))
+    }
+
+    @Test
+    fun aMailAppThatRefusesIsReportedAndTheShareSheetOffered() {
+        installApp(app)
+        val started = mutableListOf<Intent>()
+        val refusing = object : ContextWrapper(app) {
+            override fun getApplicationContext(): Context = app
+            override fun startActivity(intent: Intent) {
+                if (intent.`package` == MAIL_APP) throw SecurityException("not exported")
+                started += intent
+            }
+        }
+        var opened = false
+
+        EditionIntents.launchSend(refusing, editionFile(), "Tuesday Morning Edition", 1L, kindle) { opened = true }
+
+        assertFalse("it didn't open, so it doesn't count as sent", opened)
+        assertEquals("Couldn't open your mail app. Choose another app to send it with.", ShadowToast.getTextOfLatestToast())
+        val chooser = started.single()
+        assertEquals(Intent.ACTION_CHOOSER, chooser.action)
+        assertArrayEquals(arrayOf("me_42@kindle.com"), chooser.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)!!.getStringArrayExtra(Intent.EXTRA_EMAIL))
+    }
+
+    @Test
+    fun aShareSheetOpenedLaterDoesntRewriteAnEmailSheetsCallback() {
+        installApp(app)
+        val file = editionFile()
+        val id = readyEdition(file)
+        fun callbackOf(chooser: Intent) = chooser.extras!!.let { e -> e.keySet().map { e.get(it) }.filterIsInstance<IntentSender>().single() }
+        val emailSheet = callbackOf(EditionIntents.send(app, file, "Tuesday Morning Edition", id, kindle.copy(mailApp = null)).intent)
+        // The same edition shared the usual way, e.g. from Send again after switching delivery.
+        EditionIntents.send(app, file, "Tuesday Morning Edition", id, null)
+
+        emailSheet.sendIntent(app, 0, Intent().putExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName(MAIL_APP, "$MAIL_APP.Compose")), null, null)
+
+        idleUntil { recent() == mapOf(id to KindleSend.EMAIL) }
     }
 }

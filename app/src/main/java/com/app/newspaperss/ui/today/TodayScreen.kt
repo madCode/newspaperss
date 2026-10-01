@@ -116,13 +116,13 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                     preferOpen = state.preferOpen,
                     offerOpen = state.offerOpen,
                     sentToKindle = state.sentToKindle[latest.id],
-                    emailsKindle = state.kindleEmail != null,
+                    // Only when Send opens the mail app itself; otherwise it's the share sheet, as usual.
+                    emailsKindle = state.kindleEmail?.let { remember(it) { EditionIntents.mailAppFor(context, it) } } != null,
                     onRetry = viewModel::makeOneNow,
                     onDetails = { onOpenEdition(latest.id) },
                     onSend = {
                         viewModel.fileOf(latest)?.let {
-                            val send = EditionIntents.send(context, it, latest.title, latest.id, state.kindleEmail)
-                            if (launch(send.intent) && send.countsOnLaunch) viewModel.markEmailed(latest.id)
+                            EditionIntents.launchSend(context, it, latest.title, latest.id, state.kindleEmail) { viewModel.markEmailed(latest.id) }
                         }
                     },
                     onOpen = {

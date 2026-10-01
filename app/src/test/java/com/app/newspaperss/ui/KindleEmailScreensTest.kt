@@ -112,6 +112,9 @@ class KindleEmailScreensTest {
         val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(settings)) {}
         compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
         waitFor("I've sent it")
+        // Send will be the share sheet, so the line says what counts there.
+        compose.onNodeWithText("Choosing an app to send it with counts as sent", substring = true).assertExists()
+        compose.onNodeWithText("Send opens your mail app", substring = true).assertDoesNotExist()
 
         compose.onNodeWithText("Send").performClick()
 

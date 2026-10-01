@@ -2,7 +2,9 @@ package com.app.newspaperss.ui
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -83,11 +85,23 @@ class OnboardingTest {
         compose.onNodeWithText("Send it straight to your Kindle").assertExists()
         compose.onNodeWithText("Next").assertIsNotEnabled()
 
-        compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address")).performTextInput("me_42@kindle")
-        compose.onNodeWithText("That isn't a whole email address yet.").assertExists()
+        compose.onNodeWithText("Needed to go on.", substring = true).assertExists()
+        val field = compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address"))
+        field.performTextInput("me_42@kindle")
+        // Still typing: no error yet, but it says why Next waits.
+        compose.onNodeWithText("That isn't a whole email address yet.").assertDoesNotExist()
+        compose.onNodeWithText("Needed to go on.", substring = true).assertExists()
         compose.onNodeWithText("Next").assertIsNotEnabled()
-        compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address")).performTextInput(".com")
+
+        field.performImeAction()
+        compose.onNodeWithText("That isn't a whole email address yet.").assertExists()
+        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "That isn't a whole email address yet."))
+        compose.onNode(hasText("That isn't a whole email address yet.") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
+
+        field.performTextInput(".com")
+        compose.onNodeWithText("That isn't a whole email address yet.").assertDoesNotExist()
         compose.onNodeWithText("Find it on Amazon", substring = true).assertExists()
+        compose.onNodeWithText("Needed to go on.", substring = true).assertDoesNotExist()
         compose.onNodeWithText("Next").assertIsEnabled()
 
         compose.onNodeWithText("Ask each time").performScrollTo().performClick()
@@ -297,5 +311,14 @@ class OnboardingTest {
         assertEquals("me_42@kindle.com", restored.kindleEmail)
         assertEquals(MAIL_APP, restored.mailApp)
         assertFalse(restored.kindleByEmail)
+    }
+
+    @Test
+    fun anAddressThatLooksFinishedButIsntIsFlaggedWithoutLeavingTheField() {
+        compose.setContent { OnboardingScreen(vm) }
+        click("Get started")
+        scrollAndClick("Kindle")
+        compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address")).performTextInput("me@@kindle.com")
+        compose.onNodeWithText("That isn't a whole email address yet.").assertExists()
     }
 }

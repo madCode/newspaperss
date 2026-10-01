@@ -34,7 +34,7 @@ class NotesSaverTest {
     private val editions by lazy { EditionRepository(db, tmp.newFolder("editions"), onDelivered = { delivered += it }) }
     private val problems = mutableListOf<String>()
     private val notifier = object : EditionNotifier {
-        override fun editionReady(edition: com.app.newspaperss.data.EditionEntity, file: File, openInstead: Boolean, kindleEmail: com.app.newspaperss.settings.KindleEmail?) {}
+        override fun editionReady(edition: com.app.newspaperss.data.EditionEntity, file: File, openInstead: Boolean, byEmail: Boolean) {}
         override fun editionDelivered(edition: com.app.newspaperss.data.EditionEntity, where: String) {}
         override fun problem(title: String, reason: String) { problems += "$title: $reason" }
         override fun dismissFor(editionId: Long) {}

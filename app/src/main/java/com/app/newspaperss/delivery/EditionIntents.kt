@@ -1,8 +1,10 @@
 package com.app.newspaperss.delivery
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.settings.KindleEmail
@@ -58,7 +60,7 @@ object EditionIntents {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        val app = kindleEmail.mailApp?.takeIf { context.packageManager.queryIntentActivities(Intent(email).setPackage(it), 0).isNotEmpty() }
+        val app = mailAppFor(context, kindleEmail)
         if (app != null) {
             // A mail app can attach the file after its compose screen has gone, like Send to Kindle.
             grantRead(context, app, uri)
@@ -66,6 +68,40 @@ object EditionIntents {
         }
         val callback = EditionSentReceiver.callback(context, editionId, uri, kindleEmail = true)
         return Send(Intent.createChooser(email, "Email “$title” to your Kindle", callback), countsOnLaunch = false)
+    }
+
+    /** The mail app Send opens directly, or null when it opens the share sheet: none chosen, or it's been uninstalled. */
+    fun mailAppFor(context: Context, kindleEmail: KindleEmail): String? = kindleEmail.mailApp?.takeIf {
+        context.packageManager.queryIntentActivities(Intent(Intent.ACTION_SEND).setType(EPUB_MIME).setPackage(it), 0).isNotEmpty()
+    }
+
+    /**
+     * Starts Send for an edition. If the mail app it opens directly refuses (it's disabled, or
+     * won't take the file), the reader is told and gets the share sheet with the same email.
+     *
+     * @param newTask set when [context] isn't an activity that stays open (the notification's).
+     * @param onMailAppOpened the mail app opened directly, which counts as sent.
+     */
+    fun launchSend(context: Context, file: File, title: String, editionId: Long?, kindleEmail: KindleEmail?, newTask: Boolean = false, onMailAppOpened: () -> Unit) {
+        fun start(intent: Intent) = context.startActivity(if (newTask) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) else intent)
+        val send = send(context, file, title, editionId, kindleEmail)
+        try {
+            start(send.intent)
+            if (send.countsOnLaunch) onMailAppOpened()
+            return
+        } catch (_: ActivityNotFoundException) {
+        } catch (_: SecurityException) {
+        }
+        if (!send.countsOnLaunch || kindleEmail == null) {
+            Toast.makeText(context, "Couldn't open the share sheet.", Toast.LENGTH_LONG).show()
+            return
+        }
+        Toast.makeText(context, "Couldn't open your mail app. Choose another app to send it with.", Toast.LENGTH_LONG).show()
+        try {
+            start(send(context, file, title, editionId, kindleEmail.copy(mailApp = null)).intent)
+        } catch (_: ActivityNotFoundException) {
+        } catch (_: SecurityException) {
+        }
     }
 
     /**

@@ -3,6 +3,7 @@ package com.app.newspaperss.ui.components
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -15,9 +16,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -31,7 +39,9 @@ internal const val ASK_EACH_TIME = "Ask each time"
  * The Kindle's address and the mail app Send opens, for emailing editions to a Kindle. Shared by
  * onboarding and Settings, which word the field's label differently.
  *
- * @param hint shown under an empty or valid address, where a problem with it would go.
+ * @param hint shown under the address when there's nothing wrong with it.
+ * @param required the reader can't go on without a valid address, so until there is one the
+ *   hint says so: a disabled Next doesn't say why.
  */
 @Composable
 fun KindleEmailFields(
@@ -41,16 +51,22 @@ fun KindleEmailFields(
     onMailApp: (String?) -> Unit,
     label: String,
     hint: String? = null,
+    required: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val focus = LocalFocusManager.current
     val apps = remember { MailApps.installed(context) }
-    val problem = when {
-        address.isBlank() -> null
-        !KindleAddress.isValid(address) -> "That isn't a whole email address yet."
-        !KindleAddress.looksLikeKindle(address) -> "Kindle addresses end in @kindle.com. Check it's the one Amazon shows for your Kindle."
-        else -> null
-    }
+    // Not judged mid-typing, from the first letter: only once the reader leaves the field, or
+    // what's typed looks finished (a dot after the @). An address already there counts as left.
+    var left by rememberSaveable { mutableStateOf(address.isNotBlank()) }
+    var focused by remember { mutableStateOf(false) }
+    val valid = KindleAddress.isValid(address)
+    val looksFinished = address.substringAfter('@', "").contains('.')
+    val error = "That isn't a whole email address yet.".takeIf { address.isNotBlank() && !valid && (left || looksFinished) }
+    val message = error
+        ?: "Kindle addresses end in @kindle.com. Check it's the one Amazon shows for your Kindle.".takeIf { valid && !KindleAddress.looksLikeKindle(address) }
+        ?: listOfNotNull("Needed to go on.".takeIf { required && !valid }, hint).joinToString(" ").ifEmpty { null }
     Column(modifier) {
         OutlinedTextField(
             value = address,
@@ -59,10 +75,17 @@ fun KindleEmailFields(
             placeholder = { Text("name_abc123@kindle.com") },
             singleLine = true,
             // A non-Kindle domain is only a warning: it isn't certainly wrong.
-            isError = address.isNotBlank() && !KindleAddress.isValid(address),
-            supportingText = (problem ?: hint)?.let { { Text(it) } },
+            isError = error != null,
+            // A live region, so TalkBack reads out a problem as it appears, not only on focus.
+            supportingText = message?.let { { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) } },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done, autoCorrectEnabled = false),
-            modifier = Modifier.fillMaxWidth(),
+            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+            modifier = Modifier.fillMaxWidth()
+                .onFocusChanged {
+                    if (focused && !it.isFocused) left = true
+                    focused = it.isFocused
+                }
+                .semantics { if (error != null) error(error) },
         )
         MailAppPicker(mailApp, onMailApp, apps, Modifier.padding(top = 8.dp))
     }

@@ -204,7 +204,7 @@ module so it's all unit-tested without Android.
 | Device | How it gets there | Unattended? |
 |---|---|---|
 | Kindle | Email it to the Kindle's own address: Send opens your mail app with everything filled in, and you tap Send | One tap, then Send in the mail app |
-| Kindle, without email | Share to the Kindle app, one tap from the "ready" notification. It only reaches the cloud library | One tap |
+| Kindle, without email | Share to the Kindle app, one tap from the "ready" notification. It goes to the cloud library, or straight to the Kindle with "Add to your library" turned off in its form (then it doesn't sync) | One tap |
 | Kobo | Share to Dropbox, into the folder the Kobo syncs (`Apps/Rakuten Kobo`) | One tap |
 | PocketBook | Share to an email app, to your `@pbsync.com` address | One tap |
 | KOReader | Save to a folder that syncs to the device (Syncthing) | Yes |
@@ -219,7 +219,8 @@ edition's title as the subject and the EPUB attached. "Ask each time", or
 a chosen app that's been uninstalled, opens the share sheet with the same
 email instead. Android can't choose the "From" account for another app,
 so the address you send from has to be on Amazon's approved list
-(Personal Document Settings), and setup says so. The app's mail apps are
+(Personal Document Settings), and setup says so. The notification's Send uses the
+settings as they are when it's tapped. The app's mail apps are
 the ones that both write mail and take an EPUB.
 
 Folders use Android's folder picker. Google Drive and Dropbox don't offer
@@ -417,7 +418,9 @@ phone restarts.
   (time and days), your e-reader, delivery, reading notes, and the
   app's version.
   - **Delivery:** **Email it to your Kindle** (shown for a Kindle, or once
-    chosen) with the Kindle's address and the mail app to send with;
+    chosen) with the Kindle's address and the mail app to send with
+    (without a working address it says Send opens the share sheet until
+    one is added);
     **Send it myself** (the share sheet); or **Save to a folder**. Unless
     editions go to a folder, a schedule with notifications off gets a
     warning: a timed edition's Send is in its notification.

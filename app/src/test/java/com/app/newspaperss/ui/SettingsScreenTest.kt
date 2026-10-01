@@ -190,4 +190,18 @@ class SettingsScreenTest {
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") } }
         idleUntil { compose.onAllNodes(hasText("Notifications are off", substring = true)).fetchSemanticsNodes().isEmpty() }
     }
+
+    @Test
+    fun emailDeliveryWithoutAnAddressSaysSendWillShareUntilOneIsAdded() {
+        val line = "Add your Kindle's email address; until then Send opens the share sheet."
+        runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = null) } }
+        waitFor(line)
+
+        compose.onNode(hasSetTextAction() and hasText("Kindle's email address")).performScrollTo().performTextInput("me_42@kindle.com")
+        idleUntil { compose.onAllNodes(hasText(line)).fetchSemanticsNodes().isEmpty() }
+
+        // Still said after the e-reader changes, with an address that doesn't work.
+        runBlocking { store.update { it.copy(device = Device.KOBO, kindleEmail = "me_42@kindle") } }
+        waitFor(line)
+    }
 }

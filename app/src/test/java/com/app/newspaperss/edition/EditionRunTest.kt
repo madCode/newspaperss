@@ -25,7 +25,6 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.io.File
-import com.app.newspaperss.settings.KindleEmail
 import java.time.Instant
 
 @RunWith(AndroidJUnit4::class)
@@ -40,10 +39,10 @@ class EditionRunTest {
     private val editions by lazy { EditionRepository(db, tmp.newFolder("editions")) }
     private val notices = mutableListOf<String>()
     private val notifier = object : EditionNotifier {
-        override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean, kindleEmail: KindleEmail?) {
+        override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean, byEmail: Boolean) {
             notices += when {
                 openInstead -> "open ${edition.title}"
-                kindleEmail != null -> "email ${edition.title} to ${kindleEmail.address} with ${kindleEmail.mailApp}"
+                byEmail -> "email ${edition.title}"
                 else -> "ready ${edition.title}"
             }
         }
@@ -185,7 +184,7 @@ class EditionRunTest {
         oneSource()
         settings.update { it.copy(device = com.app.newspaperss.settings.Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_1@kindle.com", mailApp = "com.example.mail") }
         run.run(scheduled = true)
-        assertTrue(notices.single(), notices.single().startsWith("email") && notices.single().endsWith("to me_1@kindle.com with com.example.mail"))
+        assertTrue(notices.single(), notices.single().startsWith("email"))
     }
 
     @Test

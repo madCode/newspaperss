@@ -52,8 +52,9 @@ class EditionSentReceiver : BroadcastReceiver() {
             editionId?.let { intent.putExtra(EXTRA_EDITION_ID, it) }
             return PendingIntent.getBroadcast(
                 context,
-                // Extras don't tell PendingIntents apart, so without an edition the file does.
-                editionId?.toInt() ?: file.hashCode(),
+                // Extras don't tell PendingIntents apart, so the code does: per edition (or, without
+                // one, file) and per kind, or a later sheet's callback would rewrite an open one's.
+                ((editionId?.toInt() ?: file.hashCode()) shl 1) or (if (kindleEmail) 1 else 0),
                 intent,
                 PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             ).intentSender

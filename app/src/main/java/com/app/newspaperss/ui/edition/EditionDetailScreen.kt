@@ -161,10 +161,7 @@ fun EditionDetailScreen(
                     fileMissing = current.file == null,
                     sentToKindle = sentToKindle,
                     onSend = {
-                        current.file?.let {
-                            val send = EditionIntents.send(context, it, edition.title, edition.id, kindleEmail)
-                            if (launch(send.intent) && send.countsOnLaunch) viewModel.markEmailed()
-                        }
+                        current.file?.let { EditionIntents.launchSend(context, it, edition.title, edition.id, kindleEmail, onMailAppOpened = viewModel::markEmailed) }
                     },
                     onOpen = if (offerOpen) {
                         { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } }

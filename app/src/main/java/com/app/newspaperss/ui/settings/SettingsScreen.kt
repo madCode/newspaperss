@@ -258,6 +258,15 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
                 label = "Kindle's email address",
                 modifier = Modifier.padding(start = 48.dp),
             )
+            // The saved address, not the typed one: Send goes by what's saved.
+            if (s.kindleEmailTarget == null) {
+                Text(
+                    "Add your Kindle's email address; until then Send opens the share sheet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 48.dp, top = 4.dp),
+                )
+            }
             Text(
                 "The address you send from must be on Amazon's approved list.",
                 style = MaterialTheme.typography.bodySmall,
