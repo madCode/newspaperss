@@ -679,7 +679,7 @@ private fun RecentArticle(
                     tint = if (selection) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                ReadToggle(title, article, building, onToggleRead)
+                ReadToggle(title, article, onToggleRead)
             }
         },
         title = { Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium) },
@@ -700,12 +700,13 @@ private fun isStarred(article: ArticleEntity) = article.starredAt != null && art
  * The read toggle: the article's status mark, which marks a waiting article read and brings back
  * a read or delivered one. No outline: it would box in every row. Narrower than a touch target,
  * so as not to push the titles right; Compose widens its touch area to 48dp. Not tappable on an
- * article in an unsent edition, or while a build may be writing a waiting one into its book.
+ * article in an unsent edition. While a build may be writing a waiting one into its book it still
+ * takes the tap, which then says to wait, rather than letting it open the article underneath.
  */
 @Composable
-private fun ReadToggle(title: String, article: ArticleEntity, building: Boolean, onToggle: () -> Unit) {
+private fun ReadToggle(title: String, article: ArticleEntity, onToggle: () -> Unit) {
     val waiting = article.state == ArticleState.NEW
-    val tappable = article.state != ArticleState.IN_EDITION && !(building && waiting)
+    val tappable = article.state != ArticleState.IN_EDITION
     // Its own node, not merged into the row's, so TalkBack can reach it apart from opening the article.
     val toggle = if (tappable) {
         Modifier

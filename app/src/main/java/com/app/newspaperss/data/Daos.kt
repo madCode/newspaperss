@@ -331,23 +331,15 @@ interface ArticleDao {
     suspend fun setStarred(id: Long, starred: Boolean, now: Instant): Boolean =
         (if (starred) star(id, now) else unstar(id, now.minus(BUILD_HOLD))) > 0
 
-    /**
-     * Only waiting articles, and their stars go with them. One whose link has gone out before (sent,
-     * then marked unread) is delivered again rather than read. Refused during a build, as for [unstar].
-     */
+    /** Only waiting articles, and their stars go with them. Refused during a build, as for [unstar]. */
     @Query(
-        """UPDATE articles SET starredAt = NULL,
-               state = CASE WHEN url != '' AND url IN (SELECT url FROM delivered_urls) THEN 'DELIVERED' ELSE 'SKIPPED' END
-           WHERE id IN (:ids) AND state = 'NEW'
+        """UPDATE articles SET state = 'SKIPPED', starredAt = NULL WHERE id IN (:ids) AND state = 'NEW'
            AND NOT EXISTS (SELECT 1 FROM editions WHERE status = 'BUILDING' AND createdAt > :buildingSince)""",
     )
     suspend fun markReadAll(ids: Collection<Long>, buildingSince: Instant): Int
 
     /** Keeps a star given since it was marked read. */
-    @Query(
-        """UPDATE articles SET state = 'NEW', starredAt = COALESCE(starredAt, :starredAt)
-           WHERE id = :id AND state IN ('SKIPPED', 'DELIVERED')""",
-    )
+    @Query("UPDATE articles SET state = 'NEW', starredAt = COALESCE(starredAt, :starredAt) WHERE id = :id AND state = 'SKIPPED'")
     suspend fun undoMarkRead(id: Long, starredAt: Instant?): Int
 
     /**
@@ -362,12 +354,9 @@ interface ArticleDao {
     )
     suspend fun markUnread(id: Long, now: Instant): Int
 
-    /**
-     * Guids of a source's read articles (marked read, or delivered) that the server hasn't been
-     * told are read. Not starred ones: they're going out again.
-     */
+    /** Guids of a source's articles the reader marked read (and hasn't starred since) that the server hasn't been told of. */
     @Query(
-        """SELECT guid FROM articles WHERE sourceId = :sourceId AND state IN ('SKIPPED', 'DELIVERED') AND starredAt IS NULL
+        """SELECT guid FROM articles WHERE sourceId = :sourceId AND state = 'SKIPPED' AND starredAt IS NULL
            AND reportedRead = 0 ORDER BY id LIMIT :limit""",
     )
     suspend fun unreportedRead(sourceId: Long, limit: Int): List<String>
@@ -375,6 +364,9 @@ interface ArticleDao {
     /** Guids of a source's waiting articles the server still has as read: marked unread here since. */
     @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND state = 'NEW' AND reportedRead = 1 ORDER BY id LIMIT :limit")
     suspend fun unreportedUnread(sourceId: Long, limit: Int): List<String>
+
+    @Query("SELECT guid FROM articles WHERE sourceId = :sourceId AND guid IN (:guids)")
+    suspend fun knownGuids(sourceId: Long, guids: List<String>): List<String>
 
     @Query("UPDATE articles SET reportedRead = :read WHERE sourceId = :sourceId AND guid IN (:guids)")
     suspend fun setReportedRead(sourceId: Long, guids: List<String>, read: Boolean = true)

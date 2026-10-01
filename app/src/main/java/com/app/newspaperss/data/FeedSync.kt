@@ -160,9 +160,12 @@ class FeedSync(
                     // removed): delivered_urls holds whichever went out.
                     fun linksOf(h: TtrssHeadline, a: ArticleEntity) = listOf(h.link, a.url)
                     val delivered = articles.flatMap { (h, a) -> linksOf(h, a) }.distinct().chunked(500).flatMap { db.articles().deliveredAmong(it) }.toSet()
+                    // Only headlines the app doesn't have: one it has may be one the reader marked
+                    // unread after it went out, which tt-rss is being told of below.
+                    val known = articles.map { it.second.guid }.chunked(500).flatMap { db.articles().knownGuids(source.id, it) }.toSet()
                     val markedRead = db.articles().unreportedRead(source.id, limit = 500)
                     client.markRead(
-                        (articles.filter { (h, a) -> linksOf(h, a).any { it in delivered } }.map { it.first.id } +
+                        (articles.filter { (h, a) -> a.guid !in known && linksOf(h, a).any { it in delivered } }.map { it.first.id } +
                             markedRead.mapNotNull { it.removePrefix(TTRSS_GUID_PREFIX).toLongOrNull() }).distinct(),
                     )
                     if (markedRead.isNotEmpty()) db.articles().setReportedRead(source.id, markedRead)

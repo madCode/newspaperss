@@ -227,9 +227,7 @@ allowed to read that edition's file until the phone restarts.
   Marking it unread puts it back to waiting. So does marking a delivered
   or expired one unread: it waits its turn with the others, unlike ★, which
   puts it in the next edition. It counts as found again, so it gets a week
-  before it expires. Marking one read whose link has gone out before makes it
-  delivered again rather than read. A batch marked read from selection has
-  one Undo.
+  before it expires. A batch marked read from selection has one Undo.
 - **While an edition is being made** you can star articles but not unstar
   them or mark them read: the build may already have put them in the book.
   A batch is held whole, never half done.

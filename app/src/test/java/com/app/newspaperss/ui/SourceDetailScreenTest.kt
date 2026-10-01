@@ -56,6 +56,7 @@ import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.sources.SourceDetailScreen
+import com.app.newspaperss.ui.sources.HELD_NOTICE
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.failingLine
 import com.app.newspaperss.ui.sources.lastCheckedLine
@@ -407,10 +408,9 @@ class SourceDetailScreenTest {
     /** "Unread" on a sent article: back with the waiting ones, not ahead of them like a star. */
     @Test
     @Config(qualifiers = "w411dp-h1600dp")
-    fun aDeliveredArticleMarkedUnreadWaitsAgainAndATapBackMakesItDeliveredAgain() {
+    fun aDeliveredArticleMarkedUnreadWaitsAgainAndATapBackMarksItRead() {
         val (id, ids) = sourceWithArticles()
         val delivered = ids.getValue("delivered")
-        runBlocking { db.articles().rememberDelivered(listOf(delivered), Instant.now()) }
         show(id)
 
         markUnread("Article delivered").performClick()
@@ -422,7 +422,7 @@ class SourceDetailScreenTest {
 
         markRead("Article delivered").performClick()
 
-        settle { state(delivered) == ArticleState.DELIVERED }
+        settle { state(delivered) == ArticleState.SKIPPED }
     }
 
     /**
@@ -570,7 +570,10 @@ class SourceDetailScreenTest {
         show(id)
 
         settle { visible(BUILDING_NOTE) }
-        markRead("Article waiting").assertDoesNotExist()
+        markRead("Article waiting").performClick()
+        settle { visible(HELD_NOTICE) }
+        assertEquals("held, and the tap doesn't open the article instead", ArticleState.NEW, state(ids.getValue("waiting")))
+        assertNull(shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity)
         star("Article delivered").assertIsNotEnabled()
         row("Article waiting").performTouchInput { longClick() }
         row("Article delivered").performClick()

@@ -418,6 +418,11 @@ class TtrssSyncTest {
         assertEquals(listOf(20L), server.markedUnread)
         assertEquals(ArticleState.NEW, db.articles().byId(article.id)!!.state)
         assertEquals("delivery told tt-rss; the sync doesn't again", listOf(20L), server.markedRead)
+
+        // Unread there now, so tt-rss offers it again: its link went out, but the app has it waiting.
+        server.add(20, "Old", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        assertEquals("not marked read again for its delivered link", listOf(20L), server.markedRead)
     }
 
     @Test
