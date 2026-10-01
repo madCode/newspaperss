@@ -27,6 +27,7 @@
   --good: #9CCB9F; --warn: #E3B860; color-scheme: dark;
 }
 * { box-sizing: border-box }
+[hidden] { display: none !important }
 body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); padding-inline: 16px; padding-block: 0 48px; margin: 0 }
 .wrap { max-width: 1120px; margin: 0 auto }
 h1, h2, h3 { font-family: var(--serif); text-wrap: balance; line-height: 1.2; margin: 0 }
@@ -45,7 +46,7 @@ code { font: 0.86em var(--mono); background: var(--card); padding: 0 4px; border
 .tabs button:focus-visible, .phone :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
 .tab { padding-block: 24px; display: grid; gap: 20px }
 .lede { display: grid; gap: 10px }
-.split { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: start }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 32px; align-items: start }
 @media (max-width: 860px) { .split { grid-template-columns: minmax(0, 1fr) } .split .stage { justify-self: center } }
 .notes { display: grid; gap: 14px; min-width: 0 }
 .notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px }
@@ -254,43 +255,64 @@ details summary { cursor: pointer; font-weight: 500 }
 <section class="tab" id="a" data-label="A · Feeds open up">
   <div class="split">
     <div class="notes">
-      <span class="kicker">Cycle 3 · <span class="pill v">v1</span></span>
+      <span class="kicker">Cycles 3–5 · <span class="pill v">v2</span></span>
       <h2>A. Each feed opens up, folded under the account</h2>
-      <p>Sources doesn't change: tt-rss is still one row. On the account page, "Feeds in your paper" stops being a checkbox dialog and becomes the list of feeds, each opening a page like any feed's.</p>
+      <p>Sources doesn't change: tt-rss is still one row. On the account page, "Feeds in your paper" stops being a checkbox dialog and becomes the list of feeds, folded by tt-rss category, each opening a page of its own.</p>
       <h3>What changes</h3>
       <ul>
-        <li><b>A tt-rss feed gets a page:</b> Leave out, Article text, its own cap, a section, and its own recent articles.</li>
-        <li><b>"Use your tt-rss categories as sections"</b>, a switch on the account page.</li>
-        <li><b>Recent articles</b> for the whole account moves one tap down ("All recent articles"), so the account page leads with feeds.</li>
-        <li><b>Settings are kept by the feed's address</b>, not tt-rss's id for it, so they survive signing in again and, later, moving a feed between the phone and tt-rss (the Fluent Reader pattern).</li>
+        <li><b>Article text is learned per feed, with no new screen.</b> The planner already knows each article's feed; the automatic check just keeps one answer per feed instead of none. This alone fixes tt-rss's teaser and stripped feeds.</li>
+        <li><b>A tt-rss feed gets a page:</b> Leave out (or Bring back), an Article text override, a section, its own recent articles.</li>
+        <li><b>Categories start folded</b>, each saying what's inside in words: "Tech · 10 feeds, 1 left out". Own settings are written out on the row, not shown as a dot.</li>
+        <li><b>With one category chosen</b> under "Articles from", only its feeds are listed; the rest fold into "Not in your paper".</li>
+        <li><b>The section row says what applies now</b>: the account's section until "Use tt-rss categories as sections" is on. Uncategorized means no section.</li>
+        <li><b>Settings belong to the feed's source.</b> The address only carries them when the feed is found again (signing in again, moving it). A feed with settings of its own stays listed even if it's quiet for months.</li>
       </ul>
       <div class="pros-cons">
-        <div><h3>For</h3><ul><li>Sources stays four rows for everyone.</li><li>Per-feed control for the veteran, one tap deeper.</li><li>Every later per-feed idea (heart, schedule) has a home.</li></ul></div>
-        <div><h3>Against</h3><ul><li>A migration: each tt-rss feed becomes a source under the account.</li><li>Two levels to learn: what's set on the account, what on a feed.</li><li>58 rows on one page is still long.</li></ul></div>
+        <div><h3>For</h3><ul><li>Sources stays four rows for everyone.</li><li>Per-feed text, the change that matters most, needs no UI.</li><li>Every later per-feed idea (a heart, how often) has a home.</li></ul></div>
+        <div><h3>Against</h3><ul><li>A migration: each tt-rss feed becomes a source under the account.</li><li>Two levels to learn: the account, and a feed.</li><li>A per-feed cap rarely bites in a 30-minute paper (7 slots, 54 feeds): balance needs D.</li></ul></div>
       </div>
-      <div id="a-crit" class="log"></div>
+      <div id="a-crit" class="log">
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">Owner:</span> the section row said "News, its tt-rss category" while the categories switch was off. Which is in charge? <b>Fixed:</b> the row says what applies now.</li>
+          <li><span class="who">Owner:</span> with "Articles from: Essays", 46 feeds still looked live. <b>Fixed:</b> they fold into "Not in your paper".</li>
+          <li><span class="who">Owner:</span> a per-feed cap of 1 changes nothing when 54 feeds share 7 slots; what's missing is "less news, more essays". <b>New:</b> proposal D.</li>
+          <li><span class="who">Everyone:</span> per-feed article text needs no screen. <b>Reduced:</b> learned automatically; the page only overrides.</li>
+          <li><span class="who">Self-hoster:</span> keying settings by address loses them when a feed moves to https or is quiet for a month. <b>Fixed:</b> settings live on the feed's source; the address only carries them.</li>
+          <li><span class="who">Boox, TalkBack:</span> 58 open rows and a 7px dot. <b>Fixed:</b> folded categories, settings in words, real headings and switch labels.</li>
+          <li><span class="who">Owner:</span> what does a left-out feed's page look like? <b>Fixed:</b> a "Left out" line and Bring back.</li>
+        </ul></div>
+      </div>
     </div>
     <div class="stage" data-flow="a"></div>
   </div>
 </section>
 
-<section class="tab" id="b" data-label="B · Feeds in Sources">
+<section class="tab" id="b" data-label="B · Sections view">
   <div class="split">
     <div class="notes">
-      <span class="kicker">Cycle 6 · <span class="pill v">v1</span></span>
-      <h2>B. Feeds spread through Sources, by section</h2>
-      <p>The account stops being a source at all. Every tt-rss feed is a row in Sources beside the feeds added here, grouped by section, with tt-rss categories as the starting sections. The account is a small "connected" row with only account settings.</p>
+      <span class="kicker">Cycles 6–8 · <span class="pill v">v2</span></span>
+      <h2>B. Sources by section</h2>
+      <p>v1 spread all 58 tt-rss feeds through Sources. Round 1 cut it down to what was worth keeping: Sources can be shown <b>by section</b>, the way the paper's contents read, once there are two or more sections. tt-rss stays folded: in each section it's one row, "Tiny Tiny RSS · 9 feeds".</p>
       <h3>What changes</h3>
       <ul>
-        <li><b>Sources is grouped by section</b>, the same sections the paper's contents use. Sections fold.</li>
-        <li><b>A tt-rss feed is marked</b> with a small "tt-rss" tag; otherwise it's a source like any other.</li>
-        <li><b>The account row</b> holds sign-in, Articles from, read sync and Start fresh.</li>
+        <li><b>A flat list until it isn't:</b> with fewer than two sections, Sources is today's list. The Kindle reader with five starter feeds never sees a heading.</li>
+        <li><b>By section:</b> each section lists its own feeds and, folded, the tt-rss feeds in it. Tapping the tt-rss row opens A's account page, filtered to that section.</li>
+        <li><b>Left out goes to the bottom</b>, folded: "Left out · 4".</li>
+        <li><b>Every row keeps its freshness line</b>, tt-rss feeds included, so dead feeds are still easy to spot.</li>
       </ul>
       <div class="pros-cons">
-        <div><h3>For</h3><ul><li>One kind of source: no "where do I set this?"</li><li>Sources reads like the paper's contents.</li><li>Feeds added here and tt-rss feeds about the same thing sit together.</li></ul></div>
-        <div><h3>Against</h3><ul><li>Sources goes from four rows to sixty.</li><li>Pausing "all of tt-rss" has no obvious home.</li><li>Sections become a thing everyone meets, not only tt-rss users.</li></ul></div>
+        <div><h3>For</h3><ul><li>Sources reads like the paper's contents.</li><li>Phone feeds and tt-rss feeds about the same thing sit together.</li><li>Costs nothing for readers with one section.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Needs A underneath, and sections that mean something (D).</li><li>A second way to find a tt-rss feed (by section, by account).</li></ul></div>
       </div>
-      <div id="b-crit" class="log"></div>
+      <div id="b-crit" class="log">
+        <div class="critique"><h3>Round 1 · cycle 7 · personas</h3><ul>
+          <li><span class="who">Kindle reader, no tt-rss:</span> B forces sections on five starter feeds that have none. <b>Reduced:</b> headings only with two or more sections.</li>
+          <li><span class="who">Owner:</span> with "Articles from: News", Sources still listed 49 feeds that never reach the paper, and left-out feeds sat among live ones. <b>Fixed:</b> only feeds in the paper are listed; left out folds at the bottom.</li>
+          <li><span class="who">Owner:</span> tt-rss rows lost the freshness line that's there to catch dead feeds. <b>Fixed.</b></li>
+          <li><span class="who">TalkBack, Boox:</span> about 67 swipe stops; "News 10" heard as an unread count; full refresh on every fold. <b>Fixed:</b> tt-rss folded per section, headings read "News, 3 sources and 9 tt-rss feeds, folded".</li>
+          <li><span class="who">Verdict:</span> drop B as the structure; keep "Sources reads like the contents" as a view on top of A, and the time-per-section idea as its own proposal. <b>Done:</b> B v2 is that view; the idea is D.</li>
+        </ul></div>
+      </div>
     </div>
     <div class="stage" data-flow="b"></div>
   </div>
@@ -299,23 +321,59 @@ details summary { cursor: pointer; font-weight: 500 }
 <section class="tab" id="c" data-label="C · Add to tt-rss">
   <div class="split">
     <div class="notes">
-      <span class="kicker">Cycle 9 · <span class="pill v">v1</span></span>
-      <h2>C. Adding feeds back to tt-rss</h2>
-      <p>Built on A. With a tt-rss account connected, adding a feed asks where it should live: just for the paper, on this phone, or in your tt-rss too, in a category you pick. A feed already here can move to tt-rss, settings and all.</p>
+      <span class="kicker">Cycles 9–11 · <span class="pill v">v2</span></span>
+      <h2>C. Adding a feed to tt-rss too</h2>
+      <p>Built on A. With a tt-rss account connected, adding one feed asks whether it's <b>just for the paper</b> (the default) or <b>in your tt-rss too</b>. Round 1 cut v1 down to this one choice; Move to tt-rss waits.</p>
       <h3>What changes</h3>
       <ul>
-        <li><b>Add a source</b> asks "Where should it live?" only when an account is connected. The last answer is remembered.</li>
-        <li><b>Move to tt-rss</b> in a feed's menu. Its settings move with it, kept by address.</li>
-        <li><b>Only existing tt-rss categories</b> can be picked: the API can't make new ones.</li>
-        <li><b>Not offered:</b> unsubscribing in tt-rss from here; the reading list and curated lists (tt-rss can't read them).</li>
+        <li><b>Already in your tt-rss?</b> The app checks first and opens that feed instead of asking.</li>
+        <li><b>"Just for the paper" is preselected</b>, every time for now. A remembered answer can come later, if most adds turn out to go to tt-rss.</li>
+        <li><b>The category starts on the paper's own</b> ("Articles from"). Picking another warns: "won't be in your paper".</li>
+        <li><b>Its back issues</b>: a new tt-rss subscription arrives with ~20 old posts unread. "Mark its older posts read in tt-rss" is ticked by default, so the laptop count doesn't jump.</li>
+        <li><b>After adding:</b> a sync runs at once, and the message has Undo (the app unsubscribes the feed it just added).</li>
+        <li><b>Slow server:</b> stepped text while tt-rss downloads the feed. A timeout is "not sure yet", checked at the next sync, not a failure that invites a duplicate.</li>
+        <li><b>Untouched:</b> onboarding, starter packs and OPML stay phone-only, except they skip feeds already in tt-rss.</li>
       </ul>
       <div class="pros-cons">
-        <div><h3>For</h3><ul><li>One subscription list across your tt-rss apps.</li><li>tt-rss fetches all day; nothing rolls off a busy feed between phone syncs.</li><li>Explicit, as NetNewsWire does it.</li></ul></div>
-        <div><h3>Against</h3><ul><li>A paper-only feed becomes an unread count in tt-rss.</li><li>tt-rss strips some content (footnotes, Substack Notes).</li><li>A site may block the server but not the phone.</li><li>More reliance on a project that now lives on a fork.</li></ul></div>
+        <div><h3>For</h3><ul><li>One subscription list across your tt-rss apps, when you want it.</li><li>Explicit, as NetNewsWire does it; the default keeps today's behaviour.</li><li>Undo, so a wrong tap isn't a laptop chore.</li></ul></div>
+        <div><h3>Against</h3><ul><li>tt-rss strips some content (footnotes, Substack Notes): a phone feed can be better.</li><li>A site may block the server but not the phone.</li><li>More reliance on a project now living on a fork.</li></ul></div>
       </div>
-      <div id="c-crit" class="log"></div>
+      <div id="c-crit" class="log">
+        <div class="critique"><h3>Round 1 · cycle 10 · personas</h3><ul>
+          <li><span class="who">Owner on one category:</span> a feed added to another category never reaches the paper. <b>Fixed:</b> category starts on the paper's, with a warning.</li>
+          <li><span class="who">Owner:</span> subscribing dumps the feed's backlog unread into the laptop counts. <b>Fixed:</b> "Mark its older posts read in tt-rss", on by default.</li>
+          <li><span class="who">Owner, self-hoster:</span> a remembered "tt-rss too" plus no way to unsubscribe makes a wrong tap a laptop chore. <b>Fixed:</b> phone is the default; Undo unsubscribes.</li>
+          <li><span class="who">OPML, starter packs:</span> importing your own tt-rss OPML makes 58 duplicates. <b>Fixed:</b> imports skip feeds already in tt-rss; they never ask.</li>
+          <li><span class="who">Slow server:</span> a timeout then "Add to this phone" makes a duplicate once the server finishes. <b>Fixed:</b> a timeout is "not sure yet", checked at the next sync.</li>
+          <li><span class="who">Owner:</span> Move to tt-rss can orphan settings if tt-rss stores a different address, or drop stars before tt-rss has fetched anything. <b>Reduced:</b> Move is deferred.</li>
+          <li><span class="who">Self-hoster:</span> Substack through tt-rss loses Notes and footnotes. <b>Fixed:</b> the dialog says so for known hosts and keeps the phone preselected.</li>
+        </ul></div>
+      </div>
     </div>
     <div class="stage" data-flow="c"></div>
+  </div>
+</section>
+
+<section class="tab" id="d" data-label="D · Balance">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">New in round 1 · <span class="pill v">v1</span></span>
+      <h2>D. Balance the paper by section</h2>
+      <p>Both A's and B's critics found the same gap: with 54 feeds and seven slots, per-feed controls don't shape the paper. What the owner wants is "thoughtful, varied, some fun": <b>a share of the 30 minutes per section</b>. Sections come from tt-rss categories, OPML folders, or ones you make, and it works the same for every kind of source.</p>
+      <h3>What changes</h3>
+      <ul>
+        <li><b>Settings › Sections and balance</b>: each section with about how many minutes it gets. Off, the paper takes turns between sources as today.</li>
+        <li><b>A preview</b> of tomorrow's contents, so the effect of a change is visible before the morning.</li>
+        <li><b>Order</b> of sections is the order of the contents.</li>
+        <li><b>Within a section</b>, turns between its sources work as today; stars still go first.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Shapes the paper at the level the reader thinks in.</li><li>Not tt-rss-only: OPML folders get it too.</li><li>Inoreader's per-folder digests and KTool's per-feed magazines point the same way.</li></ul></div>
+        <div><h3>Against</h3><ul><li>A new screen and a new idea to explain.</li><li>Minutes are estimates; a long article can blow a section's share.</li><li>Needs sections to exist first (A's switch, or OPML).</li></ul></div>
+      </div>
+      <div id="d-crit" class="log"></div>
+    </div>
+    <div class="stage" data-flow="d"></div>
   </div>
 </section>
   </main>
@@ -365,10 +423,10 @@ const ARTS = [
 /* ---------- building blocks ---------- */
 const H = {
   bar: (t, o = {}) => `<div class="bar ${o.big ? "big" : ""}">${o.big ? "" : `<button class="ib" data-back aria-label="Back">${I.back}</button>`}<div class="t">${t}</div>${o.refresh ? `<button class="ib" aria-label="Refresh">${I.refresh}</button>` : ""}<button class="ib" ${o.menu ? `data-act="menu:${o.menu}"` : ""} aria-label="More options">${I.more}</button></div>`,
-  nav: () => `<div class="nav"><span><b>${I.today}</b>Today</span><span class="on"><b>${I.list}</b>Sources</span><span><b>${I.gear}</b>Settings</span></div>`,
+  nav: (on = "src") => `<div class="nav"><span><b>${I.today}</b>Today</span><span class="${on === "src" ? "on" : ""}"><b>${I.list}</b>Sources</span><span class="${on === "set" ? "on" : ""}"><b>${I.gear}</b>Settings</span></div>`,
   fab: (go = "") => `<button class="fab" ${go}>${I.plus} Add a source</button>`,
   row: (ti, su, o = {}) => `<${o.go || o.dlg ? "button" : "div"} class="row" ${o.go ? `data-go="${o.go}"` : ""} ${o.dlg ? `data-dlg="${o.dlg}"` : ""}>${o.icon ? `<span class="ic">${o.icon}</span>` : ""}<span class="main"><span class="ti">${ti}${o.mark ? '<span class="mark" title="Has its own settings"></span>' : ""}</span>${su ? `<span class="su">${su}</span>` : ""}</span>${o.right ?? (o.go ? I.chev : `<span class="ic">${I.more}</span>`)}</${o.go || o.dlg ? "button" : "div"}>`,
-  set: (ti, su, act) => `<div class="set"><div class="main"><div>${ti}</div>${su ? `<div class="su">${su}</div>` : ""}</div>${act}</div>`,
+  set: (ti, su, act) => `<div class="set" aria-label="${ti}"><div class="main"><div>${ti}</div>${su ? `<div class="su">${su}</div>` : ""}</div>${act}</div>`,
   tb: (label, attrs = "") => `<button class="tb" ${attrs}>${label}</button>`,
   sw: (on) => `<button class="sw ${on ? "on" : ""}" data-act="toggle" role="switch" aria-checked="${on}" aria-label="Switch"></button>`,
   art: ([mk, ti, su, read]) => `<div class="art ${read ? "read" : ""}"><span class="mk">${mk}</span><div class="main"><div class="ti">${ti}</div><div class="su">${su}</div></div><span class="star">${I.star}</span></div>`,
@@ -422,113 +480,155 @@ FLOWS.today = {
   chips: ["sources", "acct", "feeds", "cats", "feed"],
 };
 
-/* ---------- A: feeds open up, folded under the account ---------- */
-const OWN = { "Harbour Ledger · Local News": "At most 1 · Feed's text", "Garbage Collection": "Left out", "Recipes I Keep": "Left out", "Release Notes": "Left out", "Garden Log": "Left out", "A Working Library": "Section: Long reads", "Five Good Things": "New from tt-rss" };
-const feedRow = (f, go = "afeed") => H.row(f.t, OWN[f.t] || "", { go, mark: OWN[f.t] && OWN[f.t] !== "New from tt-rss" });
+/* ---------- A v2: feeds open up, folded under the account ---------- */
+const OWN = { "Harbour Ledger · Local News": "Feed's text · section Front page", "Garbage Collection": "Left out", "Recipes I Keep": "Left out", "Release Notes": "Left out", "Garden Log": "Left out", "A Working Library": "Full page", "Five Good Things": "New from tt-rss" };
+const LEFT = t => OWN[t] === "Left out";
+const catHead = (c, fs, extra = "") => { const lo = fs.filter(LEFT).length; return `<button class="sec" data-act="fold" aria-expanded="false" aria-label="${c}, ${fs.length} feeds${lo ? `, ${lo} left out` : ""}, folded" role="heading" aria-level="3">${c}<span class="n">${fs.length} feeds${lo ? `, ${lo} left out` : ""}${extra}</span></button>`; };
+const feedRow = (t, go = "afeed") => H.row(t, OWN[t] || "Last new article today", { go });
+const acctPage = (o = {}) => {
+  const cats = o.only ? { [o.only]: CATS[o.only] } : CATS;
+  return H.bar(o.title || "Tiny Tiny RSS", { menu: "acctmenu" }) +
+  `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>New articles today</span></div>
+  ${o.only ? "" : `<div class="btns"><button class="ob">Pause tt-rss</button></div>
+  ${H.set("Articles from", o.from || "All your unread articles", H.tb("Change", 'data-dlg="from"'))}
+  ${H.set("Sync read status with tt-rss", "Read and unread show in both. Delivered articles count as read.", H.sw(true))}
+  ${H.set("Use tt-rss categories as sections", "Off: all of tt-rss is one section, \"Tiny Tiny RSS\"", H.sw(false))}
+  ${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss.", H.tb("Start fresh"))}
+  <hr>`}<div class="h2">${o.only ? o.only : "Feeds · 54 in your paper"}</div><div class="hint">Tap a category, then a feed for its own settings.</div>
+  ${o.only ? "" : H.row("All recent articles", "30 waiting, from every feed", { go: "recent" })}
+  ${Object.entries(cats).map(([c, fs]) => catHead(c, fs) + `<div class="secbody" ${c === "News" || o.only ? "" : "hidden"}>${fs.filter(t => !LEFT(t)).map(t => feedRow(t)).join("")}${fs.filter(LEFT).map(t => feedRow(t, "lfeed")).join("")}</div>`).join("")}
+  ${o.from ? `<button class="sec" data-act="fold">Not in your paper<span class="n">46 feeds outside Essays &amp; ideas</span></button><div class="secbody" hidden>${ALL.filter(f => f.c !== "Essays & ideas").slice(0, 8).map(f => H.row(f.t, f.c)).join("")}</div>` : ""}
+  </div>` + H.nav();
+};
+const capBlock = H.set("1 article from this feed, then more if there's room", "Your edition setting. Choose fewer or more to give it a firm limit.", "") + `<div class="stepper"><button class="ob" aria-label="Fewer articles from this feed">−</button><button class="ob" aria-label="More articles from this feed">+</button></div>`;
 const feedPage = (o = {}) =>
-  H.bar("Harbour Ledger · Local News", { menu: o.menu }) +
+  H.bar(o.name || "Harbour Ledger · Local News") +
   `<div class="body">${o.crumb ?? `<div class="crumb">In <b data-back>Tiny Tiny RSS</b> · category News</div>`}
-  <div class="pad"><span class="host">harbourledger.example</span><span>New articles today</span><span class="host">Uses the text the site sends (your choice)</span></div>
-  <div class="btns"><button class="ob" data-dlg="${o.leave || "leave"}">Leave out of the paper</button><button class="ob" data-dlg="${o.text || "atext"}">Article text: Feed's text</button></div>
-  ${H.set("At most 1 article from this feed in each edition", "Your edition setting: 1 article from each site, then more if there's room", "")}
-  <div class="stepper"><button class="ob">−</button><button class="ob">+</button></div>
-  ${H.set("Section", o.sectionSub || "News, its tt-rss category", H.tb("Change", `data-dlg="${o.section || "section"}"`))}
-  <hr><div class="h2">Recent articles · 14 <button class="tb">Select</button></div>
-  ${ARTS.filter(a => a[2].startsWith("Harbour")).map(a => H.art([a[0], a[1], a[2].replace("Harbour Ledger · Local News · ", ""), a[3]])).join("")}</div>` + H.nav();
-const textDlg = H.dlg("Article text", H.opt("Automatic", "newspapeRSS checks each article and settles after three days", false) + H.opt("Feed's text", "Use what tt-rss sends", true) + H.opt("Full page", "Always fetch the article's page", false), H.close("Cancel"));
+  ${o.left ? `<div class="note"><b>Left out of the paper.</b> It stays in your tt-rss. Starred articles from it still go in.</div><div class="btns"><button class="ob">Bring back</button></div>` :
+  `<div class="pad"><span class="host">harbourledger.example</span><span>New articles today · about 6 a day</span><span class="host">Uses the text tt-rss sends (your choice)</span></div>
+  <div class="btns"><button class="ob" data-dlg="leave">Leave out</button><button class="ob" data-dlg="atext">Article text: Feed's text</button></div>
+  ${capBlock}
+  ${H.set("Section", o.sectionSub || "Front page (your choice)", H.tb("Change", 'data-dlg="section"'))}`}
+  <hr><div class="h2">Recent articles · ${o.left ? 0 : 14}</div>
+  ${o.left ? '<div class="hint">Nothing waiting: left-out feeds aren\'t fetched.</div>' : ARTS.filter(a => a[2].startsWith("Harbour")).map(a => H.art([a[0], a[1], a[2].replace("Harbour Ledger · Local News · ", ""), a[3]])).join("")}</div>` + H.nav();
+const textDlg = H.dlg("Article text", H.opt("Automatic", "Learned for this feed: settles after three days", false) + H.opt("Feed's text", "Use what tt-rss sends", true) + H.opt("Full page", "Always fetch the article's page", false), H.close("Cancel"));
+const sectionDlg = H.dlg("Section", `<div class="su">Where this feed's articles go in the contents.</div>` + H.opt("Same as tt-rss", "Tiny Tiny RSS, until categories become sections", false) + H.opt("Front page", "", true) + H.opt("Long reads", "", false) + H.opt("Saved for later", "", false), H.close("Cancel"));
 FLOWS.a = {
   start: "sources",
   screens: {
-    sources: { label: "Sources", note: "Unchanged: tt-rss is one row, now saying how many feeds and how many are left out.", html: () =>
+    sources: { label: "Sources", note: "Unchanged: tt-rss is one row, saying how many feeds and how many are left out.", html: () =>
       H.bar("Sources", { big: true, refresh: true }) +
-      `<div class="body">${sourcesTop()}${H.row("Tiny Tiny RSS", "58 feeds, 4 left out · New articles today", { go: "acct" })}</div>` + H.fab() + H.nav() },
-    acct: { label: "Account page", note: "Account settings on top, then every feed, by tt-rss category. ● means a feed has settings of its own. Tap Harbour Ledger.", html: () =>
-      H.bar("Tiny Tiny RSS", { menu: "acctmenu" }) +
-      `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>New articles today</span></div>
-      <div class="btns"><button class="ob">Pause all of tt-rss</button></div>
-      ${H.set("Articles from", "All your unread articles", H.tb("Change"))}
-      ${H.set("Sync read status with tt-rss", "Read and unread show in both. Delivered articles count as read.", H.sw(true))}
-      ${H.set("Use tt-rss categories as sections", "Each feed's category becomes its section in the paper, unless you choose one on the feed", H.sw(false))}
-      ${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss.", H.tb("Start fresh"))}
-      <hr><div class="h2">Feeds · 58</div><div class="hint">54 in your paper, 4 left out. Tap a feed for its own settings.</div>
-      ${H.row("All recent articles", "30 waiting, from every feed", { go: "recent" })}
-      ${Object.entries(CATS).map(([c, fs]) => `<div class="h3">${c}</div>` + fs.map(t => feedRow({ t })).join("")).join("")}</div>` + H.nav() },
-    afeed: { label: "A feed's page", note: "Everything a feed added here has, plus Leave out and Section. Its own articles only.", path: ["sources", "acct", "afeed"], html: () => feedPage() },
-    leave: { dialog: true, over: ["sources", "acct", "afeed"], label: "Leave out", note: "Same meaning as today's checkbox, now with its consequences said where you choose it.", html: () =>
+      `<div class="body">${sourcesTop()}${H.row("Tiny Tiny RSS", "54 feeds in your paper, 4 left out · New articles today", { go: "acct" })}</div>` + H.fab() + H.nav() },
+    acct: { label: "Account page", note: "Account settings, then feeds folded by category (News is open). Settings are written on the row. Tap Harbour Ledger, or a left-out feed under Tech.", html: () => acctPage() },
+    one: { label: "One category", note: "With Articles from: Essays & ideas, only its feeds are listed; the rest fold away.", path: ["sources", "one"], html: () => acctPage({ from: "Essays &amp; ideas" }).replace(/<button class="sec"[^>]*>News[\s\S]*?(?=<button class="sec"[^>]*>Not in)/, () => catHead("Essays & ideas", CATS["Essays & ideas"]) + `<div class="secbody">${CATS["Essays & ideas"].map(t => feedRow(t)).join("")}</div>`) },
+    afeed: { label: "A feed's page", note: "Leave out, an Article text override, the cap, a section, its own articles.", path: ["sources", "acct", "afeed"], html: () => feedPage() },
+    lfeed: { label: "A left-out feed", note: "Says what left out means and offers Bring back.", path: ["sources", "acct", "lfeed"], html: () => feedPage({ name: "Garbage Collection", left: true, crumb: `<div class="crumb">In <b data-back>Tiny Tiny RSS</b> · category Tech</div>` }) },
+    leave: { dialog: true, over: ["sources", "acct", "afeed"], label: "Leave out", note: "Today's checkbox, with its consequences said where you choose it.", html: () =>
       H.dlg("Leave Harbour Ledger out?", `<div>It stays in your tt-rss and in this list, so you can bring it back. It isn't fetched for the paper, and its 14 waiting articles go, except ones you starred.</div>`, H.close("Cancel") + H.close("Leave out")) },
-    atext: { dialog: true, over: ["sources", "acct", "afeed"], label: "Article text", note: "Now offered for tt-rss feeds, and learned per feed.", html: () => textDlg },
-    section: { dialog: true, over: ["sources", "acct", "afeed"], label: "Section", note: "Follow tt-rss, or pick a section the paper already has.", html: () =>
-      H.dlg("Section", H.opt("Its tt-rss category", "News", true) + H.opt("Front page", "", false) + H.opt("Long reads", "", false) + H.opt("Saved for later", "", false) + H.opt("No section", "", false), H.close("Cancel")) },
+    atext: { dialog: true, over: ["sources", "acct", "afeed"], label: "Article text", note: "Automatic is now learned per feed; this only overrides it.", html: () => textDlg },
+    section: { dialog: true, over: ["sources", "acct", "afeed"], label: "Section", note: "Follow tt-rss, or pick a section the paper already has.", html: () => sectionDlg },
+    from: { dialog: true, over: ["sources", "acct"], label: "Articles from", note: "Pick Essays & ideas to see the one-category page.", html: () =>
+      H.dlg("Articles from", H.opt("All your unread articles", "", true) + Object.keys(CATS).map(c => `<div class="opt" ${c === "Essays & ideas" ? 'data-go="one"' : 'data-act="pick"'}><span class="rad"></span><span class="main">${c}</span></div>`).join(""), H.close("Cancel")) },
     recent: { label: "All recent articles", note: "Today's mixed list, one tap down.", path: ["sources", "acct", "recent"], html: () =>
       H.bar("Tiny Tiny RSS · recent") + `<div class="body"><div class="hint" style="padding-top:8px">Tap ☆ to put one in your next edition. Tap Select to mark some as read.</div>${ARTS.map(H.art).join("")}</div>` + H.nav() },
   },
   menus: { acctmenu: [["Sign in again"], ["Remove tt-rss"]] },
-  chips: ["sources", "acct", "afeed", "leave", "atext", "section", "recent"],
+  chips: ["sources", "acct", "afeed", "lfeed", "atext", "section", "one", "recent"],
 };
 
-/* ---------- B: feeds spread through Sources by section ---------- */
-const LOCAL = { "News": ["Arts &amp; Letters Daily"], "Science": ["Field Station"] };
+/* ---------- B v2: Sources by section, tt-rss folded per section ---------- */
+const BSEC = [["Front page", [["Arts &amp; Letters Daily", "aldaily.com · New articles today"]], ["News", 9, 0]], ["Long reads", [], ["Essays & ideas", 12, 0], ["Newsletters", 9, 0]], ["Science", [["Field Station", "fieldstation.example · New articles today"]], ["Science", 6, 0]], ["Tech", [], ["Tech", 7, 3]], ["Arts & music", [], ["Arts & music", 8, 0]]];
 FLOWS.b = {
   start: "sources",
   screens: {
-    sources: { label: "Sources", note: "Every feed, local and tt-rss, under the paper's sections. Scroll: this is 60 rows. Tap a section heading to fold it.", html: () =>
-      H.bar("Sources", { big: true, refresh: true }) +
+    sources: { label: "Sources by section", note: "Two or more sections, so Sources is grouped. tt-rss is one folded row per section. Tap one.", html: () =>
+      H.bar("Sources", { big: true, refresh: true, menu: "view" }) +
       `<div class="body">${H.row("Your reading list", "Saved for later", { icon: I.bookmark, right: "" })}
-      ${H.row("Tiny Tiny RSS", "Connected · rss.example.org · 58 feeds", { go: "acct", icon: I.rss })}
-      ${Object.entries(CATS).map(([c, fs]) => `<button class="sec" data-act="fold">${c}<span class="n">${fs.length + (LOCAL[c] || []).length}</span></button><div class="secbody">` +
-        (LOCAL[c] || []).map(t => H.row(t, "New articles today")).join("") +
-        fs.map(t => H.row(`${t}<span class="tag">tt-rss</span>`, OWN[t] || "", { go: "bfeed", mark: OWN[t] && OWN[t] !== "New from tt-rss" })).join("") + `</div>`).join("")}</div>` + H.fab() + H.nav() },
-    bfeed: { label: "A feed's page", note: "The same page as in A, reached straight from Sources.", path: ["sources", "bfeed"], html: () => feedPage({ crumb: `<div class="crumb">From <b data-go="acct">Tiny Tiny RSS</b> · category News</div>` }) },
-    acct: { label: "Account", note: "Only what's account-wide. No feed list: the feeds are in Sources.", path: ["sources", "acct"], html: () =>
-      H.bar("Tiny Tiny RSS") +
-      `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>Signed in · last checked 10:21 PM</span></div>
-      <div class="btns"><button class="ob">Pause all 58 feeds</button></div>
-      ${H.set("Articles from", "All your unread articles", H.tb("Change"))}
-      ${H.set("Sync read status with tt-rss", "Read and unread show in both.", H.sw(true))}
-      ${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss.", H.tb("Start fresh"))}
-      ${H.set("Sign out", "Its 58 feeds leave Sources; your tt-rss isn't changed.", H.tb("Sign out"))}</div>` + H.nav() },
-    leave: { dialog: true, over: ["sources", "bfeed"], label: "Leave out", note: "", html: () => FLOWS.a.screens.leave.html() },
-    atext: { dialog: true, over: ["sources", "bfeed"], label: "Article text", note: "", html: () => textDlg },
-    section: { dialog: true, over: ["sources", "bfeed"], label: "Section", note: "Moving a feed's section moves its row in Sources.", html: () => FLOWS.a.screens.section.html() },
+      ${BSEC.map(([name, local, ...tt]) => { const n = tt.reduce((a, x) => a + x[1], 0); return `<div class="h3" role="heading" aria-level="3" aria-label="${name}, ${local.length} sources and ${n} tt-rss feeds">${name}</div>` +
+        local.map(([t, su]) => H.row(t, su)).join("") + H.row(`Tiny Tiny RSS · ${n} feeds`, tt.map(x => x[0]).join(" and ") + " · New articles today", { go: "tsec", icon: I.rss }); }).join("")}
+      <button class="sec" data-act="fold">Left out<span class="n">4</span></button><div class="secbody" hidden>${["Garbage Collection", "Release Notes", "Recipes I Keep", "Garden Log"].map(t => H.row(t, "tt-rss · left out")).join("")}</div>
+      </div>` + H.fab() + H.nav() },
+    flat: { label: "One section", note: "The Kindle reader with five starter feeds: no headings, today's list.", path: ["flat"], html: () =>
+      H.bar("Sources", { big: true, refresh: true }) +
+      `<div class="body">${H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" })}${["The Morning Wire", "Field Station", "Arts &amp; Letters Daily", "City Hall Notes", "The Listening Room"].map(t => H.row(t, "New articles today")).join("")}</div>` + H.fab() + H.nav() },
+    tsec: { label: "tt-rss in a section", note: "A's account page, showing only the tt-rss feeds in this section.", path: ["sources", "tsec"], html: () => acctPage({ only: "News", title: "Tiny Tiny RSS · Front page" }) },
+    afeed: { label: "A feed's page", note: "As in A.", path: ["sources", "tsec", "afeed"], html: () => feedPage() },
+    leave: { dialog: true, over: ["sources", "tsec", "afeed"], label: "Leave out", note: "", html: () => FLOWS.a.screens.leave.html() },
+    atext: { dialog: true, over: ["sources", "tsec", "afeed"], label: "Article text", note: "", html: () => textDlg },
+    section: { dialog: true, over: ["sources", "tsec", "afeed"], label: "Section", note: "Changing it moves the feed to that section's tt-rss row; a message says where.", html: () => sectionDlg },
   },
-  chips: ["sources", "bfeed", "acct"],
+  menus: { view: [["Show as one list"], ["Import from another reader (OPML)"], ["Add tt-rss account"]] },
+  chips: ["sources", "tsec", "afeed", "flat"],
 };
 
-/* ---------- C: adding feeds back to tt-rss ---------- */
+/* ---------- C v2: add one feed to tt-rss too ---------- */
 FLOWS.c = {
   start: "sources",
   screens: {
     sources: { label: "Sources", note: "As in A. Tap Add a source.", html: () =>
       H.bar("Sources", { big: true, refresh: true }) +
-      `<div class="body">${sourcesTop()}${H.row("Tiny Tiny RSS", "58 feeds, 4 left out · New articles today", { go: "acct" })}</div>` + H.fab('data-dlg="add"') + H.nav() },
-    add: { dialog: true, over: ["sources"], label: "Add a source", note: "Unchanged until a feed is found.", html: () =>
-      H.dlg("Add a source", `<div>Paste a website or feed address.</div><div class="field"><small>Address</small>longessay.example</div>`, H.close("Cancel") + `<button class="tb" data-go="where">Add</button>`) },
-    where: { dialog: true, over: ["sources"], label: "Where should it live?", note: "Only with a tt-rss account. Try both answers; the category list is tt-rss's own.", html: () =>
+      `<div class="body">${sourcesTop()}${H.row("Tiny Tiny RSS", "54 feeds in your paper, 4 left out · New articles today", { go: "acct" })}</div>` + H.fab('data-dlg="add"') + H.nav() },
+    add: { dialog: true, over: ["sources"], label: "Add a source", note: "Unchanged until a feed is found. Try \"Add\", or the address of a feed you already have in tt-rss.", html: () =>
+      H.dlg("Add a source", `<div>Paste a website or feed address.</div><div class="field"><small>Address</small>longessay.example</div><div class="su">Or try <b data-go="dupe" style="color:var(--accent);cursor:pointer">harbourledger.example</b>, already in your tt-rss.</div>`, H.close("Cancel") + `<button class="tb" data-go="where">Add</button>`) },
+    dupe: { dialog: true, over: ["sources"], label: "Already in tt-rss", note: "No question, no duplicate: open the one you have.", html: () =>
+      H.dlg("Already in your tt-rss", `<div>Harbour Ledger · Local News is one of your tt-rss feeds, in News. It's in your paper.</div>`, H.close("Cancel") + `<button class="tb" data-go="afeed">Open it</button>`) },
+    where: { dialog: true, over: ["sources"], label: "Where should it live?", note: "\"Just for the paper\" is preselected. Pick tt-rss to see the category and back-issue choices.", html: () =>
       H.dlg("Add The Long Essay", `<div class="su">longessay.example · about 3 articles a week</div>
-        ${H.opt("Just for the paper", "On this phone. tt-rss never sees it.", false)}
-        ${H.opt("In your tt-rss too", "Also in your other tt-rss apps. tt-rss fetches it; it reaches the paper like your other tt-rss feeds.", true)}
-        <div class="select" style="margin-left:32px">Category: Essays &amp; ideas <span>▾</span></div>
-        <div class="su" style="margin-left:32px">New categories are made in tt-rss.</div>`,
-        H.close("Cancel") + `<button class="tb" data-go="added">Add</button>`) },
-    added: { label: "Added to tt-rss", note: "It joins the tt-rss feeds; its first articles come with the next sync.", path: ["added"], html: () =>
-      FLOWS.c.screens.sources.html().replace('<div class="nav">', `<div class="snack"><span>Added to tt-rss in Essays &amp; ideas. Its articles come with the next sync.</span><b data-go="acct">View</b></div><div class="nav">`) },
-    fail: { dialog: true, over: ["sources"], label: "tt-rss couldn't", note: "The server can be blocked where the phone isn't. The add isn't lost.", html: () =>
-      H.dlg("tt-rss couldn't add it", `<div>Your tt-rss server couldn't download longessay.example. Some sites turn servers away but let phones in.</div><div class="su">You can add it to this phone instead, and try tt-rss again later from its page.</div>`, H.close("Cancel") + `<button class="tb" data-close>Add to this phone</button>`) },
-    local: { label: "A phone feed", note: "A feed added before you connected tt-rss. Its menu offers Move to tt-rss.", path: ["sources", "local"], html: () =>
-      H.bar("Field Station", { menu: "localmenu" }) +
-      `<div class="body"><div class="pad"><span class="host">fieldstation.example</span><span>On this phone · New articles today</span></div>
-      <div class="btns"><button class="ob">Pause</button><button class="ob">Article text: Automatic</button></div>
-      ${H.set("At most 2 articles from this site in each edition", "Your choice", "")}<div class="stepper"><button class="ob">−</button><button class="ob">+</button></div>
-      ${H.set("Section", "Science", H.tb("Change"))}
-      <hr><div class="h2">Recent articles · 12</div>${H.art(["●", "Tagging shorebirds at dawn", "Sep 30 · Waiting for an edition"])}</div>` + H.nav() },
-    move: { dialog: true, over: ["sources", "local"], label: "Move to tt-rss", note: "Settings travel with the feed's address. Stars on waiting articles carry over by link.", html: () =>
-      H.dlg("Move Field Station to tt-rss?", `<div>It'll be subscribed in your tt-rss and come to the paper from there. Its cap, article text and section come with it.</div>
-        <div class="select">Category: Science <span>▾</span></div>
-        <div class="su">Articles waiting here are replaced by tt-rss's copies at the next sync. Starred ones stay starred.</div>`, H.close("Cancel") + `<button class="tb" data-close>Move</button>`) },
-    acct: { label: "Account page", note: "As in A; the new feed is listed under its category.", path: ["sources", "acct"], html: () => FLOWS.a.screens.acct.html().replace("Feeds · 58", "Feeds · 59") },
+        <div class="opt" data-act="where1"><span class="rad on"></span><span class="main">Just for the paper<div class="su">On this phone. tt-rss never sees it.</div></span></div>
+        <div class="opt" data-act="where2"><span class="rad"></span><span class="main">In your tt-rss too<div class="su">Also in your other tt-rss apps. It comes to the paper through tt-rss.</div></span></div>
+        <div class="more" hidden style="margin-left:32px;display:grid;gap:6px">
+          <div class="select" data-dlg="cat">Category: Essays &amp; ideas <span>▾</span></div>
+          <div class="su">Your paper takes all unread, so any category is fine.</div>
+          <div class="opt" data-act="check"><span class="cb on"></span><span class="main">Mark its older posts read in tt-rss<div class="su">About 20 back issues would otherwise show as unread there</div></span></div>
+        </div>`,
+        H.close("Cancel") + `<button class="tb" data-go="adding">Add</button>`) },
+    cat: { dialog: true, over: ["sources"], then: "where", label: "Category", note: "tt-rss's own categories; new ones are made in tt-rss. With a one-category paper, others say they won't be in it.", html: () =>
+      H.dlg("Category in tt-rss", Object.keys(CATS).map((c, i) => H.opt(c, c === "Essays & ideas" ? "" : "", c === "Essays & ideas")).join("") + `<div class="su">New categories are made in tt-rss itself.</div>`, H.close("Done")) },
+    adding: { label: "Adding…", note: "tt-rss downloads the feed while you wait; stepped text, no spinner (e-ink). Tap the text to finish.", path: ["adding"], html: () =>
+      FLOWS.c.screens.sources.html() + H.dlg("Add The Long Essay", `<div data-go="added" style="cursor:pointer">Asking tt-rss to subscribe…</div><div class="su">tt-rss is downloading longessay.example. On a slow server this can take half a minute.</div>`, H.close("Cancel")) },
+    added: { label: "Added, with Undo", note: "A sync runs now. Undo unsubscribes the feed the app just added.", path: ["added"], html: () =>
+      FLOWS.c.screens.sources.html().replace('<div class="nav">', `<div class="snack"><span>Added to tt-rss in Essays &amp; ideas. Checking it now.</span><b>Undo</b></div><div class="nav">`) },
+    slow: { dialog: true, over: ["sources"], label: "Not sure yet", note: "A timeout isn't a failure: no \"add to phone\", which would make a duplicate.", html: () =>
+      H.dlg("tt-rss is still working on it", `<div>Your server didn't answer in time. It may still be subscribing to The Long Essay.</div><div class="su">newspapeRSS will look for it at the next sync and tell you either way.</div>`, H.close("OK")) },
+    fail: { dialog: true, over: ["sources"], label: "tt-rss couldn't", note: "A definite no from the server: offer the phone.", html: () =>
+      H.dlg("tt-rss couldn't add it", `<div>Your tt-rss server couldn't download longessay.example. Some sites turn servers away but let phones in.</div>`, H.close("Cancel") + `<button class="tb" data-close>Add to this phone</button>`) },
+    substack: { dialog: true, over: ["sources"], label: "A Substack", note: "Known to lose content through tt-rss: says so, keeps the phone.", html: () =>
+      H.dlg("Add Slow Thoughts", `<div class="su">slowthoughts.substack.com</div>${H.opt("Just for the paper", "Recommended: through tt-rss, Substack posts lose footnote links and embedded Notes.", true)}${H.opt("In your tt-rss too", "", false)}`, H.close("Cancel") + H.close("Add")) },
+    afeed: { label: "Existing feed", note: "", path: ["sources", "acct", "afeed"], html: () => feedPage() },
+    acct: { label: "Account page", note: "", path: ["sources", "acct"], html: () => acctPage() },
   },
-  menus: { localmenu: [["Move to tt-rss…", "move"], ["Remove source"]], acctmenu: [["Sign in again"], ["Remove tt-rss"]] },
-  chips: ["sources", "add", "where", "added", "fail", "local", "move"],
+  menus: { acctmenu: [["Sign in again"], ["Remove tt-rss"]] },
+  chips: ["sources", "add", "where", "cat", "adding", "added", "slow", "fail", "dupe", "substack"],
+};
+
+/* ---------- D v1: balance the paper by section ---------- */
+const SHARES = [["Long reads", "Essays &amp; ideas, Newsletters · 21 sources", 12], ["Front page", "News · 10 sources", 6], ["Science", "6 sources", 4], ["Arts &amp; music", "8 sources", 4], ["Saved for later", "Your reading list", 4]];
+FLOWS.d = {
+  start: "settings",
+  screens: {
+    settings: { label: "Settings", note: "The edition's settings, with one new row. Tap Sections and balance.", html: () =>
+      H.bar("Settings", { big: true }) +
+      `<div class="body"><div class="h3">Your edition</div>
+      ${H.row("Size", "About 30 minutes", { right: "" })}${H.row("When", "Ready by 6:30, every day", { right: "" })}${H.row("Order", "Take turns between sources", { right: "" })}
+      ${H.row("Sections and balance", "Long reads 12 min, Front page 6, Science 4, …", { go: "balance" })}
+      <div class="h3">Delivery</div>${H.row("Kindle", "Send to Kindle", { right: "" })}</div>` + H.nav("set") },
+    balance: { label: "Sections and balance", note: "Minutes per section, in contents order. The total is the edition's size.", path: ["settings", "balance"], html: () =>
+      H.bar("Sections and balance") +
+      `<div class="body">${H.set("Balance by section", "Each section gets about this much of your 30 minutes. Off: take turns between all sources.", H.sw(true))}
+      <div class="h3">In this order</div>
+      ${SHARES.map(([s, su, m]) => `<div class="set"><span class="ic" aria-hidden="true">≡</span><div class="main" data-go="sec" style="cursor:pointer"><div>${s}</div><div class="su">${su}</div></div><div class="stepper" style="padding:0"><button class="ob" aria-label="Less time for ${s}">−</button><span style="min-width:48px;text-align:center">${m} min</span><button class="ob" aria-label="More time for ${s}">+</button></div></div>`).join("")}
+      <div class="note">30 of 30 minutes shared. A section with nothing new gives its time to the others.</div>
+      ${H.row("Preview tomorrow's contents", "From what's waiting now", { go: "preview" })}
+      ${H.row("Make a section", "", { right: "" })}</div>` + H.nav("set") },
+    sec: { label: "A section", note: "Which sources are in it, where its sources come from.", path: ["settings", "balance", "sec"], html: () =>
+      H.bar("Long reads") + `<div class="body"><div class="pad"><span>About 12 minutes · first in the contents</span><span class="host">From tt-rss categories Essays &amp; ideas and Newsletters</span></div>
+      <div class="h3">Sources · 21</div>${[...CATS["Essays & ideas"].slice(0, 5), ...CATS["Newsletters"].slice(0, 3)].map(t => H.row(t, "tt-rss", { right: "" })).join("")}
+      <div class="hint">…and 13 more. Change a source's section on its own page.</div></div>` + H.nav("set") },
+    preview: { label: "Preview", note: "What tomorrow's paper would hold if it were made now.", path: ["settings", "balance", "preview"], html: () =>
+      H.bar("Tomorrow, if made now") + `<div class="body"><div class="pad"><span class="host">About 31 minutes · 9 articles</span></div>
+      ${[["Long reads · 13 min", ["On rereading old notebooks · 7 min", "17 small observations on patience · 6 min"]], ["Front page · 6 min", ["Council delays vote on the waterfront plan · 3 min", "Why the night bus keeps getting cut · 3 min"]], ["Science · 4 min", ["Tagging shorebirds at dawn · 4 min"]], ["Arts & music · 4 min", ["Listen: a new record from the coast · 2 min", "A gallery walk in the rain · 2 min"]], ["Saved for later · 4 min", ["Distributed databases, an interview · 4 min"]]].map(([h, items]) => `<div class="h3">${h}</div>` + items.map(t => `<div class="art"><span class="mk">·</span><div class="main"><div class="ti">${t}</div></div></div>`).join("")).join("")}</div>` + H.nav("set") },
+  },
+  chips: ["settings", "balance", "sec", "preview"],
 };
 
 /* ---------- engine ---------- */
@@ -570,7 +670,8 @@ function mountPhone(stage) {
       if (a === "pick") { t.parentElement.querySelectorAll(".rad").forEach(r => r.classList.remove("on")); t.querySelector(".rad").classList.add("on"); return; }
       if (a.startsWith("menu:")) menu = a.slice(5);
       if (a === "closemenu") menu = null;
-      if (a === "fold") { t.nextElementSibling.hidden = !t.nextElementSibling.hidden; return; }
+      if (a === "fold") { const b = t.nextElementSibling; b.hidden = !b.hidden; t.setAttribute("aria-expanded", !b.hidden); return; }
+      if (a === "where1" || a === "where2") { const d = t.closest(".db"); d.querySelectorAll(".rad").forEach(r => r.classList.remove("on")); t.querySelector(".rad").classList.add("on"); d.querySelector(".more").hidden = a === "where1"; return; }
     }
     render();
   });
@@ -581,18 +682,20 @@ function mountPhone(stage) {
 const PLAN = [
   ["1", "Competitor analysis", "Competitors tab", "done"],
   ["2", "tt-rss today", "Today tab: clickable baseline", "done"],
-  ["3", "Proposal A: feeds as sources, folded under the account", "A tab", "next"],
-  ["4–5", "A: two persona critique-and-refine rounds", "A v2, v3", ""],
-  ["6", "Proposal B: feeds spread through Sources by category", "B tab", ""],
-  ["7–8", "B: two critique-and-refine rounds", "B v2, v3", ""],
-  ["9", "Proposal C: adding feeds back to tt-rss", "C tab", ""],
-  ["10–11", "C: two critique-and-refine rounds", "C v2, v3", ""],
+  ["3", "Proposal A: feeds as sources, folded under the account", "A v1", "done"],
+  ["6", "Proposal B: feeds spread through Sources by category", "B v1", "done"],
+  ["9", "Proposal C: adding feeds back to tt-rss", "C v1", "done"],
+  ["4 · 7 · 10", "Critique round 1 for A, B and C, run side by side", "A v2, B v2 (cut down), C v2 (cut down), new D v1", "done"],
+  ["5 · 8 · 11 · D1", "Critique round 2 for A, B, C and D", "A v3, B v3, C v3, D v2", "next"],
+  ["D2", "D's second critique round", "D v3", ""],
   ["12", "Compare and recommend", "Compare tab", ""],
   ["13", "Critique of compare and recommend, then the final version", "Compare v2", ""],
 ];
 const LOG = [
+  ["Round 1 · cycles 4, 7, 10", "Three critics walked A, B and C as the owner, the self-hoster, the Kindle reader in their sixties, a TalkBack user and a Boox owner. Findings are under each proposal.", "Changed: A learns article text per feed with no screen, folds categories and writes settings in words. B is cut to an optional by-section view, with tt-rss folded per section. C is cut to one choice when adding, phone by default, with Undo; Move to tt-rss waits. New: D, a share of the paper per section, which A's and B's critics both arrived at independently."],
+  ["Cycles 3, 6, 9 · proposals v1", "A: feeds open up under the account. B: every tt-rss feed in Sources, by section. C: adding a feed asks phone or tt-rss, and Move to tt-rss.", "All three are clickable on the same made-up account (58 feeds, 7 categories)."],
   ["Cycle 2 · tt-rss today", "Read the tt-rss source in the code (SourceDetailScreen, TtrssRepository, FeedSync, EditionBuilder) and your screenshots. The app has since renamed \"Mark as read in tt-rss\" to \"Sync read status with tt-rss\"; the mockup follows main.", "Found: per-feed turns and caps already exist in the planner; what's missing is anything the reader can set or see per feed."],
-  ["Cycle 1 · competitors", "Thirteen products and four sync APIs. Grouping an account's feeds under it is the norm; per-feed settings live in the app; write-back is always an explicit choice; digests get scoped.", "Changed the plan: settings keyed by the feed's address (Fluent Reader) is a better idea than keyed by tt-rss's feed id. It goes into proposal A."],
+  ["Cycle 1 · competitors", "Thirteen products and four sync APIs. Grouping an account's feeds under it is the norm; per-feed settings live in the app; write-back is always an explicit choice; digests get scoped.", "Changed the plan: carry settings by the feed's address (Fluent Reader). Round 1 later narrowed that to carrying, not keying."],
 ];
 document.getElementById("planRows").innerHTML = PLAN.map(([n, c, o, s]) => `<tr><td>${n}</td><td>${c}</td><td>${o}</td><td>${s ? `<span class="pill ${s === "done" ? "" : "v"}">${s}</span>` : ""}</td></tr>`).join("");
 document.getElementById("log").innerHTML = LOG.map(([h, d, f]) => `<article><h3>${h}</h3><p style="margin:0">${d}</p><p style="margin:0;color:var(--muted)">${f}</p></article>`).join("");
