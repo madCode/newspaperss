@@ -48,3 +48,91 @@ B and C aren't rivals: C needs B. Moving a feed into tt-rss without B would lose
 article text and section, because a tt-rss feed has nowhere to keep them.
 
 The cycles below take B, then C, then weigh them against A.
+
+## 2. Each tt-rss feed as a source (the doorway)
+
+### What the reader gets
+
+- A tt-rss feed has the same page as a feed added here: cap, Article text (learned or chosen),
+  section, pause, its waiting and delivered articles.
+- tt-rss categories can become sections, feed by feed, without a separate feature.
+- The account keeps its own page for what's truly account-wide: sign-in, read sync, mark read
+  after delivery, Start fresh, which category.
+
+### Two ways to store it
+
+- **B1. A child source per feed.** A new kind, `TTRSS_FEED`, with a `parentId` pointing at the
+  account's source and the tt-rss feed id. Articles belong to the feed's source.
+  - The planner, caps, Article text, sections and pause already work on sources, so they work
+    here with no special case. `publicationOf(sourceId, originId)` and `left_out_feeds` go away:
+    a left-out feed is a paused one.
+  - Sync still runs once per account and writes into the children.
+- **B2. One source, plus a per-feed settings table.** Less to migrate, but every per-source
+  feature (and every one added later) has to look in two places. Today's two code paths for
+  "publication" and "left out" are that cost already, on a small scale.
+
+B1 is the one worth building if B is built at all. The ripple points to get right:
+
+- **Migration.** Make a child for each distinct `originId` and for each left-out feed (paused),
+  move articles to it (`(sourceId, guid)` stays unique: tt-rss guids are `ttrss:<id>`), and
+  carry over "last featured" so turns don't restart. A database version and a `MigrationTest`.
+- **The account row stops owning articles.** Queries that count or list a source's articles,
+  the Today counts, and the source page must not treat it as an empty feed.
+- **Notes from tt-rss** (`serverNote`: couldn't mark read, sign in again) belong to the account,
+  not the feed whose articles triggered them. `TtrssRepository.update` groups by `sourceId` today.
+- **Removal.** Removing the account removes its children (a cascade on `parentId`).
+  Signing in as another user clears them: feed ids belong to each tt-rss user, as today.
+- **The mark-read queries** select `kind = 'TTRSS'`; they'd follow the parent.
+
+### Lifecycle: tt-rss changes underneath
+
+| On the server | Here |
+|---|---|
+| A feed is added | A new source appears at the next sync, in the paper, marked "New from tt-rss" once. Matches today: all unread is taken unless a category is chosen. |
+| A feed has nothing unread | Nothing. `getFeeds` with `unread_only` doesn't list it, so absence doesn't mean gone. |
+| A feed is unsubscribed | Only a full list tells (`getFeeds` with `unread_only=false`, or `getFeedTree`, once a day). Then its source goes, starred articles kept until delivered, as for a removed feed. |
+| A feed is renamed | The title follows, unless renamed here. |
+| A feed moves category | Its section follows, unless set here. |
+
+### What "Remove" means on a tt-rss feed
+
+The risky word. Two very different wishes:
+
+- **"Not in my paper"**: pause it here. It stays in tt-rss, and in the list, so it can come back.
+- **"I'm done with this site"**: unsubscribe in tt-rss, which also takes it out of every other
+  app reading that account.
+
+The first is today's "leave out" and should be the default, called that. The second is
+section 3's question.
+
+### Clutter in Sources
+
+The reader with tt-rss often has 50 to 200 feeds. One row each would bury the starter-pack
+reader's five feeds, and Sources would become a feed reader's sidebar: the thing the app
+isn't. Ways to keep it calm:
+
+- **Grouped and folded (recommended).** One tt-rss row, as now, saying "63 feeds, 4 left out".
+  It opens the account page, whose "Feeds in your paper" list is the doorway: tap a feed for
+  its own page. A feed with its own settings shows a small mark so it's findable.
+- **Grouped by section.** tt-rss feeds mix into Sources under their sections. Honest, but long,
+  and the account's own controls lose their home.
+- **Flat.** Every feed in one list. Ruled out at this scale.
+
+The first keeps the Sources screen as simple as today for everyone, and gives the veteran the
+per-feed controls one tap deeper. No unread counts anywhere, as the principles ask.
+
+### Feeds in both places
+
+Someone with tt-rss may also add a site here that's in tt-rss too. Today one delivery uses up
+the other copy by link, so nothing goes out twice, but each copy takes turns. With per-feed
+sources, `getFeeds` gives each feed's URL, so the app can spot the pair and offer "This is
+also in your tt-rss: keep one". Not urgent; links already keep it from repeating.
+
+### Cost and risk of B
+
+- **Cost:** one migration, an account/feed split in the source page, a lifecycle check once a
+  day. No extra requests at sync.
+- **Risk:** the migration (articles change source), and every feature that assumed a source
+  syncs its own articles. Both are testable against a real Room database.
+- **Gain:** per-feed cap, Article text, sections, and a home for any later per-source feature,
+  for one persona. Nothing changes for readers without tt-rss.
