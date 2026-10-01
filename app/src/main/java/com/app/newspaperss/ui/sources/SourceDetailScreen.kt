@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import com.app.newspaperss.ui.components.BUILDING_NOTE
+import com.app.newspaperss.ui.components.historyLine
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -239,6 +240,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 items(articles, key = { it.id }) { article ->
                     RecentArticle(
                         article,
+                        historyLine(article, detail?.history?.get(article.id), expires = source.kind != SourceKind.READING_LIST),
                         locale,
                         building,
                         selection = if (selecting) article.id in selected else null,
@@ -635,6 +637,7 @@ private val IdSetSaver = Saver<Set<Long>, LongArray>(save = { it.toLongArray() }
 @Composable
 private fun RecentArticle(
     article: ArticleEntity,
+    status: String,
     locale: Locale,
     building: Boolean,
     selection: Boolean?,
@@ -644,7 +647,6 @@ private fun RecentArticle(
     onStartSelecting: () -> Unit,
 ) {
     val context = LocalContext.current
-    val status = articleStatus(article)
     val details = buildAnnotatedString {
         // When it was published: a tt-rss backlog arrives all at once, and every row would show
         // the day it was fetched.
@@ -757,14 +759,6 @@ private fun modeName(source: SourceEntity) = when {
 /** Where the source's text comes from, including while the automatic check is still deciding. */
 private fun textLine(source: SourceEntity): String? = fullTextLine(source)
     ?: if (source.kind == SourceKind.FEED && source.contentMode == ContentMode.AUTO) "Still working out whether this site sends full articles" else null
-
-internal fun articleStatus(article: ArticleEntity): String = if (isStarred(article)) "Starred for your next edition" else when (article.state) {
-    ArticleState.NEW -> "Waiting for an edition"
-    ArticleState.IN_EDITION -> "In an edition you haven't sent yet"
-    ArticleState.DELIVERED -> "Delivered"
-    ArticleState.SKIPPED -> "Marked as read"
-    ArticleState.EXPIRED -> "Not picked before it got old"
-}
 
 /** Null until a failure has lasted past the day it started: one bad sync isn't worth a second line. */
 internal fun failingLine(since: Instant?, locale: Locale, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? {

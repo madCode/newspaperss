@@ -336,6 +336,11 @@ allowed to read that edition's file until the phone restarts.
   Read, delivered and too-old rows have a dimmed title, in a lighter weight
   as well as a muted colour so it shows on e-ink, so what's still to come
   stands out. A starred one isn't dimmed: it's going out again.
+  The details line ends with where the article stands: "Waiting, N days
+  left" (it expires 7 days after it was found; saved links just say
+  "Waiting"), "In your next edition" (starred), "In Thursday's edition",
+  "Sent Wednesday", "Read", or "Not picked" (it waited a week, or the list
+  moved on).
   - **Select** (or pressing and holding a row) enters selection mode:
     checkboxes take the status marks' place, the top bar says "N
     selected", and a bar at the bottom has **☆ Next edition** and

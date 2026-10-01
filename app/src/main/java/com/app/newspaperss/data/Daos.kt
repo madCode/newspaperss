@@ -218,6 +218,21 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt DESC, id DESC")
     fun observeAllForSource(sourceId: Long): Flow<List<ArticleEntity>>
 
+    /**
+     * What a source's page says happened to its articles: when a delivered one's link went out,
+     * and which unsent edition holds one that's in an edition.
+     */
+    @Query(
+        """SELECT a.id AS articleId, d.deliveredAt AS sentAt, NULL AS editionTitle
+           FROM articles a JOIN delivered_urls d ON d.url = a.url
+           WHERE a.sourceId = :sourceId AND a.state = 'DELIVERED' AND a.url != ''
+           UNION ALL
+           SELECT ea.articleId AS articleId, NULL AS sentAt, e.title AS editionTitle
+           FROM edition_articles ea JOIN editions e ON e.id = ea.editionId JOIN articles a ON a.id = ea.articleId
+           WHERE a.sourceId = :sourceId AND a.state = 'IN_EDITION' AND e.status IN ('READY', 'BUILDING')""",
+    )
+    fun observeHistory(sourceId: Long): Flow<List<ArticleHistory>>
+
     /** Newest first by the date a source's page shows ([ArticleEntity.shownDate]). */
     @Query(
         """SELECT * FROM articles WHERE sourceId = :sourceId
@@ -470,6 +485,9 @@ interface ArticleDao {
 private const val DELIVERED_SINCE = """SELECT ea.articleId FROM edition_articles ea JOIN editions e ON e.id = ea.editionId
     WHERE ea.editionId != :editionId AND ea.articleId IS NOT NULL AND e.status = 'DELIVERED'
     AND e.deliveredAt > COALESCE((SELECT deliveredAt FROM editions WHERE id = :editionId), 0)"""
+
+/** One fact about what happened to an article: when it went out, or which unsent edition holds it. */
+data class ArticleHistory(val articleId: Long, val sentAt: Instant?, val editionTitle: String?)
 
 /** A tt-rss article's guid and the tt-rss feed it came from. */
 data class TtrssRef(val guid: String, val originId: String?)

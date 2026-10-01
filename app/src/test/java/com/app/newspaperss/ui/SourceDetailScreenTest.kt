@@ -125,8 +125,8 @@ class SourceDetailScreenTest {
         idleUntil { visible("Pause") }
         val list = compose.onNode(hasScrollAction())
         list.performScrollToNode(hasText("Went out"))
-        compose.onNodeWithText("Delivered", substring = true).assertExists()
-        list.performScrollToNode(hasText("Waiting for an edition", substring = true))
+        compose.onNodeWithText("· Sent", substring = true).assertExists()
+        list.performScrollToNode(hasText("· Waiting, ", substring = true))
         list.performScrollToIndex(0)
 
         compose.onNodeWithContentDescription("More options").performClick()
@@ -343,7 +343,7 @@ class SourceDetailScreenTest {
         compose.onNodeWithText("Tap ● to mark one read or unread, and ☆ to put it in your next edition.").assertExists()
 
         star("Article delivered").performClick()
-        settle { visible("Starred for your next edition") }
+        settle { visible("In your next edition") }
         star("Article delivered").assertIsOn().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Starred"))
         val delivered = runBlocking { db.articles().byId(ids.getValue("delivered"))!! }
         assertEquals("a star is a flag, not a state", ArticleState.DELIVERED, delivered.state)
@@ -392,7 +392,7 @@ class SourceDetailScreenTest {
         markRead("Article waiting").performClick()
 
         settle { state(waiting) == ArticleState.SKIPPED }
-        settle { visible("Marked as read") }
+        settle { visible("· Read") }
         assertEquals("the row doesn't move", top, compose.onNodeWithText("Article waiting").fetchSemanticsNode().boundsInRoot.top)
         assertNull("marking read clears the star", runBlocking { db.articles().byId(waiting)!!.starredAt })
         assertFalse("a second tap undoes it, so no snackbar", visible("Undo"))
