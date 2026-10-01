@@ -241,22 +241,27 @@ interface ArticleDao {
     fun observeHistory(sourceId: Long): Flow<List<ArticleHistory>>
 
     /**
-     * A paid post an edition found next to nothing free in; [skip] leaves it out for good, as one
-     * that waited too long. Not a starred one, nor one that's already left the waiting articles.
+     * A paid post an edition found next to nothing free in; [skip] leaves it out for good, as
+     * [ArticleEntity.paidSkipped]. Not a starred one, nor one that's already left the waiting articles:
+     * a star given while the edition was being made wins.
      */
     @Query(
         """UPDATE articles SET paidOnly = 1,
+               paidSkipped = CASE WHEN :skip AND state = 'NEW' AND starredAt IS NULL THEN 1 ELSE paidSkipped END,
                state = CASE WHEN :skip AND state = 'NEW' AND starredAt IS NULL THEN 'EXPIRED' ELSE state END
            WHERE id = :id""",
     )
     suspend fun markPaidOnly(id: Long, skip: Boolean)
 
-    /** How many of a source's articles were paid posts with nothing free, and how many of them were left out. */
+    /** How many of a source's articles were paid posts with nothing free, and how many of them are left out. */
     @Query(
-        """SELECT COUNT(*) AS found, COALESCE(SUM(CASE WHEN state = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS skipped
+        """SELECT COUNT(*) AS found, COALESCE(SUM(CASE WHEN paidSkipped = 1 AND state = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS skipped
            FROM articles WHERE sourceId = :sourceId AND paidOnly = 1""",
     )
     fun observePaidOnly(sourceId: Long): Flow<PaidOnlyCount>
+
+    @Query("SELECT COUNT(*) FROM articles WHERE id IN (:ids) AND paidSkipped = 1 AND state = 'EXPIRED'")
+    suspend fun countPaidSkipped(ids: Collection<Long>): Int
 
     /** Newest first by the date a source's page shows ([ArticleEntity.shownDate]). */
     @Query(
@@ -388,7 +393,7 @@ interface ArticleDao {
      * sync marks it unread (see [unreportedUnread]).
      */
     @Query(
-        """UPDATE articles SET state = 'NEW', discoveredAt = :now,
+        """UPDATE articles SET state = 'NEW', discoveredAt = :now, paidSkipped = 0,
                reportedRead = CASE WHEN state = 'DELIVERED' THEN 1 ELSE reportedRead END
            WHERE id = :id AND state IN ('SKIPPED', 'EXPIRED', 'DELIVERED')""",
     )
@@ -511,9 +516,10 @@ private const val DELIVERED_SINCE = """SELECT ea.articleId FROM edition_articles
     WHERE ea.editionId != :editionId AND ea.articleId IS NOT NULL AND e.status = 'DELIVERED'
     AND e.deliveredAt > COALESCE((SELECT deliveredAt FROM editions WHERE id = :editionId), 0)"""
 
-/** One fact about what happened to an article: when it went out, or which unsent edition holds it. */
+/** A source's paid posts with next to nothing free: how many were found, and how many are left out. */
 data class PaidOnlyCount(val found: Int, val skipped: Int)
 
+/** One fact about what happened to an article: when it went out, or which unsent edition holds it. */
 data class ArticleHistory(val articleId: Long, val sentAt: Instant?, val editionTitle: String?)
 
 /** A tt-rss article's guid and the tt-rss feed it came from. */

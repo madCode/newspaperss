@@ -36,7 +36,7 @@ fun historyLine(
         ArticleState.DELIVERED -> history?.sentAt?.let { "Sent ${dayOf(it, now, zone, locale)}" } ?: "Sent"
         ArticleState.SKIPPED -> "Read"
         // Not "too old": a list's newest-only cap and leaving a feed out expire articles too.
-        ArticleState.EXPIRED -> if (article.paidOnly) "Skipped: a paid post" else "Not picked"
+        ArticleState.EXPIRED -> if (article.paidSkipped) "Skipped: a paid post" else "Not picked"
     }
 }
 

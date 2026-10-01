@@ -66,13 +66,13 @@ class HistoryLineTest {
     @Test
     fun readAndExpiredSayJustThat() {
         assertEquals("Read", line(article(ArticleState.SKIPPED)))
-        assertEquals("Not picked", line(article(ArticleState.EXPIRED)))
+        assertEquals("a paid post that let in, then got old", "Not picked", line(article(ArticleState.EXPIRED).copy(paidOnly = true)))
     }
 
     /** A paid post its source skipped didn't wait too long; it says why it never went in. */
     @Test
     fun aSkippedPaidPostSaysSo() {
-        assertEquals("Skipped: a paid post", line(article(ArticleState.EXPIRED).copy(paidOnly = true)))
-        assertEquals("Not picked", line(article(ArticleState.EXPIRED)))
+        assertEquals("Skipped: a paid post", line(article(ArticleState.EXPIRED).copy(paidOnly = true, paidSkipped = true)))
+        assertEquals("a paid post that let in, then got old", "Not picked", line(article(ArticleState.EXPIRED).copy(paidOnly = true)))
     }
 }

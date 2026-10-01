@@ -58,8 +58,9 @@ class ExtractorContentProvider(
         // reader saved on purpose waits for the next edition instead of being used up as a stub.
         if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
         if (extracted.nothingFree) {
-            // A star asks for this article whatever it turns out to be.
-            val skip = source.skipPaidPosts && article.starredAt == null
+            // A star asks for this article whatever it turns out to be, and one found before and
+            // still here was let in or brought back by the reader: only a first find is skipped.
+            val skip = source.skipPaidPosts && article.starredAt == null && !article.paidOnly
             onPaidOnly(article.id, skip)
             if (skip) return null
         }

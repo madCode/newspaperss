@@ -89,9 +89,12 @@ module so it's all unit-tested without Android.
   paywall are removed. One with next to nothing free (under 50 words: a
   title and a picture) can be left out instead, per source, with **Skip
   paid posts with nothing free** on its page. That switch shows once the
-  source has had one, is off until turned on, and says how many it
-  skipped lately. A skipped post counts as not picked ("Skipped: a paid
-  post") and isn't fetched again; a starred one still goes in.
+  source has had one, is off until turned on, and says how many it has
+  skipped (on a tt-rss account, for every feed in it). Only a first find
+  is skipped: it counts as not picked ("Skipped: a paid post") and isn't
+  fetched again. Starring it or marking it unread asks for it, so it goes
+  in. An edition whose every new article was skipped is nothing new, not
+  a failure.
 - **Embeds.** A video can't play in a book: a video's poster frame stands
   in for it, and a YouTube or Vimeo player becomes a link to the video
   (with YouTube's thumbnail). tt-rss passes no players on, so a caption

@@ -234,7 +234,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                     val paidOnly = detail?.paidOnly
                     // Only once the source has had one: most never do, and the page has enough on it.
                     if (source.kind != SourceKind.READING_LIST && paidOnly != null && (source.skipPaidPosts || paidOnly.found > 0)) {
-                        PaidPostsOption(source.skipPaidPosts, paidOnly.skipped, viewModel::setSkipPaidPosts)
+                        PaidPostsOption(source.skipPaidPosts, paidOnly.skipped, source.kind == SourceKind.TTRSS, viewModel::setSkipPaidPosts)
                     }
                     HorizontalDivider(Modifier.padding(top = 16.dp))
                     ArticlesHeading(articles, selecting, onSelect = { selecting = true })
@@ -339,7 +339,7 @@ private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onM
 }
 
 @Composable
-private fun PaidPostsOption(skip: Boolean, skipped: Int, onChange: (Boolean) -> Unit) {
+private fun PaidPostsOption(skip: Boolean, skipped: Int, wholeAccount: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth()
             .toggleable(value = skip, role = Role.Switch, onValueChange = onChange)
@@ -349,11 +349,14 @@ private fun PaidPostsOption(skip: Boolean, skipped: Int, onChange: (Boolean) -> 
         Column(Modifier.weight(1f)) {
             Text("Skip paid posts with nothing free")
             Text(
-                when {
-                    skipped > 0 -> "${plural(skipped, "paid post")} skipped lately: a title and a picture, nothing to read."
-                    skip -> "A post that's only a title and a picture won't take a place."
-                    else -> "Some of its posts are for paying subscribers, with only a title and a picture free."
-                },
+                listOfNotNull(
+                    when {
+                        skip && skipped > 0 -> "${plural(skipped, "paid post")} skipped so far: a title and a picture, nothing to read."
+                        skip -> "A post that's only a title and a picture won't take a place."
+                        else -> "Some of its posts are for paying subscribers, with only a title and a picture free."
+                    },
+                    "For every feed in this account.".takeIf { wholeAccount },
+                ).joinToString(" "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

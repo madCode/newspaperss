@@ -810,7 +810,7 @@ class SourceDetailScreenTest {
         idleUntil { runBlocking { db.sources().byId(id)!!.skipPaidPosts } }
 
         runBlocking { repo.markPaidOnly(ids.getValue("waiting"), skip = true) }
-        idleUntil { compose.waitForIdle(); visible("1 paid post skipped lately") }
+        idleUntil { compose.waitForIdle(); visible("1 paid post skipped so far") }
         assertTrue(visible("Skipped: a paid post"))
         assertEquals(ArticleState.EXPIRED, state(ids.getValue("waiting")))
     }

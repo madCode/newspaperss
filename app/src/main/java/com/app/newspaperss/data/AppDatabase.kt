@@ -101,6 +101,7 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE sources ADD COLUMN skipPaidPosts INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE articles ADD COLUMN paidOnly INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE articles ADD COLUMN paidSkipped INTEGER NOT NULL DEFAULT 0")
             }
         }
 

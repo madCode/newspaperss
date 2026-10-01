@@ -190,10 +190,11 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 6, true, AppDatabase.MIGRATION_5_6).use { db ->
             db.query("SELECT skipPaidPosts FROM sources WHERE id = 1").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
-            db.query("SELECT paidOnly, state FROM articles WHERE id = 7").use { c ->
+            db.query("SELECT paidOnly, paidSkipped, state FROM articles WHERE id = 7").use { c ->
                 c.moveToFirst()
                 assertEquals(0, c.getInt(0))
-                assertEquals("NEW", c.getString(1))
+                assertEquals(0, c.getInt(1))
+                assertEquals("NEW", c.getString(2))
             }
         }
     }
