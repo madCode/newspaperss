@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
+### Cycle 64: no doubled gaps around screens (17:35–17:50)
+- **From you:** a screenshot of an edition page: why so much space?
+- **Cause:** the tabs pad every screen for the status bar and the gesture bar, and each screen's own top bar and frame padded for them again: an empty status bar's height above the title, and a gesture bar's height above the tabs.
+- **Shipped:** the screens see those bars as already handled. A test gives the phone a status bar and checks the title sits just under it once (it sat a second bar lower before the fix).
+
 ### UX pass (13:00–15:00, afternoon)
 UX design only, no new features. Twelve patterns listed, four research sweeps (onboarding, delivery and hand-off, lists and destructive actions, settings with accessibility and e-ink), then one PR per fix, each reviewed. The options considered and what was decided for every pattern are in the session's UX report page. Pattern by pattern:
 - **Today** ([#81](https://github.com/madCode/newspaperss/pull/81)): once an edition exists, "Make another edition" is a quiet link, not the filled button; a failure reads before its Try again, and there's one retry per failure; "N starred articles are waiting for your next edition". Review caught two retry buttons in the most common failure, a retry beside Send, and a first fix that would have told TalkBack "Your edition is ready." for a failure.

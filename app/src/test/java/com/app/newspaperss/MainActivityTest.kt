@@ -1,6 +1,12 @@
 package com.app.newspaperss
 
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performClick
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -10,6 +16,7 @@ import com.app.newspaperss.testutil.idleUntil
 import kotlinx.coroutines.runBlocking
 import androidx.work.testing.WorkManagerTestInitHelper
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -40,6 +47,30 @@ class MainActivityTest {
     fun aFirstRunStartsWithOnboarding() {
         launchWith(onboarded = false)
         shows("Get started")
+    }
+
+    /** A screen inside the tabs clears the status bar once, not again on top of the tabs' own padding. */
+    @Test
+    fun aScreensTopBarSitsJustBelowTheStatusBar() {
+        runBlocking { app.container.settings.update { it.copy(onboarded = true) } }
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        shows("Sources")
+        compose.onAllNodes(hasText("Settings") and hasClickAction()).onFirst().performClick()
+        shows("minutes of reading")
+        val density = app.resources.displayMetrics.density
+        val statusBar = (40 * density).toInt()
+        scenario.onActivity { activity ->
+            val insets = WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, statusBar, 0, 0))
+                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, 60))
+                .build()
+            ViewCompat.dispatchApplyWindowInsets(activity.window.decorView, insets)
+        }
+        compose.waitForIdle()
+
+        val title = compose.onAllNodes(hasText("Settings")).fetchSemanticsNodes().minOf { it.boundsInRoot.top }
+        // Counted twice, the title would sit a whole status bar lower.
+        assertTrue("title at $title", title > statusBar && title < 2 * statusBar)
     }
 
     @Test
