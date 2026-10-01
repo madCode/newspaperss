@@ -3,7 +3,22 @@ package com.app.newspaperss.ui
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasProgressBarRangeInfo
-import androidx.compose.ui.test.junit4.createComposeRule
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebView
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
+import com.app.newspaperss.settings.PreviewTextSize
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -31,7 +46,7 @@ import java.time.LocalDate
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
 class ArticlePreviewScreenTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     @get:Rule val tmp = TemporaryFolder()
 
     @Test
@@ -79,6 +94,57 @@ class ArticlePreviewScreenTest {
             // The second article is reached by the first one's "Next" link, served page by page.
             val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, dark.first, dark.second).second.toString(Charsets.UTF_8)
             assertTrue(next.contains(style))
+            // A strip shrunk to the book's image size fills the width, on every page.
+            assertTrue(next, next.contains("figure img, div.article-body > img { width: 100%; }"))
         }
+    }
+
+    private fun oneArticleEdition(): File {
+        val file = tmp.newFile("z.epub")
+        val article = EditionArticle(title = "A story", sourceTitle = "S", url = "https://a.example/", bodyHtml = "<p>x</p>", minutes = 1.0)
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
+        }
+        return file
+    }
+
+    private fun webView(): WebView {
+        fun find(view: View): WebView? = view as? WebView ?: (view as? ViewGroup)?.let { group -> (0 until group.childCount).firstNotNullOfOrNull { find(group.getChildAt(it)) } }
+        var found: WebView? = null
+        idleUntil { found = find(compose.activity.window.decorView); found != null }
+        return found!!
+    }
+
+    @Test
+    fun thePickedTextSizeIsAppliedAndKeptInPlace() {
+        val file = oneArticleEdition()
+        var size by mutableStateOf(PreviewTextSize.DEFAULT)
+        val picked = mutableListOf<PreviewTextSize>()
+        compose.setContent {
+            ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size, onTextSize = { picked += it; size = it })
+        }
+        val view = webView()
+        assertEquals(100, view.settings.textZoom)
+
+        compose.onNodeWithContentDescription("Text size").performClick()
+        compose.onNodeWithText("Larger").performClick()
+        compose.waitForIdle()
+
+        assertEquals(listOf(PreviewTextSize.LARGER), picked)
+        assertEquals(145, view.settings.textZoom)
+        assertSame("the same page, so the reader keeps their place", view, webView())
+        // The menu marks the current size.
+        compose.onNodeWithContentDescription("Text size").performClick()
+        compose.onNode(hasText("Larger") and hasContentDescription("Current size")).assertExists()
+        compose.onNode(hasText("Default") and hasContentDescription("Current size")).assertDoesNotExist()
+    }
+
+    @Test
+    fun thePreviewCanBePinchedToZoomWithoutButtonsOverThePage() {
+        val file = oneArticleEdition()
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}) }
+        val settings = webView().settings
+        assertTrue(settings.builtInZoomControls)
+        assertFalse(settings.displayZoomControls)
     }
 }

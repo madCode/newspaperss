@@ -313,7 +313,9 @@ allowed to read that edition's file until the phone restarts.
 - **Edition:** the same buttons as Today's card, including **Mark as not sent**,
   and its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
-  network). **Notes** exports a Markdown file for a notes app: front matter
+  network). **Aa** in the preview's top bar sets its text size (Small,
+  Default, Large, Larger), kept for next time. Pictures that stand alone
+  fill the width, and the page can be pinched to zoom into a comic. **Notes** exports a Markdown file for a notes app: front matter
   (date, edition, sources, a tag) for Obsidian, the closing page's question and
   a few reflection prompts at the top, then per article its source, author, date, link, a citation and room for notes.
   **Delete edition** is in the ⋮ menu, and asks by name, saying what happens

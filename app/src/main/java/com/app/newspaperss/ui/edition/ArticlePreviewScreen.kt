@@ -12,6 +12,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.app.newspaperss.settings.PreviewTextSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,10 +59,18 @@ private sealed interface Preview {
  * One article as the e-reader will show it, read straight out of the EPUB.
  *
  * @param loadFile the edition's file, or null if it's gone. Called off the main thread.
+ * @param textSize the preview's text size; [onTextSize] is called when the reader picks another.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: String, onBack: () -> Unit) {
+fun ArticlePreviewScreen(
+    loadFile: suspend () -> File?,
+    position: Int,
+    title: String,
+    onBack: () -> Unit,
+    textSize: PreviewTextSize = PreviewTextSize.DEFAULT,
+    onTextSize: (PreviewTextSize) -> Unit = {},
+) {
     // Read in the background so the screen shows at once: reading a large edition during
     // composition holds up the frame, and the tap that opened it seems not to have registered.
     val preview by produceState<Preview>(Preview.Loading, position) {
@@ -74,6 +92,7 @@ fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: St
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+                actions = { TextSizeMenu(textSize, onTextSize) },
             )
         },
     ) { padding ->
@@ -86,7 +105,25 @@ fun ArticlePreviewScreen(loadFile: suspend () -> File?, position: Int, title: St
             // Keyed: the WebView is built once, so a new article needs a new one.
             is Preview.Ready -> key(p) {
                 val colors = MaterialTheme.colorScheme
-                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), Modifier.fillMaxSize().padding(padding))
+                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textSize.percent, Modifier.fillMaxSize().padding(padding))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextSizeMenu(textSize: PreviewTextSize, onTextSize: (PreviewTextSize) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }, modifier = Modifier.semantics { contentDescription = "Text size" }) { Text("Aa") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for (size in PreviewTextSize.entries) {
+                DropdownMenuItem(
+                    text = { Text(size.label) },
+                    onClick = { open = false; onTextSize(size) },
+                    // A tick, not only a tint, so the current size shows on e-ink.
+                    trailingIcon = if (size == textSize) { { Icon(Icons.Default.Check, contentDescription = "Current size") } } else null,
+                )
             }
         }
     }
@@ -109,9 +146,11 @@ internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: 
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, modifier: Modifier) {
+private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, modifier: Modifier) {
     AndroidView(
         modifier = modifier,
+        // Applied in place, so a new size keeps the reader's place in the article.
+        update = { it.settings.textZoom = textZoom },
         factory = { context ->
             WebView(context).apply {
                 // Before the page loads too, so a dark screen doesn't flash white.
@@ -120,6 +159,9 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
                 settings.javaScriptEnabled = false
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
+                // Pinch to zoom, for a comic's small print; no on-screen buttons over the page.
+                settings.builtInZoomControls = true
+                settings.displayZoomControls = false
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse {
                         val (mime, bytes) = bookResponse(request.url.toString(), pages, background, text)
@@ -147,8 +189,16 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
  * The book leaves side margins and colours to the e-reader's own settings, so the preview supplies
  * them: a WebView has no margins, and would show the page black on white in the app's dark mode.
  * The book's links and rules take the text's colour, so they follow.
+ *
+ * Pictures that stand alone (in a figure, or an article that is just the image) fill the width:
+ * a tall strip shrunk to fit the book's image size would otherwise sit narrow in the middle.
  */
 internal fun forPreview(xhtml: String, background: Int, text: Int): String =
-    xhtml.replaceFirst("</head>", "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; }</style></head>")
+    xhtml.replaceFirst(
+        "</head>",
+        "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; } $FILL_WIDTH</style></head>",
+    )
+
+private const val FILL_WIDTH = "figure img, div.article-body > img { width: 100%; }"
 
 private fun css(argb: Int) = "#%06X".format(argb and 0xFFFFFF)

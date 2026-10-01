@@ -32,6 +32,7 @@ class SettingsStoreTest {
                 folderName = "Books",
                 notesFolderUri = "content://tree/vault",
                 notesFolderName = "Vault",
+                previewTextSize = PreviewTextSize.LARGER,
             )
         }
         val s = store.current()
@@ -47,6 +48,14 @@ class SettingsStoreTest {
         assertEquals("Books", s.folderName)
         assertEquals("content://tree/vault", s.notesFolderUri)
         assertEquals("Vault", s.notesFolderName)
+        assertEquals(PreviewTextSize.LARGER, s.previewTextSize)
+    }
+
+    @Test
+    fun aTextSizeThisVersionDoesntKnowReadsAsDefault() = runTest {
+        // Written by a newer version that has more sizes, then the app downgraded.
+        dataStore.edit { it[stringPreferencesKey("preview_text_size")] = "HUGE" }
+        assertEquals(PreviewTextSize.DEFAULT, store.current().previewTextSize)
     }
 
     @Test
