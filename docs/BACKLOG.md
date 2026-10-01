@@ -15,6 +15,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Explain per device what counts as "delivered" *(personas)*
 
 ### Sources and fetching
+- [ ] **Platform pass** *(you asked)*: a test corpus of real posts from the big blog and newsletter platforms (Substack, Ghost, WordPress, Medium, Blogger, Tumblr, Buttondown, beehiiv, Micro.blog), from their own feeds and through tt-rss, each checked in the book for footnotes, embeds (Notes, tweets and Bluesky posts, YouTube, galleries), pull quotes and captions, paywall teasers and link posts. Fix what breaks, and keep the corpus as regression tests. The first finds: Substack Notes and footnotes after tt-rss (#109)
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
 - [ ] "No feed found" in onboarding: offer the reading list there too (done in Sources) *(personas)*
 - [ ] Page cleanup's furniture patterns ("Recommended stories", "Subscribe to", "Read more:") are English only, so "Lire aussi", "Mehr zum Thema" and "Lee también" slip into French, German and Spanish articles. Key them by the article's language *(live)*
