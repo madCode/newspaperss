@@ -340,7 +340,8 @@ allowed to read that edition's file until the phone restarts.
   and its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
   network). **Aa** in the preview's top bar sets its text size (Small,
-  Default, Large, Larger), kept for next time. Large pictures that stand
+  Default, Large, Larger), kept for next time, on top of Android's own font
+  size. Large pictures that stand
   alone fill the width (small ones keep their size), and the page can be
   pinched to zoom into a comic. **Notes** exports a Markdown file for a
   notes app: front matter
