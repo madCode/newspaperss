@@ -135,6 +135,11 @@ class SettingsScreenTest {
     fun theReaderTipIsAboutSharingSoOnlySharingShowsIt() {
         runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.SHARE) } }
         waitFor("tap Send and choose the Kindle app")
+        // Under the choice it belongs to, where the reader is looking when they pick it.
+        val (send, tip, folder) = listOf("Send it myself", "tap Send and choose the Kindle app", "Save to a folder").map {
+            compose.onNodeWithText(it, substring = true).fetchSemanticsNode().positionInRoot.y
+        }
+        assertTrue(send < tip && tip < folder)
 
         // A Kindle owner saving to a folder isn't told to wait for a Send.
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books") } }
@@ -225,6 +230,8 @@ class SettingsScreenTest {
 
     @Test
     fun theTwoFolderButtonsSayWhichFolderAndLineUp() {
+        grant("content://tree")
+        grant("content://vault")
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books", notesFolderUri = "content://vault", notesFolderName = "Vault") } }
         waitFor("Choose another notes folder")
         val starts = listOf("Choose another delivery folder", "Choose another notes folder").map {
@@ -242,8 +249,16 @@ class SettingsScreenTest {
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree/books", folderName = "Books", notesFolderUri = "content://tree/gone", notesFolderName = "Vault") } }
         waitFor("Saved automatically to Books.")
         // The notes folder's grant is gone (its app uninstalled, say): every save there would fail.
-        compose.onNodeWithText("Can't reach Vault. Choose it again.").performScrollTo().assertExists()
+        compose.onNodeWithText("Can't reach Vault. Tap to choose it again.").performScrollTo().assertExists()
         compose.onNodeWithText("Choose another notes folder").assertExists()
+
+        // Tapping the row, as the line says, picks a folder again rather than turning notes off.
+        compose.onNodeWithText("Save notes for each edition").performClick()
+        assertEquals(Intent.ACTION_OPEN_DOCUMENT_TREE, shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>()).nextStartedActivity.action)
+        assertEquals("content://tree/gone", runBlocking { store.current().notesFolderUri })
+
+        compose.onNodeWithText("Turn off").performScrollTo().performClick()
+        idleUntil { runBlocking { store.current().notesFolderUri } == null }
     }
 
     /** At 200% the per-source count keeps the width; − and + go on the line below. */

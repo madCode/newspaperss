@@ -10,6 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -32,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -226,17 +228,6 @@ private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
             }
         }
     }
-    // The tip is about sending with the share sheet. Folder and email delivery say what they do
-    // under their own options, where a Kindle owner saving to a folder isn't told to wait for a Send.
-    val tip = s.device?.takeIf { s.delivery == DeliveryMethod.SHARE }?.let(DeviceTips::tip)
-    tip?.let {
-        Text(
-            it,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
 }
 
 @Composable
@@ -291,13 +282,25 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
         detail = "Tap Send on each edition and choose an app: the Kindle app, Dropbox, email or any other.",
         onClick = vm::useShare,
     )
+    // How to send to this e-reader with the share sheet: under the choice, where the reader is
+    // looking when they pick it, and only then (a folder or email reader doesn't wait for a Send).
+    if (s.delivery == DeliveryMethod.SHARE) {
+        s.device?.let {
+            Text(
+                DeviceTips.tip(it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = OPTION_INDENT, bottom = 8.dp),
+            )
+        }
+    }
     val folderReachable = rememberReachable(s.folderUri)
     DeliveryOption(
         selected = s.delivery == DeliveryMethod.FOLDER,
         title = "Save to a folder",
         detail = when {
             s.folderUri == null -> "Fully automatic, for KOReader and other readers that sync a folder on this phone (for example with Syncthing)."
-            !folderReachable -> "Can't reach ${s.folderName ?: "your folder"}. Choose it again."
+            !folderReachable -> "Can't reach ${s.folderName ?: "your folder"}. Tap to choose it again."
             else -> "Saved automatically to ${s.folderName ?: "your folder"}."
         },
         problem = s.folderUri != null && !folderReachable,
@@ -352,15 +355,19 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
     val saving = s.notesFolderUri != null
     val reachable = rememberReachable(s.notesFolderUri)
     Heading("Reading notes")
+    fun turnOff() {
+        release(context, s.notesFolderUri, keep = setOf(s.folderUri))
+        vm.setNotesFolder(null, null)
+    }
+    // A folder that can't be reached is what the row offers to fix, so tapping it picks one again
+    // rather than turning notes off under a line that says "Tap to choose it again".
+    val tap = if (saving && !reachable) {
+        Modifier.clickable(onClickLabel = "Choose the notes folder again") { pickFolder.launch(null) }
+    } else {
+        Modifier.toggleable(saving, role = Role.Switch) { on -> if (on) pickFolder.launch(null) else turnOff() }
+    }
     Row(
-        Modifier.fillMaxWidth().toggleable(saving, role = Role.Switch) { on ->
-            if (on) {
-                pickFolder.launch(null)
-            } else {
-                release(context, s.notesFolderUri, keep = setOf(s.folderUri))
-                vm.setNotesFolder(null, null)
-            }
-        }.heightIn(min = 48.dp).padding(vertical = 4.dp),
+        Modifier.fillMaxWidth().then(tap).heightIn(min = 48.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -369,7 +376,7 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
             Text(
                 when {
                     !saving -> "A Markdown file for each edition, for Obsidian or any notes app. You'll pick the folder."
-                    !reachable -> "Can't reach $name. Choose it again."
+                    !reachable -> "Can't reach $name. Tap to choose it again."
                     else -> "Saved to $name when an edition is delivered."
                 },
                 style = MaterialTheme.typography.bodySmall,
@@ -378,7 +385,13 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
         }
         Switch(checked = saving, onCheckedChange = null)
     }
-    if (saving) OutlinedButton(onClick = { pickFolder.launch(null) }, Modifier.padding(start = OPTION_INDENT)) { Text("Choose another notes folder") }
+    if (saving) {
+        Row(Modifier.padding(start = OPTION_INDENT), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { pickFolder.launch(null) }) { Text("Choose another notes folder") }
+            // The row no longer turns notes off while the folder is unreachable, so this does.
+            if (!reachable) TextButton(onClick = ::turnOff, modifier = Modifier.padding(start = 8.dp)) { Text("Turn off") }
+        }
+    }
 }
 
 @Composable
