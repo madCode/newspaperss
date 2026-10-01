@@ -34,6 +34,8 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     val categories = mutableMapOf(0 to "Uncategorized")
     /** Ids passed to updateArticle to clear the unread flag. */
     val markedRead = mutableListOf<Long>()
+    /** Ids passed to updateArticle to set it again. */
+    val markedUnread = mutableListOf<Long>()
     val ops = mutableListOf<String>()
     /** An HTTP status to answer every request with, instead of the API's reply. */
     var failWith: Int? = null
@@ -118,10 +120,15 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                 },
             )
             "updateArticle" -> {
-                check(request["field"]!!.jsonPrimitive.content == "2" && request["mode"]!!.jsonPrimitive.content == "0")
+                val mode = request["mode"]!!.jsonPrimitive.content
+                check(request["field"]!!.jsonPrimitive.content == "2" && (mode == "0" || mode == "1"))
                 val ids = str("article_ids")!!.split(",").map { it.toLong() }
-                markedRead += ids
-                unread.removeAll { it.id in ids }
+                if (mode == "0") {
+                    markedRead += ids
+                    unread.removeAll { it.id in ids }
+                } else {
+                    markedUnread += ids
+                }
                 ok(buildJsonObject { put("status", "OK"); put("updated", ids.size) })
             }
             "catchupFeed" -> {

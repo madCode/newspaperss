@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -734,6 +735,137 @@ class EditionBuilderTest {
         delivering.markDelivered(built.editionId)
         assertEquals(EditionStatus.DELIVERED, db.editions().byId(built.editionId)!!.status)
         assertEquals(ArticleState.DELIVERED, stateOf("n1"))
+    }
+
+    /** A send that never arrived can be undone: the articles aren't lost, and the edition can go again. */
+    @Test
+    fun anEditionMarkedAsNotSentCanBeSentAgainAsIfItNeverWent() = runTest {
+        source("a", null, "a1", "a2")
+        editions.setStarred(idOf("a2"), true)
+        val built = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+        editions.markDelivered(built.editionId)
+        val urls = listOf("https://a.example/a1", "https://a.example/a2")
+
+        assertTrue(editions.markNotSent(built.editionId))
+
+        val edition = db.editions().byId(built.editionId)!!
+        assertEquals(EditionStatus.READY, edition.status)
+        assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
+        assertEquals(ArticleState.IN_EDITION, stateOf("a2"))
+        assertTrue("it went in starred, so it keeps its star", starredAt("a2") != null)
+        assertNull(starredAt("a1"))
+        assertTrue("a new copy of its links may come in again", db.articles().deliveredAmong(urls).isEmpty())
+
+        editions.markSent(built.editionId)
+        assertEquals(EditionStatus.DELIVERED, db.editions().byId(built.editionId)!!.status)
+        assertEquals(ArticleState.DELIVERED, stateOf("a1"))
+        assertEquals(urls, db.articles().deliveredAmong(urls).sorted())
+    }
+
+    @Test
+    fun anEditionMarkedAsNotSentAndNotSentAgainGivesItsArticlesToTheNextOne() = runTest {
+        source("a", null, "a1", "a2")
+        val first = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        editions.markNotSent(first.editionId)
+
+        val second = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+
+        assertEquals(EditionStatus.FAILED, db.editions().byId(first.editionId)!!.status)
+        assertEquals(listOf(idOf("a1"), idOf("a2")).sorted(), db.editions().articleIds(second.editionId).sorted())
+    }
+
+    @Test
+    fun onlyADeliveredEditionWithItsBookStillThereCanBeMarkedAsNotSent() = runTest {
+        source("a", null, "a1")
+        val ready = builder.build(EditionSettings()) as BuildResult.Built
+        assertFalse("not sent yet", editions.markNotSent(ready.editionId))
+
+        editions.markDelivered(ready.editionId)
+        editions.fileOf(db.editions().byId(ready.editionId)!!)!!.delete()
+        assertFalse("nothing to send again", editions.markNotSent(ready.editionId))
+        assertEquals(EditionStatus.DELIVERED, db.editions().byId(ready.editionId)!!.status)
+        assertEquals(ArticleState.DELIVERED, stateOf("a1"))
+    }
+
+    /** One article in two unsent editions: giving back the older one mustn't free it from the newer. */
+    @Test
+    fun anArticleBroughtBackIntoANewerEditionStaysThereWhenTheOldOneIsMarkedAsNotSent() = runTest {
+        source("a", null, "a1")
+        val first = builder.build(EditionSettings()) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        editions.setStarred(idOf("a1"), true)
+        val second = builder.build(EditionSettings()) as BuildResult.Built
+        assertEquals(listOf(idOf("a1")), db.editions().articleIds(second.editionId))
+
+        assertTrue(editions.markNotSent(first.editionId))
+        editions.delete(first.editionId)
+
+        assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
+        assertFalse("not offered to a third edition", db.articles().candidates().any { it.guid == "a1" })
+    }
+
+    /** An article that went out again in a newer edition was delivered: marking the old one as not sent mustn't send it a third time. */
+    @Test
+    fun anArticleDeliveredAgainInANewerEditionStaysDeliveredWhenTheOldOneIsMarkedAsNotSent() = runTest {
+        source("a", null, "a1")
+        editions.setStarred(idOf("a1"), true)
+        val first = builder.build(EditionSettings()) as BuildResult.Built
+        editions.markDelivered(first.editionId)
+        editions.setStarred(idOf("a1"), true)
+        val later = EditionRepository(db, tmp.root, Clock.offset(clock, Duration.ofHours(1)))
+        val second = builder.build(EditionSettings()) as BuildResult.Built
+        later.markDelivered(second.editionId)
+
+        assertTrue(editions.markNotSent(first.editionId))
+
+        assertEquals(ArticleState.DELIVERED, stateOf("a1"))
+        assertNull("its star isn't brought back either", starredAt("a1"))
+    }
+
+    /** Sending again after marking as not sent is the same delivery: its notes are saved once. */
+    @Test
+    fun sendingAgainAfterMarkingAsNotSentDoesntRepeatTheWorkOfDelivery() = runTest {
+        val followUps = mutableListOf<Long>()
+        val delivering = EditionRepository(db, tmp.root, clock, onDelivered = { followUps += it })
+        source("a", null, "a1")
+        val built = builder.build(EditionSettings()) as BuildResult.Built
+        delivering.markSent(built.editionId)
+        delivering.markNotSent(built.editionId)
+        delivering.markSent(built.editionId)
+
+        assertEquals(EditionStatus.DELIVERED, db.editions().byId(built.editionId)!!.status)
+        assertEquals(listOf(built.editionId), followUps)
+    }
+
+    @Test
+    fun markingAsNotSentAsksForItsTtrssArticlesToBeMarkedUnread() = runTest {
+        val asked = mutableListOf<Long>()
+        val marking = EditionRepository(db, tmp.root, clock) { asked += it }
+        source("a", null, "a1")
+        val feedOnly = builder.build(EditionSettings()) as BuildResult.Built
+        marking.markDelivered(feedOnly.editionId)
+        marking.markNotSent(feedOnly.editionId)
+        assertTrue(asked.isEmpty())
+        marking.delete(feedOnly.editionId)
+
+        ttrss("n1" to ("1" to "Example News"))
+        val withTtrss = builder.build(EditionSettings()) as BuildResult.Built
+        marking.markDelivered(withTtrss.editionId)
+        assertTrue(marking.markNotSent(withTtrss.editionId))
+        assertEquals(listOf(withTtrss.editionId, withTtrss.editionId), asked)
+    }
+
+    @Test
+    fun aFailureToScheduleMarkUnreadDoesntStopMarkingAsNotSent() = runTest {
+        var failing = false
+        val marking = EditionRepository(db, tmp.root, clock) { if (failing) throw IllegalStateException("WorkManager isn't initialised") }
+        ttrss("n1" to ("1" to "Example News"))
+        val built = builder.build(EditionSettings()) as BuildResult.Built
+        marking.markDelivered(built.editionId)
+        failing = true
+        assertTrue(marking.markNotSent(built.editionId))
+        assertEquals(EditionStatus.READY, db.editions().byId(built.editionId)!!.status)
     }
 
     @Test

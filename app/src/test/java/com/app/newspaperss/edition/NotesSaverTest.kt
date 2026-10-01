@@ -79,6 +79,20 @@ class NotesSaverTest {
         assertEquals(listOf(id), delivered)
     }
 
+    /** Sending again after marking as not sent doesn't ask a second time, so the first ask must still save. */
+    @Test
+    fun notesAskedForBeforeAnEditionWasMarkedAsNotSentAreStillSavedOnce() = runTest {
+        settings.update { it.copy(notesFolderUri = "content://vault", notesFolderName = "Vault") }
+        val (id, title) = sentEdition()
+        assertTrue(editions.markNotSent(id))
+
+        saver.save(id)
+        editions.markSent(id)
+
+        assertEquals(listOf("content://vault/$title notes.md (text/markdown)"), saved)
+        assertEquals("sent again, not asked again", listOf(id), delivered)
+    }
+
     @Test
     fun noNotesFolderNoNotes() = runTest {
         val (id, _) = sentEdition()

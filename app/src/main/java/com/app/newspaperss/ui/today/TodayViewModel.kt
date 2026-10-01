@@ -87,6 +87,10 @@ class TodayViewModel(
         viewModelScope.launch { editions.markSent(editionId) }
     }
 
+    fun markNotSent(editionId: Long) {
+        viewModelScope.launch { editions.markNotSent(editionId) }
+    }
+
     companion object {
         /** @param lastDueMs [EditionScheduler.LAST_DUE], so an edition started early isn't shown as still to come. */
         fun nextEdition(s: Settings, now: ZonedDateTime, lastDueMs: Long = 0L): String? {

@@ -193,6 +193,18 @@ too); or opening it on a Boox. **I've sent it** covers any other route, and
 when the next one is built was never sent: it's marked not sent and its
 articles go back, keeping their stars, before the new one is planned.
 
+**A send that didn't arrive can be undone.** A failed Send to Kindle still
+counts as sent, because Android only reports the app you chose.
+**Didn't arrive? Mark as not sent** on a sent edition (while its file is
+still here) makes it ready to send again:
+- its articles go back into it, with the stars they went in with;
+- its links are no longer remembered as delivered;
+- its tt-rss articles are marked unread on the server again.
+
+Send it again, or leave it and the next edition takes its articles, like any
+unsent one. Other copies of its links that delivery used up stay used. An
+article brought back into a newer edition since stays in that one.
+
 **The app you send to can read the book after its screen closes.** A share
 only lets the receiving screen read the file, and Send to Kindle uploads
 after its form closes. So the Kindle app, and whichever app you pick, is
@@ -224,8 +236,9 @@ allowed to read that edition's file until the phone restarts.
   saved links do, retried for two days; a bot-check page's title is never taken.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
-  read on the server once delivered, and ones you marked as read at the next
-  sync (so Undo never has to reach the server). A source can turn that off, or
+  read on the server once delivered (and unread again if the edition is
+  marked as not sent), and ones you marked as read at the next sync (so Undo
+  never has to reach the server). A source can turn that off, or
   take one category instead of all unread; adding the account asks which,
   before the first sync. tt-rss's own stars aren't synced: there a star
   usually means "keep this", not "for tomorrow".
@@ -265,14 +278,16 @@ allowed to read that edition's file until the phone restarts.
 
 - **Today** (home): when the next edition is due, how many starred articles
   will go in the next one (only when some will), and the latest edition with
-  **Send**, **Open** and **I've sent it** (**Send again** once delivered).
+  **Send**, **Open** and **I've sent it** (**Send again** and **Didn't
+  arrive? Mark as not sent** once delivered).
   **Make an edition now** is the main button only before the first edition;
   after that it's a quiet **Make another edition**, since today's paper is
   done. A failed build or edition offers **Try again** after saying what
   went wrong. Earlier editions are listed below. Kindle and Kobo readers
   aren't offered **Open**, here or on an edition's page: it opens the book
   on the phone, and they get it by sending it.
-- **Edition:** its contents; tap an article to preview it as the e-reader
+- **Edition:** the same buttons as Today's card, including **Mark as not sent**,
+  and its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
   network). **Notes** exports a Markdown file for a notes app: front matter
   (date, edition, sources, a tag) for Obsidian, the closing page's question and

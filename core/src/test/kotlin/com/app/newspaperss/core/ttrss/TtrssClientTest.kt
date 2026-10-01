@@ -228,8 +228,20 @@ class TtrssClientTest {
     }
 
     @Test
+    fun markUnreadSetsTheUnreadFlag() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""{"status":"OK","updated":1}"""))
+        client().markUnread(listOf(12345L))
+        assertEquals(
+            Json.parseToJsonElement("""{"sid":"sid-1","op":"updateArticle","article_ids":"12345","mode":1,"field":2}"""),
+            server.sent[1],
+        )
+    }
+
+    @Test
     fun markingNothingSendsNothing() = runTest {
         client().markRead(emptyList())
+        client().markUnread(emptyList())
         assertTrue(server.sent.isEmpty())
     }
 

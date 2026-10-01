@@ -11,15 +11,18 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.app.newspaperss.NewspaperssApp
 
-/** Marks a delivered edition's tt-rss articles read on the server, retrying a few times. */
+/**
+ * Marks an edition's tt-rss articles read on the server once it's delivered, or unread once it's
+ * marked as not sent, retrying a few times.
+ */
 class TtrssMarkReadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val editionId = inputData.getLong(EDITION_ID, -1)
-        val done = (applicationContext as NewspaperssApp).container.ttrss.markRead(editionId)
+        val done = (applicationContext as NewspaperssApp).container.ttrss.syncRead(editionId)
         return when {
             done -> Result.success()
             runAttemptCount + 1 < MAX_ATTEMPTS -> Result.retry()
-            // The source shows the error; the articles stay unread in tt-rss, which loses nothing.
+            // The source shows the error; tt-rss is left as it was, which loses nothing.
             else -> Result.failure()
         }
     }
@@ -33,8 +36,9 @@ class TtrssMarkReadWorker(context: Context, params: WorkerParameters) : Coroutin
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setInputData(workDataOf(EDITION_ID to editionId))
                 .build()
-            // An edition confirmed as delivered twice only needs marking read once.
-            WorkManager.getInstance(context).enqueueUniqueWork("ttrss-mark-read-$editionId", ExistingWorkPolicy.KEEP, request)
+            // Replaced, not kept: the work reads the edition's state when it runs, so only the
+            // newest request matters, and one still retrying a delivery mustn't block undoing it.
+            WorkManager.getInstance(context).enqueueUniqueWork("ttrss-mark-read-$editionId", ExistingWorkPolicy.REPLACE, request)
         }
     }
 }

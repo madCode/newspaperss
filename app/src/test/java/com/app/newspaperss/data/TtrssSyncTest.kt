@@ -485,6 +485,44 @@ class TtrssSyncTest {
 
     }
 
+    /**
+     * An edition marked as not sent puts its tt-rss articles back to unread, and a late retry of
+     * the delivery's mark-read can't undo that.
+     */
+    @Test
+    fun anEditionMarkedAsNotSentHasItsArticlesMarkedUnreadAgain() = runTest {
+        val source = connect()
+        server.add(10, "One", feedId = 1, feedTitle = "Example News")
+        server.add(11, "Two", feedId = 1, feedTitle = "Example News")
+        sync.syncAll()
+        val editionId = editionWith(source.id, "ttrss:10", "ttrss:11")
+        db.articles().setState(db.articles().allForSource(source.id).map { it.id }, ArticleState.IN_EDITION)
+        tmp.newFile("tuesday.epub")
+        db.editions().update(db.editions().byId(editionId)!!.copy(fileName = "tuesday.epub"))
+        val editions = EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC))
+        editions.markDelivered(editionId)
+        assertTrue(ttrss.syncRead(editionId))
+        assertEquals(listOf(10L, 11L), server.markedRead.sorted())
+
+        assertTrue(editions.markNotSent(editionId))
+        http.unreachable += server.apiUrl
+        assertFalse("unreachable is worth retrying", ttrss.syncRead(editionId))
+        assertEquals(
+            "Articles from an edition that wasn't sent weren't marked unread in tt-rss. Couldn't reach tt-rss.",
+            db.sources().byId(source.id)!!.serverNote,
+        )
+        http.unreachable.clear()
+        assertTrue(ttrss.syncRead(editionId))
+
+        assertEquals(listOf(10L, 11L), server.markedUnread.sorted())
+        assertEquals("not marked read again", 2, server.markedRead.size)
+        assertNull(db.sources().byId(source.id)!!.serverNote)
+
+        editions.markSent(editionId)
+        assertTrue(ttrss.syncRead(editionId))
+        assertEquals("sent again, read again", listOf(10L, 10L, 11L, 11L), server.markedRead.sorted())
+    }
+
     @Test
     fun anEditionWithoutTtrssArticlesNeedsNothing() = runTest {
         val feed = sources.addFeed("https://blog.example/feed", "Blog")

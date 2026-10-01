@@ -14,6 +14,10 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 3 · Wed 30 Sep
 
+### Cycle 65: a send that didn't arrive can be undone (17:15–18:10)
+- **From you:** a Send to Kindle that failed still marked the edition sent, so its articles were used up and marked read in tt-rss, with no way back.
+- **Shipped:** **Didn't arrive? Mark as not sent** on a sent edition, on Today and its page, after a dialog that names it. It's ready to send again: its articles go back into it with the stars they went in with, its links stop counting as delivered, and its tt-rss articles are marked unread on the server. Send it again, or the next edition takes them.
+- **tt-rss:** the mark-read work now looks at the edition when it runs and marks read or unread to match, so a late retry can't undo a newer change.
 ### Cycle 64: no doubled gaps around screens (17:35–17:50)
 - **From you:** a screenshot of an edition page: why so much space?
 - **Cause:** the tabs pad every screen for the status bar and the gesture bar, and each screen's own top bar and frame padded for them again: an empty status bar's height above the title, and a gesture bar's height above the tabs.

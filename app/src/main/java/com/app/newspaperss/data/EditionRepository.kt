@@ -7,18 +7,19 @@ import java.io.File
 import java.time.Clock
 
 /**
- * @param onDelivered called with an edition's id once it's delivered, for work that follows
- *   delivery (saving its reading notes). Like [onTtrssDelivered], it must return quickly.
- * @param onTtrssDelivered called with an edition's id once it's delivered with tt-rss articles
- *   in it, to mark them read on the server. It must return quickly and leave the work to run
- *   elsewhere: delivery doesn't wait for tt-rss.
+ * @param onDelivered called with an edition's id the first time it's delivered, for work that
+ *   follows delivery (saving its reading notes), not again if it's sent again after being marked
+ *   as not sent. Like [onTtrssChanged], it must return quickly.
+ * @param onTtrssChanged called with an edition's id once it's delivered, or marked as not sent,
+ *   with tt-rss articles in it, to mark them read or unread on the server to match. It must
+ *   return quickly and leave the work to run elsewhere: delivery doesn't wait for tt-rss.
  */
 class EditionRepository(
     private val db: AppDatabase,
     val editionsDir: File,
     private val clock: Clock = Clock.systemUTC(),
     private val onDelivered: (editionId: Long) -> Unit = {},
-    private val onTtrssDelivered: (editionId: Long) -> Unit = {},
+    private val onTtrssChanged: (editionId: Long) -> Unit = {},
 ) {
     fun observeAll(): Flow<List<EditionEntity>> = db.editions().observeAll()
 
@@ -40,36 +41,71 @@ class EditionRepository(
 
     /** Delivery succeeded: only now are the edition's articles used up. */
     suspend fun markDelivered(id: Long, onlyIfReady: Boolean = false) {
-        val delivered = db.withTransaction {
-            val edition = db.editions().byId(id) ?: return@withTransaction false
+        val firstTime = db.withTransaction {
+            val edition = db.editions().byId(id) ?: return@withTransaction null
             // Checked inside the transaction: a build may be releasing unsent editions at the same
             // time, and the reader may have deleted this one while a folder copy was finishing.
             // Already delivered (the reader tapped Sent while a folder copy was finishing): the
             // work that follows delivery, like saving notes, mustn't run twice.
-            if (edition.status == EditionStatus.DELETED || edition.status == EditionStatus.DELIVERED) return@withTransaction false
-            if (onlyIfReady && edition.status != EditionStatus.READY) return@withTransaction false
+            if (edition.status == EditionStatus.DELETED || edition.status == EditionStatus.DELIVERED) return@withTransaction null
+            if (onlyIfReady && edition.status != EditionStatus.READY) return@withTransaction null
             val articleIds = db.editions().articleIds(id)
+            // One instant for both: marking it as not sent finds the links it remembered by it.
+            val now = clock.instant()
             db.articles().setDelivered(articleIds)
-            db.articles().rememberDelivered(articleIds, clock.instant())
+            db.articles().rememberDelivered(articleIds, now)
             db.articles().deliverCopies(articleIds)
             db.articles().unstarCopies(articleIds)
-            db.editions().update(edition.copy(status = EditionStatus.DELIVERED, deliveredAt = clock.instant(), error = null))
-            true
-        }
-        if (!delivered) return
-        try {
-            onDelivered(id)
-        } catch (e: Exception) {
-            // The edition is delivered either way; only its notes are missing.
-            Log.w(TAG, "Couldn't schedule saving the notes: ${e.javaClass.name}")
+            db.editions().update(edition.copy(status = EditionStatus.DELIVERED, deliveredAt = now, error = null))
+            edition.deliveredAt == null
+        } ?: return
+        if (firstTime) {
+            try {
+                onDelivered(id)
+            } catch (e: Exception) {
+                // The edition is delivered either way; only its notes are missing.
+                Log.w(TAG, "Couldn't schedule saving the notes: ${e.javaClass.name}")
+            }
         }
         if (db.articles().ttrssInEdition(id).isEmpty()) return
         try {
-            onTtrssDelivered(id)
+            onTtrssChanged(id)
         } catch (e: Exception) {
             // The edition is delivered either way; its tt-rss articles just stay unread there.
             Log.w(TAG, "Couldn't schedule marking tt-rss articles read: ${e.javaClass.name}")
         }
+    }
+
+    /**
+     * The reader says a delivered edition never arrived. It's ready to send again, its articles
+     * back in it with the stars they went in with, so sending it again or letting the next
+     * edition release it works as if it was never marked. Copies of its links that delivery used
+     * up stay used: they may have gone out elsewhere, and nothing records which. So do articles
+     * delivered again since in a newer edition.
+     *
+     * @return false if it isn't delivered, or its EPUB is gone so it couldn't be sent again.
+     */
+    suspend fun markNotSent(id: Long): Boolean {
+        val undone = db.withTransaction {
+            val edition = db.editions().byId(id)?.takeIf { it.status == EditionStatus.DELIVERED && fileOf(it) != null }
+                ?: return@withTransaction false
+            // Stars first: restoring them looks for articles still delivered.
+            db.articles().restoreStars(id, clock.instant())
+            db.articles().undeliver(id)
+            edition.deliveredAt?.let { db.articles().forgetDelivered(id, it) }
+            db.editions().update(edition.copy(status = EditionStatus.READY, error = null))
+            true
+        }
+        if (!undone) return false
+        if (db.articles().ttrssUnsentInEdition(id).isNotEmpty()) {
+            try {
+                onTtrssChanged(id)
+            } catch (e: Exception) {
+                // It's ready to send either way; its tt-rss articles just stay read there.
+                Log.w(TAG, "Couldn't schedule marking tt-rss articles unread: ${e.javaClass.name}")
+            }
+        }
+        return true
     }
 
     /**

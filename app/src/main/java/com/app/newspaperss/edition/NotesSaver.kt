@@ -18,7 +18,9 @@ class NotesSaver(
 ) {
     suspend fun save(editionId: Long) {
         val folderUri = settings.current().notesFolderUri ?: return
-        val edition = editions.byId(editionId)?.takeIf { it.status == EditionStatus.DELIVERED } ?: return
+        // Delivered at some point, not necessarily now: one marked as not sent before this ran
+        // won't ask again when it's sent again.
+        val edition = editions.byId(editionId)?.takeIf { it.deliveredAt != null && it.status != EditionStatus.DELETED } ?: return
         val error = try {
             // Not the Notes button's copy: sharing that one rewrites it, maybe mid-copy.
             notes.write(editionId, File(notes.notesDir, "saved"))?.let { folder.deliver(it, folderUri, it.name, EditionNotes.MIME) }
