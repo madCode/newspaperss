@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,11 +46,13 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @Composable
 fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), onOpenEdition: (Long) -> Unit = {}) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     fun launch(intent: android.content.Intent): Boolean = try {
         context.startActivity(intent)
         true
@@ -121,8 +124,11 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                     onRetry = viewModel::makeOneNow,
                     onDetails = { onOpenEdition(latest.id) },
                     onSend = {
-                        viewModel.fileOf(latest)?.let {
-                            EditionIntents.launchSend(context, it, latest.title, latest.id, state.kindleEmail) { viewModel.markEmailed(latest.id) }
+                        viewModel.fileOf(latest)?.let { file ->
+                            scope.launch {
+                                val body = state.kindleEmail?.let { viewModel.emailBody(latest.id) }
+                                EditionIntents.launchSend(context, file, latest.title, latest.id, state.kindleEmail, body) { viewModel.markEmailed(latest.id) }
+                            }
                         }
                     },
                     onOpen = {

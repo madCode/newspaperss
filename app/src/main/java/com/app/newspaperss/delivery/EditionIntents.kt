@@ -48,15 +48,20 @@ object EditionIntents {
     /**
      * Send for an edition: with [kindleEmail], an email to the Kindle's address with the edition
      * attached, opened straight in the chosen mail app while it's still installed, otherwise in
-     * the share sheet so a mail app picked there gets To and Subject filled in. Without it, [share].
+     * the share sheet so a mail app picked there gets To, Subject and [body] filled in. Without it,
+     * [share], which leaves out [body]: every app in that sheet would get it, and the Kindle app or
+     * Dropbox could keep the text as a document of its own.
+     *
+     * @param body the email's text, from [EditionEmail].
      */
-    fun send(context: Context, file: File, title: String, editionId: Long?, kindleEmail: KindleEmail?): Send {
+    fun send(context: Context, file: File, title: String, editionId: Long?, kindleEmail: KindleEmail?, body: String? = null): Send {
         if (kindleEmail == null) return Send(share(context, file, title, editionId), countsOnLaunch = false)
         val uri = uriFor(context, file)
         val email = Intent(Intent.ACTION_SEND).apply {
             type = EPUB_MIME
             putExtra(Intent.EXTRA_EMAIL, arrayOf(kindleEmail.address))
             putExtra(Intent.EXTRA_SUBJECT, title)
+            body?.let { putExtra(Intent.EXTRA_TEXT, it) }
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -79,12 +84,13 @@ object EditionIntents {
      * Starts Send for an edition. If the mail app it opens directly refuses (it's disabled, or
      * won't take the file), the reader is told and gets the share sheet with the same email.
      *
+     * @param body the email's text, used only when emailing a Kindle; see [send].
      * @param newTask set when [context] isn't an activity that stays open (the notification's).
      * @param onMailAppOpened the mail app opened directly, which counts as sent.
      */
-    fun launchSend(context: Context, file: File, title: String, editionId: Long?, kindleEmail: KindleEmail?, newTask: Boolean = false, onMailAppOpened: () -> Unit) {
+    fun launchSend(context: Context, file: File, title: String, editionId: Long?, kindleEmail: KindleEmail?, body: String? = null, newTask: Boolean = false, onMailAppOpened: () -> Unit) {
         fun start(intent: Intent) = context.startActivity(if (newTask) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) else intent)
-        val send = send(context, file, title, editionId, kindleEmail)
+        val send = send(context, file, title, editionId, kindleEmail, body)
         try {
             start(send.intent)
             if (send.countsOnLaunch) onMailAppOpened()
@@ -98,7 +104,7 @@ object EditionIntents {
         }
         Toast.makeText(context, "Couldn't open your mail app. Choose another app to send it with.", Toast.LENGTH_LONG).show()
         try {
-            start(send(context, file, title, editionId, kindleEmail.copy(mailApp = null)).intent)
+            start(send(context, file, title, editionId, kindleEmail.copy(mailApp = null), body).intent)
         } catch (_: ActivityNotFoundException) {
         } catch (_: SecurityException) {
         }

@@ -13,6 +13,7 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.SendEditionActivity
+import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.settings.DeliveryMethod
@@ -71,7 +72,7 @@ class KindleEmailTest {
         installApp(app)
         val file = editionFile()
 
-        val send = EditionIntents.send(context, file, "Tuesday Morning Edition", 1L, kindle)
+        val send = EditionIntents.send(context, file, "Tuesday Morning Edition", 1L, kindle, BODY)
 
         assertTrue("no share sheet to report a pick, so opening it is what counts", send.countsOnLaunch)
         val email = send.intent
@@ -80,6 +81,7 @@ class KindleEmailTest {
         assertEquals(EditionIntents.EPUB_MIME, email.type)
         assertArrayEquals(arrayOf("me_42@kindle.com"), email.getStringArrayExtra(Intent.EXTRA_EMAIL))
         assertEquals("Tuesday Morning Edition", email.getStringExtra(Intent.EXTRA_SUBJECT))
+        assertEquals(BODY, email.getStringExtra(Intent.EXTRA_TEXT))
         assertEquals(EditionIntents.uriFor(app, file), email.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
         assertTrue(email.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertEquals("the mail app may attach the file after its screen has gone", listOf(MAIL_APP), granted)
@@ -87,7 +89,7 @@ class KindleEmailTest {
 
     @Test
     fun aMailAppThatsGoneFallsBackToTheShareSheetWithTheSameEmail() {
-        val send = EditionIntents.send(context, editionFile(), "Tuesday Morning Edition", 1L, kindle)
+        val send = EditionIntents.send(context, editionFile(), "Tuesday Morning Edition", 1L, kindle, BODY)
 
         assertFalse(send.countsOnLaunch)
         assertEquals(Intent.ACTION_CHOOSER, send.intent.action)
@@ -95,6 +97,7 @@ class KindleEmailTest {
         assertNull(email.`package`)
         assertArrayEquals("a mail app picked there still gets To filled in", arrayOf("me_42@kindle.com"), email.getStringArrayExtra(Intent.EXTRA_EMAIL))
         assertEquals("Tuesday Morning Edition", email.getStringExtra(Intent.EXTRA_SUBJECT))
+        assertEquals(BODY, email.getStringExtra(Intent.EXTRA_TEXT))
     }
 
     @Test
@@ -107,10 +110,11 @@ class KindleEmailTest {
 
     @Test
     fun withoutAKindleAddressSendSharesAsBefore() {
-        val send = EditionIntents.send(context, editionFile(), "Tuesday Morning Edition", 1L, null)
+        val send = EditionIntents.send(context, editionFile(), "Tuesday Morning Edition", 1L, null, BODY)
         assertFalse(send.countsOnLaunch)
         val shared = send.intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)!!
         assertNull(shared.getStringArrayExtra(Intent.EXTRA_EMAIL))
+        assertNull("every app in the share sheet would get the text, the Kindle app included", shared.getStringExtra(Intent.EXTRA_TEXT))
         assertEquals(listOf(EditionIntents.KINDLE_PACKAGE), granted)
     }
 
@@ -179,12 +183,22 @@ class KindleEmailTest {
         val intent = notificationSend()
         assertEquals("an activity of ours, which may start another from a notification", SendEditionActivity::class.java.name, intent.component?.className)
         val id = intent.getLongExtra(SendEditionActivity.EXTRA_EDITION_ID, 0L)
+        runBlocking {
+            db.editions().insertArticles(listOf(
+                EditionArticleEntity(editionId = id, articleId = null, position = 0, title = "The quiet return of the night train", sourceTitle = "The Guardian", minutes = 8.4),
+                EditionArticleEntity(editionId = id, articleId = null, position = 1, title = "Why bridges hum", sourceTitle = "Aeon", minutes = 5.0),
+            ))
+        }
 
         val (activity, started) = tapSend(intent)
 
         assertEquals(Intent.ACTION_SEND, started.action)
         assertEquals(MAIL_APP, started.`package`)
         assertArrayEquals(arrayOf("me_42@kindle.com"), started.getStringArrayExtra(Intent.EXTRA_EMAIL))
+        assertEquals(
+            "Tuesday Morning Edition: 2 articles, about 13 min.\n\n• The quiet return of the night train — The Guardian\n• Why bridges hum — Aeon",
+            started.getStringExtra(Intent.EXTRA_TEXT),
+        )
         idleUntil { activity.isFinishing }
         idleUntil { statusOf(id) == EditionStatus.DELIVERED }
         idleUntil { recent() == mapOf(id to KindleSend.EMAIL) }
@@ -286,3 +300,5 @@ class KindleEmailTest {
         idleUntil { recent() == mapOf(id to KindleSend.EMAIL) }
     }
 }
+
+private const val BODY = "Tuesday Morning Edition: 1 article, about 5 min."

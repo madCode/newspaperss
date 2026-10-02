@@ -92,6 +92,8 @@ class TodayViewModel(
 
     fun fileOf(edition: EditionEntity): File? = editions.fileOf(edition)
 
+    suspend fun emailBody(editionId: Long): String? = editions.emailBody(editionId)
+
     fun markSent(edition: EditionEntity) = markSent(edition.id)
 
     fun markSent(editionId: Long) {

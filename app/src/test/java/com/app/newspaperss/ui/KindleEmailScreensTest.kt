@@ -78,9 +78,11 @@ class KindleEmailScreensTest {
     private fun statusOf(id: Long) = runBlocking { db.editions().byId(id) }?.status
 
     private fun assertMailAppOpened() {
+        idleUntil { shadowOf(app).peekNextStartedActivity() != null }
         val started = shadowOf(app).nextStartedActivity
         assertEquals(Intent.ACTION_SEND, started.action)
         assertEquals(MAIL_APP, started.`package`)
+        assertEquals("Tuesday Morning Edition: 1 article, about 4 min.\n\n• A story — Example News", started.getStringExtra(Intent.EXTRA_TEXT))
     }
 
     @Test
@@ -118,6 +120,7 @@ class KindleEmailScreensTest {
 
         compose.onNodeWithText("Send").performClick()
 
+        idleUntil { shadowOf(app).peekNextStartedActivity() != null }
         assertEquals(Intent.ACTION_CHOOSER, shadowOf(app).nextStartedActivity.action)
         compose.waitForIdle()
         assertEquals(EditionStatus.READY, statusOf(id))
