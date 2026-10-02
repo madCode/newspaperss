@@ -31,7 +31,6 @@ import com.app.newspaperss.ui.edition.imageSizes
 import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.ui.edition.bookResponse
 import com.app.newspaperss.ui.edition.BOOK_ORIGIN
-import com.app.newspaperss.ui.edition.ArticleLink
 import com.app.newspaperss.ui.edition.pageLink
 import android.content.Intent
 import org.robolectric.Shadows.shadowOf
@@ -230,8 +229,15 @@ class ArticlePreviewScreenTest {
         compose.onNodeWithContentDescription("Share link").assertDoesNotExist()
     }
 
+    private fun sharedLink(): Pair<String?, String?> {
+        compose.onNodeWithContentDescription("Share link").performClick()
+        @Suppress("DEPRECATION")
+        val send = shadowOf(compose.activity).nextStartedActivity.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
+        return send.getStringExtra(Intent.EXTRA_SUBJECT) to send.getStringExtra(Intent.EXTRA_TEXT)
+    }
+
     @Test
-    fun aPageReachedByNextSharesItsOwnLink() {
+    fun sharingFollowsThePageOnScreen() {
         val file = tmp.newFile("n.epub")
         // Long enough that the first ends with a "Next" link to the second.
         val articles = listOf("One", "Two").map {
@@ -240,11 +246,23 @@ class ArticlePreviewScreenTest {
         file.outputStream().use {
             EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
         }
-        EpubPages(file).use { pages ->
-            assertTrue(pages.article(0)!!.contains(EpubPages.articleHref(1)))
-            assertEquals(ArticleLink("Two", "https://a.example/Two"), pageLink(BOOK_ORIGIN + EpubPages.articleHref(1), pages))
-            assertEquals(null, pageLink(BOOK_ORIGIN + "style.css", pages))
-            assertEquals(null, pageLink("about:blank", pages))
-        }
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}) }
+        val view = webView()
+        val client = shadowOf(view).webViewClient
+        val first = BOOK_ORIGIN + EpubPages.articleHref(0)
+        assertEquals("loaded at its own address, so in-page links resolve to it", first, shadowOf(view).lastLoadDataWithBaseURL.baseUrl)
+
+        // The first load, and a footnote on the same page, keep its link.
+        client.doUpdateVisitedHistory(view, "about:blank", false)
+        client.doUpdateVisitedHistory(view, "$first#a1-fn1", false)
+        idleUntil { compose.onAllNodes(hasContentDescription("Share link")).fetchSemanticsNodes().isNotEmpty() }
+        assertEquals("One" to "https://a.example/One", sharedLink())
+
+        client.doUpdateVisitedHistory(view, BOOK_ORIGIN + EpubPages.articleHref(1), false)
+        // The new page's link is read off the main thread.
+        idleUntil { sharedLink().second == "https://a.example/Two" }
+        assertEquals("Two" to "https://a.example/Two", sharedLink())
+
+        EpubPages(file).use { pages -> assertEquals(null, pageLink(BOOK_ORIGIN + "style.css", pages)) }
     }
 }

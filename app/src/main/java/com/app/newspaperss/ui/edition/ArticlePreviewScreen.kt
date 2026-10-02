@@ -135,7 +135,7 @@ fun ArticlePreviewScreen(
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf<Job?>(null) }
     val onPage = { url: String, pages: EpubPages ->
-        // Only book pages: the first page is loaded as data, and reports about:blank.
+        // Only book pages: the first page is loaded as data and may report about:blank.
         if (url.startsWith(BOOK_ORIGIN)) {
             reading?.cancel()
             reading = scope.launch { link = withContext(Dispatchers.IO) { pageLink(url, pages) } }
@@ -170,7 +170,7 @@ fun ArticlePreviewScreen(
                 // Setting textZoom replaces the WebView's own scaling by Android's font size, so apply
                 // that here: someone who reads with large system text gets it at "Default" too.
                 val textZoom = (textSize.percent * LocalDensity.current.fontScale).roundToInt()
-                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, { onPage(it, p.pages) }, Modifier.fillMaxSize().padding(padding))
+                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, BOOK_ORIGIN + EpubPages.articleHref(position), { onPage(it, p.pages) }, Modifier.fillMaxSize().padding(padding))
             }
         }
     }
@@ -211,7 +211,7 @@ internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: 
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, onPage: (url: String) -> Unit, modifier: Modifier) {
+private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, pageUrl: String, onPage: (url: String) -> Unit, modifier: Modifier) {
     AndroidView(
         modifier = modifier,
         // Applied in place, so a new size keeps the reader's place in the article.
@@ -246,7 +246,9 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
                         return true
                     }
                 }
-                loadDataWithBaseURL(BOOK_ORIGIN, forPreview(xhtml, background, text, imageSizes(pages)), "application/xhtml+xml", "utf-8", null)
+                // The page's own address in the book, not the bare origin: its footnote links then
+                // resolve to this page, and the Share link follows the page on screen.
+                loadDataWithBaseURL(pageUrl, forPreview(xhtml, background, text, imageSizes(pages)), "application/xhtml+xml", "utf-8", null)
             }
         },
     )
