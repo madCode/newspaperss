@@ -53,6 +53,7 @@ import com.app.newspaperss.ui.components.BUILDING_NOTE
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.ui.today.failureColor
+import com.app.newspaperss.delivery.EditionEmail
 import com.app.newspaperss.delivery.EditionIntents
 import com.app.newspaperss.delivery.KindleSend
 import com.app.newspaperss.settings.KindleEmail
@@ -161,7 +162,10 @@ fun EditionDetailScreen(
                     fileMissing = current.file == null,
                     sentToKindle = sentToKindle,
                     onSend = {
-                        current.file?.let { EditionIntents.launchSend(context, it, edition.title, edition.id, kindleEmail, onMailAppOpened = viewModel::markEmailed) }
+                        current.file?.let {
+                            val body = kindleEmail?.let { EditionEmail.body(edition.title, current.contents.map(EditionContent::entry)) }
+                            EditionIntents.launchSend(context, it, edition.title, edition.id, kindleEmail, body, onMailAppOpened = viewModel::markEmailed)
+                        }
                     },
                     onOpen = if (offerOpen) {
                         { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } }

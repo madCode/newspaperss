@@ -215,7 +215,9 @@ module so it's all unit-tested without Android.
 (…@kindle.com), and a book emailed there is delivered to that device by
 itself. The app doesn't send mail: Send opens the mail app chosen in
 setup, straight to a compose screen with the Kindle's address, the
-edition's title as the subject and the EPUB attached. "Ask each time", or
+edition's title as the subject and the EPUB attached. The body lists the
+edition's articles, so your Sent folder shows what each one held (Amazon
+ignores it). "Ask each time", or
 a chosen app that's been uninstalled, opens the share sheet with the same
 email instead. Android can't choose the "From" account for another app,
 so the address you send from has to be on Amazon's approved list

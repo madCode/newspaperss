@@ -30,8 +30,9 @@ class SendEditionActivity : Activity() {
         val container = (application as NewspaperssApp).container
         container.appScope.launch {
             val email = container.settings.current().kindleEmailTarget
+            val body = email?.let { container.editions.emailBody(id) }
             // Its own task: this one is excluded from Recents, and the half-written email shouldn't be.
-            EditionIntents.launchSend(this@SendEditionActivity, file, title, id, email, newTask = true) {
+            EditionIntents.launchSend(this@SendEditionActivity, file, title, id, email, body, newTask = true) {
                 container.appScope.launch { container.editions.markEmailedToKindle(id) }
             }
             finish()

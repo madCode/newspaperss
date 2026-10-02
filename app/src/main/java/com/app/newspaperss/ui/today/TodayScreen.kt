@@ -108,6 +108,8 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, hadOne = latest != null, onMake = viewModel::makeOneNow) }
         if (latest != null) {
             item(key = "latest") {
+                // Ready before Send is tapped: the mail app has to open while the screen is still in front.
+                val emailBody by remember(latest.id) { viewModel.emailBody(latest.id) }.collectAsState(null)
                 LatestEdition(
                     latest,
                     first = editions.size == 1,
@@ -122,7 +124,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                     onDetails = { onOpenEdition(latest.id) },
                     onSend = {
                         viewModel.fileOf(latest)?.let {
-                            EditionIntents.launchSend(context, it, latest.title, latest.id, state.kindleEmail) { viewModel.markEmailed(latest.id) }
+                            EditionIntents.launchSend(context, it, latest.title, latest.id, state.kindleEmail, emailBody) { viewModel.markEmailed(latest.id) }
                         }
                     },
                     onOpen = {
