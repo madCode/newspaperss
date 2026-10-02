@@ -1,6 +1,7 @@
 package com.app.newspaperss.edition
 
 import com.app.newspaperss.core.extract.FullTextCheck
+import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.data.FeedChoice
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
@@ -955,5 +956,26 @@ class EditionBuilderTest {
 
         assertEquals(listOf("7", "8"), checked.sorted())
         assertEquals(setOf("7", "8"), db.sources().allPublications().map { it.key }.toSet())
+    }
+
+    /** A feed wrongly settled on its own text needs three teasers in a row to switch: daily checks, not one a fortnight. */
+    @Test
+    fun aFeedWhoseLastCheckFoundATeaserIsCheckedTheNextDay() = runTest {
+        val http = FakeHttp()
+        val checked = mutableListOf<Long>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            if (text.check) checked += sourceId
+            sources.recordFullText(sourceId, originId, e, text.check, text.day!!)
+        }
+        val today = clock.instant().atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+        val teaser = sources.addFeed("https://teaser.example/feed", "Teaser")
+        val full = sources.addFeed("https://full.example/feed", "Full")
+        db.sources().savePublication(PublicationEntity(teaser, PublicationEntity.OWN, ContentMode.FEED, FullTextEvidence.PAGE_LONGER, 1, today - 1, checkedDay = today - 1))
+        db.sources().savePublication(PublicationEntity(full, PublicationEntity.OWN, ContentMode.FEED, FullTextEvidence.FEED_FULL, 3, today - 1, checkedDay = today - 1))
+        db.articles().insertNew(listOf(longArticle(teaser, "a", "teaser.example", http), longArticle(full, "b", "full.example", http)))
+
+        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals("the settled one waits its 14 days", listOf(teaser), checked)
     }
 }

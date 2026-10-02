@@ -1,12 +1,11 @@
 package com.app.newspaperss.edition
 
-import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
-import org.jsoup.Jsoup
 import com.app.newspaperss.core.extract.ExtractInput
 import com.app.newspaperss.core.extract.FullTextCheck
 import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.core.extract.HtmlCleaner
 import com.app.newspaperss.core.images.ArticleImages
 import com.app.newspaperss.core.images.EncodedImage
 import com.app.newspaperss.core.images.ImageAllowance
@@ -108,7 +107,8 @@ class ExtractorContentProvider(
             if (source.contentModeChosen) return source.contentMode
             val mode = learned ?: source.contentMode
             if (mode != ContentMode.FEED) return mode
-            val words = article.feedHtml?.let { ReadingTime.words(Jsoup.parse(it).text()) } ?: 0
+            // Counted as the extractor counts, after cleaning, so the two agree on what's long.
+            val words = article.feedHtml?.let { HtmlCleaner.clean(it, article.url, article.title).wordCount } ?: 0
             return if (words < ArticleExtractor.FULL_TEXT_WORDS) ContentMode.AUTO else ContentMode.FEED
         }
 

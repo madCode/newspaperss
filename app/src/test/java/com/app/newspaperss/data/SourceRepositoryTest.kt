@@ -120,6 +120,18 @@ class SourceRepositoryTest {
         assertTrue(db.sources().allPublications().isEmpty())
     }
 
+    /** A check whose page couldn't be read still counts as the day's check; otherwise it would come back every edition. */
+    @Test
+    fun aCheckThatShowedNothingIsStillRememberedAndChangesNothingElse() = runTest {
+        val id = repo.addFeed("https://a.example/feed", "A")
+        record(id, FullTextEvidence.PAGE_LONGER, 2)
+        repo.recordFullText(id, null, null, checked = true, day = 20_200)
+        val publication = db.sources().publication(id, PublicationEntity.OWN)!!
+        assertEquals(20_200L, publication.checkedDay)
+        assertEquals(FullTextEvidence.PAGE_LONGER, publication.fullTextEvidence)
+        assertEquals(2, publication.fullTextStreak)
+    }
+
     @Test
     fun aCheckIsRememberedAsTheDayOfTheLastCheck() = runTest {
         val id = repo.addFeed("https://a.example/feed", "A")
