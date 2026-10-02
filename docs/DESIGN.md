@@ -166,7 +166,9 @@ module so it's all unit-tested without Android.
     5 minutes or more, a "Next" link with the next one's source and time (a
     pause after a long piece; after a short one, turning the page is enough);
   - footnotes that work in the book, even from tt-rss, which strips the
-    ids they point at (they're paired up again by number), and Substack
+    ids they point at (they're paired up again by number). A marker points
+    at the whole footnote, so a Kindle's popup shows its text, and markers
+    side by side are split with a comma ("3, 4"). Substack
     Notes quoted where the post embeds them (from Substack's own feed: tt-rss
     strips the Note's text);
   - "That's all for today", a chapter in the contents, with the day's
