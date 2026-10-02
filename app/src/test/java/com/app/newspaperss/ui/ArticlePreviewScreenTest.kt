@@ -31,6 +31,10 @@ import com.app.newspaperss.ui.edition.imageSizes
 import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.ui.edition.bookResponse
 import com.app.newspaperss.ui.edition.BOOK_ORIGIN
+import com.app.newspaperss.ui.edition.ArticleLink
+import com.app.newspaperss.ui.edition.pageLink
+import android.content.Intent
+import org.robolectric.Shadows.shadowOf
 import org.junit.Assert.assertTrue
 import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
@@ -135,9 +139,9 @@ class ArticlePreviewScreenTest {
         }
     }
 
-    private fun oneArticleEdition(): File {
+    private fun oneArticleEdition(url: String = "https://a.example/"): File {
         val file = tmp.newFile("z.epub")
-        val article = EditionArticle(title = "A story", sourceTitle = "S", url = "https://a.example/", bodyHtml = "<p>x</p>", minutes = 1.0)
+        val article = EditionArticle(title = "A story", sourceTitle = "S", url = url, bodyHtml = "<p>x</p>", minutes = 1.0)
         file.outputStream().use {
             EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
         }
@@ -196,5 +200,51 @@ class ArticlePreviewScreenTest {
         val settings = webView().settings
         assertTrue(settings.builtInZoomControls)
         assertFalse(settings.displayZoomControls)
+    }
+
+    @Test
+    fun shareSendsTheOriginalsLinkToTheShareSheet() {
+        val file = oneArticleEdition(url = "https://www.a.example/2026/a-story?ref=feed")
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "Shown title", onBack = {}) }
+        idleUntil { compose.onAllNodes(hasContentDescription("Share link")).fetchSemanticsNodes().isNotEmpty() }
+
+        compose.onNodeWithContentDescription("Share link").performClick()
+
+        val chooser = shadowOf(compose.activity).nextStartedActivity
+        assertEquals(Intent.ACTION_CHOOSER, chooser.action)
+        @Suppress("DEPRECATION")
+        val send = chooser.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
+        assertEquals(Intent.ACTION_SEND, send.action)
+        assertEquals("text/plain", send.type)
+        assertEquals("the whole address, not the host the page shows", "https://www.a.example/2026/a-story?ref=feed", send.getStringExtra(Intent.EXTRA_TEXT))
+        assertEquals("A story", send.getStringExtra(Intent.EXTRA_SUBJECT))
+    }
+
+    @Test
+    fun anArticleWithoutAWebLinkHasNoShareButton() {
+        val file = oneArticleEdition(url = "")
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}) }
+        webView()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Text size").assertExists()
+        compose.onNodeWithContentDescription("Share link").assertDoesNotExist()
+    }
+
+    @Test
+    fun aPageReachedByNextSharesItsOwnLink() {
+        val file = tmp.newFile("n.epub")
+        // Long enough that the first ends with a "Next" link to the second.
+        val articles = listOf("One", "Two").map {
+            EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 30.0)
+        }
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
+        }
+        EpubPages(file).use { pages ->
+            assertTrue(pages.article(0)!!.contains(EpubPages.articleHref(1)))
+            assertEquals(ArticleLink("Two", "https://a.example/Two"), pageLink(BOOK_ORIGIN + EpubPages.articleHref(1), pages))
+            assertEquals(null, pageLink(BOOK_ORIGIN + "style.css", pages))
+            assertEquals(null, pageLink("about:blank", pages))
+        }
     }
 }

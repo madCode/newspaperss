@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.TextButton
@@ -34,14 +35,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -59,7 +64,37 @@ internal const val BOOK_ORIGIN = "https://edition.newspaperss.invalid/"
 private sealed interface Preview {
     data object Loading : Preview
     data object Missing : Preview
-    class Ready(val pages: EpubPages, val xhtml: String) : Preview
+    class Ready(val pages: EpubPages, val xhtml: String, val link: ArticleLink?) : Preview
+}
+
+/** An article's title and the web address of its original, as the book's page gives them. */
+internal data class ArticleLink(val title: String, val url: String)
+
+/**
+ * The original's address from a page's "Read the original at …" link, or null when the page has
+ * none: the book only makes that a link for a web address, so whatever it holds can be shared.
+ */
+internal fun articleLink(xhtml: String): ArticleLink? {
+    val doc = Jsoup.parse(xhtml, "", Parser.xmlParser())
+    val url = doc.selectFirst("p.source-link a[href]")?.attr("href")?.takeIf { it.isNotBlank() } ?: return null
+    return ArticleLink(doc.selectFirst("h1.article-title")?.text().orEmpty(), url)
+}
+
+/** [articleLink] of the book page at [url], or null if [url] isn't a page of the book. */
+internal fun pageLink(url: String, pages: EpubPages): ArticleLink? {
+    if (!url.startsWith(BOOK_ORIGIN)) return null
+    val path = "OEBPS/" + url.removePrefix(BOOK_ORIGIN).substringBefore('#').substringBefore('?')
+    if (EpubPages.mimeOf(path) != "application/xhtml+xml") return null
+    return pages.entry(path)?.toString(Charsets.UTF_8)?.let(::articleLink)
+}
+
+internal fun shareIntent(link: ArticleLink, fallbackTitle: String): Intent {
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, link.title.ifEmpty { fallbackTitle })
+        putExtra(Intent.EXTRA_TEXT, link.url)
+    }
+    return Intent.createChooser(send, null)
 }
 
 /**
@@ -84,22 +119,42 @@ fun ArticlePreviewScreen(
         val pages = withContext(Dispatchers.IO) { loadFile()?.let(::EpubPages) }
         try {
             val xhtml = pages?.let { withContext(Dispatchers.IO) { it.article(position) } }
+            val link = xhtml?.let { withContext(Dispatchers.IO) { articleLink(it) } }
             // Set on the main thread: under a test's unconfined dispatcher the code after
             // withContext(IO) can resume on the IO thread, and the new state then touches views.
             withContext(Dispatchers.Main.immediate) {
-                value = if (pages != null && xhtml != null) Preview.Ready(pages, xhtml) else Preview.Missing
+                value = if (pages != null && xhtml != null) Preview.Ready(pages, xhtml, link) else Preview.Missing
             }
             awaitCancellation()
         } finally {
             pages?.close()
         }
     }
+    // The page on screen can change under the preview: a long article ends in a "Next" link.
+    var link by remember(preview) { mutableStateOf((preview as? Preview.Ready)?.link) }
+    val scope = rememberCoroutineScope()
+    var reading by remember { mutableStateOf<Job?>(null) }
+    val onPage = { url: String, pages: EpubPages ->
+        // Only book pages: the first page is loaded as data, and reports about:blank.
+        if (url.startsWith(BOOK_ORIGIN)) {
+            reading?.cancel()
+            reading = scope.launch { link = withContext(Dispatchers.IO) { pageLink(url, pages) } }
+        }
+    }
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-                actions = { TextSizeMenu(textSize, onTextSize) },
+                actions = {
+                    link?.let { l ->
+                        IconButton(onClick = { runCatching { context.startActivity(shareIntent(l, title)) } }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share link")
+                        }
+                    }
+                    TextSizeMenu(textSize, onTextSize)
+                },
             )
         },
     ) { padding ->
@@ -115,7 +170,7 @@ fun ArticlePreviewScreen(
                 // Setting textZoom replaces the WebView's own scaling by Android's font size, so apply
                 // that here: someone who reads with large system text gets it at "Default" too.
                 val textZoom = (textSize.percent * LocalDensity.current.fontScale).roundToInt()
-                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, Modifier.fillMaxSize().padding(padding))
+                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, { onPage(it, p.pages) }, Modifier.fillMaxSize().padding(padding))
             }
         }
     }
@@ -156,7 +211,7 @@ internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: 
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, modifier: Modifier) {
+private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, onPage: (url: String) -> Unit, modifier: Modifier) {
     AndroidView(
         modifier = modifier,
         // Applied in place, so a new size keeps the reader's place in the article.
@@ -177,6 +232,8 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
                         val (mime, bytes) = bookResponse(request.url.toString(), pages, background, text)
                         return WebResourceResponse(mime, "utf-8", ByteArrayInputStream(bytes))
                     }
+
+                    override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) = onPage(url)
 
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                         val url = request.url
