@@ -202,5 +202,7 @@ PR: no feed lists, hosts, emails or accounts.
 
 End the run with a short summary for madCode, grouped as: PRs opened (with
 links), questions waiting on you, waiting on reporters, stuck PRs, and
-skipped. If
-nothing needed you, say that in one line.
+skipped. Link every issue, PR and comment you mention, as
+`[#N](https://github.com/<owner>/<repo>/issues/N)` (`/pull/N` for PRs), so
+madCode can click straight through; a bare `#N` isn't clickable outside
+GitHub. If nothing needed you, say that in one line.
