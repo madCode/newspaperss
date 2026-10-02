@@ -502,6 +502,15 @@ class EpubWriterTest {
         }
     }
 
+    /** A marker opening a paragraph isn't a footnote, and one block holding every footnote can't stand for one of them. */
+    @Test
+    fun onlyAFootnoteOnItsOwnTakesItsNumbersPlace() {
+        val body = "<p><a id=\"r1\" href=\"#n1\">1</a> Starts a paragraph.<a id=\"r2\" href=\"#n2\">2</a></p>" +
+            "<p><a id=\"n1\" href=\"#r1\">1</a> First.<br/><a id=\"n2\" href=\"#r2\">2</a> Second.</p>"
+        val page = write(unsectioned(article(body = body))).let { it.xml("OEBPS/" + it.articleHrefs().single()) }
+        assertTrue(page.elements("p").none { it.getAttribute("id").isNotEmpty() })
+    }
+
     /** Footnotes that already keep their id on the footnote (WordPress's list items) are left as they are. */
     @Test
     fun aFootnoteWithItsIdOnTheBlockStaysAsItIs() {

@@ -83,12 +83,18 @@ internal object ArticleBody {
     private fun fixFootnotes(root: Element) {
         val byId = root.select("[id]").associateBy { it.id() }
         fun target(link: Element): Element? = link.attr("href").trim().takeIf { it.startsWith("#") }?.let { byId[it.substring(1)] }
+        val order = root.select("*").withIndex().associate { (i, el) -> el to i }
         val paired = root.select("a[href][id]").filter { link -> target(link)?.let { it.tagName() == "a" && target(it) === link } == true }
+        val pairedSet = paired.toSet()
+        // The number is the later of the two links, and alone in its block: a block holding several
+        // footnotes would show them all.
         val (numbers, markers) = paired.partition { link ->
             val parent = link.parent()
             parent != null && parent !== root && !parent.hasAttr("id") &&
+                order.getValue(link) > order.getValue(target(link)!!) &&
                 parent.childNodes().firstOrNull { it !is TextNode || !it.isBlank } === link &&
-                parent.text().length > link.text().length
+                parent.text().length > link.text().length &&
+                parent.select("a").none { it !== link && it in pairedSet }
         }
         for (number in numbers) {
             number.parent()!!.id(number.id())
