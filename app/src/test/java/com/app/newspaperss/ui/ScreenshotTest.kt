@@ -318,6 +318,14 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(fontScale = 2f)
+    fun settingsDeliveryAtLargeText() {
+        runBlocking { store.update { it.copy(device = Device.BOOX) } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07g-settings-delivery-200", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.DELIVERY, onBack = {}) }
+    }
+
+    @Test
     fun settingsNotes() {
         val vm = SettingsViewModel(store) {}
         shoot("07f-settings-notes", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.NOTES, onBack = {}) }

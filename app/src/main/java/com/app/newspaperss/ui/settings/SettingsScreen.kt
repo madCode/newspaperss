@@ -63,6 +63,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
@@ -161,8 +162,9 @@ fun SettingsPageScreen(viewModel: SettingsViewModel, page: SettingsPage, onBack:
 }
 
 @Composable
-private fun SubHeading(text: String, modifier: Modifier = Modifier) =
+private fun SubHeading(text: String, modifier: Modifier = Modifier) {
     Text(text, style = MaterialTheme.typography.titleMedium, modifier = modifier.semantics { heading() })
+}
 
 @Composable
 private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
@@ -279,7 +281,8 @@ private fun ReaderPicker(s: AppSettings, vm: SettingsViewModel) {
             value = s.device?.label ?: "Not chosen",
             onValueChange = {},
             readOnly = true,
-            singleLine = true,
+            // Wraps rather than scrolling sideways: "Boox or another Android e-reader" is cut off at large text.
+            singleLine = false,
             label = { Text("Your e-reader") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
@@ -293,6 +296,7 @@ private fun ReaderPicker(s: AppSettings, vm: SettingsViewModel) {
                         expanded = false
                     },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                    modifier = Modifier.semantics { selected = device == s.device },
                 )
             }
         }

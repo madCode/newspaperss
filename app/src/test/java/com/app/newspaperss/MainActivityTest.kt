@@ -79,6 +79,7 @@ class MainActivityTest {
         launchWith(onboarded = true)
         shows("Sources")
         compose.onAllNodes(hasText("Settings") and hasClickAction()).onFirst().performClick()
+        shows("Reading notes")
         compose.onNodeWithText("Reading notes").performClick()
         shows("Save notes for each edition")
 

@@ -83,7 +83,9 @@ class SettingsScreenTest {
                 else -> SettingsPageScreen(vm, p, onBack = { open = null })
             }
         }
-        waitFor(page?.title ?: "Your edition")
+        // The title draws before the settings load from DataStore, so wait for the content.
+        idleUntil { vm.settings.value != null }
+        waitFor(if (page == null) "newspapeRSS" else page.title)
     }
 
     @After fun stopStore() = runBlocking { storeScope.coroutineContext[Job]!!.cancelAndJoin() }
@@ -158,6 +160,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("Boox or another Android e-reader").performClick()
 
         idleUntil { runBlocking { store.current().device } == Device.BOOX }
+        waitFor("Boox or another Android e-reader")
         // A Boox reader isn't offered Kindle email.
         idleUntil { compose.onAllNodes(hasText("Email it to your Kindle")).fetchSemanticsNodes().isEmpty() }
     }
