@@ -5,7 +5,10 @@ enum class FullTextEvidence(val mode: ContentMode) {
     /** The page had at least twice the feed's words: the feed is a teaser. */
     PAGE_LONGER(ContentMode.PAGE),
 
-    /** The feed carried the whole article. */
+    /** The page's article had pictures and the feed's copy of it had none. */
+    PAGE_IMAGES(ContentMode.PAGE),
+
+    /** The feed carried the whole article: the page, fetched to compare, had no more. */
     FEED_FULL(ContentMode.FEED),
 
     /** The feed's text was short, but extraction found even less on the page. */
@@ -34,15 +37,25 @@ data class FullTextState(val mode: ContentMode, val evidence: FullTextEvidence?,
 object FullTextCheck {
     const val SETTLE_AFTER = 3
 
+    /** Long items checked against their page in one edition, for sources still being worked out or due a re-check. */
+    const val CHECKS_PER_EDITION = 5
+
+    /** A source settled on its feed's text has one long item checked this often, in case the site starts sending teasers. */
+    const val RECHECK_AFTER_DAYS = 14
+
     /** What [article] says about its source, or null if it doesn't tell (e.g. the page couldn't be reached at all). */
     fun evidence(article: ExtractedArticle): FullTextEvidence? {
         val suggested = ArticleExtractor.suggestMode(article.feedWordCount, article.pageWordCount)
+        val compared = article.pageWordCount != null && article.feedWordCount > 0
         return when {
             // Unread for its own reasons (too large, gone, no connection): the feed's text standing
             // in says nothing about whether the page has more.
             article.pageFailure != null -> null
             suggested == ContentMode.PAGE -> FullTextEvidence.PAGE_LONGER
-            article.usedFeedContent && article.feedWordCount >= ArticleExtractor.FULL_TEXT_WORDS -> FullTextEvidence.FEED_FULL
+            compared && (article.pageImageCount ?: 0) > 0 && article.feedImageCount == 0 -> FullTextEvidence.PAGE_IMAGES
+            // Only once the page was tried: a long item can still be a teaser. A site that turns the
+            // page away but sends whole articles still gives full articles.
+            (compared || article.pageBlocked) && article.feedWordCount >= ArticleExtractor.FULL_TEXT_WORDS -> FullTextEvidence.FEED_FULL
             suggested == ContentMode.FEED -> FullTextEvidence.FEED_SHORT
             // Blocked with no feed text says nothing: the page was the only text there was.
             article.pageBlocked && article.feedWordCount > 0 -> FullTextEvidence.BLOCKED
@@ -55,5 +68,16 @@ object FullTextCheck {
         if (sameWay && state.day == day) return state
         val streak = if (sameWay) state.streak + 1 else 1
         return FullTextState(if (streak >= SETTLE_AFTER) evidence.mode else state.mode, evidence, streak, day)
+    }
+
+    /**
+     * Whether a long item from a source in [mode] should be checked against its page on [today]:
+     * while the source is still being worked out, and every [RECHECK_AFTER_DAYS] once it has
+     * settled on its feed's text. A source settled on the page fetches it anyway.
+     */
+    fun dueForCheck(mode: ContentMode, checkedDay: Long?, today: Long): Boolean = when (mode) {
+        ContentMode.AUTO -> checkedDay != today
+        ContentMode.FEED -> checkedDay == null || today - checkedDay >= RECHECK_AFTER_DAYS
+        ContentMode.PAGE -> false
     }
 }

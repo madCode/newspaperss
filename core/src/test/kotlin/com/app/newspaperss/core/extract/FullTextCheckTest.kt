@@ -15,7 +15,7 @@ class FullTextCheckTest {
     @Test
     fun eachArticleOutcomeCountsAsTheRightEvidence() {
         assertEquals(FullTextEvidence.PAGE_LONGER, FullTextCheck.evidence(extracted(40, 900, usedFeed = false)))
-        assertEquals("a long feed item taken without fetching", FullTextEvidence.FEED_FULL, FullTextCheck.evidence(extracted(800, null, usedFeed = true)))
+        assertEquals("a long feed item checked against a page no longer", FullTextEvidence.FEED_FULL, FullTextCheck.evidence(extracted(800, 900, usedFeed = false)))
         assertEquals("a long feed that beat the page", FullTextEvidence.FEED_FULL, FullTextCheck.evidence(extracted(800, 200, usedFeed = true)))
         assertEquals(FullTextEvidence.FEED_SHORT, FullTextCheck.evidence(extracted(150, 30, usedFeed = true)))
         assertEquals(FullTextEvidence.BLOCKED, FullTextCheck.evidence(extracted(40, null, usedFeed = true, blocked = true, note = "Couldn't fetch")))
@@ -29,12 +29,34 @@ class FullTextCheckTest {
     @Test
     fun outcomesThatDontTellAreIgnored() {
         assertNull("page about as long as the feed", FullTextCheck.evidence(extracted(200, 300, usedFeed = false)))
+        assertNull(
+            "a long feed item taken without fetching its page: it could still be a teaser",
+            FullTextCheck.evidence(extracted(800, null, usedFeed = true)),
+        )
         assertNull("no feed text to compare", FullTextCheck.evidence(extracted(0, 900, usedFeed = false)))
         assertNull("couldn't connect: maybe the phone was offline", FullTextCheck.evidence(extracted(40, null, usedFeed = true, note = "Couldn't fetch")))
         assertNull(
             "blocked with no feed text: there were no summaries to fall back on",
             FullTextCheck.evidence(extracted(0, null, usedFeed = false, note = "Couldn't fetch").copy(pageBlocked = true)),
         )
+    }
+
+    @Test
+    fun picturesOnlyThePageHasPointToThePage() {
+        val compared = extracted(500, 520, usedFeed = false)
+        assertEquals(FullTextEvidence.PAGE_IMAGES, FullTextCheck.evidence(compared.copy(feedImageCount = 0, pageImageCount = 2)))
+        assertEquals("the feed has its pictures too", FullTextEvidence.FEED_FULL, FullTextCheck.evidence(compared.copy(feedImageCount = 2, pageImageCount = 2)))
+        assertEquals("a picture-less page", FullTextEvidence.FEED_FULL, FullTextCheck.evidence(compared.copy(feedImageCount = 0, pageImageCount = 0)))
+    }
+
+    @Test
+    fun longItemsAreCheckedWhileWorkingItOutAndNowAndThenOnceSettledOnTheFeed() {
+        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.AUTO, null, 100))
+        assertEquals("once a day while working it out", false, FullTextCheck.dueForCheck(ContentMode.AUTO, 100, 100))
+        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.FEED, null, 100))
+        assertEquals(false, FullTextCheck.dueForCheck(ContentMode.FEED, 100 - FullTextCheck.RECHECK_AFTER_DAYS + 1L, 100))
+        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.FEED, 100 - FullTextCheck.RECHECK_AFTER_DAYS.toLong(), 100))
+        assertEquals("settled on the page: it's fetched anyway", false, FullTextCheck.dueForCheck(ContentMode.PAGE, null, 100))
     }
 
     /** One piece of evidence per day, on consecutive days. */

@@ -12,6 +12,19 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
+## Day 5 · Fri 2 Oct
+
+### Cycle 71: article text, checked and per publication
+- **From you:** Automatic should look at the page now and then before deciding a feed is full text; tt-rss feeds should each learn on their own; count pictures, not just words.
+- **Found:** a long item (300+ words) counted as proof the feed was full without its page ever being read, so a feed of long teasers settled on "Full articles". tt-rss feeds learned nothing at all.
+- **Shipped:** what the check learns lives per publication (a feed here, or one feed in tt-rss), moved from the source row. Each edition reads the pages of up to 5 long items, one per publication, while it's still working out or every 14 days once settled on the feed; a teaser found that way gets its page in that edition. A page with pictures the feed's copy lacks counts for the page. Database version 6.
+
+## Day 4 · Thu 1 Oct
+
+### Cycle 70: what tt-rss is as a source, explored
+- **From you:** each tt-rss feed as its own source? add what you subscribe to here back to tt-rss? does either clutter?
+- **Did:** competitors, today's screens and clickable proposals, each critiqued by the personas over several rounds; in [docs/research/ttrss-backend/](research/ttrss-backend/index.html). Recommended: tt-rss stays one row with its feeds inset under it, folded; each feed learns its article text (cycle 71); sections and balance later; adding to tt-rss only by hand for now.
+
 ## Day 3 · Wed 30 Sep
 
 ### Cycle 69: read rows step back (21:50–22:05)

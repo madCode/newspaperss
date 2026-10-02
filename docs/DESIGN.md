@@ -122,11 +122,21 @@ module so it's all unit-tested without Android.
   content. When a page's text is clearly not the article, the page's main
   image is used, and a webcomic's own comic (all its panels) beats the
   feed's thumbnail.
-- **Which text to use, per source.** Each article is evidence: a page with
-  twice the feed's words means the feed is a teaser; a feed of 300+ words,
-  or a site that blocks fetching, means the feed is enough. Three days
-  pointing the same way set the source to that; the reader can override it
-  on the source's page ("Article text: Automatic / Feed's text / Full page").
+- **Which text to use, per publication.** A publication is who wrote the
+  articles: a feed added here, or one feed inside a tt-rss account, each
+  learning on its own. Each article whose page was read is evidence:
+  - a page with twice the feed's words, or with pictures the feed's copy
+    lacks, means the feed is a teaser;
+  - a feed of 300+ words whose page has no more, or a site that blocks
+    fetching, means the feed is enough.
+  Three days pointing the same way set the publication to that; the reader
+  can override a feed on its page ("Article text: Automatic / Feed's text /
+  Full page").
+  - A short item always has its page read. A long one is taken from the feed,
+    so it only counts once checked: each edition reads the pages of up to 5
+    long items, one per publication, from publications still being worked
+    out, or settled on the feed's text and not checked for 14 days.
+  - A check that finds a teaser uses the page in that edition already.
 - **Language.** Each article is tagged with its language (`xml:lang`, and
   `dir="rtl"` for right-to-left scripts) so e-readers hyphenate and lay it
   out correctly. The text decides; the page's declared language breaks ties.

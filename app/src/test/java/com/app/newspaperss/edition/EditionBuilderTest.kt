@@ -1,5 +1,6 @@
 package com.app.newspaperss.edition
 
+import com.app.newspaperss.core.extract.FullTextCheck
 import com.app.newspaperss.data.FeedChoice
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
@@ -13,6 +14,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.MarkReadBatch
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.testutil.DbRule
@@ -50,7 +52,7 @@ class EditionBuilderTest {
     private val sources = SourceRepository(db, clock)
     private val unreadable = mutableSetOf<String>()
     private val broken = mutableSetOf<String>()
-    private val content = ArticleContentProvider { a, _, _ ->
+    private val content = ArticleContentProvider { a, _, _, _ ->
         if (a.guid in broken) throw IllegalStateException("parser crashed on ${a.url}")
         if (a.guid in unreadable) null else ArticleContent(a.title, null, "<p>${a.title} body</p>", wordCount = 2000)
     }
@@ -391,7 +393,7 @@ class EditionBuilderTest {
         editions.setStarred(idOf("b1"), true)
         var markedDuringBuild: MarkReadBatch? = null
         var unstarredDuringBuild: Boolean? = null
-        val meddling = ArticleContentProvider { a, _, _ ->
+        val meddling = ArticleContentProvider { a, _, _, _ ->
             if (a.guid == "a1") {
                 markedDuringBuild = sources.markRead(listOf(a.id))
                 unstarredDuringBuild = sources.setStarred(idOf("b1"), false)
@@ -513,7 +515,7 @@ class EditionBuilderTest {
     @Test
     fun eachArticlesLanguageReachesTheBook() = runTest {
         source("a", null, "a1")
-        val french = ArticleContentProvider { a, _, _ -> ArticleContent(a.title, null, "<p>Bonjour</p>", wordCount = 238, language = "fr") }
+        val french = ArticleContentProvider { a, _, _, _ -> ArticleContent(a.title, null, "<p>Bonjour</p>", wordCount = 238, language = "fr") }
         val built = EditionBuilder(db, french, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings()) as BuildResult.Built
 
         ZipFile(editions.fileOf(db.editions().byId(built.editionId)!!)!!).use { zip ->
@@ -525,7 +527,7 @@ class EditionBuilderTest {
     @Test
     fun imagesPastTheEditionBudgetAreLeftOutInReadingOrder() = runTest {
         source("a", null, "a1", "a2")
-        val withImage = ArticleContentProvider { a, _, _ ->
+        val withImage = ArticleContentProvider { a, _, _, _ ->
             val href = "images/a${a.id}-1.jpg"
             ArticleContent(
                 a.title, null, "<p>${a.title}</p><figure><img src=\"$href\"/><figcaption>${a.guid} caption</figcaption></figure>",
@@ -590,7 +592,7 @@ class EditionBuilderTest {
     fun theCoverCountsAgainstTheEditionsImageBudget() = runTest {
         source("a", null, "a1")
         val href = "images/a1-1.jpg"
-        val withImage = ArticleContentProvider { a, _, _ ->
+        val withImage = ArticleContentProvider { a, _, _, _ ->
             ArticleContent(a.title, null, "<p><img src=\"$href\"/></p>", wordCount = 238, images = listOf(EpubImage(href, "image/jpeg", ByteArray(60))))
         }
         val built = EditionBuilder(db, withImage, tmp.root, clock, ZoneOffset.UTC, imageBudgetBytes = 100) {
@@ -654,7 +656,7 @@ class EditionBuilderTest {
     fun aCancelledBuildIsMarkedFailed() = runTest {
         source("a", null, "a1")
         val fetching = CompletableDeferred<Unit>()
-        val hanging = ArticleContentProvider { _, _, _ ->
+        val hanging = ArticleContentProvider { _, _, _, _ ->
             fetching.complete(Unit)
             awaitCancellation()
         }
@@ -883,26 +885,73 @@ class EditionBuilderTest {
 
         tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
 
-        assertEquals(ContentMode.AUTO, db.sources().byId(id)!!.contentMode)
+        assertEquals(ContentMode.AUTO, db.sources().publication(id, PublicationEntity.OWN)?.contentMode ?: ContentMode.AUTO)
     }
 
     @Test
     fun aSiteSettledOnItsSummariesIsRecheckedAndCanMoveToFullPages() = runTest {
         val http = FakeHttp()
         var day = 20_000L
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, e ->
-            sources.recordFullText(sourceId, e, day)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, checked ->
+            sources.recordFullText(sourceId, originId, e, checked, day)
         }
         val id = sources.addFeed("https://unblocked.example/feed", "Unblocked")
-        db.sources().setFullText(id, ContentMode.FEED, com.app.newspaperss.core.extract.FullTextEvidence.BLOCKED, 3, day)
+        db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, ContentMode.FEED, com.app.newspaperss.core.extract.FullTextEvidence.BLOCKED, 3, day))
         val words = (1..800).joinToString(" ") { "word$it" }
         repeat(3) { i ->
             day++
             http.page("https://unblocked.example/$i", "<html><body><article><h1>Story</h1><p>$words</p></article></body></html>")
             val article = ArticleEntity(id = 100L + i, sourceId = id, guid = "$i", url = "https://unblocked.example/$i", title = "Story $i", feedHtml = "<p>A teaser.</p>")
-            provider.contentFor(article, db.sources().byId(id)!!, com.app.newspaperss.core.images.ImageAllowance())
+            val learned = db.sources().publication(id, PublicationEntity.OWN)?.contentMode
+            provider.contentFor(article, db.sources().byId(id)!!, com.app.newspaperss.core.images.ImageAllowance(), TextChoice(learned))
         }
 
-        assertEquals(ContentMode.PAGE, db.sources().byId(id)!!.contentMode)
+        assertEquals(ContentMode.PAGE, db.sources().publication(id, PublicationEntity.OWN)!!.contentMode)
+    }
+
+    private fun longArticle(sourceId: Long, guid: String, host: String, http: FakeHttp, originId: String? = null): ArticleEntity {
+        val text = (1..600).joinToString(" ") { "word$it" }
+        http.page("https://$host/$guid", "<html><body><article><p>$text</p></article></body></html>")
+        return ArticleEntity(sourceId = sourceId, guid = guid, url = "https://$host/$guid", title = "Story $guid", feedHtml = "<p>$text</p>", originId = originId)
+    }
+
+    /** Checking costs page fetches, so an edition checks a few publications, each once. */
+    @Test
+    fun anEditionChecksAtMostFiveLongItemsOnePerPublication() = runTest {
+        val http = FakeHttp()
+        val checked = mutableListOf<Pair<Long, String?>>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, check ->
+            if (check) checked += sourceId to originId
+            sources.recordFullText(sourceId, originId, e, check)
+        }
+        val feeds = (1..6).map { sources.addFeed("https://site$it.example/feed", "Site $it") }
+        val ttrss = sources.addTtrss("https://rss.example/api/")
+        db.articles().insertNew(
+            feeds.flatMap { id -> listOf(longArticle(id, "a$id", "site$id.example", http), longArticle(id, "b$id", "site$id.example", http)) } +
+                listOf(longArticle(ttrss, "t1", "news.example", http, originId = "7"), longArticle(ttrss, "t2", "news.example", http, originId = "8")),
+        )
+
+        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals(FullTextCheck.CHECKS_PER_EDITION, checked.size)
+        assertEquals("one item per publication", checked.size, checked.distinct().size)
+        assertEquals(FullTextCheck.CHECKS_PER_EDITION, db.sources().allPublications().count { it.checkedDay != null })
+    }
+
+    @Test
+    fun eachTtrssFeedIsCheckedOnItsOwn() = runTest {
+        val http = FakeHttp()
+        val checked = mutableListOf<String?>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, check ->
+            if (check) checked += originId
+            sources.recordFullText(sourceId, originId, e, check)
+        }
+        val ttrss = sources.addTtrss("https://rss.example/api/")
+        db.articles().insertNew((1..3).map { longArticle(ttrss, "t$it", "news.example", http, originId = if (it == 3) "8" else "7") })
+
+        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals(listOf("7", "8"), checked.sorted())
+        assertEquals(setOf("7", "8"), db.sources().allPublications().map { it.key }.toSet())
     }
 }

@@ -52,7 +52,7 @@ class NotesSaverTest {
         SourceRepository(db).addFeed("https://example.com/feed", "Blog")
         http.page("https://example.com/feed", rss("Blog", "1" to "One"))
         FeedSync(db, http).syncAll()
-        val content = ArticleContentProvider { a, _, _ -> ArticleContent(a.title, null, "<p>body</p>", 500) }
+        val content = ArticleContentProvider { a, _, _, _ -> ArticleContent(a.title, null, "<p>body</p>", 500) }
         val id = (EditionBuilder(db, content, editions.editionsDir).build(com.app.newspaperss.edition.EditionSettings()) as BuildResult.Built).editionId
         editions.markSent(id)
         return id to db.editions().byId(id)!!.title

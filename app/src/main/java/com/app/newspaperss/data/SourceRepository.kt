@@ -11,6 +11,7 @@ import com.app.newspaperss.core.lists.CuratedLists
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -184,17 +185,39 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
      * Sets how a source's articles get their text. [ContentMode.AUTO] hands the choice back to
      * the automatic check, which starts over; any other mode is the reader's and stays.
      */
-    suspend fun chooseContentMode(id: Long, mode: ContentMode) = sources.setContentMode(id, mode, chosen = mode != ContentMode.AUTO)
-
-    /** Adds one article's evidence to its source's full-text check (see [FullTextCheck]). */
-    suspend fun recordFullText(sourceId: Long, evidence: FullTextEvidence, day: Long = LocalDate.now().toEpochDay()) = db.withTransaction {
-        val source = sources.byId(sourceId) ?: return@withTransaction
-        // A reading list or tt-rss account mixes many sites: one article says nothing about the next.
-        if (source.kind != SourceKind.FEED || source.contentModeChosen) return@withTransaction
-        val state = FullTextState(source.contentMode, source.fullTextEvidence, source.fullTextStreak, source.fullTextDay)
-        val next = FullTextCheck.next(state, evidence, day)
-        if (next != state) sources.setFullText(sourceId, next.mode, next.evidence, next.streak, next.day)
+    suspend fun chooseContentMode(id: Long, mode: ContentMode) = db.withTransaction {
+        sources.setContentMode(id, mode, chosen = mode != ContentMode.AUTO)
+        sources.forgetPublication(id, PublicationEntity.OWN)
     }
+
+    /**
+     * Adds one article's evidence to its publication's full-text check (see [FullTextCheck]): the
+     * source's own feed, or for tt-rss, the feed the article came from ([originId]). [checked]
+     * says the article was a long item fetched to check it, which counts as the day's check.
+     */
+    suspend fun recordFullText(
+        sourceId: Long, originId: String?, evidence: FullTextEvidence, checked: Boolean = false, day: Long = LocalDate.now().toEpochDay(),
+    ) = db.withTransaction {
+        val source = sources.byId(sourceId) ?: return@withTransaction
+        // The reading list and curated lists mix many sites: one article says nothing about the next.
+        val key = when (source.kind) {
+            SourceKind.FEED -> PublicationEntity.OWN
+            SourceKind.TTRSS -> originId ?: return@withTransaction
+            else -> return@withTransaction
+        }
+        if (source.contentModeChosen) return@withTransaction
+        val publication = sources.publication(sourceId, key) ?: PublicationEntity(sourceId, key)
+        val state = FullTextState(publication.contentMode, publication.fullTextEvidence, publication.fullTextStreak, publication.fullTextDay)
+        val next = FullTextCheck.next(state, evidence, day)
+        val updated = publication.copy(
+            contentMode = next.mode, fullTextEvidence = next.evidence, fullTextStreak = next.streak, fullTextDay = next.day,
+            checkedDay = if (checked) day else publication.checkedDay,
+        )
+        if (updated != publication) sources.savePublication(updated)
+    }
+
+    /** Each source's own publication, by source id. */
+    fun observeOwnPublications(): Flow<Map<Long, PublicationEntity>> = sources.observeOwnPublications().map { list -> list.associateBy { it.sourceId } }
 
     /** Returns how many feeds were new. */
     suspend fun importOpml(xml: String): Int {

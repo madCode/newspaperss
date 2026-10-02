@@ -59,17 +59,20 @@ class SourceRepositoryTest {
     private var day = 20_000L
 
     /** [times] pieces of evidence, one a day. */
-    private suspend fun record(id: Long, evidence: FullTextEvidence, times: Int) = repeat(times) { repo.recordFullText(id, evidence, day++) }
+    private suspend fun record(id: Long, evidence: FullTextEvidence, times: Int, originId: String? = null) =
+        repeat(times) { repo.recordFullText(id, originId, evidence, day = day++) }
 
     private suspend fun source(id: Long) = db.sources().byId(id)!!
+
+    private suspend fun learned(id: Long, key: String = PublicationEntity.OWN) = db.sources().publication(id, key)?.contentMode ?: ContentMode.AUTO
 
     @Test
     fun threeTeasersInARowSwitchAFeedToFetchingPages() = runTest {
         val id = repo.addFeed("https://a.example/feed", "A")
         record(id, FullTextEvidence.PAGE_LONGER, 2)
-        assertEquals(ContentMode.AUTO, source(id).contentMode)
+        assertEquals(ContentMode.AUTO, learned(id))
         record(id, FullTextEvidence.PAGE_LONGER, 1)
-        assertEquals(ContentMode.PAGE, source(id).contentMode)
+        assertEquals(ContentMode.PAGE, learned(id))
     }
 
     @Test
@@ -79,27 +82,50 @@ class SourceRepositoryTest {
         record(id, FullTextEvidence.PAGE_LONGER, 5)
         assertEquals(ContentMode.FEED, source(id).contentMode)
         assertTrue(source(id).contentModeChosen)
+        assertEquals("nothing learned against the reader's choice", null, db.sources().publication(id, PublicationEntity.OWN))
     }
 
     @Test
     fun choosingAutomaticAgainStartsTheCheckOver() = runTest {
         val id = repo.addFeed("https://a.example/feed", "A")
         record(id, FullTextEvidence.BLOCKED, 3)
-        assertEquals(ContentMode.FEED, source(id).contentMode)
+        assertEquals(ContentMode.FEED, learned(id))
 
         repo.chooseContentMode(id, ContentMode.AUTO)
 
-        assertEquals(ContentMode.AUTO, source(id).contentMode)
+        assertEquals(ContentMode.AUTO, learned(id))
         assertFalse(source(id).contentModeChosen)
         record(id, FullTextEvidence.PAGE_LONGER, 2)
-        assertEquals("earlier evidence doesn't count towards the new run", ContentMode.AUTO, source(id).contentMode)
+        assertEquals("earlier evidence doesn't count towards the new run", ContentMode.AUTO, learned(id))
     }
 
     @Test
-    fun sourcesMixingManySitesAreLeftAlone() = runTest {
+    fun eachTtrssFeedLearnsOnItsOwn() = runTest {
         val ttrss = repo.addTtrss("https://rss.example/api/")
-        record(ttrss, FullTextEvidence.PAGE_LONGER, 3)
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 3, originId = "7")
+        record(ttrss, FullTextEvidence.FEED_FULL, 3, originId = "8")
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 3, originId = null)
+
+        assertEquals(ContentMode.PAGE, learned(ttrss, "7"))
+        assertEquals(ContentMode.FEED, learned(ttrss, "8"))
+        assertEquals("an article not from any one feed says nothing", ContentMode.AUTO, learned(ttrss))
         assertEquals(ContentMode.AUTO, source(ttrss).contentMode)
+    }
+
+    @Test
+    fun theReadingListIsLeftAlone() = runTest {
+        val list = db.sources().all().firstOrNull { it.kind == SourceKind.READING_LIST }?.id
+            ?: db.sources().insert(SourceEntity(kind = SourceKind.READING_LIST, url = "newspaperss:reading-list", title = "Saved", contentMode = ContentMode.PAGE))
+        record(list, FullTextEvidence.FEED_FULL, 3)
+        assertTrue(db.sources().allPublications().isEmpty())
+    }
+
+    @Test
+    fun aCheckIsRememberedAsTheDayOfTheLastCheck() = runTest {
+        val id = repo.addFeed("https://a.example/feed", "A")
+        repo.recordFullText(id, null, FullTextEvidence.FEED_FULL, checked = true, day = 20_100)
+        repo.recordFullText(id, null, FullTextEvidence.FEED_FULL, day = 20_101)
+        assertEquals(20_100L, db.sources().publication(id, PublicationEntity.OWN)!!.checkedDay)
     }
 
     /** Articles by guid, each inserted in [states]' state, with the star given. */

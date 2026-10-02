@@ -52,6 +52,10 @@ data class ExtractedArticle(
     val feedWordCount: Int,
     /** Words extracted from the page, or null if the page wasn't fetched or failed. */
     val pageWordCount: Int?,
+    /** Images in the feed's text, counted when the page's text was used instead. */
+    val feedImageCount: Int = 0,
+    /** Images in the page's article, or null unless the page's text was used. */
+    val pageImageCount: Int? = null,
     /** The site turned the page request away or answered with a bot check. */
     val pageBlocked: Boolean = false,
     /** The page was tried and couldn't be read for another reason, or null if it was read or not tried. */
@@ -144,7 +148,7 @@ class ArticleExtractor(private val http: HttpClient) {
                         feedWords = feedWords,
                         pageWords = words,
                         declaredLanguage = page.content.language,
-                    )
+                    ).copy(feedImageCount = feed?.imageUrls?.size ?: 0, pageImageCount = page.clean.imageUrls.size)
                 }
             }
         }

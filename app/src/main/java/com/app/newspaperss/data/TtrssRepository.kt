@@ -81,7 +81,10 @@ class TtrssRepository(
         // server. The category is asked again each time; left-out feeds aren't, so they're kept for
         // the same user signing in again (after a lost Keystore key, say) unless the old login is gone.
         db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
-        if (previous?.apiUrl != account.apiUrl || previous.user != account.user) db.sources().clearLeftOut(sourceId)
+        if (previous?.apiUrl != account.apiUrl || previous.user != account.user) {
+            db.sources().clearLeftOut(sourceId)
+            db.sources().clearPublications(sourceId)
+        }
         return null
     }
 

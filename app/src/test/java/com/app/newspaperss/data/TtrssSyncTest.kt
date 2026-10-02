@@ -151,7 +151,7 @@ class TtrssSyncTest {
     }
 
     @Test
-    fun leftOutFeedsStayForTheSameUserAndGoForAnother() = runTest {
+    fun feedChoicesStayForTheSameUserAndGoForAnother() = runTest {
         // Feed ids belong to each tt-rss user; another user on the same server has their own.
         val source = connect()
         sources.setFeedInPaper(source.id, FeedChoice("42", "Press Office", inPaper = true), inPaper = false)
@@ -159,9 +159,11 @@ class TtrssSyncTest {
         assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
         assertEquals(listOf("42"), db.sources().allLeftOut().map { it.originId })
 
+        db.sources().savePublication(PublicationEntity(source.id, "42", com.app.newspaperss.core.extract.ContentMode.PAGE))
         server.user = "partner"
         assertNull(ttrss.connect("rss.example.com/tt-rss", "partner", "secret"))
         assertTrue(db.sources().allLeftOut().isEmpty())
+        assertTrue("what was learned about feed 42 was about another user's feed", db.sources().allPublications().isEmpty())
     }
 
     @Test

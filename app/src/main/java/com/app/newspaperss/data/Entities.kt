@@ -31,13 +31,20 @@ data class SourceEntity(
     val siteUrl: String? = null,
     val section: String? = null,
     val position: Int = 0,
+    /**
+     * The reader's choice ([contentModeChosen]), or a mode fixed by the kind of source (the reading
+     * list and curated lists fetch pages). What the automatic check learns is kept per
+     * [PublicationEntity] instead, so it's [ContentMode.AUTO] here for a feed the reader left to it.
+     */
     val contentMode: ContentMode = ContentMode.AUTO,
     /** The reader picked [contentMode] themselves, so the automatic full-text check leaves it alone. */
     val contentModeChosen: Boolean = false,
-    /** The latest article's [FullTextEvidence] and the run behind it; see [com.app.newspaperss.core.extract.FullTextCheck]. */
+    /**
+     * Unused: the check's state lives in [PublicationEntity]. Kept because dropping a column means
+     * rebuilding this table, and dropping it with foreign keys on would delete every article.
+     */
     val fullTextEvidence: FullTextEvidence? = null,
     val fullTextStreak: Int = 0,
-    /** The epoch day the last piece of full-text evidence was counted. */
     val fullTextDay: Long? = null,
     val paused: Boolean = false,
     /** At most this many articles per edition from this source; null follows the edition setting. Not used for tt-rss. */
@@ -134,6 +141,37 @@ data class ArticleEntity(
     foreignKeys = [ForeignKey(entity = SourceEntity::class, parentColumns = ["id"], childColumns = ["sourceId"], onDelete = ForeignKey.CASCADE)],
 )
 data class LeftOutFeedEntity(val sourceId: Long, val originId: String, val title: String)
+
+/**
+ * Who wrote a source's articles, as against how they arrive: a feed's own publication has [key]
+ * "", and each feed in a tt-rss account is one, keyed by its id there ([ArticleEntity.originId]).
+ * Holds what the automatic full-text check has learned about it (see
+ * [com.app.newspaperss.core.extract.FullTextCheck]); a mode the reader chose stays on the source.
+ */
+@Entity(
+    tableName = "publications",
+    primaryKeys = ["sourceId", "key"],
+    foreignKeys = [ForeignKey(entity = SourceEntity::class, parentColumns = ["id"], childColumns = ["sourceId"], onDelete = ForeignKey.CASCADE)],
+)
+data class PublicationEntity(
+    val sourceId: Long,
+    val key: String,
+    val contentMode: ContentMode = ContentMode.AUTO,
+    /** The latest article's [FullTextEvidence] and the run of days behind it. */
+    val fullTextEvidence: FullTextEvidence? = null,
+    val fullTextStreak: Int = 0,
+    /** The epoch day the last piece of evidence was counted. */
+    val fullTextDay: Long? = null,
+    /** The epoch day a long item was last checked against its page. */
+    val checkedDay: Long? = null,
+) {
+    companion object {
+        /** The key of a source's own feed, and of an article with no [ArticleEntity.originId]. */
+        const val OWN = ""
+
+        fun keyOf(article: ArticleEntity) = article.originId ?: OWN
+    }
+}
 
 /** A feed an aggregator's articles came from, as the source page lists it. */
 data class FeedName(val originId: String, val title: String?, val lastSeen: Instant)

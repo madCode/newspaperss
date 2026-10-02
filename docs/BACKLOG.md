@@ -23,6 +23,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Webcomic title text (xkcd's hover text) is dropped; show it as a caption *(device)*
 
 ### The book
+- [ ] Video and audio players vanish without a trace: the cleaner drops every iframe, video and audio, leaving "Watch:" or a heading over nothing. In a sample of 405 recent items from 41 feeds (Oct 2), 8% had a player (16% outside the starter packs), almost all YouTube. Put a line where each was ("▶ Video: title, youtube.com/…") *(live)*
 - [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
 - [ ] A text size setting for the article preview *(your brother asked; medium priority)*
 - [ ] Comics in the article preview: let a strip fill the page width, and allow pinch to zoom *(you asked)*
@@ -37,7 +38,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
-- [ ] Decide what tt-rss is as a source *(you asked; sitting with it for a week first)*. Is it one source by itself, as now, or a doorway to the feeds underneath it, each with its own controls? Your gut says the current simple approach is best. The per-feed cap below and "tt-rss categories as sections" in the proposals depend on the answer. Options, trade-offs and a recommendation: [research/ttrss-backend.md](research/ttrss-backend.md)
+- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): recommended keeping one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page; per-feed article text is done (cycle 71). Waiting on your answers to its "For you to decide" list
 - [ ] Per-feed cap on the tt-rss source page ("two from Current Affairs"); leaving a feed out is done
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] A heart for "loved this / keep it", synced to tt-rss *(you asked)*. The ☆ stays "put it in my next edition": two different wishes, and tt-rss's own star already means "keep" (which is why its stars aren't synced as ☆ today). Things to settle first:
@@ -223,6 +224,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Article text is checked, not assumed: each edition reads the pages of up to 5 long items, one per publication (a feed here, or one feed in tt-rss), which each learn on their own; pictures the feed's copy lacks count for the page
 - [x] A tt-rss timeout says the server took too long, not that it couldn't be reached *(personas)*
 - [x] tt-rss: leave a feed out of the paper from the source's page; it isn't fetched, and its waiting articles go except starred ones *(personas)*
 - [x] No Open for Kindle and Kobo readers, who send the book rather than open it on the phone *(personas)*

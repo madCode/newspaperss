@@ -2,6 +2,7 @@ package com.app.newspaperss.edition
 
 import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.core.images.ImageAllowance
+import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.SourceEntity
 
@@ -21,7 +22,15 @@ data class ArticleContent(
     val notTheStory: Boolean = false,
 )
 
+/**
+ * How to get an article's text beyond its source's own setting.
+ *
+ * @property learned what the full-text check has learned about the article's publication, if anything.
+ * @property check fetch the page even for a long item and compare, as one of the edition's checks.
+ */
+data class TextChoice(val learned: ContentMode? = null, val check: Boolean = false)
+
 fun interface ArticleContentProvider {
     /** The article's readable content, or null if there's nothing worth including. */
-    suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance): ArticleContent?
+    suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance, text: TextChoice): ArticleContent?
 }

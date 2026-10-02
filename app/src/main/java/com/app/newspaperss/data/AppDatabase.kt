@@ -16,8 +16,8 @@ class Converters {
 }
 
 @Database(
-    entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class, LeftOutFeedEntity::class],
-    version = 5,
+    entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class, LeftOutFeedEntity::class, PublicationEntity::class],
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -97,7 +97,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `publications` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, " +
+                        "`fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, " +
+                        "PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                // What the check learned about a feed moves to its own publication; a mode the
+                // reader chose stays on the source. With no checkedDay, a feed settled on its text
+                // has a long item checked against its page in the next edition.
+                db.execSQL(
+                    "INSERT INTO publications (sourceId, `key`, contentMode, fullTextEvidence, fullTextStreak, fullTextDay) " +
+                        "SELECT id, '', contentMode, fullTextEvidence, fullTextStreak, fullTextDay FROM sources " +
+                        "WHERE kind = 'FEED' AND contentModeChosen = 0 AND (contentMode != 'AUTO' OR fullTextEvidence IS NOT NULL)",
+                )
+                db.execSQL("UPDATE sources SET contentMode = 'AUTO' WHERE kind = 'FEED' AND contentModeChosen = 0")
+                db.execSQL("UPDATE sources SET fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL")
+            }
+        }
+
         fun open(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db")
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
     }
 }

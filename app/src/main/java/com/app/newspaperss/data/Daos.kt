@@ -87,11 +87,27 @@ interface SourceDao {
     @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
     suspend fun setServerNote(id: Long, note: String?)
 
-    @Query("UPDATE sources SET contentMode = :mode, fullTextEvidence = :evidence, fullTextStreak = :streak, fullTextDay = :day WHERE id = :id")
-    suspend fun setFullText(id: Long, mode: ContentMode, evidence: FullTextEvidence?, streak: Int, day: Long?)
-
-    @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen, fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL WHERE id = :id")
+    @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen WHERE id = :id")
     suspend fun setContentMode(id: Long, mode: ContentMode, chosen: Boolean)
+
+    @Query("SELECT * FROM publications WHERE sourceId = :sourceId AND `key` = :key")
+    suspend fun publication(sourceId: Long, key: String): PublicationEntity?
+
+    @Query("SELECT * FROM publications")
+    suspend fun allPublications(): List<PublicationEntity>
+
+    /** Each source's own publication, for showing what the check found. */
+    @Query("SELECT * FROM publications WHERE `key` = ''")
+    fun observeOwnPublications(): Flow<List<PublicationEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun savePublication(publication: PublicationEntity)
+
+    @Query("DELETE FROM publications WHERE sourceId = :sourceId AND `key` = :key")
+    suspend fun forgetPublication(sourceId: Long, key: String)
+
+    @Query("DELETE FROM publications WHERE sourceId = :sourceId")
+    suspend fun clearPublications(sourceId: Long)
 
     @Query("UPDATE sources SET maxArticles = :max WHERE id = :id")
     suspend fun setMaxArticles(id: Long, max: Int?)

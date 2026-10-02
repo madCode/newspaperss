@@ -1,31 +1,36 @@
 package com.app.newspaperss.edition
 
-import com.app.newspaperss.delivery.FolderDelivery
+import android.util.Log
+import androidx.room.withTransaction
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.edition.Candidate
-import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.core.edition.EditionPlanner
 import com.app.newspaperss.core.edition.EditionTitles
 import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
 import com.app.newspaperss.core.epub.EpubImage
-import com.app.newspaperss.core.notes.Reflection
-import com.app.newspaperss.core.plural
-import com.app.newspaperss.core.net.hostOf
 import com.app.newspaperss.core.epub.EpubWriter
+import com.app.newspaperss.core.extract.ArticleExtractor
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextCheck
+import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.core.images.ImageBudget
 import com.app.newspaperss.core.images.ImageRules
+import com.app.newspaperss.core.net.hostOf
+import com.app.newspaperss.core.notes.Reflection
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
-import android.util.Log
-import androidx.room.withTransaction
+import com.app.newspaperss.delivery.FolderDelivery
+import org.jsoup.Jsoup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -140,10 +145,12 @@ class EditionBuilder(
         // tt-rss candidates are keyed by publication, so an account-wide cap wouldn't match any of them.
         val caps = sources.filter { it.kind != SourceKind.TTRSS }.mapNotNull { s -> s.maxArticles?.let { s.id.toString() to it } }.toMap()
         val rules = settings.rules.copy(sourceCaps = caps)
+        val texts = TextChoices(db.sources().allPublications(), now.toLocalDate().toEpochDay())
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, rules, { minutesOf(it.second) }) { c ->
             val article = byId.getValue(c.id.toLong())
+            val source = sourcesById.getValue(article.sourceId)
             val result = try {
-                content.contentFor(article, sourcesById.getValue(article.sourceId), allowance)?.let { article to it }
+                content.contentFor(article, source, allowance, texts.choose(article, source))?.let { article to it }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -317,4 +324,29 @@ class EditionBuilder(
         const val STOPPED = "Stopped before it was finished; its articles will be in the next edition."
         const val UNEXPECTED = "Something went wrong making this edition. Your articles are safe and will be in the next one."
     }
+}
+
+/**
+ * Each article's [TextChoice]: what its publication has learned, and whether it's one of the
+ * edition's [FullTextCheck.CHECKS_PER_EDITION] checks. Articles are fetched in plan order, so the
+ * checks go to the first long items from publications that are due, one per publication.
+ */
+private class TextChoices(publications: List<PublicationEntity>, private val today: Long) {
+    private val byKey = publications.associateBy { it.sourceId to it.key }
+    private val checked = mutableSetOf<Pair<Long, String>>()
+
+    fun choose(article: ArticleEntity, source: SourceEntity): TextChoice {
+        if (source.contentModeChosen || (source.kind != SourceKind.FEED && source.kind != SourceKind.TTRSS)) return TextChoice()
+        val key = source.id to PublicationEntity.keyOf(article)
+        val publication = byKey[key]
+        val mode = publication?.contentMode ?: ContentMode.AUTO
+        val check = checked.size < FullTextCheck.CHECKS_PER_EDITION && key !in checked && article.viaUrl == null &&
+            FullTextCheck.dueForCheck(mode, publication?.checkedDay, today) && isLong(article)
+        if (check) checked += key
+        return TextChoice(publication?.contentMode, check)
+    }
+
+    // A short item has its page fetched anyway; only a long one needs a check to find a teaser.
+    private fun isLong(article: ArticleEntity) =
+        (article.feedHtml?.let { ReadingTime.words(Jsoup.parse(it).text()) } ?: 0) >= ArticleExtractor.FULL_TEXT_WORDS
 }

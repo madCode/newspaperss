@@ -62,6 +62,7 @@ import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.lists.CuratedList
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import androidx.compose.foundation.selection.selectable
@@ -288,7 +289,7 @@ private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit,
     var choosingMode by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf(false) }
     val s = row.source
-    val fullText = fullTextLine(s)
+    val fullText = fullTextLine(s, row.text)
     val status = statusLine(s, row.lastNew)
     ListItem(
         modifier = Modifier.clickable(onClickLabel = "Open ${s.title}", onClick = onOpen),
@@ -388,8 +389,11 @@ internal fun statusLine(source: SourceEntity, lastNew: Instant?): String = when 
 
 internal fun hasProblem(source: SourceEntity) = (source.lastError != null || source.serverNote != null) && !source.paused
 
-/** Where a site's article text comes from, once the app knows or the reader has chosen; null while it's still checking. */
-internal fun fullTextLine(source: SourceEntity): String? {
+/**
+ * Where a site's article text comes from, once the app knows or the reader has chosen; null while
+ * it's still checking. [learned] is the source's own publication, where the check keeps what it found.
+ */
+internal fun fullTextLine(source: SourceEntity, learned: PublicationEntity?): String? {
     if (source.kind != SourceKind.FEED) return null
     if (source.contentModeChosen) {
         return when (source.contentMode) {
@@ -398,10 +402,10 @@ internal fun fullTextLine(source: SourceEntity): String? {
             ContentMode.AUTO -> null
         }
     }
-    return when (source.contentMode) {
+    return when (learned?.contentMode ?: ContentMode.AUTO) {
         ContentMode.AUTO -> null
         ContentMode.PAGE -> "Full articles"
-        ContentMode.FEED -> when (source.fullTextEvidence) {
+        ContentMode.FEED -> when (learned?.fullTextEvidence) {
             FullTextEvidence.FEED_SHORT -> "Summaries only"
             FullTextEvidence.BLOCKED -> "Site blocks fetching: using the summaries it sends"
             else -> "Full articles"

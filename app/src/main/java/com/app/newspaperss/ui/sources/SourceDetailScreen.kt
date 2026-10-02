@@ -107,6 +107,7 @@ import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
@@ -216,7 +217,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp + barRoom)) {
                 item {
-                    Health(source, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
+                    Health(source, detail?.text, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
                     FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
                         if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(source)}") }
@@ -282,14 +283,14 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
 }
 
 @Composable
-private fun Health(source: SourceEntity, lastNew: Instant?, locale: Locale, is24Hour: Boolean) {
+private fun Health(source: SourceEntity, learned: PublicationEntity?, lastNew: Instant?, locale: Locale, is24Hour: Boolean) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(SourceRepository.hostOf(source.siteUrl ?: source.url), style = MaterialTheme.typography.bodyMedium, color = muted)
         Text(statusLine(source, lastNew), color = if (hasProblem(source)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
         if (!source.paused) failingLine(source.failingSince, locale)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         lastCheckedLine(source.lastFetchedAt, locale, is24Hour)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
-        textLine(source)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
+        textLine(source, learned)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
     }
 }
 
@@ -755,8 +756,8 @@ private fun modeName(source: SourceEntity) = when {
 }
 
 /** Where the source's text comes from, including while the automatic check is still deciding. */
-private fun textLine(source: SourceEntity): String? = fullTextLine(source)
-    ?: if (source.kind == SourceKind.FEED && source.contentMode == ContentMode.AUTO) "Still working out whether this site sends full articles" else null
+private fun textLine(source: SourceEntity, learned: PublicationEntity?): String? = fullTextLine(source, learned)
+    ?: if (source.kind == SourceKind.FEED && !source.contentModeChosen) "Still working out whether this site sends full articles" else null
 
 internal fun articleStatus(article: ArticleEntity): String = if (isStarred(article)) "Starred for your next edition" else when (article.state) {
     ArticleState.NEW -> "Waiting for an edition"

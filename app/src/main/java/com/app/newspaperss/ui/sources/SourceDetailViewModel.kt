@@ -7,6 +7,7 @@ import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.MarkedRead
 import com.app.newspaperss.data.StarBatch
 import com.app.newspaperss.core.plural
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
@@ -28,7 +29,8 @@ import kotlinx.coroutines.launch
  * [source] is null once the source is gone, e.g. removed from here.
  * [defaultMax] is the edition's own per-source cap, which [SourceEntity.maxArticles] replaces.
  */
-data class SourceDetail(val source: SourceEntity?, val articles: List<ArticleEntity>, val defaultMax: Int)
+/** A source's page: the source, its recent articles, the edition's per-source default, and what the check found about its own feed. */
+data class SourceDetail(val source: SourceEntity?, val articles: List<ArticleEntity>, val defaultMax: Int, val text: PublicationEntity? = null)
 
 /** The tt-rss category chooser: loading, the choices, or why they couldn't be loaded. */
 sealed interface CategoryPicker {
@@ -49,7 +51,9 @@ class SourceDetailViewModel(
 ) : ViewModel() {
     /** Null until loaded. */
     val detail: StateFlow<SourceDetail?> =
-        combine(repository.observe(id), repository.observeRecentArticles(id), defaultMax) { source, articles, max -> SourceDetail(source, articles, max) }
+        combine(repository.observe(id), repository.observeRecentArticles(id), defaultMax, repository.observeOwnPublications()) { source, articles, max, texts ->
+            SourceDetail(source, articles, max, texts[id])
+        }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**

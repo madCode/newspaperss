@@ -174,6 +174,37 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun version5MovesWhatTheCheckLearnedToEachFeedsPublication() {
+        helper.createDatabase(DB, 5).use { db ->
+            fun source(id: Int, kind: String, mode: String, chosen: Int, evidence: String?) = db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextEvidence, fullTextStreak, fullTextDay, paused, markReadOnServer, addedAt) " +
+                    "VALUES ($id, '$kind', 'https://s$id.example/feed', 'S$id', $id, '$mode', $chosen, ${evidence?.let { "'$it'" } ?: "NULL"}, 3, 20000, 0, 1, 0)",
+            )
+            source(1, "FEED", "FEED", 0, "BLOCKED")
+            source(2, "FEED", "PAGE", 1, null)
+            source(3, "FEED", "AUTO", 0, null)
+            source(4, "READING_LIST", "PAGE", 0, null)
+        }
+
+        helper.runMigrationsAndValidate(DB, 6, true, AppDatabase.MIGRATION_5_6).use { db ->
+            db.query("SELECT sourceId, `key`, contentMode, fullTextEvidence, fullTextStreak, checkedDay FROM publications").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(1L, c.getLong(0))
+                assertEquals("", c.getString(1))
+                assertEquals("FEED", c.getString(2))
+                assertEquals("BLOCKED", c.getString(3))
+                assertEquals(3, c.getInt(4))
+                assertTrue("checked again soon", c.isNull(5))
+                assertTrue("only the feed that had learned something", !c.moveToNext())
+            }
+            db.query("SELECT id, contentMode, contentModeChosen FROM sources ORDER BY id").use { c ->
+                val modes = generateSequence { if (c.moveToNext()) c.getString(1) to c.getInt(2) else null }.toList()
+                assertEquals(listOf("AUTO" to 0, "PAGE" to 1, "AUTO" to 0, "PAGE" to 0), modes)
+            }
+        }
+    }
+
     private companion object {
         const val DB = "migration-test.db"
     }

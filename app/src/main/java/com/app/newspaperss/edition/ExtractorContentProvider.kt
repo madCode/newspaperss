@@ -28,31 +28,34 @@ import java.io.IOException
  * Extracts each article and embeds its images. The edition-wide image size budget is applied
  * later by [EditionBuilder], in reading order.
  *
- * @param onEvidence receives what each article showed about where its source's full text is,
- *   for [com.app.newspaperss.data.SourceRepository.recordFullText].
+ * @param onEvidence receives what each article showed about where its publication's full text is,
+ *   and whether it was one of the edition's checks, for [com.app.newspaperss.data.SourceRepository.recordFullText].
  */
 class ExtractorContentProvider(
     private val extractor: ArticleExtractor,
     private val http: HttpClient,
     private val encoder: ImageEncoder,
-    private val onEvidence: suspend (sourceId: Long, FullTextEvidence) -> Unit,
+    private val onEvidence: suspend (sourceId: Long, originId: String?, FullTextEvidence, checked: Boolean) -> Unit,
 ) : ArticleContentProvider {
     // Downloads overlap but decoding doesn't: a decoded photo can take tens of MB of heap.
     private val encoding = Mutex()
 
-    override suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance): ArticleContent? {
-        val extracted = extractor.extract(
-            ExtractInput(
-                url = article.url,
-                feedTitle = article.title,
-                feedHtml = article.feedHtml,
-                feedAuthor = article.author,
-                mode = modeFor(article, source),
-                feedUrl = article.viaUrl,
-            ),
+    override suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance, text: TextChoice): ArticleContent? {
+        val input = ExtractInput(
+            url = article.url,
+            feedTitle = article.title,
+            feedHtml = article.feedHtml,
+            feedAuthor = article.author,
+            mode = modeFor(article, source, text.learned),
+            feedUrl = article.viaUrl,
         )
+        val checking = text.check && article.viaUrl == null && input.mode != ContentMode.PAGE
+        val fetched = extractor.extract(if (checking) input.copy(mode = ContentMode.PAGE) else input)
         // A link post's story page against its pitch says nothing about the source's own feed.
-        if (article.viaUrl == null) FullTextCheck.evidence(extracted)?.let { onEvidence(source.id, it) }
+        val evidence = if (article.viaUrl == null) FullTextCheck.evidence(fetched) else null
+        evidence?.let { onEvidence(source.id, article.originId, it, checking) }
+        // A check that found the feed's text complete keeps that text, as the article would have had.
+        val extracted = if (checking && fetched.pageWordCount != null && evidence?.mode != ContentMode.PAGE) extractor.extract(input) else fetched
         // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
         // reader saved on purpose waits for the next edition instead of being used up as a stub.
         if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
@@ -91,16 +94,18 @@ class ExtractorContentProvider(
 
     private companion object {
         /**
-         * A source the check settled on the feed's text still has its short items checked against
+         * A publication the check settled on the feed's text still has its short items checked against
          * the page: otherwise it could never find out that the site stopped blocking or started
          * sending teasers. A mode the reader chose is used as is. A link post's story is always
          * fetched unless the reader chose the feed's text: its pitch is never the article.
          */
-        fun modeFor(article: ArticleEntity, source: SourceEntity): ContentMode {
+        fun modeFor(article: ArticleEntity, source: SourceEntity, learned: ContentMode?): ContentMode {
             if (article.viaUrl != null) {
                 return if (source.contentModeChosen && source.contentMode == ContentMode.FEED) ContentMode.FEED else ContentMode.PAGE
             }
-            if (source.contentModeChosen || source.contentMode != ContentMode.FEED) return source.contentMode
+            if (source.contentModeChosen) return source.contentMode
+            val mode = learned ?: source.contentMode
+            if (mode != ContentMode.FEED) return mode
             val words = article.feedHtml?.let { ReadingTime.words(Jsoup.parse(it).text()) } ?: 0
             return if (words < ArticleExtractor.FULL_TEXT_WORDS) ContentMode.AUTO else ContentMode.FEED
         }

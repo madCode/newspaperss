@@ -8,6 +8,7 @@ import com.app.newspaperss.core.feed.FindResult
 import com.app.newspaperss.core.feed.FoundFeed
 import com.app.newspaperss.core.lists.CuratedList
 import com.app.newspaperss.core.lists.CuratedLists
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
@@ -30,7 +31,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class SourceRow(val source: SourceEntity, val lastNew: Instant?)
+/** A row in Sources: the source, its newest article, and what the full-text check found about its own feed. */
+data class SourceRow(val source: SourceEntity, val lastNew: Instant?, val text: PublicationEntity? = null)
 
 sealed interface AddState {
     data object Closed : AddState
@@ -64,9 +66,9 @@ class SourcesViewModel(
     private val saveToReadingList: (suspend (url: String) -> Boolean)? = null,
     private val onSourcesChanged: () -> Unit,
 ) : ViewModel() {
-    val rows: StateFlow<List<SourceRow>?> = combine(repository.observe(), repository.observeActivity()) { sources, activity ->
+    val rows: StateFlow<List<SourceRow>?> = combine(repository.observe(), repository.observeActivity(), repository.observeOwnPublications()) { sources, activity, texts ->
         val bySource = activity.associate { it.sourceId to it.lastNew }
-        sources.filter { it.kind != SourceKind.READING_LIST }.map { SourceRow(it, bySource[it.id]) }
+        sources.filter { it.kind != SourceKind.READING_LIST }.map { SourceRow(it, bySource[it.id], texts[it.id]) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The curated lists not added yet, offered in the add dialog. */
