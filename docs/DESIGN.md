@@ -363,7 +363,9 @@ phone restarts.
   will show it (read straight from the EPUB, with nothing fetched from the
   network). **Aa** in the preview's top bar sets its text size (Small,
   Default, Large, Larger), kept for next time, on top of Android's own font
-  size. Large pictures that stand
+  size. **Share** beside it sends the article's original link to Android's
+  share sheet, for the page on screen; it's hidden when an article has no web
+  link. Large pictures that stand
   alone fill the width (small ones keep their size), and the page can be
   pinched to zoom into a comic. **Notes** exports a Markdown file for a
   notes app: front matter
