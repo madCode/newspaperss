@@ -40,6 +40,7 @@ internal object ArticleBody {
         }
         body.select("picture").unwrap()
         cleanAttributes(body)
+        fixFootnotes(body)
         val ids = prefixIds(body, idPrefix)
         fixLinks(body, ids)
         fixImages(body, imageHrefs)
@@ -69,6 +70,33 @@ internal object ArticleBody {
                     name in ID_REFERENCE_ATTRIBUTES
                 if (drop) element.removeAttr(name)
             }
+        }
+    }
+
+    /**
+     * Footnotes a Kindle can show in its popup, which shows only the element a marker points at.
+     * A footnote often keeps its id on its own number, the link back to the text (Substack's do), so
+     * the popup said just "5": the id moves to the block the number starts. A footnote is told by
+     * its two links pointing at each other. Markers side by side ("34") get a comma between them,
+     * so each is a word of its own to tap.
+     */
+    private fun fixFootnotes(root: Element) {
+        val byId = root.select("[id]").associateBy { it.id() }
+        fun target(link: Element): Element? = link.attr("href").trim().takeIf { it.startsWith("#") }?.let { byId[it.substring(1)] }
+        val paired = root.select("a[href][id]").filter { link -> target(link)?.let { it.tagName() == "a" && target(it) === link } == true }
+        val (numbers, markers) = paired.partition { link ->
+            val parent = link.parent()
+            parent != null && parent !== root && !parent.hasAttr("id") &&
+                parent.childNodes().firstOrNull { it !is TextNode || !it.isBlank } === link &&
+                parent.text().length > link.text().length
+        }
+        for (number in numbers) {
+            number.parent()!!.id(number.id())
+            number.removeAttr("id")
+        }
+        val markerSet = markers.toSet()
+        for (marker in markers) {
+            if (marker.nextSibling() in markerSet) marker.after(", ")
         }
     }
 
