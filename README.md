@@ -82,7 +82,9 @@ who'd rather not set up Python, a server and a scheduler.
 The newest debug build is always at
 [newspapeRSS-debug.apk](https://github.com/madCode/newspaperss/releases/download/latest-debug/newspapeRSS-debug.apk)
 (Android 8 or later). It installs beside a release build, and Settings shows
-which build it is.
+which build it is. The [release page](https://github.com/madCode/newspaperss/releases/tag/latest-debug)
+names the newest build, its commit and date, and has the same file under the
+build's number.
 
 ## Building
 

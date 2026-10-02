@@ -66,12 +66,24 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           mv app-debug.apk newspapeRSS-debug.apk
-          notes="The newest build from main (${GITHUB_SHA::7}). Installs beside a release build as com.app.newspaperss.debug."
-          # Updated in place, so the link never 404s between builds.
+          build="${{ github.run_number }}"
+          short="${GITHUB_SHA::7}"
+          # The same build under a numbered name, so a download can't be mistaken for an older one.
+          numbered="newspapeRSS-debug-$build.apk"
+          cp newspapeRSS-debug.apk "$numbered"
+          title="Debug build $build · $short · $(date -u '+%b %-d')"
+          notes="Build $build from main ($short), $(date -u '+%Y-%m-%d %H:%M') UTC. Installs beside a release build as com.app.newspaperss.debug; its version is 0.1.0-debug.$build+$short (Settings, at the bottom)."
+          # Updated in place, so the fixed link never 404s between builds. Title, notes and tag
+          # follow each build: otherwise the page keeps the first build's date and commit.
           if gh release view latest-debug > /dev/null 2>&1; then
-            gh release upload latest-debug newspapeRSS-debug.apk --clobber
-            gh release edit latest-debug --notes "$notes"
+            gh release upload latest-debug newspapeRSS-debug.apk "$numbered" --clobber
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/latest-debug" -f sha="$GITHUB_SHA" -F force=true > /dev/null
+            gh release edit latest-debug --title "$title" --notes "$notes"
+            # Only the newest numbered copy stays.
+            gh release view latest-debug --json assets --jq '.assets[].name' \
+              | { grep -E '^newspapeRSS-debug-[0-9]+\.apk$' || true; } | { grep -vx "$numbered" || true; } \
+              | while read -r old; do gh release delete-asset latest-debug "$old" -y; done
           else
-            gh release create latest-debug newspapeRSS-debug.apk --prerelease --target "$GITHUB_SHA" \
-              --title "Latest debug build" --notes "$notes"
+            gh release create latest-debug newspapeRSS-debug.apk "$numbered" --prerelease --target "$GITHUB_SHA" \
+              --title "$title" --notes "$notes"
           fi
