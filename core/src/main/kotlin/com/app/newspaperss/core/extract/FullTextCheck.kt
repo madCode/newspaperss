@@ -52,7 +52,9 @@ object FullTextCheck {
             // in says nothing about whether the page has more.
             article.pageFailure != null -> null
             suggested == ContentMode.PAGE -> FullTextEvidence.PAGE_LONGER
-            compared && (article.pageImageCount ?: 0) > 0 && article.feedImageCount == 0 -> FullTextEvidence.PAGE_IMAGES
+            // Only a page with all of the feed's text: a paywall page with a hero image isn't the better copy.
+            compared && (article.pageImageCount ?: 0) > 0 && article.feedImageCount == 0 &&
+                article.pageWordCount!! >= article.feedWordCount -> FullTextEvidence.PAGE_IMAGES
             // Only once the page was tried: a long item can still be a teaser. A site that turns the
             // page away but sends whole articles still gives full articles.
             (compared || article.pageBlocked) && article.feedWordCount >= ArticleExtractor.FULL_TEXT_WORDS -> FullTextEvidence.FEED_FULL
@@ -72,12 +74,14 @@ object FullTextCheck {
 
     /**
      * Whether a long item from a source in [mode] should be checked against its page on [today]:
-     * while the source is still being worked out, and every [RECHECK_AFTER_DAYS] once it has
-     * settled on its feed's text. A source settled on the page fetches it anyway.
+     * daily while the source is still being worked out, or while settled on its feed's text but
+     * the latest [evidence] points to the page, so a change of mind takes three days, not three
+     * re-checks; otherwise every [RECHECK_AFTER_DAYS] once settled on the feed. A source settled on
+     * the page fetches it anyway.
      */
-    fun dueForCheck(mode: ContentMode, checkedDay: Long?, today: Long): Boolean = when (mode) {
-        ContentMode.AUTO -> checkedDay != today
-        ContentMode.FEED -> checkedDay == null || today - checkedDay >= RECHECK_AFTER_DAYS
-        ContentMode.PAGE -> false
+    fun dueForCheck(mode: ContentMode, evidence: FullTextEvidence?, checkedDay: Long?, today: Long): Boolean = when {
+        mode == ContentMode.PAGE -> false
+        mode == ContentMode.AUTO || evidence?.mode == ContentMode.PAGE -> checkedDay != today
+        else -> checkedDay == null || today - checkedDay >= RECHECK_AFTER_DAYS
     }
 }

@@ -39,7 +39,10 @@ class AppContainer(
     context: Context,
     val http: HttpClient = OkHttpHttpClient(OkHttpHttpClient.defaultClient(File(context.cacheDir, "http"))),
     val db: AppDatabase = AppDatabase.open(context),
-    content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), SourceRepository(db)::recordFullText),
+    content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, evidence, text ->
+        val sources = SourceRepository(db)
+        if (text.day != null) sources.recordFullText(sourceId, originId, evidence, text.check, text.day) else sources.recordFullText(sourceId, originId, evidence, text.check)
+    },
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
     fetchReadingListTitles: (articleIds: List<Long>) -> Unit = { ReadingListTitleWorker.enqueue(context, it) },

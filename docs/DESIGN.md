@@ -45,6 +45,7 @@ This document describes how the app works today. What's planned is in
 | Concept | What it is |
 |---|---|
 | **Source** | Where articles come from: an RSS, Atom or JSON feed; the **reading list** (links you shared or saved); a tt-rss account; or a **curated list**, a page that picks a few links a day (Arts & Letters Daily). |
+| **Publication** | Who wrote a source's articles, as against how they arrive: a feed added here is one, and each feed inside a tt-rss account is one. Takes turns in the paper and learns its own article text. |
 | **Section** | A heading in the edition's contents. Sections come from OPML folders, and the reading list is "Saved for later". |
 | **Edition settings** | One recipe: size (minutes), per-source cap, order (take turns / in order / shuffle), and the time and days it should be ready. |
 | **Edition** | One built issue: a dated title ("Tuesday Morning Edition, Sep 29"), its articles, the EPUB and its status: building, ready, delivered, failed or deleted. |
@@ -135,8 +136,11 @@ module so it's all unit-tested without Android.
   - A short item always has its page read. A long one is taken from the feed,
     so it only counts once checked: each edition reads the pages of up to 5
     long items, one per publication, from publications still being worked
-    out, or settled on the feed's text and not checked for 14 days.
-  - A check that finds a teaser uses the page in that edition already.
+    out, or settled on the feed's text and not checked for 14 days (daily
+    once a check finds a teaser, so it can switch in three days).
+  - A check that finds a teaser uses the page in that edition already;
+    otherwise the article is as it would have been without one. A page with
+    pictures counts only if it has all of the feed's text.
 - **Language.** Each article is tagged with its language (`xml:lang`, and
   `dir="rtl"` for right-to-left scripts) so e-readers hyphenate and lay it
   out correctly. The text decides; the page's declared language breaks ties.
@@ -378,6 +382,8 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 
 ## 10. Architecture
 
+### Modules
+
 ```
 :core  (Kotlin/JVM, no Android)          :app  (Android, Compose)
 ├─ feed/     parsing, feed discovery,    ├─ data/      Room database, repositories
@@ -394,10 +400,60 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 └─ net/      HttpClient (OkHttp)
 ```
 
+### Data
+
+```mermaid
+erDiagram
+    SOURCE ||--o{ PUBLICATION : "learns per"
+    SOURCE ||--o{ ARTICLE : "brings in"
+    SOURCE ||--o{ LEFT_OUT_FEED : "tt-rss only"
+    PUBLICATION ||--o{ ARTICLE : "wrote"
+    EDITION ||--o{ EDITION_ARTICLE : holds
+    ARTICLE ||--o{ EDITION_ARTICLE : "goes in"
+    SOURCE {
+        string kind "feed, reading list, tt-rss, curated list"
+        string contentMode "the reader's choice, or fixed"
+    }
+    PUBLICATION {
+        string key "empty for a feed, the tt-rss feed id"
+        string contentMode "what the check learned"
+        int checkedDay "last long item checked"
+    }
+    ARTICLE {
+        string originId "the tt-rss feed id"
+        string state
+    }
+```
+
+- **A source is how articles arrive** (a feed address, a tt-rss account, the
+  reading list, a curated list): sync, read sync, sign-in and Pause are per
+  source.
+- **A publication is who wrote them:** the article text check is per
+  publication, and the planner takes turns between publications.
+- `delivered_urls` (links already sent) stands alone.
+
+### Choosing an article's text
+
+```mermaid
+flowchart TD
+    A[Article in plan order] --> B{Reader chose a mode for the source?}
+    B -- yes --> M[Use it]
+    B -- no --> C{Long item, publication due a check,<br/>fewer than 5 checks this edition?}
+    C -- yes --> P[Read the page and compare]
+    P --> E[Evidence for its publication]
+    P --> T{Teaser?}
+    T -- yes --> PG[Page text]
+    T -- no --> FT[Feed text]
+    C -- no --> L[The publication's learned mode,<br/>short items still read the page]
+    E --> S[Three days the same way settles the publication]
+```
+
+### Notes
+
 - **`:core` is pure Kotlin,** so the planner, parser, extractor and EPUB
   writer run as fast JVM tests.
 - **One activity, Jetpack Compose, ViewModels with StateFlow.**
-- **Room** holds sources, articles and editions, with exported schemas
+- **Room** holds sources, publications, articles and editions, with exported schemas
   (`app/schemas`) and tested migrations. **DataStore** holds settings.
 - **WorkManager** runs the sync, the build, the timers, and what follows
   delivery (marking tt-rss read, saving notes).

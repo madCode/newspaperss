@@ -28,14 +28,15 @@ import java.io.IOException
  * Extracts each article and embeds its images. The edition-wide image size budget is applied
  * later by [EditionBuilder], in reading order.
  *
- * @param onEvidence receives what each article showed about where its publication's full text is,
- *   and whether it was one of the edition's checks, for [com.app.newspaperss.data.SourceRepository.recordFullText].
+ * @param onEvidence receives what each article showed about where its publication's full text is
+ *   (null if nothing, which is still passed on for a check, so the check counts as done), with the
+ *   article's [TextChoice], for [com.app.newspaperss.data.SourceRepository.recordFullText].
  */
 class ExtractorContentProvider(
     private val extractor: ArticleExtractor,
     private val http: HttpClient,
     private val encoder: ImageEncoder,
-    private val onEvidence: suspend (sourceId: Long, originId: String?, FullTextEvidence, checked: Boolean) -> Unit,
+    private val onEvidence: suspend (sourceId: Long, originId: String?, FullTextEvidence?, TextChoice) -> Unit,
 ) : ArticleContentProvider {
     // Downloads overlap but decoding doesn't: a decoded photo can take tens of MB of heap.
     private val encoding = Mutex()
@@ -53,9 +54,10 @@ class ExtractorContentProvider(
         val fetched = extractor.extract(if (checking) input.copy(mode = ContentMode.PAGE) else input)
         // A link post's story page against its pitch says nothing about the source's own feed.
         val evidence = if (article.viaUrl == null) FullTextCheck.evidence(fetched) else null
-        evidence?.let { onEvidence(source.id, article.originId, it, checking) }
-        // A check that found the feed's text complete keeps that text, as the article would have had.
-        val extracted = if (checking && fetched.pageWordCount != null && evidence?.mode != ContentMode.PAGE) extractor.extract(input) else fetched
+        if (evidence != null || checking) onEvidence(source.id, article.originId, evidence, text.copy(check = checking))
+        // Unless the check found the page the better copy, the article is what it would have been
+        // without one: the feed's text, with no note about a page that failed.
+        val extracted = if (checking && evidence?.mode != ContentMode.PAGE) extractor.extract(input) else fetched
         // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
         // reader saved on purpose waits for the next edition instead of being used up as a stub.
         if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null

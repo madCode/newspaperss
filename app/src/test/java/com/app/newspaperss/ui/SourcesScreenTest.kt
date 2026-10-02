@@ -18,6 +18,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.feed.FeedFinder
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import kotlinx.coroutines.flow.first
@@ -209,9 +210,9 @@ class SourcesScreenTest {
     @Test
     fun aSitesArticleTextIsShownAndTheReadersChoiceIsSaved() {
         val id = runBlocking {
-            db.sources().insert(
-                SourceEntity(url = "https://walled.example/feed", title = "Walled", contentMode = ContentMode.FEED, fullTextEvidence = FullTextEvidence.BLOCKED, fullTextStreak = 3),
-            )
+            db.sources().insert(SourceEntity(url = "https://walled.example/feed", title = "Walled")).also { id ->
+                db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, ContentMode.FEED, FullTextEvidence.BLOCKED, 3))
+            }
         }
         waitFor("Site blocks fetching")
 

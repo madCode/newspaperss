@@ -873,7 +873,9 @@ class EditionBuilderTest {
     @Test
     fun oneMorningOfBotChecksDoesntSettleASite() = runTest {
         val http = FakeHttp()
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), sources::recordFullText)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            sources.recordFullText(sourceId, originId, e, text.check)
+        }
         val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
         val id = sources.addFeed("https://blocked.example/feed", "Blocked")
         db.articles().insertNew(
@@ -892,8 +894,8 @@ class EditionBuilderTest {
     fun aSiteSettledOnItsSummariesIsRecheckedAndCanMoveToFullPages() = runTest {
         val http = FakeHttp()
         var day = 20_000L
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, checked ->
-            sources.recordFullText(sourceId, originId, e, checked, day)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            sources.recordFullText(sourceId, originId, e, text.check, day)
         }
         val id = sources.addFeed("https://unblocked.example/feed", "Unblocked")
         db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, ContentMode.FEED, com.app.newspaperss.core.extract.FullTextEvidence.BLOCKED, 3, day))
@@ -920,9 +922,9 @@ class EditionBuilderTest {
     fun anEditionChecksAtMostFiveLongItemsOnePerPublication() = runTest {
         val http = FakeHttp()
         val checked = mutableListOf<Pair<Long, String?>>()
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, check ->
-            if (check) checked += sourceId to originId
-            sources.recordFullText(sourceId, originId, e, check)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            if (text.check) checked += sourceId to originId
+            sources.recordFullText(sourceId, originId, e, text.check, text.day!!)
         }
         val feeds = (1..6).map { sources.addFeed("https://site$it.example/feed", "Site $it") }
         val ttrss = sources.addTtrss("https://rss.example/api/")
@@ -941,10 +943,10 @@ class EditionBuilderTest {
     @Test
     fun eachTtrssFeedIsCheckedOnItsOwn() = runTest {
         val http = FakeHttp()
-        val checked = mutableListOf<String?>()
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, check ->
-            if (check) checked += originId
-            sources.recordFullText(sourceId, originId, e, check)
+        val checked = mutableListOf<String>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            if (text.check) checked += originId.orEmpty()
+            sources.recordFullText(sourceId, originId, e, text.check, text.day!!)
         }
         val ttrss = sources.addTtrss("https://rss.example/api/")
         db.articles().insertNew((1..3).map { longArticle(ttrss, "t$it", "news.example", http, originId = if (it == 3) "8" else "7") })

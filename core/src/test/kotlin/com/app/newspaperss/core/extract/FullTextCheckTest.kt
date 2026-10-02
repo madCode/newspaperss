@@ -47,16 +47,26 @@ class FullTextCheckTest {
         assertEquals(FullTextEvidence.PAGE_IMAGES, FullTextCheck.evidence(compared.copy(feedImageCount = 0, pageImageCount = 2)))
         assertEquals("the feed has its pictures too", FullTextEvidence.FEED_FULL, FullTextCheck.evidence(compared.copy(feedImageCount = 2, pageImageCount = 2)))
         assertEquals("a picture-less page", FullTextEvidence.FEED_FULL, FullTextCheck.evidence(compared.copy(feedImageCount = 0, pageImageCount = 0)))
+        assertEquals(
+            "a page with a picture but less text, like a paywall, isn't the better copy",
+            FullTextEvidence.FEED_FULL,
+            FullTextCheck.evidence(extracted(600, 450, usedFeed = false).copy(feedImageCount = 0, pageImageCount = 1)),
+        )
     }
 
     @Test
     fun longItemsAreCheckedWhileWorkingItOutAndNowAndThenOnceSettledOnTheFeed() {
-        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.AUTO, null, 100))
-        assertEquals("once a day while working it out", false, FullTextCheck.dueForCheck(ContentMode.AUTO, 100, 100))
-        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.FEED, null, 100))
-        assertEquals(false, FullTextCheck.dueForCheck(ContentMode.FEED, 100 - FullTextCheck.RECHECK_AFTER_DAYS + 1L, 100))
-        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.FEED, 100 - FullTextCheck.RECHECK_AFTER_DAYS.toLong(), 100))
-        assertEquals("settled on the page: it's fetched anyway", false, FullTextCheck.dueForCheck(ContentMode.PAGE, null, 100))
+        val full = FullTextEvidence.FEED_FULL
+        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.AUTO, null, null, 100))
+        assertEquals("once a day while working it out", false, FullTextCheck.dueForCheck(ContentMode.AUTO, full, 100, 100))
+        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.FEED, full, null, 100))
+        assertEquals(false, FullTextCheck.dueForCheck(ContentMode.FEED, full, 100 - FullTextCheck.RECHECK_AFTER_DAYS + 1L, 100))
+        assertEquals(true, FullTextCheck.dueForCheck(ContentMode.FEED, full, 100 - FullTextCheck.RECHECK_AFTER_DAYS.toLong(), 100))
+        assertEquals(
+            "settled on the feed, but the last check found a teaser: daily, so it can switch in three days",
+            true, FullTextCheck.dueForCheck(ContentMode.FEED, FullTextEvidence.PAGE_LONGER, 99, 100),
+        )
+        assertEquals("settled on the page: it's fetched anyway", false, FullTextCheck.dueForCheck(ContentMode.PAGE, null, null, 100))
     }
 
     /** One piece of evidence per day, on consecutive days. */

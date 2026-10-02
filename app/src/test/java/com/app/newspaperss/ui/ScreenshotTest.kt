@@ -28,6 +28,7 @@ import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.edition.EditionNotes
@@ -196,7 +197,7 @@ class ScreenshotTest {
             db.articles().setState(listOf(ids[4]), ArticleState.DELIVERED)
             db.articles().setState(listOf(ids[5]), ArticleState.EXPIRED)
             db.sources().recordSuccess(id, Instant.now(), null, "https://www.theguardian.com", "")
-            db.sources().setFullText(id, ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3, null)
+            db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3))
             id
         }
         return SourceDetailViewModel(repo, id, flowOf(1))

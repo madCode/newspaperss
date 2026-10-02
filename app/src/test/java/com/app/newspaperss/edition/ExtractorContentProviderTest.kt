@@ -27,10 +27,10 @@ import org.robolectric.annotation.GraphicsMode
 class ExtractorContentProviderTest {
     private val http = FakeHttp()
     private val evidence = mutableListOf<Pair<Long, FullTextEvidence>>()
-    private val checks = mutableListOf<FullTextEvidence>()
-    private val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { id, _, e, checked ->
-        evidence += id to e
-        if (checked) checks += e
+    private val checks = mutableListOf<FullTextEvidence?>()
+    private val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { id, _, e, text ->
+        e?.let { evidence += id to it }
+        if (text.check) checks += e
     }
     private val source = SourceEntity(id = 1, url = "https://example.com/feed", title = "Example", contentMode = ContentMode.FEED)
 
@@ -172,6 +172,37 @@ class ExtractorContentProviderTest {
         assertTrue(unchecked.bodyHtml.contains("feed1 "))
         assertTrue("a whole article keeps the feed's text it would have had", confirmed.bodyHtml.contains("feed1 "))
         assertEquals("a teaser is replaced by its page in this edition already", 1500, teaser.wordCount)
+    }
+
+    /** A check is extra: whatever happens to the page, a whole article comes out as it would have without one. */
+    @Test
+    fun aCheckThatCantReadThePageLeavesTheArticleAlone() = runTest {
+        val auto = source.copy(contentMode = ContentMode.AUTO)
+        val whole = "<p>${words(600, "feed")}</p>"
+        val plain = provider.contentFor(article(whole), auto, ImageAllowance(), TextChoice())!!
+
+        http.page("https://example.com/story", "<html>Forbidden</html>", code = 403)
+        val blocked = provider.contentFor(article(whole), auto, ImageAllowance(), TextChoice(check = true))!!
+        http.page("https://example.com/story", "", code = 404)
+        val gone = provider.contentFor(article(whole), auto, ImageAllowance(), TextChoice(check = true))!!
+
+        assertEquals(plain.bodyHtml, blocked.bodyHtml)
+        assertEquals("no note about a page the reader never asked for", null, blocked.note)
+        assertEquals(null, gone.note)
+        assertEquals("both count as the day's check, so it isn't retried every edition", 2, checks.size)
+        assertEquals(listOf(FullTextEvidence.FEED_FULL, null), checks)
+    }
+
+    @Test
+    fun aShorterPageWithAPictureDoesntReplaceAWholeArticle() = runTest {
+        val auto = source.copy(contentMode = ContentMode.AUTO)
+        http.files["https://example.com/hero.png"] = "image/png" to transparentPng(600, 400)
+        http.page("https://example.com/story", "<html><body><article><img src=\"https://example.com/hero.png\"/><p>${words(450, "page")}</p></article></body></html>")
+
+        val content = provider.contentFor(article("<p>${words(600, "feed")}</p>"), auto, ImageAllowance(), TextChoice(check = true))!!
+
+        assertTrue(content.bodyHtml.contains("feed1 "))
+        assertEquals(listOf<FullTextEvidence?>(FullTextEvidence.FEED_FULL), checks)
     }
 
     @Test

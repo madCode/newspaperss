@@ -14,6 +14,7 @@ import com.app.newspaperss.core.epub.EpubWriter
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextCheck
+import com.app.newspaperss.core.extract.HtmlCleaner
 import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.core.images.ImageBudget
 import com.app.newspaperss.core.images.ImageRules
@@ -30,7 +31,6 @@ import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.delivery.FolderDelivery
-import org.jsoup.Jsoup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -145,7 +145,7 @@ class EditionBuilder(
         // tt-rss candidates are keyed by publication, so an account-wide cap wouldn't match any of them.
         val caps = sources.filter { it.kind != SourceKind.TTRSS }.mapNotNull { s -> s.maxArticles?.let { s.id.toString() to it } }.toMap()
         val rules = settings.rules.copy(sourceCaps = caps)
-        val texts = TextChoices(db.sources().allPublications(), now.toLocalDate().toEpochDay())
+        val texts = TextChoices(db.sources().allPublications(), clock.instant().atZone(zone).toLocalDate().toEpochDay())
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, rules, { minutesOf(it.second) }) { c ->
             val article = byId.getValue(c.id.toLong())
             val source = sourcesById.getValue(article.sourceId)
@@ -341,12 +341,13 @@ private class TextChoices(publications: List<PublicationEntity>, private val tod
         val publication = byKey[key]
         val mode = publication?.contentMode ?: ContentMode.AUTO
         val check = checked.size < FullTextCheck.CHECKS_PER_EDITION && key !in checked && article.viaUrl == null &&
-            FullTextCheck.dueForCheck(mode, publication?.checkedDay, today) && isLong(article)
+            FullTextCheck.dueForCheck(mode, publication?.fullTextEvidence, publication?.checkedDay, today) && isLong(article)
         if (check) checked += key
-        return TextChoice(publication?.contentMode, check)
+        return TextChoice(publication?.contentMode, check, today)
     }
 
     // A short item has its page fetched anyway; only a long one needs a check to find a teaser.
+    // Counted as the extractor counts, after cleaning, so the two agree on what's long.
     private fun isLong(article: ArticleEntity) =
-        (article.feedHtml?.let { ReadingTime.words(Jsoup.parse(it).text()) } ?: 0) >= ArticleExtractor.FULL_TEXT_WORDS
+        (article.feedHtml?.let { HtmlCleaner.clean(it, article.url, article.title).wordCount } ?: 0) >= ArticleExtractor.FULL_TEXT_WORDS
 }

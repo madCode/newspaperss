@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())

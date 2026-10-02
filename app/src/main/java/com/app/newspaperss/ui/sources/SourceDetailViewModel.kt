@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
 /**
  * [source] is null once the source is gone, e.g. removed from here.
  * [defaultMax] is the edition's own per-source cap, which [SourceEntity.maxArticles] replaces.
+ * [text] is what the full-text check found about the source's own feed.
  */
-/** A source's page: the source, its recent articles, the edition's per-source default, and what the check found about its own feed. */
 data class SourceDetail(val source: SourceEntity?, val articles: List<ArticleEntity>, val defaultMax: Int, val text: PublicationEntity? = null)
 
 /** The tt-rss category chooser: loading, the choices, or why they couldn't be loaded. */

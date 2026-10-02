@@ -193,10 +193,11 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     /**
      * Adds one article's evidence to its publication's full-text check (see [FullTextCheck]): the
      * source's own feed, or for tt-rss, the feed the article came from ([originId]). [checked]
-     * says the article was a long item fetched to check it, which counts as the day's check.
+     * says the article was a long item fetched to check it, which counts as the day's check even
+     * when it showed nothing ([evidence] null).
      */
     suspend fun recordFullText(
-        sourceId: Long, originId: String?, evidence: FullTextEvidence, checked: Boolean = false, day: Long = LocalDate.now().toEpochDay(),
+        sourceId: Long, originId: String?, evidence: FullTextEvidence?, checked: Boolean = false, day: Long = LocalDate.now(clock).toEpochDay(),
     ) = db.withTransaction {
         val source = sources.byId(sourceId) ?: return@withTransaction
         // The reading list and curated lists mix many sites: one article says nothing about the next.
@@ -208,7 +209,7 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
         if (source.contentModeChosen) return@withTransaction
         val publication = sources.publication(sourceId, key) ?: PublicationEntity(sourceId, key)
         val state = FullTextState(publication.contentMode, publication.fullTextEvidence, publication.fullTextStreak, publication.fullTextDay)
-        val next = FullTextCheck.next(state, evidence, day)
+        val next = evidence?.let { FullTextCheck.next(state, it, day) } ?: state
         val updated = publication.copy(
             contentMode = next.mode, fullTextEvidence = next.evidence, fullTextStreak = next.streak, fullTextDay = next.day,
             checkedDay = if (checked) day else publication.checkedDay,
