@@ -92,7 +92,7 @@ class TodayViewModel(
 
     fun fileOf(edition: EditionEntity): File? = editions.fileOf(edition)
 
-    suspend fun emailBody(editionId: Long): String? = editions.emailBody(editionId)
+    fun emailBody(editionId: Long): Flow<String?> = editions.observeEmailBody(editionId)
 
     fun markSent(edition: EditionEntity) = markSent(edition.id)
 

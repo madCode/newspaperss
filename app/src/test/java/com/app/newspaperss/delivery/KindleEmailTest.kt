@@ -97,15 +97,27 @@ class KindleEmailTest {
         assertNull(email.`package`)
         assertArrayEquals("a mail app picked there still gets To filled in", arrayOf("me_42@kindle.com"), email.getStringArrayExtra(Intent.EXTRA_EMAIL))
         assertEquals("Tuesday Morning Edition", email.getStringExtra(Intent.EXTRA_SUBJECT))
-        assertEquals(BODY, email.getStringExtra(Intent.EXTRA_TEXT))
+        assertNull("the Kindle app and Dropbox are in this sheet too", email.getStringExtra(Intent.EXTRA_TEXT))
+    }
+
+    @Test
+    fun aDeletedEditionHasNoEmailBody() {
+        val id = readyEdition(editionFile())
+        assertEquals("Tuesday Morning Edition: 0 articles, about 0 min.", runBlocking { app.container.editions.emailBody(id) })
+        runBlocking { app.container.editions.delete(id) }
+        assertNull("its row stays, marked deleted", runBlocking { app.container.editions.emailBody(id) })
     }
 
     @Test
     fun askEachTimeOffersTheShareSheet() {
         installApp(app)
-        val send = EditionIntents.send(context, editionFile(), "Tuesday Morning Edition", 1L, kindle.copy(mailApp = null))
+        installApp(app, "com.dropbox.android", "Dropbox", listOf(IntentFilter(Intent.ACTION_SEND).apply { addDataType(EditionIntents.EPUB_MIME) }))
+        val send = EditionIntents.send(context, editionFile(), "Tuesday Morning Edition", 1L, kindle.copy(mailApp = null), BODY)
         assertFalse(send.countsOnLaunch)
         assertEquals(Intent.ACTION_CHOOSER, send.intent.action)
+        val perApp = send.intent.getBundleExtra(Intent.EXTRA_REPLACEMENT_EXTRAS)!!
+        assertEquals("only mail apps get the body", setOf(MAIL_APP), perApp.keySet())
+        assertEquals(BODY, perApp.getBundle(MAIL_APP)!!.getString(Intent.EXTRA_TEXT))
     }
 
     @Test

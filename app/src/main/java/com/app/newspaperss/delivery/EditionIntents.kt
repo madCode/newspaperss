@@ -4,8 +4,10 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import androidx.core.os.bundleOf
 import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.settings.KindleEmail
 import java.io.File
@@ -49,8 +51,8 @@ object EditionIntents {
      * Send for an edition: with [kindleEmail], an email to the Kindle's address with the edition
      * attached, opened straight in the chosen mail app while it's still installed, otherwise in
      * the share sheet so a mail app picked there gets To, Subject and [body] filled in. Without it,
-     * [share], which leaves out [body]: every app in that sheet would get it, and the Kindle app or
-     * Dropbox could keep the text as a document of its own.
+     * [share]. Only mail apps get [body]: the Kindle app or Dropbox, also in the share sheet, could
+     * keep the text as a document of its own.
      *
      * @param body the email's text, from [EditionEmail].
      */
@@ -61,7 +63,6 @@ object EditionIntents {
             type = EPUB_MIME
             putExtra(Intent.EXTRA_EMAIL, arrayOf(kindleEmail.address))
             putExtra(Intent.EXTRA_SUBJECT, title)
-            body?.let { putExtra(Intent.EXTRA_TEXT, it) }
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -69,10 +70,17 @@ object EditionIntents {
         if (app != null) {
             // A mail app can attach the file after its compose screen has gone, like Send to Kindle.
             grantRead(context, app, uri)
+            body?.let { email.putExtra(Intent.EXTRA_TEXT, it) }
             return Send(email.setPackage(app), countsOnLaunch = true)
         }
         val callback = EditionSentReceiver.callback(context, editionId, uri, kindleEmail = true)
-        return Send(Intent.createChooser(email, "Email “$title” to your Kindle", callback), countsOnLaunch = false)
+        val chooser = Intent.createChooser(email, "Email “$title” to your Kindle", callback)
+        if (body != null) {
+            val perApp = Bundle()
+            MailApps.installed(context).forEach { perApp.putBundle(it.packageName, bundleOf(Intent.EXTRA_TEXT to body)) }
+            chooser.putExtra(Intent.EXTRA_REPLACEMENT_EXTRAS, perApp)
+        }
+        return Send(chooser, countsOnLaunch = false)
     }
 
     /** The mail app Send opens directly, or null when it opens the share sheet: none chosen, or it's been uninstalled. */
