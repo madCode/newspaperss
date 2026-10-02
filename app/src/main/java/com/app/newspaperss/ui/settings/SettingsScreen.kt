@@ -24,7 +24,17 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -73,43 +83,89 @@ import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import kotlin.math.roundToInt
 
+/** Settings: a row per page, each with a line saying how it's set now, so the setup reads at a glance. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
+fun SettingsScreen(viewModel: SettingsViewModel, onOpen: (SettingsPage) -> Unit) {
     val settings by viewModel.settings.collectAsState()
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { padding ->
         val s = settings ?: return@Scaffold
+        val locale = LocalConfiguration.current.locales[0]
+        val notificationsOn = rememberNotificationsEnabled()
+        val folderReachable = rememberReachable(s.folderUri)
+        val notesReachable = rememberReachable(s.notesFolderUri)
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
-            EditionSection(s, viewModel)
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
-            ScheduleSection(s, viewModel)
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
-            // Before Delivery: the e-reader decides which delivery options are offered.
-            ReaderSection(s, viewModel)
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
-            DeliverySection(s, viewModel)
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
-            NotesSection(s, viewModel)
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            SettingsPage.entries.forEach { page ->
+                val summary = when (page) {
+                    SettingsPage.EDITION -> SettingsSummary.edition(s)
+                    SettingsPage.SCHEDULE -> SettingsSummary.schedule(s, notificationsOn, locale)
+                    SettingsPage.DELIVERY -> SettingsSummary.delivery(s, folderReachable)
+                    SettingsPage.NOTES -> SettingsSummary.notes(s, notesReachable)
+                }
+                SummaryRow(page.title, summary) { onOpen(page) }
+                HorizontalDivider()
+            }
             val context = LocalContext.current
             val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
             Text(
                 "newspapeRSS $version",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp),
+                modifier = Modifier.padding(vertical = 16.dp),
             )
         }
     }
 }
 
 @Composable
-private fun Heading(text: String) =
-    Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp).semantics { heading() })
+private fun SummaryRow(title: String, summary: Summary, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).heightIn(min = 48.dp).padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(summary.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            summary.problem?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** One Settings page, opened from the summary: the same controls the summary row describes. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsPageScreen(viewModel: SettingsViewModel, page: SettingsPage, onBack: () -> Unit) {
+    val settings by viewModel.settings.collectAsState()
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(page.title) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            )
+        },
+    ) { padding ->
+        val s = settings ?: return@Scaffold
+        Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
+            when (page) {
+                SettingsPage.EDITION -> EditionSection(s, viewModel)
+                SettingsPage.SCHEDULE -> ScheduleSection(s, viewModel)
+                SettingsPage.DELIVERY -> {
+                    ReaderPicker(s, viewModel)
+                    DeliverySection(s, viewModel)
+                }
+                SettingsPage.NOTES -> NotesSection(s, viewModel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubHeading(text: String, modifier: Modifier = Modifier) =
+    Text(text, style = MaterialTheme.typography.titleMedium, modifier = modifier.semantics { heading() })
 
 @Composable
 private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
-    Heading("Your edition")
     var minutes by remember(s.edition.minutes) { mutableFloatStateOf(s.edition.minutes.toFloat()) }
     Text("About ${minutes.roundToInt()} minutes of reading")
     Slider(
@@ -156,7 +212,7 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Text("Order", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp).semantics { heading() })
+    SubHeading("Order", Modifier.padding(top = 12.dp))
     Column(Modifier.selectableGroup()) {
         listOf(
             Ordering.TAKE_TURNS to "Take turns between sources",
@@ -179,7 +235,6 @@ private fun EditionSection(s: AppSettings, vm: SettingsViewModel) {
 private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
     val context = LocalContext.current
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    Heading("Schedule")
     Row(
         Modifier.fillMaxWidth().toggleable(s.scheduleEnabled, role = Role.Switch) { on ->
             vm.setScheduleEnabled(on)
@@ -213,21 +268,41 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
     }
 }
 
-/** The e-reader chosen in onboarding, changeable later: it decides Send or Open, and the tips shown. */
+/** The e-reader chosen in onboarding, changeable later: it decides Send or Open, the delivery choices and the tips shown. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReaderSection(s: AppSettings, vm: SettingsViewModel) {
-    Heading("Your e-reader")
-    Column(Modifier.selectableGroup()) {
-        Device.entries.forEach { device ->
-            Row(
-                Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.setDevice(device) }.heightIn(min = 48.dp).padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = s.device == device, onClick = null)
-                Text(device.label, Modifier.padding(start = 12.dp))
+private fun ReaderPicker(s: AppSettings, vm: SettingsViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+    // A dropdown rather than six radio rows, so the page fits one screen with the Kindle email fields open.
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = s.device?.label ?: "Not chosen",
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text("Your e-reader") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            Device.entries.forEach { device ->
+                DropdownMenuItem(
+                    text = { Text(device.label) },
+                    onClick = {
+                        vm.setDevice(device)
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                )
             }
         }
     }
+    Text(
+        "Decides how editions can reach it, and the tips you see.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp),
+    )
 }
 
 @Composable
@@ -240,7 +315,7 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
             vm.useFolder(uri.toString(), FolderDelivery.displayName(context.contentResolver, uri))
         }
     }
-    Heading("Delivery")
+    SubHeading("How it gets there", Modifier.padding(top = 24.dp, bottom = 4.dp))
     if (s.device == Device.KINDLE || s.delivery == DeliveryMethod.KINDLE_EMAIL) {
         DeliveryOption(
             selected = s.delivery == DeliveryMethod.KINDLE_EMAIL,
@@ -354,7 +429,6 @@ private fun NotesSection(s: AppSettings, vm: SettingsViewModel) {
     }
     val saving = s.notesFolderUri != null
     val reachable = rememberReachable(s.notesFolderUri)
-    Heading("Reading notes")
     fun turnOff() {
         release(context, s.notesFolderUri, keep = setOf(s.folderUri))
         vm.setNotesFolder(null, null)
@@ -412,12 +486,7 @@ private fun DeliveryOption(selected: Boolean, title: String, detail: String, pro
 @Composable
 private fun NotificationsOffWarning(delivery: DeliveryMethod) {
     val context = LocalContext.current
-    var enabled by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
-    LifecycleResumeEffect(Unit) {
-        enabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
-        onPauseOrDispose {}
-    }
-    if (enabled) return
+    if (rememberNotificationsEnabled()) return
     Column(Modifier.padding(vertical = 8.dp)) {
         Text(
             if (delivery == DeliveryMethod.FOLDER) "Notifications are off, so you won't hear if an edition fails to arrive."
@@ -432,4 +501,16 @@ private fun NotificationsOffWarning(delivery: DeliveryMethod) {
             )
         }) { Text("Turn on notifications") }
     }
+}
+
+/** Whether this app may post notifications, checked again whenever the screen comes back from Android's settings. */
+@Composable
+private fun rememberNotificationsEnabled(): Boolean {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
+    LifecycleResumeEffect(Unit) {
+        enabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        onPauseOrDispose {}
+    }
+    return enabled
 }

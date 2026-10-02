@@ -31,6 +31,7 @@ import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.edition.EditionNotes
+import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.FakeHttp
@@ -46,6 +47,8 @@ import com.app.newspaperss.core.epub.EpubWriter
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
+import com.app.newspaperss.ui.settings.SettingsPage
+import com.app.newspaperss.ui.settings.SettingsPageScreen
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
@@ -282,15 +285,41 @@ class ScreenshotTest {
 
     @Test
     fun settings() {
-        runBlocking { store.update { it.copy(scheduleEnabled = true) } }
+        runBlocking { store.update { it.copy(device = Device.KINDLE, scheduleEnabled = true, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "name_abc123@kindle.com") } }
         val vm = SettingsViewModel(store) {}
-        shoot("07-settings", ready = { vm.settings.value != null }) { SettingsScreen(vm) }
+        shoot("07-settings", ready = { vm.settings.value != null }) { SettingsScreen(vm, onOpen = {}) }
     }
 
     @Test
     @Config(fontScale = 2f)
     fun settingsAtLargeText() {
         val vm = SettingsViewModel(store) {}
-        shoot("07b-settings-200", ready = { vm.settings.value != null }) { SettingsScreen(vm) }
+        shoot("07b-settings-200", ready = { vm.settings.value != null }) { SettingsScreen(vm, onOpen = {}) }
+    }
+
+    @Test
+    fun settingsEdition() {
+        val vm = SettingsViewModel(store) {}
+        shoot("07c-settings-edition", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.EDITION, onBack = {}) }
+    }
+
+    @Test
+    fun settingsSchedule() {
+        runBlocking { store.update { it.copy(scheduleEnabled = true) } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07d-settings-schedule", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.SCHEDULE, onBack = {}) }
+    }
+
+    @Test
+    fun settingsDelivery() {
+        runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "name_abc123@kindle.com") } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07e-settings-delivery", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.DELIVERY, onBack = {}) }
+    }
+
+    @Test
+    fun settingsNotes() {
+        val vm = SettingsViewModel(store) {}
+        shoot("07f-settings-notes", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.NOTES, onBack = {}) }
     }
 }

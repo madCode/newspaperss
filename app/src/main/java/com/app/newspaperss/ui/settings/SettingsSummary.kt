@@ -1,0 +1,96 @@
+package com.app.newspaperss.ui.settings
+
+import com.app.newspaperss.core.edition.Ordering
+import com.app.newspaperss.settings.DeliveryMethod
+import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.Settings
+import java.time.DayOfWeek
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.time.format.TextStyle
+import java.util.Locale
+
+/**
+ * One line on a Settings summary row, and what needs fixing there, if anything. Problems show on
+ * the summary so nothing that needs attention is hidden a tap away.
+ */
+data class Summary(val text: String, val problem: String? = null)
+
+/** The pages Settings opens from its summary, in the order the summary lists them. */
+enum class SettingsPage(val slug: String, val title: String) {
+    EDITION("edition", "Your edition"),
+    SCHEDULE("schedule", "Schedule"),
+    // One page: the e-reader decides which delivery choices are offered.
+    DELIVERY("delivery", "E-reader & delivery"),
+    NOTES("notes", "Reading notes"),
+    ;
+
+    companion object {
+        fun of(slug: String?): SettingsPage? = entries.firstOrNull { it.slug == slug }
+    }
+}
+
+object SettingsSummary {
+    fun edition(s: Settings): Summary {
+        val order = when (s.edition.ordering) {
+            Ordering.TAKE_TURNS -> "take turns"
+            Ordering.IN_ORDER -> "source by source"
+            Ordering.SHUFFLE -> "shuffled"
+        }
+        return Summary("About ${s.edition.minutes} minutes · ${s.edition.maxPerSource} per source · $order")
+    }
+
+    fun schedule(s: Settings, notificationsOn: Boolean, locale: Locale): Summary {
+        if (!s.scheduleEnabled) return Summary("Off: make editions from Today")
+        val time = "Ready by " + s.schedule.time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
+        val days = s.schedule.days
+        val text = when {
+            days.isEmpty() -> time
+            days.size == DayOfWeek.entries.size -> "$time, every day"
+            days == WEEKDAYS -> "$time, weekdays"
+            days == WEEKEND -> "$time, weekends"
+            else -> "$time, " + days.sorted().joinToString(", ") { it.getDisplayName(TextStyle.SHORT, locale) }
+        }
+        val problem = when {
+            days.isEmpty() -> "Pick at least one day."
+            !notificationsOn -> "Notifications are off."
+            else -> null
+        }
+        return Summary(text, problem)
+    }
+
+    fun delivery(s: Settings, folderReachable: Boolean): Summary {
+        val folder = s.folderName ?: "your folder"
+        val target = s.kindleEmailTarget
+        val (how, problem) = when (s.delivery) {
+            DeliveryMethod.KINDLE_EMAIL ->
+                if (target != null) "emailed to ${target.address}" to null else "emailed to your Kindle" to "Add your Kindle's email address."
+            DeliveryMethod.SHARE -> "you send it" to null
+            DeliveryMethod.FOLDER -> "saved to $folder" to (if (folderReachable) null else "Can't reach $folder.")
+        }
+        val text = listOfNotNull(s.device?.let(::shortName), how).joinToString(" · ")
+        return Summary(text.replaceFirstChar { it.uppercase() }, problem)
+    }
+
+    fun notes(s: Settings, reachable: Boolean): Summary {
+        val name = s.notesFolderName ?: "your folder"
+        return when {
+            s.notesFolderUri == null -> Summary("Off")
+            reachable -> Summary("Saved to $name")
+            else -> Summary("Saved to $name", "Can't reach $name.")
+        }
+    }
+
+    // The labels in the picker explain themselves; a summary line has room for a name.
+    private fun shortName(device: Device) = when (device) {
+        Device.KINDLE -> "Kindle"
+        Device.KOBO -> "Kobo"
+        Device.BOOX -> "Boox"
+        Device.POCKETBOOK -> "PocketBook"
+        Device.KOREADER -> "KOReader"
+        Device.OTHER -> "Other e-reader"
+    }
+
+    private val WEEKDAYS = DayOfWeek.entries.toSet() - DayOfWeek.SATURDAY - DayOfWeek.SUNDAY
+    private val WEEKEND = setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
+}

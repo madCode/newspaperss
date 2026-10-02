@@ -3,6 +3,7 @@ package com.app.newspaperss
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
@@ -56,7 +57,7 @@ class MainActivityTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         shows("Sources")
         compose.onAllNodes(hasText("Settings") and hasClickAction()).onFirst().performClick()
-        shows("minutes of reading")
+        shows("About 30 minutes")
         val density = app.resources.displayMetrics.density
         val statusBar = (40 * density).toInt()
         scenario.onActivity { activity ->
@@ -71,6 +72,19 @@ class MainActivityTest {
         val title = compose.onAllNodes(hasText("Settings")).fetchSemanticsNodes().minOf { it.boundsInRoot.top }
         // Counted twice, the title would sit a whole status bar lower.
         assertTrue("title at $title", title > statusBar && title < 2 * statusBar)
+    }
+
+    @Test
+    fun aSettingsPageOpensFromTheSummaryAndTheTabGoesBackToIt() {
+        launchWith(onboarded = true)
+        shows("Sources")
+        compose.onAllNodes(hasText("Settings") and hasClickAction()).onFirst().performClick()
+        compose.onNodeWithText("Reading notes").performClick()
+        shows("Save notes for each edition")
+
+        compose.onAllNodes(hasText("Settings") and hasClickAction()).onFirst().performClick()
+        shows("About 30 minutes")
+        compose.onNodeWithText("Save notes for each edition").assertDoesNotExist()
     }
 
     @Test
