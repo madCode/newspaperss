@@ -39,6 +39,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 
 ### tt-rss, for a returning reader *(personas)*
 - [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): recommended keeping one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page; per-feed article text is done (cycle 71). Waiting on your answers to its "For you to decide" list
+- [ ] Sources carry, publications write: move each setting about the writing onto the publication, one step at a time, each with its own migration. Left out is done (cycle 72); next the cap and the section move off the source row (the reading list's fixed "Saved for later" and full page become its one publication's settings); then the daily full feed list from tt-rss fills in each publication's name, address and category, for the inset list in Sources
 - [ ] Per-feed cap on the tt-rss source page ("two from Current Affairs"); leaving a feed out is done
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] A heart for "loved this / keep it", synced to tt-rss *(you asked)*. The ☆ stays "put it in my next edition": two different wishes, and tt-rss's own star already means "keep" (which is why its stars aren't synced as ☆ today). Things to settle first:

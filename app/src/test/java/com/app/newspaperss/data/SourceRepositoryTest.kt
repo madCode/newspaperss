@@ -140,6 +140,23 @@ class SourceRepositoryTest {
         assertEquals(20_100L, db.sources().publication(id, PublicationEntity.OWN)!!.checkedDay)
     }
 
+    /** One row holds both, so neither a check nor taking a feed back may write over the other. */
+    @Test
+    fun leavingAFeedOutAndWhatTheCheckLearnedKeepEachOther() = runTest {
+        val ttrss = repo.addTtrss("https://rss.example/api/")
+        val feed = FeedChoice("7", "Teasers", inPaper = true)
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 3, originId = "7")
+        repo.setFeedInPaper(ttrss, feed, inPaper = false)
+        assertEquals(ContentMode.PAGE, learned(ttrss, "7"))
+
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 1, originId = "7")
+        assertEquals(listOf("7"), db.sources().allLeftOut().map { it.key })
+
+        repo.setFeedInPaper(ttrss, feed, inPaper = true)
+        assertTrue(db.sources().allLeftOut().isEmpty())
+        assertEquals(ContentMode.PAGE, learned(ttrss, "7"))
+    }
+
     /** Articles by guid, each inserted in [states]' state, with the star given. */
     private suspend fun articles(vararg states: Pair<String, ArticleState>, starred: Map<String, java.time.Instant> = emptyMap()): Map<String, Long> {
         val id = repo.addFeed("https://a.example/feed", "A")

@@ -53,20 +53,17 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
      */
     fun observeFeeds(id: Long): Flow<List<FeedChoice>> =
         combine(sources.observeFeeds(id, clock.instant().minus(FEEDS_LISTED_FOR)), sources.observeLeftOut(id)) { seen, leftOut ->
-        val out = leftOut.associateBy { it.originId }
+        val out = leftOut.associateBy { it.key }
         val names = seen.associate { it.originId to (it.title ?: out[it.originId]?.title ?: it.originId) } +
-            leftOut.filter { it.originId !in seen.map { s -> s.originId } }.associate { it.originId to it.title }
+            leftOut.filter { it.key !in seen.map { s -> s.originId } }.associate { it.key to (it.title ?: it.key) }
         names.map { (originId, title) -> FeedChoice(originId, title, inPaper = originId !in out) }.sortedBy { it.title.lowercase() }
     }
 
     /** Leaving a feed out lets its waiting articles go too, except starred ones, so none shows as waiting in vain. */
     suspend fun setFeedInPaper(sourceId: Long, feed: FeedChoice, inPaper: Boolean) = db.withTransaction {
-        if (inPaper) {
-            sources.takeBack(sourceId, feed.originId)
-        } else {
-            sources.leaveOut(LeftOutFeedEntity(sourceId, feed.originId, feed.title))
-            db.articles().expireWaitingFromFeed(sourceId, feed.originId)
-        }
+        val publication = sources.publication(sourceId, feed.originId) ?: PublicationEntity(sourceId, feed.originId)
+        sources.savePublication(publication.copy(title = feed.title, leftOut = !inPaper))
+        if (!inPaper) db.articles().expireWaitingFromFeed(sourceId, feed.originId)
     }
 
     /** Adds a feed unless one with this URL exists; returns its id either way. */
@@ -187,7 +184,7 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
      */
     suspend fun chooseContentMode(id: Long, mode: ContentMode) = db.withTransaction {
         sources.setContentMode(id, mode, chosen = mode != ContentMode.AUTO)
-        sources.forgetPublication(id, PublicationEntity.OWN)
+        sources.forgetFullText(id, PublicationEntity.OWN)
     }
 
     /**

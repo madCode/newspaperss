@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
@@ -201,6 +201,31 @@ class MigrationTest {
             db.query("SELECT id, contentMode, contentModeChosen FROM sources ORDER BY id").use { c ->
                 val modes = generateSequence { if (c.moveToNext()) c.getString(1) to c.getInt(2) else null }.toList()
                 assertEquals(listOf("AUTO" to 0, "PAGE" to 1, "AUTO" to 0, "PAGE" to 0), modes)
+            }
+        }
+    }
+
+    @Test
+    fun version6LeftOutFeedsBecomeLeftOutPublicationsKeepingWhatTheCheckLearned() {
+        helper.createDatabase(DB, 6).use { db ->
+            db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt) " +
+                    "VALUES (1, 'TTRSS', 'https://rss.example/api/', 'Tiny Tiny RSS', 0, 'AUTO', 0, 0, 0, 1, 0)",
+            )
+            db.execSQL(
+                "INSERT INTO publications (sourceId, `key`, contentMode, fullTextEvidence, fullTextStreak, fullTextDay) VALUES " +
+                    "(1, '42', 'PAGE', 'PAGE_LONGER', 3, 20000), (1, '9', 'FEED', 'FEED_FULL', 3, 20000)",
+            )
+            db.execSQL("INSERT INTO left_out_feeds (sourceId, originId, title) VALUES (1, '42', 'Teasers'), (1, '7', 'Press releases')")
+        }
+
+        helper.runMigrationsAndValidate(DB, 7, true, AppDatabase.MIGRATION_6_7).use { db ->
+            db.query("SELECT `key`, contentMode, title, leftOut FROM publications ORDER BY `key`").use { c ->
+                val rows = generateSequence { if (c.moveToNext()) listOf(c.getString(0), c.getString(1), c.getString(2), c.getInt(3).toString()) else null }.toList()
+                assertEquals(
+                    listOf(listOf("42", "PAGE", "Teasers", "1"), listOf("7", "AUTO", "Press releases", "1"), listOf("9", "FEED", null, "0")),
+                    rows,
+                )
             }
         }
     }

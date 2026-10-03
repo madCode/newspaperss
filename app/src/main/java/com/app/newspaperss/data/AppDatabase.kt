@@ -16,8 +16,8 @@ class Converters {
 }
 
 @Database(
-    entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class, LeftOutFeedEntity::class, PublicationEntity::class],
-    version = 6,
+    entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class, PublicationEntity::class],
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -117,8 +117,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** A left-out tt-rss feed becomes a flag on its publication. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE publications ADD COLUMN `title` TEXT")
+                db.execSQL("ALTER TABLE publications ADD COLUMN `leftOut` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +
+                        "SELECT sourceId, originId, 'AUTO', 0 FROM left_out_feeds",
+                )
+                db.execSQL(
+                    "UPDATE publications SET leftOut = 1, title = (SELECT l.title FROM left_out_feeds l " +
+                        "WHERE l.sourceId = publications.sourceId AND l.originId = publications.`key`) " +
+                        "WHERE EXISTS (SELECT 1 FROM left_out_feeds l WHERE l.sourceId = publications.sourceId AND l.originId = publications.`key`)",
+                )
+                db.execSQL("DROP TABLE left_out_feeds")
+            }
+        }
+
         fun open(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
     }
 }

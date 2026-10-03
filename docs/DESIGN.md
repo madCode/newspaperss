@@ -45,7 +45,7 @@ This document describes how the app works today. What's planned is in
 | Concept | What it is |
 |---|---|
 | **Source** | Where articles come from: an RSS, Atom or JSON feed; the **reading list** (links you shared or saved); a tt-rss account; or a **curated list**, a page that picks a few links a day (Arts & Letters Daily). |
-| **Publication** | Who wrote a source's articles, as against how they arrive: a feed added here is one, and each feed inside a tt-rss account is one. Takes turns in the paper and learns its own article text. |
+| **Publication** | Who wrote a source's articles, as against how they arrive: a feed added here is one, and each feed inside a tt-rss account is one. Takes turns in the paper, learns its own article text and can be left out. |
 | **Section** | A heading in the edition's contents. Sections come from OPML folders, and the reading list is "Saved for later". |
 | **Edition settings** | One recipe: size (minutes), per-source cap, order (take turns / in order / shuffle), and the time and days it should be ready. |
 | **Edition** | One built issue: a dated title ("Tuesday Morning Edition, Sep 29"), its articles, the EPUB and its status: building, ready, delivered, failed or deleted. |
@@ -404,9 +404,8 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 
 ```mermaid
 erDiagram
-    SOURCE ||--o{ PUBLICATION : "learns per"
+    SOURCE ||--o{ PUBLICATION : carries
     SOURCE ||--o{ ARTICLE : "brings in"
-    SOURCE ||--o{ LEFT_OUT_FEED : "tt-rss only"
     PUBLICATION ||--o{ ARTICLE : "wrote"
     EDITION ||--o{ EDITION_ARTICLE : holds
     ARTICLE ||--o{ EDITION_ARTICLE : "goes in"
@@ -418,6 +417,7 @@ erDiagram
         string key "empty for a feed, the tt-rss feed id"
         string contentMode "what the check learned"
         int checkedDay "last long item checked"
+        bool leftOut "kept out of the paper"
     }
     ARTICLE {
         string originId "the tt-rss feed id"
@@ -428,8 +428,10 @@ erDiagram
 - **A source is how articles arrive** (a feed address, a tt-rss account, the
   reading list, a curated list): sync, read sync, sign-in and Pause are per
   source.
-- **A publication is who wrote them:** the article text check is per
-  publication, and the planner takes turns between publications.
+- **A publication is who wrote them:** the article text check and leaving
+  out are per publication, and the planner takes turns between
+  publications. A publication's row is written only once there's
+  something to keep; no row means the defaults.
 - `delivered_urls` (links already sent) stands alone.
 
 ### Choosing an article's text

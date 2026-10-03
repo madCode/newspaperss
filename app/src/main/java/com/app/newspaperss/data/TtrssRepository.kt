@@ -63,7 +63,7 @@ class TtrssRepository(
     suspend fun add(address: String, user: String, password: String, category: TtrssCategory?): String? {
         val account = TtrssAccount(TtrssClient.apiUrl(address), user.trim(), password)
         val previous = try {
-            (accounts.load() as? StoredAccount.Ready)?.account
+            accounts.login()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -78,11 +78,11 @@ class TtrssRepository(
         }
         val sourceId = sources.addTtrss(account.apiUrl)
         // Category and feed ids belong to each tt-rss user, and this may be another user on the same
-        // server. The category is asked again each time; left-out feeds aren't, so they're kept for
-        // the same user signing in again (after a lost Keystore key, say) unless the old login is gone.
+        // server. The category is asked again each time; its feeds' publications (left out, what the
+        // text check learned) aren't, so they're kept for the same user signing in again, after a
+        // lost Keystore key say, and go only when the login is another one or was forgotten.
         db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
-        if (previous?.apiUrl != account.apiUrl || previous.user != account.user) {
-            db.sources().clearLeftOut(sourceId)
+        if (previous != (account.apiUrl to account.user)) {
             db.sources().clearPublications(sourceId)
         }
         return null

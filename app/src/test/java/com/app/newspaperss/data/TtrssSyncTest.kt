@@ -35,7 +35,8 @@ class TtrssSyncTest {
     private val http = FakeHttp()
     private val server = FakeTtrss(http)
     private val now = Instant.parse("2026-09-29T06:00:00Z")
-    private val accounts by lazy { TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher()) }
+    private val accountData by lazy { PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") } }
+    private val accounts by lazy { TtrssAccountStore(accountData, testCipher()) }
     private val sources by lazy { SourceRepository(db, Clock.fixed(now, ZoneOffset.UTC)) }
     private val ttrss by lazy { TtrssRepository(db, http, accounts, sources) }
     private val sync by lazy { FeedSync(db, http, Clock.fixed(now, ZoneOffset.UTC), Duration.ofDays(7), accounts) }
@@ -157,13 +158,25 @@ class TtrssSyncTest {
         sources.setFeedInPaper(source.id, FeedChoice("42", "Press Office", inPaper = true), inPaper = false)
 
         assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
-        assertEquals(listOf("42"), db.sources().allLeftOut().map { it.originId })
+        assertEquals(listOf("42"), db.sources().allLeftOut().map { it.key })
 
         db.sources().savePublication(PublicationEntity(source.id, "42", com.app.newspaperss.core.extract.ContentMode.PAGE))
         server.user = "partner"
         assertNull(ttrss.connect("rss.example.com/tt-rss", "partner", "secret"))
         assertTrue(db.sources().allLeftOut().isEmpty())
         assertTrue("what was learned about feed 42 was about another user's feed", db.sources().allPublications().isEmpty())
+    }
+
+    @Test
+    fun feedChoicesStayForTheSameUserSigningInAfterThePhoneLostThePasswordsKey() = runTest {
+        val source = connect()
+        sources.setFeedInPaper(source.id, FeedChoice("42", "Press Office", inPaper = true), inPaper = false)
+        val lostKey = TtrssAccountStore(accountData, AesGcmCipher { javax.crypto.spec.SecretKeySpec(ByteArray(32) { 7 }, "AES") })
+        assertEquals(StoredAccount.Locked, lostKey.load())
+
+        assertNull(TtrssRepository(db, http, lostKey, sources).connect("rss.example.com/tt-rss", "reader", "secret"))
+
+        assertEquals(listOf("42"), db.sources().allLeftOut().map { it.key })
     }
 
     @Test

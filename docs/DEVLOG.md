@@ -12,6 +12,13 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
+## Day 6 · Sat 3 Oct
+
+### Cycle 72: left out moves onto the publication
+- **From you:** go with "sources carry, publications write": settings about the writing belong to the publication, settings about the connection to the source.
+- **Shipped:** the first step. Leaving a tt-rss feed out is now a flag on its publication, beside what the text check learned, instead of a table of its own. Nothing changes on screen. Database version 7.
+- **Review caught:** signing in again after the phone lost the password's key (same user, same server) wiped every left-out feed, and would now wipe what each feed had learned too. The saved address and username are now compared, which stay readable without the password.
+
 ## Day 5 · Fri 2 Oct
 
 ### Cycle 71: article text, checked and per publication

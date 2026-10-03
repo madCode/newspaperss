@@ -237,7 +237,7 @@ class SourceDetailScreenTest {
         idleUntil { compose.waitForIdle(); visible("Press Office") }
         compose.onNodeWithText("Press Office").performClick()
         idleUntil { compose.waitForIdle(); visible("1 of 2: 1 left out") }
-        assertEquals(listOf("42"), runBlocking { db.sources().allLeftOut().map { it.originId } })
+        assertEquals(listOf("42"), runBlocking { db.sources().allLeftOut().map { it.key } })
 
         compose.onNodeWithText("Press Office").performClick()
         idleUntil { compose.waitForIdle(); visible("All 2") }

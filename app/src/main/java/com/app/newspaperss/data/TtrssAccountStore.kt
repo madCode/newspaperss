@@ -58,6 +58,12 @@ class TtrssAccountStore(private val store: DataStore<Preferences>, private val c
         return StoredAccount.Ready(TtrssAccount(url, p[Keys.user] ?: "", password))
     }
 
+    /** The saved address and username, which stay readable when the password can't be (Locked). */
+    suspend fun login(): Pair<String, String>? {
+        val p = store.data.first()
+        return p[Keys.url]?.let { it to (p[Keys.user] ?: "") }
+    }
+
     suspend fun save(account: TtrssAccount) {
         val sealed = Base64.getEncoder().encodeToString(cipher.encrypt(account.password.toByteArray(Charsets.UTF_8)))
         store.edit {

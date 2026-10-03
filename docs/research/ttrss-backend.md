@@ -90,7 +90,7 @@ B1 was the first choice here; critique against the code reversed it: the list be
   - read sync (`syncReadState`: unreported read and unread, waiting unread, confirmed read);
   - `setReportedRead` after marking read or unread;
   - `chooseCategory`'s `expireWaiting`, and leaving a feed out (`expireWaitingFromFeed`);
-  - `clearLeftOut` when another user signs in.
+  - `clearPublications` when another user signs in.
 - **The mark-read queries** select `kind = 'TTRSS'` and read `markReadOnServer` from the
   article's own source; both would come from the parent.
 - **Notes from tt-rss** (`serverNote`: couldn't mark read, sign in again) belong to the account,

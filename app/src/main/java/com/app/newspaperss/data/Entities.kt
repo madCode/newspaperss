@@ -131,22 +131,10 @@ data class ArticleEntity(
 }
 
 /**
- * A tt-rss feed the reader left out of the paper: sync stops fetching it and the planner skips
- * any of its articles still here, unless starred. [originId] is tt-rss's feed id; [title] keeps
- * it listed, so it can come back, after its articles are gone.
- */
-@Entity(
-    tableName = "left_out_feeds",
-    primaryKeys = ["sourceId", "originId"],
-    foreignKeys = [ForeignKey(entity = SourceEntity::class, parentColumns = ["id"], childColumns = ["sourceId"], onDelete = ForeignKey.CASCADE)],
-)
-data class LeftOutFeedEntity(val sourceId: Long, val originId: String, val title: String)
-
-/**
  * Who wrote a source's articles, as against how they arrive: a feed's own publication has [key]
  * "", and each feed in a tt-rss account is one, keyed by its id there ([ArticleEntity.originId]).
- * Holds what the automatic full-text check has learned about it (see
- * [com.app.newspaperss.core.extract.FullTextCheck]); a mode the reader chose stays on the source.
+ * Settings about the writing live here, settings about the connection on the source. A row is
+ * written only once there's something to keep, so no row means the defaults.
  */
 @Entity(
     tableName = "publications",
@@ -156,6 +144,10 @@ data class LeftOutFeedEntity(val sourceId: Long, val originId: String, val title
 data class PublicationEntity(
     val sourceId: Long,
     val key: String,
+    /**
+     * What the automatic full-text check has learned (see
+     * [com.app.newspaperss.core.extract.FullTextCheck]); a mode the reader chose stays on the source.
+     */
     val contentMode: ContentMode = ContentMode.AUTO,
     /** The latest article's [FullTextEvidence] and the run of days behind it. */
     val fullTextEvidence: FullTextEvidence? = null,
@@ -164,6 +156,13 @@ data class PublicationEntity(
     val fullTextDay: Long? = null,
     /** The epoch day a long item was last checked against its page. */
     val checkedDay: Long? = null,
+    /** The name it was last listed under, so a left-out feed stays listed after its articles are gone. */
+    val title: String? = null,
+    /**
+     * The reader left it out of the paper: sync stops fetching it and the planner skips any of its
+     * articles still here, unless starred.
+     */
+    @ColumnInfo(defaultValue = "0") val leftOut: Boolean = false,
 ) {
     companion object {
         /** The key of a source's own feed, and of an article with no [ArticleEntity.originId]. */

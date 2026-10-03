@@ -18,17 +18,11 @@ import java.time.Instant
 
 @Dao
 interface SourceDao {
-    @Query("SELECT * FROM left_out_feeds WHERE sourceId = :sourceId")
-    fun observeLeftOut(sourceId: Long): Flow<List<LeftOutFeedEntity>>
+    @Query("SELECT * FROM publications WHERE sourceId = :sourceId AND leftOut = 1")
+    fun observeLeftOut(sourceId: Long): Flow<List<PublicationEntity>>
 
-    @Query("SELECT * FROM left_out_feeds")
-    suspend fun allLeftOut(): List<LeftOutFeedEntity>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun leaveOut(feed: LeftOutFeedEntity)
-
-    @Query("DELETE FROM left_out_feeds WHERE sourceId = :sourceId AND originId = :originId")
-    suspend fun takeBack(sourceId: Long, originId: String)
+    @Query("SELECT * FROM publications WHERE leftOut = 1")
+    suspend fun allLeftOut(): List<PublicationEntity>
 
     /**
      * The feeds an aggregator's articles came from since [since], each with the name it was last
@@ -39,9 +33,6 @@ interface SourceDao {
             "WHERE sourceId = :sourceId AND originId IS NOT NULL AND discoveredAt >= :since GROUP BY originId",
     )
     fun observeFeeds(sourceId: Long, since: Instant): Flow<List<FeedName>>
-
-    @Query("DELETE FROM left_out_feeds WHERE sourceId = :sourceId")
-    suspend fun clearLeftOut(sourceId: Long)
 
     @Query("SELECT * FROM sources ORDER BY position, id")
     fun observeAll(): Flow<List<SourceEntity>>
@@ -103,8 +94,11 @@ interface SourceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun savePublication(publication: PublicationEntity)
 
-    @Query("DELETE FROM publications WHERE sourceId = :sourceId AND `key` = :key")
-    suspend fun forgetPublication(sourceId: Long, key: String)
+    @Query(
+        "UPDATE publications SET contentMode = 'AUTO', fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL, checkedDay = NULL " +
+            "WHERE sourceId = :sourceId AND `key` = :key",
+    )
+    suspend fun forgetFullText(sourceId: Long, key: String)
 
     @Query("DELETE FROM publications WHERE sourceId = :sourceId")
     suspend fun clearPublications(sourceId: Long)

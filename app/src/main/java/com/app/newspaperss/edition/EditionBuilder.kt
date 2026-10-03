@@ -91,7 +91,7 @@ class EditionBuilder(
             // change made afterwards would be silently undone when they're marked IN_EDITION.
             // The same link from two sources goes in once, and a starred copy is the one kept.
             // A star is the reader asking for that article, even from a feed they left out.
-            val leftOut = db.sources().allLeftOut().map { publicationOf(it.sourceId, it.originId) }.toSet()
+            val leftOut = db.sources().allLeftOut().map { publicationOf(it.sourceId, it.key.ifEmpty { null }) }.toSet()
             val articles = db.articles().candidates()
                 .filter { it.sourceId in sourcesById && (it.starredAt != null || publicationOf(it) !in leftOut) }
                 .sortedBy { it.starredAt == null }
