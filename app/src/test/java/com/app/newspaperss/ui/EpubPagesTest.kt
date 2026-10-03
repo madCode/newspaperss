@@ -47,12 +47,12 @@ class EpubPagesTest {
         }
         val pages = EpubPages(file)
 
-        val (cssType, css) = com.app.newspaperss.ui.edition.bookResponse(com.app.newspaperss.ui.edition.BOOK_ORIGIN + "style.css", pages, 0, 0)
+        val (cssType, css) = com.app.newspaperss.ui.edition.bookResponse(com.app.newspaperss.ui.edition.BOOK_ORIGIN + "style.css", pages, 0, 0, justify = true)
         assertTrue(css.isNotEmpty())
         assertTrue(cssType == "text/css")
-        val (_, pixel) = com.app.newspaperss.ui.edition.bookResponse("https://tracker.example/pixel.gif", pages, 0, 0)
+        val (_, pixel) = com.app.newspaperss.ui.edition.bookResponse("https://tracker.example/pixel.gif", pages, 0, 0, justify = true)
         assertTrue("outside the book: empty, not fetched", pixel.isEmpty())
-        val (_, missing) = com.app.newspaperss.ui.edition.bookResponse(com.app.newspaperss.ui.edition.BOOK_ORIGIN + "images/none.jpg", pages, 0, 0)
+        val (_, missing) = com.app.newspaperss.ui.edition.bookResponse(com.app.newspaperss.ui.edition.BOOK_ORIGIN + "images/none.jpg", pages, 0, 0, justify = true)
         assertTrue(missing.isEmpty())
     }
 

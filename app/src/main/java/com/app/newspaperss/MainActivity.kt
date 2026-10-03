@@ -3,7 +3,6 @@ package com.app.newspaperss
 import android.net.Uri
 
 import com.app.newspaperss.settings.offersOpen
-import com.app.newspaperss.settings.PreviewTextSize
 import androidx.compose.runtime.remember
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -190,8 +189,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                     position = position,
                     title = contents.getOrNull(position)?.entry?.title ?: editionTitle.orEmpty(),
                     onBack = { nav.navigateUp() },
-                    textSize = textSize ?: PreviewTextSize.DEFAULT,
-                    onTextSize = { size -> container.appScope.launch { container.settings.update { it.copy(previewTextSize = size) } } },
+                    textSize = textSize,
                 )
             }
             composable(Tab.SOURCES.route) {

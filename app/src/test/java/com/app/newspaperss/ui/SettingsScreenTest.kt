@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasClickAction
@@ -15,6 +16,7 @@ import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.KindleEmail
+import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.testutil.MAIL_APP
 import com.app.newspaperss.testutil.installApp
 import org.robolectric.Shadows.shadowOf
@@ -134,6 +136,27 @@ class SettingsScreenTest {
         compose.onNodeWithText("Shuffle").performScrollTo().performClick()
         idleUntil { runBlocking { store.current().edition.ordering } == Ordering.SHUFFLE }
         compose.onNodeWithText("Shuffle").assertIsSelected()
+    }
+
+    @Test
+    fun theArticleTextSizeKeepsAnEarlierChoiceAndSavesANewOne() {
+        // Chosen with the preview's old Aa menu: the same stored value.
+        runBlocking { store.update { it.copy(previewTextSize = PreviewTextSize.LARGER) } }
+        show()
+        waitFor("Article text size")
+        compose.onNode(hasText("Larger") and hasClickAction()).assertExists()
+        compose.onNodeWithText("Article text size").performClick()
+        waitFor("on top of Android's own font size")
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup)).assertExists()
+        compose.onNodeWithText("Larger").assertIsSelected()
+
+        compose.onNodeWithText("Largest").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
+        idleUntil { runBlocking { store.current().previewTextSize } == PreviewTextSize.LARGEST }
+        compose.onNodeWithText("Largest").assertIsSelected()
+        compose.onNodeWithText("Larger").assertIsNotSelected()
+
+        compose.onNodeWithContentDescription("Back").performClick()
+        waitFor("Largest")
     }
 
     @Test
