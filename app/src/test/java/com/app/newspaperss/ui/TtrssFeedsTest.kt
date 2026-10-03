@@ -172,13 +172,17 @@ class TtrssFeedsTest {
         compose.setContent { SourcesScreen(vm, onOpenNotInPaper = { notIn = it }) }
         idleUntil { compose.waitForIdle(); visible("Not in your paper") }
 
-        assertTrue(visible("3 feeds in 2 other categories"))
+        assertTrue(visible("3 feeds outside News"))
         assertTrue(visible("Articles from News"))
         compose.onNodeWithText("Not in your paper").performClick()
         assertEquals(account, notIn)
 
-        runBlocking { db.sources().setTtrssCategory(account, null, null) }
-        idleUntil { compose.waitForIdle(); !visible("Not in your paper") }
+        // Until the next list, the feeds known are the old category's: none are shown as in the paper.
+        runBlocking { db.sources().setTtrssCategory(account, 4, "Science") }
+        idleUntil { compose.waitForIdle(); visible("Your feeds in Science show here after the next check.") }
+        assertFalse(visible("Quarterly Review"))
+        assertFalse(visible("Not in your paper"))
+        assertTrue(visible("Checking… · Articles from Science"))
     }
 
     @Test
@@ -187,13 +191,13 @@ class TtrssFeedsTest {
         runBlocking {
             db.sources().setTtrssCategory(account, 3, "News")
             db.sources().savePublication(PublicationEntity(account, "20", title = "Field Station", category = "Science", outsideCategory = true))
-            db.sources().savePublication(PublicationEntity(account, "21", title = "Deep Time", category = "Science", outsideCategory = true))
+            db.sources().savePublication(PublicationEntity(account, "21", title = "Deep Time", category = "Science", outsideCategory = true, leftOut = true))
             db.sources().setFeedsListed(account, Instant.now())
         }
         val vm = SourceDetailViewModel(repo, account, flowOf(1))
         var opened = false
         compose.setContent { NotInPaperScreen(vm, onBack = {}, onOpenAccount = { opened = true }) }
-        idleUntil { compose.waitForIdle(); visible("2 feeds: Deep Time, Field Station") }
+        idleUntil { compose.waitForIdle(); visible("2 feeds: Deep Time (left out), Field Station") }
         assertTrue(visible("Your paper takes articles from News only"))
         compose.onNodeWithText("Change Articles from in Settings").performClick()
         assertTrue(opened)
@@ -212,6 +216,8 @@ class TtrssFeedsTest {
         assertEquals("⚠ Couldn't mark articles read", problem(account.copy(serverNote = "Couldn't mark articles read")))
 
         assertEquals("Checking…", accountLine(account.copy(lastFetchedAt = null), ServerSources(account)))
+        val waiting = account.copy(ttrssCategoryId = 4, ttrssCategoryTitle = "Science")
+        assertEquals("Checking… · Articles from Science", accountLine(waiting, ServerSources(waiting)))
         val feeds = listOf(FeedCategory("News", listOf(FeedChoice("1", "A", inPaper = true), FeedChoice("2", "B", inPaper = true))))
         assertEquals("2 feeds in your paper · Articles from News", accountLine(account.copy(ttrssCategoryTitle = "News"), ServerSources(account, feeds)))
     }

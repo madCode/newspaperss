@@ -266,7 +266,12 @@ class FeedSync(
                     publication.copy(
                         title = feed.title.ifBlank { publication.title.orEmpty() }.ifBlank { null },
                         feedUrl = feed.feedUrl ?: publication.feedUrl,
-                        category = feed.categoryId?.let(categories::get) ?: publication.category,
+                        // Category 0 is tt-rss's Uncategorized, under whatever name the server's language gives it.
+                        category = when (val id = feed.categoryId) {
+                            null -> publication.category
+                            0 -> null
+                            else -> categories[id] ?: publication.category
+                        },
                         listed = inPaperCategory,
                         outsideCategory = !inPaperCategory,
                     ),

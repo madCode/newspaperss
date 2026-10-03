@@ -236,8 +236,13 @@ private fun LazyListScope.serverFeeds(
     item(key = "from-server") { SectionHeading("From your tt-rss") }
     if (server.categories.isEmpty()) {
         item(key = "no-feeds") {
+            val category = server.account?.ttrssCategoryTitle
             Text(
-                if (server.account?.lastFetchedAt == null) "Your feeds show here once your tt-rss has been checked." else "None of your feeds are in the paper.",
+                when {
+                    server.waitingForList -> "Your feeds${category?.let { " in $it" }.orEmpty()} show here after the next check."
+                    server.account?.lastFetchedAt == null -> "Your feeds show here once your tt-rss has been checked."
+                    else -> "None of your feeds are in the paper."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -259,11 +264,8 @@ private fun LazyListScope.serverFeeds(
     }
     if (server.outside.isNotEmpty()) {
         item(key = "not-in-paper") {
-            val feeds = server.outside.sumOf { it.feeds.size }
-            LinkRow(
-                "Not in your paper",
-                "${plural(feeds, "feed")} in ${plural(server.outside.size, "other category", "other categories")}",
-            ) { onOpenNotInPaper(accountId) }
+            val feeds = plural(server.outside.sumOf { it.feeds.size }, "feed")
+            LinkRow("Not in your paper", server.account?.ttrssCategoryTitle?.let { "$feeds outside $it" } ?: feeds) { onOpenNotInPaper(accountId) }
         }
     }
     if (server.leftOut > 0) {
@@ -332,8 +334,7 @@ private fun AccountRow(account: SourceEntity, server: ServerSources, onOpen: () 
 
 /** What the account gives the paper: "54 feeds in your paper", and the category if one is chosen. */
 internal fun accountLine(account: SourceEntity, server: ServerSources): String {
-    if (account.lastFetchedAt == null && server.inPaper == 0) return "Checking…"
-    val feeds = "${plural(server.inPaper, "feed")} in your paper"
+    val feeds = if (server.waitingForList || (account.lastFetchedAt == null && server.inPaper == 0)) "Checking…" else "${plural(server.inPaper, "feed")} in your paper"
     return account.ttrssCategoryTitle?.let { "$feeds · Articles from $it" } ?: feeds
 }
 

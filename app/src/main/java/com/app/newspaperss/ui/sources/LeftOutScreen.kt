@@ -84,8 +84,11 @@ fun NotInPaperScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onOpe
         LazyColumn(Modifier.padding(padding)) {
             item(key = "hint") {
                 Text(
-                    if (chosen == null || outside.isEmpty()) "Your paper takes articles from all your tt-rss feeds."
-                    else "Your paper takes articles from $chosen only. These stay in your tt-rss.",
+                    when {
+                        chosen == null -> "Your paper takes articles from all your tt-rss feeds."
+                        outside.isEmpty() -> "Your paper takes articles from $chosen only. Your other feeds are listed here after the next check."
+                        else -> "Your paper takes articles from $chosen only. These stay in your tt-rss."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
@@ -96,7 +99,10 @@ fun NotInPaperScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onOpe
             items(outside, key = { it.name?.let { n -> "category/$n" } ?: "uncategorized" }) { category ->
                 ListItem(
                     headlineContent = { Text(category.name ?: UNCATEGORIZED) },
-                    supportingContent = { Text("${plural(category.feeds.size, "feed")}: ${category.feeds.joinToString(", ") { it.title }}") },
+                    // A left-out feed says so: choosing its category again won't bring it into the paper.
+                    supportingContent = {
+                        Text("${plural(category.feeds.size, "feed")}: ${category.feeds.joinToString(", ") { if (it.publication?.leftOut == true) "${it.title} (left out)" else it.title }}")
+                    },
                 )
                 HorizontalDivider()
             }

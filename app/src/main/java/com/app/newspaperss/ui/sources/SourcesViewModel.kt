@@ -60,6 +60,12 @@ data class ServerSources(
     val outside: List<FeedCategory> = emptyList(),
 ) {
     val inPaper get() = categories.sumOf { it.feeds.size }
+
+    /**
+     * A category was chosen and its feeds haven't been listed yet. Until they are, the feeds
+     * known are from before, and many aren't in the new category: none are shown.
+     */
+    val waitingForList get() = account?.ttrssCategoryId != null && account.feedsListedAt == null
 }
 
 /** Sources as shown: [rows] on this phone, and [server] in the server setup (null in the phone setup). */
@@ -138,6 +144,7 @@ class SourcesViewModel(
                 setup == null -> flowOf(null)
                 id == null -> flowOf(ServerSources(null))
                 else -> combine(repository.observe(id), repository.observeFeeds(id), repository.observeOutsideCategory(id)) { source, feeds, outside ->
+                    if (ServerSources(source).waitingForList) return@combine ServerSources(source)
                     ServerSources(
                         source,
                         byCategory(feeds.filter { it.inPaper }),

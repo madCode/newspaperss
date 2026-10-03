@@ -189,13 +189,16 @@ class TtrssSyncTest {
 
     /**
      * With a category chosen, the rest of the account's feeds are listed as outside it, for
-     * "Not in your paper"; a subcategory's feeds are in the chosen one, not outside it.
+     * "Not in your paper"; a subcategory's feeds are in the chosen one, not outside it, and
+     * tt-rss's Uncategorized is no category whatever it's called.
      */
     @Test
     fun feedsOutsideTheChosenCategoryAreListedApart() = runTest {
         server.categories[2] = "Essays"
         server.categories[3] = "News"
         server.categories[5] = "Long reads"
+        // Uncategorized under the server's own language: still no category here.
+        server.categories[0] = "Sans catégorie"
         server.subcategories[5] = 2
         server.feeds[7] = FakeTtrss.Feed("Quarterly Review", "https://quarterly.example/feed", 2)
         server.feeds[10] = FakeTtrss.Feed("Slow Essays", "https://slow.example/feed", 5)
@@ -208,7 +211,7 @@ class TtrssSyncTest {
 
         assertEquals(listOf("Quarterly Review", "Slow Essays"), sources.observeFeeds(source.id).first().map { it.title })
         assertEquals(
-            setOf("Daily News" to "News", "Someone's Blog" to "Uncategorized"),
+            setOf("Daily News" to "News", "Someone's Blog" to null),
             sources.observeOutsideCategory(source.id).first().map { it.title to it.category }.toSet(),
         )
 
