@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withContext
@@ -132,7 +133,16 @@ fun ArticlePreviewScreen(
         // Only book pages: the first page is loaded as data and may report about:blank.
         if (url.startsWith(BOOK_ORIGIN)) {
             reading?.cancel()
-            reading = scope.launch { link = withContext(Dispatchers.IO) { pageLink(url, pages) } }
+            reading = scope.launch {
+                val read = withContext(Dispatchers.IO) { pageLink(url, pages) }
+                // Set on the main thread, where a newer page cancels this read: resumed on the IO
+                // thread (as under a test's unconfined dispatcher), a read cancelled a moment too
+                // late could write its page's link over the newer one.
+                withContext(Dispatchers.Main.immediate) {
+                    ensureActive()
+                    link = read
+                }
+            }
         }
     }
     val context = LocalContext.current
