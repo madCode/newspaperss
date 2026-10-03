@@ -380,9 +380,10 @@ phone restarts.
 
    Each card is a full-width bordered button with an arrow, one TalkBack
    button read as its title and description, with no selected state to
-   show in colour. Below: "You can change this later in Settings." Sites
-   already added on this phone are said to go if the server is chosen,
-   before the tap. The answer is saved as the tap moves on. "Step N of M"
+   show in colour. Below: "You can change this later in Settings." With
+   sites already added on this phone, the server card asks first: "Remove
+   the 3 sites you added?", **Remove and use my server** or **Keep them**.
+   The answer is saved as the tap moves on. "Step N of M"
    follows the path: 4 steps for picking sites, 5 for a server or another
    reader app.
 4. **From another reader app, bring your list:** "In Feedly or Inoreader,
@@ -406,7 +407,8 @@ phone restarts.
    lists. No starter packs. Going back to the question and choosing this
    phone signs out, so no half-made account is left; going back from this
    phone's sources and choosing the server removes the sites added there,
-   and the question says so first. Back waits while signing in.
+   and the question asks first. Back waits while signing in, and an import
+   still reading stops before anything is removed.
 7. **How much, and when?** A 10–90 minute slider, "A new edition every
    day", and a "Ready by" time.
 8. **The first edition** builds right away, with its progress on Today.
@@ -457,7 +459,9 @@ whose Kindle and KOReader answers ask for more on the same page).
     nearly everything on it is tt-rss's, and the account's settings are in
     Settings. Top to bottom:
     - **Only when something needs doing**, a banner above the list (so one
-      that appears later isn't scrolled out of sight): **Sign in to your
+      that appears later isn't scrolled out of sight; at most a third of
+      the screen, scrolling within it, with TalkBack hearing it as a
+      heading and when it appears): **Sign in to your
       tt-rss** with no working account; otherwise what's wrong in words
       ("⚠ Couldn't reach tt-rss. Since 6:10 AM. Showing what it last
       listed.", or that it's paused) with **Settings**, which opens

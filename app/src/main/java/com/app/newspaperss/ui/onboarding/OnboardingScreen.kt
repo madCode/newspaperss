@@ -29,6 +29,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -337,12 +341,15 @@ private fun FeedCheck(title: String, checked: Boolean, onToggle: () -> Unit) {
 
 @Composable
 private fun FeedsFromStep(s: OnboardingState, vm: OnboardingViewModel) {
+    // A tap is the answer, and the server's answer removes sites already added here: it asks
+    // first, so a mis-tap (easy on e-ink) or TalkBack reaching the card first loses nothing.
+    var confirmServer by rememberSaveable { mutableStateOf(false) }
     Title("Where do your feeds live now?")
     AnswerCard("I'll pick some sites", "Newspapers, magazines, blogs, newsletters. Most people start here.", !s.forking) {
         vm.answer(FeedsAnswer.SITES)
     }
     AnswerCard("On my own RSS server", "Tiny Tiny RSS. Your feeds stay there; the paper is made from them.", !s.forking) {
-        vm.answer(FeedsAnswer.SERVER)
+        if (s.phoneFeeds > 0) confirmServer = true else vm.answer(FeedsAnswer.SERVER)
     }
     AnswerCard("In another reader app", "Feedly, Inoreader and others: bring your list as a file.", !s.forking) {
         vm.answer(FeedsAnswer.OTHER_APP)
@@ -353,12 +360,13 @@ private fun FeedsFromStep(s: OnboardingState, vm: OnboardingViewModel) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 12.dp),
     )
-    // Said before the tap, since the tap is the choice.
-    if (s.phoneFeeds > 0) {
-        Text(
-            "Choosing your own server removes the ${plural(s.phoneFeeds, "site")} you added on this phone: with a server, your sites come from it.",
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(top = 8.dp),
+    if (confirmServer) {
+        AlertDialog(
+            onDismissRequest = { confirmServer = false },
+            title = { Text("Remove the ${plural(s.phoneFeeds, "site")} you added?") },
+            text = { Text("With your own server, your sites come from it, so the ones added on this phone are removed.") },
+            confirmButton = { TextButton(onClick = { confirmServer = false; vm.answer(FeedsAnswer.SERVER) }) { Text("Remove and use my server") } },
+            dismissButton = { TextButton(onClick = { confirmServer = false }) { Text("Keep them") } },
         )
     }
     if (s.forking && s.signedIn && !s.server) Text("Signing out of tt-rss…", Modifier.padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite })
@@ -415,7 +423,7 @@ private fun ImportStep(s: OnboardingState, vm: OnboardingViewModel) {
         )
     }
     val status = when (result) {
-        null -> if (s.phoneFeeds > 0) "${plural(s.phoneFeeds, "site")} added." else null
+        null -> null
         FileImport.Reading -> "Reading the file…"
         FileImport.Failed -> "Couldn't read that file. Try again, or skip and pick sites instead."
         is FileImport.Done -> when {

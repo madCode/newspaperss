@@ -330,8 +330,14 @@ class OnboardingTest {
         choosePhone()
         runBlocking { SourceRepository(db).addFeed("https://a.example/feed", "A") }
         click("Back")
-        idleUntil { compose.waitForIdle(); visible("Choosing your own server removes the 1 site you added on this phone") }
+        idleUntil { compose.waitForIdle(); vm.state.value.phoneFeeds == 1 }
         click("On my own RSS server")
+        compose.onNodeWithText("Remove the 1 site you added?").assertExists()
+        click("Keep them")
+        assertEquals("a tap that wasn't meant loses nothing", Step.FEEDS_FROM, vm.state.value.step)
+        assertEquals(1, runBlocking { db.sources().all() }.size)
+        click("On my own RSS server")
+        click("Remove and use my server")
         idleUntil { compose.waitForIdle(); visible("Sign in to your tt-rss") }
         assertTrue("never mixed", runBlocking { db.sources().all() }.isEmpty())
     }
@@ -634,10 +640,37 @@ class OnboardingTest {
         vm.importOpml(resolver, opml("feeds.opml", "https://a.example/feed"))
         idleUntil { compose.waitForIdle(); visible("Added 1 site.") }
         click("Back")
-        idleUntil { compose.waitForIdle(); visible("Choosing your own server removes the 1 site") }
+        idleUntil { compose.waitForIdle(); vm.state.value.phoneFeeds == 1 }
         click("On my own RSS server")
+        click("Remove and use my server")
         idleUntil { compose.waitForIdle(); visible("Sign in to your tt-rss") }
         assertTrue("never mixed", runBlocking { db.sources().all() }.isEmpty())
         assertTrue(stepIs("Step 3 of 5"))
+
+        click("Back")
+        click("In another reader app")
+        idleUntil { compose.waitForIdle(); vm.state.value.step == Step.IMPORT }
+        assertFalse("the earlier file's result went with its sites", visible("Added 1 site."))
+        compose.onNodeWithText("Skip").assertExists()
+    }
+
+    @Test
+    fun anImportStillReadingWhenTheServerIsChosenAddsNothing() {
+        // A pipe: reading it waits until the test writes, as a slow cloud file would.
+        val fifo = java.io.File(tmp.root, "slow.opml")
+        assertEquals(0, ProcessBuilder("mkfifo", fifo.path).start().waitFor())
+        vm.next(); vm.chooseDevice(Device.KOBO); vm.next()
+        vm.answer(FeedsAnswer.OTHER_APP)
+        idleUntil { vm.state.value.step == Step.IMPORT }
+        vm.importOpml(resolver, android.net.Uri.fromFile(fifo))
+        assertEquals(FileImport.Reading, vm.state.value.fileImport)
+
+        vm.back()
+        vm.answer(FeedsAnswer.SERVER)
+        Thread { fifo.writeText("""<opml version="2.0"><body><outline type="rss" text="A" xmlUrl="https://a.example/feed"/></body></opml>""") }.start()
+        idleUntil { vm.state.value.step == Step.SIGN_IN }
+        assertTrue("never mixed", runBlocking { db.sources().all() }.none { it.kind == SourceKind.FEED })
+        assertNull(vm.state.value.fileImport)
+        assertEquals(FeedsFrom.SERVER, runBlocking { store.current().feedsFrom })
     }
 }

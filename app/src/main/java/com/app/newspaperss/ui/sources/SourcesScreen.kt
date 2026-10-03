@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -192,8 +193,12 @@ fun SourcesScreen(
                 // list rather than in it: the list keeps its first row in place, so a banner
                 // appearing later as its first item would land out of sight.
                 val account = srv?.account
-                if (srv != null && shown.needsSignIn) SignInBanner(onOpenAccount)
-                else account?.let { accountProblem(it, locale, is24Hour) }?.let { AccountProblemBanner(it, onOpenAccount) }
+                // At most a third of the screen, scrolling within it, so with large text the list keeps room.
+                val bannerMax = (LocalConfiguration.current.screenHeightDp / 3).dp
+                Column(Modifier.heightIn(max = bannerMax).verticalScroll(rememberScrollState())) {
+                    if (srv != null && shown.needsSignIn) SignInBanner(onOpenAccount)
+                    else account?.let { accountProblem(it, locale, is24Hour) }?.let { AccountProblemBanner(it, onOpenAccount) }
+                }
                 SourceList(shown, viewModel, onOpenReadingList, onOpenSource, onOpenFeed, onOpenLeftOut, onOpenNotInPaper)
             }
         }
@@ -310,7 +315,8 @@ private fun AccountProblemBanner(problem: String, onOpen: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text(problem, style = MaterialTheme.typography.bodyMedium)
+            // A heading, so TalkBack can jump to it, and announced when it appears while Sources is open.
+            Text(problem, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite })
             OutlinedButton(onClick = onOpen, modifier = Modifier.padding(top = 8.dp).semantics { contentDescription = "Your tt-rss settings" }) {
                 Text("Settings")
             }

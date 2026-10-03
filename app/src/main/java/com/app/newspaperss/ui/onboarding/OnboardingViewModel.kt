@@ -176,9 +176,10 @@ class OnboardingViewModel(
     }
 
     // Not while signing in: the sign-in would finish after the reader had moved on, perhaps to
-    // this phone, and leave an account nobody chose.
+    // this phone, and leave an account nobody chose. Nor while leaving the fork, which would then
+    // move the reader on from wherever Back took them.
     fun back() = _state.update { s ->
-        if (s.signIn.testing) return@update s
+        if (s.signIn.testing || s.forking) return@update s
         val i = s.path.indexOf(s.step)
         s.copy(step = if (i <= 0) Step.WELCOME else s.path[i - 1])
     }
@@ -203,6 +204,8 @@ class OnboardingViewModel(
         _state.update { it.copy(forking = true) }
         viewModelScope.launch {
             try {
+                // An import still reading would add its sites after the server's removal of them.
+                importing?.cancelAndJoin()
                 if (choice == FeedsFrom.PHONE && ttrss != null) {
                     // A sign-in still running would add its account after the sign-out.
                     signingIn?.cancelAndJoin()
@@ -210,10 +213,11 @@ class OnboardingViewModel(
                     _state.update { it.copy(serverFound = null) }
                 }
                 // Never mixed: sites added on the phone path go when the reader picks the server
-                // instead. The step says so before Next.
+                // instead. The question asks first.
                 if (choice == FeedsFrom.SERVER) sources.observe().first().filter { it.kind == SourceKind.FEED }.forEach { sources.remove(it) }
                 settings.update { it.copy(feedsFrom = choice) }
-                _state.update { it.copy(step = it.path[it.path.indexOf(Step.FEEDS_FROM) + 1]) }
+                // An earlier file's result would read as this visit's; the sites it added still count.
+                _state.update { it.copy(step = it.path[it.path.indexOf(Step.FEEDS_FROM) + 1], fileImport = null) }
             } finally {
                 _state.update { it.copy(forking = false) }
             }
@@ -234,14 +238,17 @@ class OnboardingViewModel(
     fun importOpml(resolver: ContentResolver, uri: Uri) {
         if (state.value.fileImport == FileImport.Reading) return
         _state.update { it.copy(fileImport = FileImport.Reading) }
-        viewModelScope.launch {
+        importing = viewModelScope.launch {
             val result = try {
                 val text = withContext(Dispatchers.IO) {
                     resolver.openInputStream(uri)?.use { it.bufferedReader().readText() } ?: throw IOException("no stream")
                 }
                 sources.importOpml(text).let { FileImport.Done(it.inFile, it.added) }
             } catch (e: Exception) {
-                if (e is CancellationException) throw e
+                if (e is CancellationException) {
+                    _state.update { it.copy(fileImport = null) }
+                    throw e
+                }
                 FileImport.Failed
             }
             _state.update { it.copy(fileImport = result) }
@@ -249,6 +256,7 @@ class OnboardingViewModel(
     }
 
     private var signingIn: Job? = null
+    private var importing: Job? = null
 
     fun editSignIn(form: TtrssForm) = _state.update { s -> if (s.signIn.testing) s else s.copy(signIn = form.copy(error = null)) }
 
