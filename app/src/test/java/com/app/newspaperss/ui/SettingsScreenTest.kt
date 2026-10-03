@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performTextInput
 import android.content.Intent
@@ -29,7 +30,13 @@ import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
+import com.app.newspaperss.ui.settings.SettingsPage
+import com.app.newspaperss.ui.settings.SettingsPageScreen
 import com.app.newspaperss.ui.settings.SettingsScreen
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,12 +66,26 @@ class SettingsScreenTest {
     private val storeScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val rescheduled = mutableListOf<Settings>()
 
+    private lateinit var vm: SettingsViewModel
+
     @Before
-    fun show() {
+    fun makeStore() {
         store = SettingsStore(PreferenceDataStoreFactory.create(scope = storeScope) { tmp.newFile("s.preferences_pb") })
-        val vm = SettingsViewModel(store) { rescheduled += it }
-        compose.setContent { SettingsScreen(vm) }
-        waitFor("Your edition")
+        vm = SettingsViewModel(store) { rescheduled += it }
+    }
+
+    /** Settings as the app shows it: the summary, or [page] opened from it, with Back to the summary. */
+    private fun show(page: SettingsPage? = null) {
+        compose.setContent {
+            var open by remember { mutableStateOf(page) }
+            when (val p = open) {
+                null -> SettingsScreen(vm, onOpen = { open = it })
+                else -> SettingsPageScreen(vm, p, onBack = { open = null })
+            }
+        }
+        // The title draws before the settings load from DataStore, so wait for the content.
+        idleUntil { vm.settings.value != null }
+        waitFor(if (page == null) "newspapeRSS" else page.title)
     }
 
     @After fun stopStore() = runBlocking { storeScope.coroutineContext[Job]!!.cancelAndJoin() }
@@ -75,21 +96,25 @@ class SettingsScreenTest {
 
     @Test
     fun turningOnTheScheduleShowsDaysAndReschedules() {
+        show(SettingsPage.SCHEDULE)
         compose.onNodeWithText("Make an edition automatically").performScrollTo().performClick()
         idleUntil { rescheduled.isNotEmpty() }
         waitFor("Mon")
+        compose.onNodeWithText("Make an edition automatically").assertHeightIsAtLeast(48.dp)
         assertEquals(true, rescheduled.last().scheduleEnabled)
     }
 
     @Test
-    fun theOrderAndScheduleRowsAreFullSizeTargets() {
-        listOf("Take turns between sources", "Source by source, in list order", "Shuffle", "Make an edition automatically").forEach {
+    fun theOrderRowsAreFullSizeTargets() {
+        show(SettingsPage.EDITION)
+        listOf("Take turns between sources", "Source by source, in list order", "Shuffle").forEach {
             compose.onNodeWithText(it).performScrollTo().assertHeightIsAtLeast(48.dp)
         }
     }
 
     @Test
     fun screenReadersHearWhatTheStepperChangesAndTheNewNumber() {
+        show(SettingsPage.EDITION)
         compose.onNodeWithContentDescription("More from each source").performScrollTo().performClick()
         idleUntil { runBlocking { store.current().edition.maxPerSource } == 2 }
         compose.onNode(hasText("2 articles from each source", substring = true) and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
@@ -97,13 +122,15 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun theSizeSliderSaysMinutesAndSectionsAreHeadings() {
+    fun theSizeSliderSaysMinutesAndOrderIsAHeading() {
+        show(SettingsPage.EDITION)
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "30 minutes")).assertExists()
-        compose.onNode(hasText("Your edition") and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertExists()
+        compose.onNode(hasText("Order") and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertExists()
     }
 
     @Test
     fun orderingIsSaved() {
+        show(SettingsPage.EDITION)
         compose.onNodeWithText("Shuffle").performScrollTo().performClick()
         idleUntil { runBlocking { store.current().edition.ordering } == Ordering.SHUFFLE }
         compose.onNodeWithText("Shuffle").assertIsSelected()
@@ -111,6 +138,7 @@ class SettingsScreenTest {
 
     @Test
     fun notesCanBeSavedWhateverTheDeliveryAndTurnedOff() {
+        show(SettingsPage.NOTES)
         // A Kindle reader shares each edition, and still gets notes in her vault.
         grant("content://vault")
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.SHARE, notesFolderUri = "content://vault", notesFolderName = "Vault") } }
@@ -125,14 +153,21 @@ class SettingsScreenTest {
 
     @Test
     fun theEReaderCanBeChangedAfterOnboarding() {
-        compose.onNodeWithText("Boox or another Android e-reader").performScrollTo().performClick()
+        runBlocking { store.update { it.copy(device = Device.KINDLE) } }
+        show(SettingsPage.DELIVERY)
+        waitFor("Email it to your Kindle")
+        compose.onNode(hasText("Your e-reader") and hasClickAction()).performClick()
+        compose.onNodeWithText("Boox or another Android e-reader").performClick()
 
-        idleUntil { runBlocking { store.current().device } == com.app.newspaperss.settings.Device.BOOX }
-        compose.onNodeWithText("Boox or another Android e-reader").assertIsSelected()
+        idleUntil { runBlocking { store.current().device } == Device.BOOX }
+        waitFor("Boox or another Android e-reader")
+        // A Boox reader isn't offered Kindle email.
+        idleUntil { compose.onAllNodes(hasText("Email it to your Kindle")).fetchSemanticsNodes().isEmpty() }
     }
 
     @Test
     fun theReaderTipIsAboutSharingSoOnlySharingShowsIt() {
+        show(SettingsPage.DELIVERY)
         runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.SHARE) } }
         waitFor("tap Send and choose the Kindle app")
         // Under the choice it belongs to, where the reader is looking when they pick it.
@@ -151,26 +186,69 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun theEReaderComesBeforeDeliveryWhichItsChoicesDependOn() {
-        val order = listOf("Your edition", "Schedule", "Your e-reader", "Delivery", "Reading notes").map {
-            compose.onNode(hasText(it) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).fetchSemanticsNode().positionInRoot.y
+    fun theSummarySaysHowEachPageIsSetAndOpensIt() {
+        show()
+        waitFor("About 30 minutes · 1 per source · take turns")
+        compose.onNodeWithText("Off: make editions from Today").assertExists()
+        compose.onNodeWithText("Off").assertExists()
+        val rows = SettingsPage.entries.map { compose.onNodeWithText(it.title).fetchSemanticsNode().positionInRoot.y }
+        assertEquals("in the order of the pages", rows.sorted(), rows)
+
+        compose.onNodeWithText("Schedule").assertHeightIsAtLeast(48.dp).performClick()
+        waitFor("Make an edition automatically")
+        compose.onNodeWithContentDescription("Back").performClick()
+        waitFor("About 30 minutes")
+    }
+
+    @Test
+    fun aChangeOnAPageShowsOnTheSummary() {
+        runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.SHARE) } }
+        show(SettingsPage.DELIVERY)
+        waitFor("Send it myself")
+        compose.onNodeWithText("Email it to your Kindle").performClick()
+        waitFor("The address you send from")
+        compose.onNode(hasSetTextAction() and hasText("Kindle's email address")).performScrollTo().performTextInput("me_42@kindle.com")
+        idleUntil { runBlocking { store.current().kindleEmailTarget } != null }
+
+        compose.onNodeWithContentDescription("Back").performClick()
+        waitFor("Kindle · emailed to me_42@kindle.com")
+    }
+
+    @Test
+    fun whatNeedsFixingShowsOnTheSummaryNotATapAway() {
+        shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>().getSystemService(android.app.NotificationManager::class.java)).setNotificationsEnabled(false)
+        grant("content://tree/books")
+        runBlocking {
+            store.update {
+                it.copy(
+                    device = Device.KOREADER, scheduleEnabled = true, delivery = DeliveryMethod.FOLDER, folderUri = "content://tree/books", folderName = "Books",
+                    notesFolderUri = "content://tree/gone", notesFolderName = "Vault",
+                )
+            }
         }
-        assertEquals(order.sorted(), order)
+        show()
+        waitFor("KOReader · saved to Books")
+        compose.onNodeWithText("Notifications are off.").assertExists()
+        compose.onNodeWithText("Can't reach Vault.").assertExists()
+        compose.onNodeWithText("Can't reach Books.").assertDoesNotExist()
     }
 
     @Test
     fun theBuildIsNamedAtTheBottomSoFeedbackCanSayWhichOne() {
+        show()
         compose.onNodeWithText("newspapeRSS 0.1.0", substring = true).performScrollTo().assertExists()
     }
 
     @Test
     fun perSourceCapCanBeRaised() {
+        show(SettingsPage.EDITION)
         compose.onNodeWithText("+").performClick()
         waitFor("2 articles from each source, then more")
     }
 
     @Test
     fun aKindleReaderCanSwitchToEmailAndSetItUp() {
+        show(SettingsPage.DELIVERY)
         installApp(ApplicationProvider.getApplicationContext())
         runBlocking { store.update { it.copy(device = Device.KINDLE) } }
         waitFor("Email it to your Kindle")
@@ -191,6 +269,7 @@ class SettingsScreenTest {
 
     @Test
     fun emailToKindleIsOfferedOnlyToKindleReadersOrWhoeverAlreadyUsesIt() {
+        show(SettingsPage.DELIVERY)
         runBlocking { store.update { it.copy(device = Device.KOBO) } }
         waitFor("Send it myself")
         compose.onNodeWithText("Email it to your Kindle").assertDoesNotExist()
@@ -203,6 +282,7 @@ class SettingsScreenTest {
 
     @Test
     fun withNotificationsOffEachDeliveryIsWarnedWhatItWontHear() {
+        show(SettingsPage.SCHEDULE)
         shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>().getSystemService(android.app.NotificationManager::class.java)).setNotificationsEnabled(false)
         runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_42@kindle.com", scheduleEnabled = true) } }
         waitFor("Notifications are off")
@@ -216,6 +296,7 @@ class SettingsScreenTest {
 
     @Test
     fun emailDeliveryWithoutAnAddressSaysSendWillShareUntilOneIsAdded() {
+        show(SettingsPage.DELIVERY)
         val line = "Add your Kindle's email address; until then Send opens the share sheet."
         runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = null) } }
         waitFor(line)
@@ -228,18 +309,6 @@ class SettingsScreenTest {
         waitFor(line)
     }
 
-    @Test
-    fun theTwoFolderButtonsSayWhichFolderAndLineUp() {
-        grant("content://tree")
-        grant("content://vault")
-        runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Books", notesFolderUri = "content://vault", notesFolderName = "Vault") } }
-        waitFor("Choose another notes folder")
-        val starts = listOf("Choose another delivery folder", "Choose another notes folder").map {
-            compose.onNodeWithText(it).fetchSemanticsNode().positionInRoot.x
-        }
-        assertEquals(starts[0], starts[1])
-    }
-
     private fun grant(uri: String) = ApplicationProvider.getApplicationContext<android.app.Application>().contentResolver
         .takePersistableUriPermission(android.net.Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
 
@@ -247,9 +316,9 @@ class SettingsScreenTest {
     fun aFolderTheAppCanNoLongerReachSaysSoInsteadOfSavingAutomatically() {
         grant("content://tree/books")
         runBlocking { store.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree/books", folderName = "Books", notesFolderUri = "content://tree/gone", notesFolderName = "Vault") } }
-        waitFor("Saved automatically to Books.")
+        show(SettingsPage.NOTES)
         // The notes folder's grant is gone (its app uninstalled, say): every save there would fail.
-        compose.onNodeWithText("Can't reach Vault. Tap to choose it again.").performScrollTo().assertExists()
+        waitFor("Can't reach Vault. Tap to choose it again.")
         compose.onNodeWithText("Choose another notes folder").assertExists()
 
         // Tapping the row, as the line says, picks a folder again rather than turning notes off.
@@ -265,6 +334,7 @@ class SettingsScreenTest {
     @Test
     @Config(application = TestApp::class, fontScale = 2f)
     fun atLargeFontSizesTheCountButtonsGoBelowItsWords() {
+        show(SettingsPage.EDITION)
         val words = compose.onNodeWithText("from each source", substring = true).fetchSemanticsNode().boundsInRoot
         val fewer = compose.onNodeWithContentDescription("Fewer from each source").fetchSemanticsNode().boundsInRoot
         assertTrue("below", fewer.top >= words.bottom)

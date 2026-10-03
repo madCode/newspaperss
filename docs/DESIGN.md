@@ -420,14 +420,21 @@ phone restarts.
   checklist (compatible with the library); Pocket and Instapaper exports
   import too. **✕** removes a link at once, with **Undo** in a snackbar, since
   removing is routine and a confirm would only be tapped through.
-- **Settings,** in this order: the edition (size, how many from each
-  source, order), the schedule (time and days), your e-reader, delivery,
-  reading notes, and the app's version. The e-reader comes before
-  delivery because it decides which delivery options show.
-  - **Schedule:** with notifications off, a warning for every delivery:
+- **Settings** is a summary: one row per page, each with a line saying
+  how it's set now ("About 30 minutes · 1 per source · take turns",
+  "Ready by 6:30 AM, weekdays", "Kindle · emailed to …", "Off"), then the
+  app's version. Tapping a row opens its page, with a back arrow. Anything
+  that needs fixing (no days picked, notifications off, a folder it can't
+  reach, a Kindle address missing) also shows on the row in red, so it
+  isn't a tap away. The pages:
+  - **Your edition:** size, how many from each source, order. At large
+    text sizes, the − and + for the per-source count go below its words.
+  - **Schedule:** on or off, the time and the days. With notifications off, a warning for every delivery:
     a shared or emailed edition's Send is in its notification, and a
     folder save that fails is only reported there.
-  - **Delivery:** **Email it to your Kindle** (shown for a Kindle, or once
+  - **E-reader & delivery:** the e-reader in a dropdown at the top, then
+    "How it gets there". They share a page because the e-reader decides
+    which delivery options show: **Email it to your Kindle** (shown for a Kindle, or once
     chosen) with the Kindle's address and the mail app to send with
     (without a working address it says Send opens the share sheet until
     one is added); **Send it myself** (tap Send and choose an app), with
@@ -436,8 +443,6 @@ phone restarts.
     was revoked, or its app uninstalled) says "Can't reach <name>. Tap to
     choose it again." instead of saving automatically, and tapping picks
     it again; so does the notes folder, which also offers **Turn off**.
-  - At large text sizes, the − and + for the per-source count go below
-    its words.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
     delivered, by share, folder or Open, in the background so a slow cloud folder

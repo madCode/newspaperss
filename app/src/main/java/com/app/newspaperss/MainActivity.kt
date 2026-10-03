@@ -54,6 +54,8 @@ import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
 import com.app.newspaperss.ui.readinglist.ReadingListScreen
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
+import com.app.newspaperss.ui.settings.SettingsPage
+import com.app.newspaperss.ui.settings.SettingsPageScreen
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.work.SyncWorker
@@ -70,6 +72,7 @@ private const val READING_LIST = "reading-list"
 private const val EDITION = "edition/{id}"
 private const val ARTICLE = "edition/{id}/article/{position}"
 private const val SOURCE = "source/{id}"
+private const val SETTINGS_PAGE = "settings/{page}"
 
 class MainActivity : ComponentActivity() {
     @Volatile private var settingsLoaded = false
@@ -116,7 +119,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
             NavigationBar {
                 Tab.entries.forEach { tab ->
                     val route = current?.destination?.route
-                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE)) || (tab == Tab.TODAY && (route == EDITION || route == ARTICLE))
+                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE)) || (tab == Tab.TODAY && (route == EDITION || route == ARTICLE)) || (tab == Tab.SETTINGS && route == SETTINGS_PAGE)
                     NavigationBarItem(
                         selected = inTab,
                         onClick = {
@@ -204,10 +207,18 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                 ReadingListScreen(vm, onBack = { nav.navigateUp() })
             }
             composable(Tab.SETTINGS.route) {
-                val context = LocalContext.current.applicationContext
-                val vm = viewModel { SettingsViewModel(container.settings) { container.appScope.launch { EditionScheduler.reschedule(context, it) } } }
-                SettingsScreen(vm)
+                SettingsScreen(settingsViewModel(container), onOpen = { nav.navigate("settings/${it.slug}") { launchSingleTop = true } })
+            }
+            composable(SETTINGS_PAGE, arguments = listOf(navArgument("page") { type = NavType.StringType })) { entry ->
+                val page = SettingsPage.of(entry.arguments?.getString("page")) ?: SettingsPage.EDITION
+                SettingsPageScreen(settingsViewModel(container), page, onBack = { nav.navigateUp() })
             }
         }
     }
+}
+
+@Composable
+private fun settingsViewModel(container: AppContainer): SettingsViewModel {
+    val context = LocalContext.current.applicationContext
+    return viewModel { SettingsViewModel(container.settings) { container.appScope.launch { EditionScheduler.reschedule(context, it) } } }
 }
