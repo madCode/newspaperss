@@ -137,7 +137,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         /**
          * The writing settings move from a source to its own publication: the article text the
-         * reader chose and the cap. Sections go: nothing reads them now. tt-rss publications gain
+         * reader chose and the cap. Sections aren't kept: the paper has none. tt-rss publications gain
          * what the account's feed list says about them.
          */
         val MIGRATION_7_8 = object : Migration(7, 8) {

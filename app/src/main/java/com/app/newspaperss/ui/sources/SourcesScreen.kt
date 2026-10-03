@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -163,11 +164,12 @@ fun SourcesScreen(
                     }
                     if (feedsShown && row.feeds.isNotEmpty()) {
                         val inPaper = row.feeds.filter { it.feed.inPaper }
-                        items(inPaper, key = { "${row.source.id}/${it.feed.originId}" }) { feed ->
-                            InsetFeed(feed, onOpen = { onOpenFeed(row.source.id, feed.feed.originId) })
-                            InsetDivider()
-                        }
                         val leftOut = row.feeds.size - inPaper.size
+                        itemsIndexed(inPaper, key = { _, it -> "${row.source.id}/${it.feed.originId}" }) { i, feed ->
+                            InsetFeed(feed, onOpen = { onOpenFeed(row.source.id, feed.feed.originId) })
+                            // The last one's rule would sit on the group's closing rule.
+                            if (i < inPaper.lastIndex || leftOut > 0) InsetDivider()
+                        }
                         if (leftOut > 0) {
                             item(key = "${row.source.id}/left-out") {
                                 InsetRow("Left out · $leftOut", null, "Open the feeds left out of your paper") { onOpenLeftOut(row.source.id) }

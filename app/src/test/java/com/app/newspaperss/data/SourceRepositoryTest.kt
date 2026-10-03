@@ -7,7 +7,6 @@ import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.TestApp
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

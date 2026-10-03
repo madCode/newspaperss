@@ -726,6 +726,18 @@ class EditionBuilderTest {
         assertEquals(listOf("a", "Example News"), editions.observeArticles(built.editionId).first().map { it.sourceTitle })
     }
 
+    /** The planner takes turns between a tt-rss account's feeds; the book keeps each feed's articles together. */
+    @Test
+    fun aTtrssFeedsArticlesStayTogetherInTheBook() = runTest {
+        ttrss("n1" to ("1" to "Example News"), "n2" to ("1" to "Example News"), "b1" to ("2" to "A Blog"), "b2" to ("2" to "A Blog"))
+
+        val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 3)) as BuildResult.Built
+
+        val order = editions.observeArticles(built.editionId).first().map { it.sourceTitle }
+        assertEquals(4, order.size)
+        assertEquals("one run per feed", 2, order.zipWithNext().count { (a, b) -> a != b } + 1)
+    }
+
     /** A tt-rss feed's own cap is its own: the account's other feeds keep the edition's. */
     @Test
     fun aTtrssFeedsOwnCapAppliesToItAlone() = runTest {

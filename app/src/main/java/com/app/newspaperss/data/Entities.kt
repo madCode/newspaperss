@@ -38,8 +38,9 @@ data class SourceEntity(
     val contentMode: ContentMode = ContentMode.AUTO,
     val paused: Boolean = false,
     /**
-     * Unused: these are kept per [PublicationEntity] now. Kept because dropping a column means
-     * rebuilding this table, and dropping it with foreign keys on would delete every article.
+     * Unused, and always null: what these held is kept per [PublicationEntity], or not at all
+     * (sections). Kept because dropping a column means rebuilding this table, and dropping it
+     * with foreign keys on would delete every article.
      */
     val section: String? = null,
     val contentModeChosen: Boolean = false,

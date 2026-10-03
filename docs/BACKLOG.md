@@ -226,7 +226,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
-- [x] Your tt-rss feeds on Sources: inset under the tt-rss row, folded until you open them, each with its own page (leave out, article text, cap, its articles); a daily feed list from tt-rss names every feed; article text, cap and section are per publication, so a tt-rss feed has its own
+- [x] Your tt-rss feeds on Sources: inset under the tt-rss row, folded until you open them, each with its own page (leave out, article text, cap, its articles); a daily feed list from tt-rss names every feed; article text and cap are per publication, so a tt-rss feed has its own
 - [x] Article text is checked, not assumed: each edition reads the pages of up to 5 long items, one per publication (a feed here, or one feed in tt-rss), which each learn on their own; pictures the feed's copy lacks count for the page
 - [x] A tt-rss timeout says the server took too long, not that it couldn't be reached *(personas)*
 - [x] tt-rss: leave a feed out of the paper from the source's page; it isn't fetched, and its waiting articles go except starred ones *(personas)*
