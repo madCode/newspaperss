@@ -154,9 +154,6 @@ fun SourcesScreen(
                         SourceItem(
                             row,
                             onOpen = { onOpenSource(row.source.id) },
-                            onRemove = { viewModel.remove(row.source) },
-                            onTogglePause = { viewModel.togglePaused(row.source) },
-                            onChooseMode = { viewModel.chooseContentMode(row.source, it) },
                             feedsShown = feedsShown.takeIf { row.feeds.isNotEmpty() },
                             onShowFeeds = viewModel::showFeeds,
                         )
@@ -362,22 +359,14 @@ internal fun feedsLine(feeds: List<FeedRow>): String {
 }
 
 /**
+ * A source's row: tapping it opens the source's page, where its settings are. Nothing else on
+ * the row but a tt-rss account's fold button, so 50+ rows stay plain.
+ *
  * @param feedsShown for a tt-rss row with feeds, whether they're shown under it; null for any
  *   other row.
  */
 @Composable
-private fun SourceItem(
-    row: SourceRow,
-    onOpen: () -> Unit,
-    onRemove: () -> Unit,
-    onTogglePause: () -> Unit,
-    onChooseMode: (ContentMode) -> Unit,
-    feedsShown: Boolean? = null,
-    onShowFeeds: (Boolean) -> Unit = {},
-) {
-    var menu by remember { mutableStateOf(false) }
-    var choosingMode by remember { mutableStateOf(false) }
-    var removing by remember { mutableStateOf(false) }
+private fun SourceItem(row: SourceRow, onOpen: () -> Unit, feedsShown: Boolean? = null, onShowFeeds: (Boolean) -> Unit = {}) {
     val s = row.source
     val fullText = if (s.kind == SourceKind.FEED) fullTextLine(row.text) else null
     val status = statusLine(s, row.lastNew)
@@ -403,37 +392,19 @@ private fun SourceItem(
                 }
             }
         },
-        trailingContent = {
-            Row {
-                if (feedsShown != null) {
-                    val count = row.feeds.count { it.feed.inPaper }
-                    // Its own button, not the row: the row opens the account's page, as every row opens its source.
-                    IconButton(onClick = { onShowFeeds(!feedsShown) }) {
-                        Icon(
-                            if (feedsShown) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = if (feedsShown) "Hide the feeds" else "Show ${plural(count, "feed")} in your paper",
-                        )
-                    }
-                }
-                Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More for ${s.title}") }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text(if (s.paused) "Resume" else "Pause") }, onClick = { menu = false; onTogglePause() })
-                        if (s.kind == SourceKind.FEED) {
-                            DropdownMenuItem(text = { Text("Article text") }, onClick = { menu = false; choosingMode = true })
-                        }
-                        DropdownMenuItem(text = { Text("Remove source") }, onClick = { menu = false; removing = true })
-                    }
+        trailingContent = feedsShown?.let { shown ->
+            {
+                val count = row.feeds.count { it.feed.inPaper }
+                // Its own button, not the row: the row opens the account's page, as every row opens its source.
+                IconButton(onClick = { onShowFeeds(!shown) }) {
+                    Icon(
+                        if (shown) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (shown) "Hide the feeds" else "Show ${plural(count, "feed")} in your paper",
+                    )
                 }
             }
         },
     )
-    if (choosingMode) {
-        ContentModeDialog(row.text?.chosenMode ?: ContentMode.AUTO, onChoose = { choosingMode = false; onChooseMode(it) }, onDismiss = { choosingMode = false })
-    }
-    if (removing) {
-        RemoveSourceDialog(s, onConfirm = { removing = false; onRemove() }, onDismiss = { removing = false })
-    }
 }
 
 @Composable

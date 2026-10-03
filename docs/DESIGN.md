@@ -403,16 +403,17 @@ phone restarts.
   "You starred it". On delivered editions each article has a trailing **☆** to
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
 - **Sources:** each source with its health ("Full articles", "Summaries
-  only", "Site blocks fetching", "Failing for N days"). A source's page
-  shows its recent articles, its cap, pause and the article-text
-  setting; **Remove source** is in its ⋮ menu, as on the list.
+  only", "Site blocks fetching", "Failing for N days"). Tapping a row
+  opens the source's page; a row has nothing else to tap, so a long list
+  stays plain. The page shows its recent articles, its cap, pause and the
+  article-text setting; **Remove source** is in its ⋮ menu.
   - **tt-rss** is one row, always last so a feed added later doesn't land
-    under it; the paper follows the same order. It says how many feeds are in the paper and how many are left
-    out. A round **▾** button beside it shows its feeds just beneath it,
+    under it; the paper follows the same order. It says how many feeds
+    are in the paper and how many are left out. A round **▾** button beside it shows its feeds just beneath it,
     indented, A to Z, folded until you open them and then left as you
     left them, with a rule between each. A line under a feed only when it
-    says something: "Also on this phone", or its own settings. **Left out · N** at the end opens
-    the left-out feeds. Each feed opens its own page; the row itself opens
+    says something: "Also on this phone", or its own settings. **Left
+    out · N** at the end opens the left-out feeds. Each feed opens its own page; the row itself opens
     the account's page.
   - A feed added here that's also in your tt-rss says "Also in your tt-rss",
     matched by address.

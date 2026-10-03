@@ -189,12 +189,6 @@ class SourcesViewModel(
         }
     }
 
-    fun remove(source: SourceEntity) {
-        viewModelScope.launch {
-            if (source.kind == SourceKind.TTRSS && ttrss != null) ttrss.forget(source) else repository.remove(source)
-        }
-    }
-
     val canAddTtrss get() = ttrss != null
 
     private val _ttrssForm = MutableStateFlow<TtrssForm?>(null)
@@ -248,14 +242,6 @@ class SourcesViewModel(
         } else {
             _ttrssForm.value = form.copy(testing = false, categories = null, category = null, error = error)
         }
-    }
-
-    fun togglePaused(source: SourceEntity) {
-        viewModelScope.launch { repository.setPaused(source.id, !source.paused) }
-    }
-
-    fun chooseContentMode(source: SourceEntity, mode: ContentMode) {
-        viewModelScope.launch { repository.chooseContentMode(source.id, PublicationEntity.OWN, mode) }
     }
 
     fun refresh() = onSourcesChanged()

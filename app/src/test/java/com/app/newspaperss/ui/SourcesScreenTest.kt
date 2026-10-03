@@ -166,22 +166,12 @@ class SourcesScreenTest {
     }
 
     @Test
-    fun tappingASourceOpensItAndRemovingOneAsksFirst() {
+    fun tappingASourceOpensIt() {
         val id = runBlocking { SourceRepository(db).addFeed("https://example.com/feed", "Posts") }
         waitFor("Posts")
 
         compose.onNodeWithText("Posts").performClick()
         assertEquals(id, opened)
-
-        compose.onNodeWithContentDescription("More for Posts").performClick()
-        compose.onNodeWithText("Remove source").performClick()
-        compose.onNodeWithText("Keep").performClick()
-        assertEquals(1, runBlocking { db.sources().all().size })
-
-        compose.onNodeWithContentDescription("More for Posts").performClick()
-        compose.onNodeWithText("Remove source").performClick()
-        compose.onNode(hasText("Remove source") and hasAnyAncestor(isDialog())).performClick()
-        waitFor("Posts", present = false)
     }
 
     @Test
@@ -208,7 +198,7 @@ class SourcesScreenTest {
     }
 
     @Test
-    fun aSitesArticleTextIsShownAndTheReadersChoiceIsSaved() {
+    fun aSitesArticleTextIsShownAndTheReadersChoiceToo() {
         val id = runBlocking {
             db.sources().insert(SourceEntity(url = "https://walled.example/feed", title = "Walled")).also { id ->
                 db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, ContentMode.FEED, FullTextEvidence.BLOCKED, 3))
@@ -216,12 +206,8 @@ class SourcesScreenTest {
         }
         waitFor("Site blocks fetching")
 
-        compose.onNodeWithContentDescription("More for Walled").performClick()
-        compose.onNodeWithText("Article text").performClick()
-        compose.onNodeWithText("Always fetch the full page").performClick()
-
+        runBlocking { SourceRepository(db).chooseContentMode(id, PublicationEntity.OWN, ContentMode.PAGE) }
         waitFor("Always fetches the full page (your choice)")
-        assertEquals(ContentMode.PAGE, runBlocking { db.sources().publication(id, PublicationEntity.OWN)?.chosenMode })
     }
 
     @Test

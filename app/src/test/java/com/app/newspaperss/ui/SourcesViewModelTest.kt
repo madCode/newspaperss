@@ -17,6 +17,7 @@ import com.app.newspaperss.testutil.FakeTtrss
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.testutil.testCipher
+import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.sources.TtrssForm
 import kotlinx.coroutines.flow.launchIn
@@ -149,7 +150,8 @@ class SourcesViewModelTest {
         val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
         val sources = SourceRepository(db)
         var changed = 0
-        val vm = SourcesViewModel(sources, FeedFinder(http), TtrssRepository(db, http, accounts, sources)) { changed++ }
+        val ttrss = TtrssRepository(db, http, accounts, sources)
+        val vm = SourcesViewModel(sources, FeedFinder(http), ttrss) { changed++ }
         vm.rows.launchIn(kotlinx.coroutines.MainScope())
 
         vm.openTtrss()
@@ -166,7 +168,12 @@ class SourcesViewModelTest {
         val row = vm.rows.value!!.single()
         assertEquals(SourceKind.TTRSS, row.source.kind)
 
-        vm.remove(row.source)
+        // Removed from its page, which signs out too.
+        SourceDetailViewModel(sources, row.source.id, kotlinx.coroutines.flow.flowOf(1), ttrss).apply {
+            detail.launchIn(kotlinx.coroutines.MainScope())
+            idleUntil { detail.value?.source != null }
+            remove()
+        }
         idleUntil { vm.rows.value?.isEmpty() == true }
         idleUntil { runBlocking { accounts.load() } == StoredAccount.None }
     }

@@ -14,6 +14,10 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 81: up to date with main; plain rows on Sources
+- **From you:** bring the branch up to date with main; take the ⋮ menus off Sources, since everything in them is on the source's page.
+- **Shipped:** main's paid posts, Kindle email and Settings pages are in. Main's database version 6 shipped first, so this branch's database changes are one step from it, to version 7. A row on Sources opens its page and has nothing else to tap, except tt-rss's ▾.
+
 ### Cycle 80: no sections; rules between the feeds
 - **From you:** sections are complexity a 30-minute paper of 8 articles doesn't need; take them out, and bring them back if they're missed. 50+ feeds without rules between them would be overwhelming.
 - **Shipped:** the paper is one list in your sources' order, with no headings, the reading list's "Saved for later" included; there's no Section setting, OPML folders are ignored on import and not written on export. The feeds under tt-rss have an inset rule between each. Database version 7 simply doesn't have sections.
