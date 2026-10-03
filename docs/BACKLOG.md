@@ -99,6 +99,19 @@ a reader who chose it moves to Smart. The orders become Take turns, Smart and Sh
   monthly post that lands the day after an edition is full. Count how many rare sources' articles
   expire once Smart is in: if it stays near zero, the longer window isn't needed.
 
+### High-priority sources *(you asked)*
+Mark a source as high priority and its new posts go first, the way a star puts one article first.
+The reader's own choice, visible on the source's page, rather than the app guessing.
+
+- **Order, not count:** a priority source goes to the front of the turns when it has something new,
+  still within its per-source cap and the budget; stars still come first. "Allow more" stays the
+  setting for how many.
+- **Too many means none:** when priority sources alone fill an edition, they take turns among
+  themselves like everyone else; say so on Settings rather than quietly dropping the rest.
+- **With Smart:** Smart is for readers who never set anything; priority is the reader's override on
+  top. Build whichever is missed first: in a simulation of one reader's 80 feeds, daily 30-minute
+  editions with Take turns already lost almost no posts from rarely-posting sources.
+
 ### Sharing an article
 Share an article with someone. The link is easy; the full extracted text raises copyright questions and
 shouldn't become a way around paywalls. A likely middle: the link plus a short excerpt.
