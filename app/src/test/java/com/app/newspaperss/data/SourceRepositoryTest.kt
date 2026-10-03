@@ -181,6 +181,17 @@ class SourceRepositoryTest {
         assertEquals(null to null, db.sources().publication(ttrss, "7")!!.let { it.section to it.maxArticles })
     }
 
+    /** The account page's checklist falls back to a feed's id for a name; that isn't saved as one. */
+    @Test
+    fun leavingOutAFeedKnownOnlyByItsIdSavesNoName() = runTest {
+        val ttrss = repo.addTtrss("https://rss.example/api/")
+        repo.setFeedInPaper(ttrss, FeedChoice("7", "7", inPaper = true), inPaper = false)
+        assertEquals(null, db.sources().publication(ttrss, "7")!!.title)
+        db.sources().savePublication(db.sources().publication(ttrss, "7")!!.copy(title = "Quarterly Review"))
+        repo.setFeedInPaper(ttrss, FeedChoice("7", "A feed", inPaper = false), inPaper = true)
+        assertEquals("the listed name stays", "Quarterly Review", db.sources().publication(ttrss, "7")!!.title)
+    }
+
     @Test
     fun aSavedLinksSectionIsTheReadingListsOwn() = runTest {
         val list = ReadingListRepository(db).sourceId()

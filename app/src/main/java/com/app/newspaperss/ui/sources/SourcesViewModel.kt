@@ -108,6 +108,7 @@ class SourcesViewModel(
             val bySource = activity.associate { it.sourceId to it.lastNew }
             val phoneFeeds = sources.filter { it.kind == SourceKind.FEED }
             val ttrssUrls = feeds.mapNotNull { it.publication?.feedUrl }
+            // The edition follows the same order (see EditionBuilder).
             sources.filter { it.kind != SourceKind.READING_LIST }.sortedBy { it.kind == SourceKind.TTRSS }.map { s ->
                 SourceRow(
                     s, bySource[s.id], texts[s.id],

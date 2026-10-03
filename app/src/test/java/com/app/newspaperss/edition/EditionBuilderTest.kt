@@ -715,6 +715,17 @@ class EditionBuilderTest {
         }
     }
 
+    /** The paper follows Sources, where tt-rss is last, even when it was added before a feed. */
+    @Test
+    fun ttrssComesAfterFeedsAddedLaterAsOnSources() = runTest {
+        ttrss("n1" to ("1" to "Example News"))
+        source("a", null, "a1")
+
+        val built = builder.build(EditionSettings(minutes = 600, ordering = com.app.newspaperss.core.edition.Ordering.IN_ORDER)) as BuildResult.Built
+
+        assertEquals(listOf("a", "Example News"), editions.observeArticles(built.editionId).first().map { it.sourceTitle })
+    }
+
     /** A tt-rss feed's own cap and section are its own: the account's other feeds keep the edition's. */
     @Test
     fun aTtrssFeedsOwnCapAndSectionApplyToItAlone() = runTest {

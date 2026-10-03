@@ -179,7 +179,8 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     }
     val articles = detail?.articles.orEmpty()
     val publication = detail?.text
-    val feedTitle = publication?.title ?: articles.firstNotNullOfOrNull { it.originTitle } ?: "A feed"
+    val knownTitle = publication?.title ?: articles.firstNotNullOfOrNull { it.originTitle }
+    val feedTitle = knownTitle ?: "A feed"
     Scaffold(
         topBar = {
             if (selecting) {
@@ -234,7 +235,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                         val leftOut = publication?.leftOut == true
                         FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (leftOut) {
-                                OutlinedButton(onClick = { viewModel.setInPaper(feedTitle, true) }) { Text("Bring back") }
+                                OutlinedButton(onClick = { viewModel.setInPaper(knownTitle, true) }) { Text("Bring back") }
                             } else {
                                 OutlinedButton(onClick = { leavingOut = true }) { Text("Leave out") }
                                 OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(publication)}") }
@@ -307,8 +308,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         )
     }
     if (leavingOut) {
-        val waiting = articles.count { it.state == ArticleState.NEW && it.starredAt == null }
-        LeaveOutDialog(feedTitle, waiting, onConfirm = { leavingOut = false; viewModel.setInPaper(feedTitle, false) }, onDismiss = { leavingOut = false })
+        LeaveOutDialog(feedTitle, onConfirm = { leavingOut = false; viewModel.setInPaper(knownTitle, false) }, onDismiss = { leavingOut = false })
     }
     val categories by viewModel.categories.collectAsState()
     categories?.let { CategoryDialog(it, source?.ttrssCategoryId, viewModel::chooseCategory, viewModel::closeCategories) }
@@ -333,15 +333,12 @@ private fun FeedHeader(source: SourceEntity, publication: PublicationEntity?) {
 }
 
 @Composable
-private fun LeaveOutDialog(title: String, waiting: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun LeaveOutDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Leave $title out?") },
         text = {
-            Text(
-                "It stays in your tt-rss, so you can bring it back. It isn't fetched for the paper" +
-                    if (waiting > 0) ", and its ${plural(waiting, "waiting article")} go, except ones you starred." else ".",
-            )
+            Text("It stays in your tt-rss, so you can bring it back. It isn't fetched for the paper, and its waiting articles go, except ones you starred.")
         },
         confirmButton = { TextButton(onClick = onConfirm) { Text("Leave out") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },

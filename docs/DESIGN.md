@@ -346,7 +346,7 @@ allowed to read that edition's file until the phone restarts.
   shows its recent articles, its cap, section, pause and the article-text
   setting; **Remove source** is in its ⋮ menu, as on the list.
   - **tt-rss** is one row, always last so a feed added later doesn't land
-    under it. It says how many feeds are in the paper and how many are left
+    under it; the paper follows the same order. It says how many feeds are in the paper and how many are left
     out. A round **▾** button beside it shows its feeds just beneath it,
     indented, A to Z, folded until you open them and then left as you
     left them. A line under a feed only when it says something: "Also on
@@ -465,7 +465,7 @@ erDiagram
 
 ```mermaid
 flowchart TD
-    A[Article in plan order] --> B{Reader chose a mode for the source?}
+    A[Article in plan order] --> B{Reader chose a mode for its publication?}
     B -- yes --> M[Use it]
     B -- no --> C{Long item, publication due a check,<br/>fewer than 5 checks this edition?}
     C -- yes --> P[Read the page and compare]

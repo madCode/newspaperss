@@ -16,6 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -26,6 +27,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LeftOutScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onOpenFeed: (key: String) -> Unit) {
     val feeds by viewModel.feeds.collectAsState()
+    val detail by viewModel.detail.collectAsState()
+    // The account was removed, here or elsewhere.
+    LaunchedEffect(detail) { if (detail != null && detail?.source == null) onBack() }
     val leftOut = feeds.filter { !it.inPaper }
     Scaffold(
         topBar = {

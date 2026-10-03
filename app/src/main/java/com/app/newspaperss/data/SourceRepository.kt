@@ -56,14 +56,16 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
 
     /**
      * A tt-rss account's feeds, A to Z. Once tt-rss has listed them, the feeds it takes articles
-     * from (see [SourceEntity.feedsListedAt]); until then, those seen in the last month and every
-     * left-out one, which stays so it can come back.
+     * from (see [SourceEntity.feedsListedAt]), and any that has sent articles since: one subscribed
+     * after the day's list is in the paper already. Until then, those seen in the last month and
+     * every left-out one, which stays so it can come back.
      */
     fun observeFeeds(id: Long): Flow<List<FeedChoice>> =
         combine(sources.observe(id), sources.observeFeeds(id, clock.instant().minus(FEEDS_LISTED_FOR)), sources.observePublicationsOf(id)) { source, seen, publications ->
             val byKey = publications.associateBy { it.key }
-            val keys = if (source?.feedsListedAt != null) {
-                publications.filter { it.listed }.map { it.key }
+            val listedAt = source?.feedsListedAt
+            val keys = if (listedAt != null) {
+                publications.filter { it.listed }.map { it.key } + seen.filter { !it.lastSeen.isBefore(listedAt) }.map { it.originId }
             } else {
                 seen.map { it.originId } + publications.filter { it.leftOut }.map { it.key }
             }
@@ -78,7 +80,9 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     /** Leaving a feed out lets its waiting articles go too, except starred ones, so none shows as waiting in vain. */
     suspend fun setFeedInPaper(sourceId: Long, feed: FeedChoice, inPaper: Boolean) = db.withTransaction {
         val publication = sources.publication(sourceId, feed.originId) ?: PublicationEntity(sourceId, feed.originId)
-        sources.savePublication(publication.copy(title = feed.title, leftOut = !inPaper))
+        // A name the list gave stays; a feed's id standing in for a name isn't one.
+        val title = publication.title ?: feed.title.takeIf { it.isNotBlank() && it != feed.originId }
+        sources.savePublication(publication.copy(title = title, leftOut = !inPaper))
         if (!inPaper) db.articles().expireWaitingFromFeed(sourceId, feed.originId)
     }
 

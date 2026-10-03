@@ -244,9 +244,10 @@ class FeedSync(
         }
         val sources = db.sources()
         db.withTransaction {
-            // A list for a category the reader has since changed would show the wrong feeds.
+            // A new category or sign-in since the sync began clears feedsListedAt: this list
+            // would be for the wrong feeds, or another user's.
             val current = sources.byId(source.id) ?: return@withTransaction
-            if (current.ttrssCategoryId != source.ttrssCategoryId) return@withTransaction
+            if (current.ttrssCategoryId != source.ttrssCategoryId || current.feedsListedAt != source.feedsListedAt) return@withTransaction
             sources.unlistPublications(source.id)
             for (feed in feeds) {
                 val key = feed.id.toString()

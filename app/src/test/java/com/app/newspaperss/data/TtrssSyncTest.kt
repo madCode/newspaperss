@@ -159,12 +159,17 @@ class TtrssSyncTest {
         assertEquals("https://quiet.example/rss" to "Essays", quiet.feedUrl to quiet.category)
 
         server.feeds.remove(9)
+        server.add(2, "First post", feedId = 11, feedTitle = "Subscribed Today")
         sync.syncAll()
-        assertEquals("not asked again the same day", 2, sources.observeFeeds(source.id).first().size)
+        assertEquals(
+            "not asked again the same day, but a feed subscribed since shows once it sends articles",
+            listOf("Quarterly Review", "Quiet Blog", "Subscribed Today"),
+            sources.observeFeeds(source.id).first().map { it.title },
+        )
 
         val nextDay = FeedSync(db, http, Clock.fixed(now.plus(Duration.ofDays(1)), ZoneOffset.UTC), Duration.ofDays(7), accounts)
         nextDay.syncAll()
-        assertEquals("unsubscribed in tt-rss", listOf("Quarterly Review"), sources.observeFeeds(source.id).first().map { it.title })
+        assertEquals("unsubscribed in tt-rss", listOf("Quarterly Review", "Subscribed Today"), sources.observeFeeds(source.id).first().map { it.title })
     }
 
     @Test

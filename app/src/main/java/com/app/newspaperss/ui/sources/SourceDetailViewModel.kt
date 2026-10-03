@@ -85,11 +85,11 @@ class SourceDetailViewModel(
         viewModelScope.launch { repository.setSection(id, key, section) }
     }
 
-    /** A tt-rss feed's page: leaves the feed out of the paper, or brings it back. */
-    fun setInPaper(title: String, inPaper: Boolean) {
+    /** A tt-rss feed's page: leaves the feed out of the paper, or brings it back. [title] if its name is known. */
+    fun setInPaper(title: String?, inPaper: Boolean) {
         if (!isFeed) return
         viewModelScope.launch {
-            repository.setFeedInPaper(id, FeedChoice(key, title, !inPaper), inPaper)
+            repository.setFeedInPaper(id, FeedChoice(key, title ?: key, !inPaper), inPaper)
             if (inPaper) onSourceChanged()
         }
     }

@@ -99,7 +99,7 @@ interface SourceDao {
     @Query("DELETE FROM publications WHERE sourceId = :sourceId")
     suspend fun clearPublications(sourceId: Long)
 
-    /** A new category lists the account's feeds again at the next sync. */
+    /** A new category, or a sign-in, lists the account's feeds again at the next sync. */
     @Query("UPDATE sources SET ttrssCategoryId = :categoryId, ttrssCategoryTitle = :title, feedsListedAt = NULL WHERE id = :id")
     suspend fun setTtrssCategory(id: Long, categoryId: Int?, title: String?)
 

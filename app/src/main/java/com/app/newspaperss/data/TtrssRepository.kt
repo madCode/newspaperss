@@ -81,9 +81,9 @@ class TtrssRepository(
         // server. The category is asked again each time; its feeds' publications (left out, what the
         // text check learned) aren't, so they're kept for the same user signing in again, after a
         // lost Keystore key say, and go only when the login is another one or was forgotten.
-        db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
-        if (previous != (account.apiUrl to account.user)) {
-            db.sources().clearPublications(sourceId)
+        db.withTransaction {
+            db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
+            if (previous != (account.apiUrl to account.user)) db.sources().clearPublications(sourceId)
         }
         return null
     }

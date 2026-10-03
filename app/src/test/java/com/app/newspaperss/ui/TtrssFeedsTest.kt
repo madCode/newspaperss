@@ -133,7 +133,7 @@ class TtrssFeedsTest {
         idleUntil { runBlocking { db.sources().publication(account, "7")!!.chosenMode } == ContentMode.PAGE }
 
         compose.onNodeWithText("Leave out").performClick()
-        idleUntil { compose.waitForIdle(); visible("its 2 waiting articles go") }
+        idleUntil { compose.waitForIdle(); visible("its waiting articles go") }
         compose.onAllNodes(hasText("Leave out"))[1].performClick()
         idleUntil { compose.waitForIdle(); visible("Left out of the paper") }
         val left = runBlocking { db.sources().publication(account, "7")!! }
@@ -149,12 +149,16 @@ class TtrssFeedsTest {
         val account = account()
         val vm = SourceDetailViewModel(repo, account, flowOf(1))
         var opened: String? = null
-        compose.setContent { LeftOutScreen(vm, onBack = {}, onOpenFeed = { opened = it }) }
+        var back = false
+        compose.setContent { LeftOutScreen(vm, onBack = { back = true }, onOpenFeed = { opened = it }) }
         idleUntil { compose.waitForIdle(); visible("Press Office") }
 
         assertFalse(visible("Quarterly Review"))
         compose.onNodeWithText("Press Office").performClick()
         assertEquals("42", opened)
+
+        runBlocking { repo.remove(db.sources().byId(account)!!) }
+        idleUntil { compose.waitForIdle(); back }
     }
 
     @Test

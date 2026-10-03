@@ -72,7 +72,8 @@ class EditionBuilder(
     suspend fun build(settings: EditionSettings, dueAt: Instant? = null, onProgress: (done: Int) -> Unit = {}): BuildResult {
         failInterrupted()
         releaseUndelivered()
-        val sources = db.sources().all().filter { !it.paused }
+        // tt-rss last, as Sources lists it: the paper's order is the list's.
+        val sources = db.sources().all().filter { !it.paused }.sortedBy { it.kind == SourceKind.TTRSS }
         val sourcesById = sources.associateBy { it.id }
 
         // A timed edition is built ahead of its time; it's titled and dated for when it's due.
