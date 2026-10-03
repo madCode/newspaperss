@@ -525,14 +525,15 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
 
 @Composable
 private fun ArticlesHeading(articles: List<ArticleEntity>, selecting: Boolean, onSelect: () -> Unit) {
+    // The list stops at the newest few, so its count isn't everything the source has waiting.
     Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            if (articles.isEmpty()) "Recent articles" else "Recent articles · ${articles.size}",
+            if (articles.isEmpty()) "Newest articles" else "Newest articles · ${articles.size}",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f).semantics {
                 heading()
-                contentDescription = if (articles.isEmpty()) "Recent articles" else "Recent articles, ${articles.size}"
+                contentDescription = if (articles.isEmpty()) "Newest articles" else "Newest articles, ${articles.size}"
             },
         )
         if (articles.isNotEmpty()) {
