@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
@@ -174,98 +174,82 @@ class MigrationTest {
         }
     }
 
+    private fun rows(c: android.database.Cursor) = generateSequence {
+        if (c.moveToNext()) (0 until c.columnCount).map { if (c.isNull(it)) null else c.getString(it) } else null
+    }.toList()
+
+    /** What each feed learned and what the reader chose move to its own publication; sections aren't kept. */
     @Test
-    fun version5MovesWhatTheCheckLearnedToEachFeedsPublication() {
-        helper.createDatabase(DB, 5).use { db ->
-            fun source(id: Int, kind: String, mode: String, chosen: Int, evidence: String?) = db.execSQL(
-                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextEvidence, fullTextStreak, fullTextDay, paused, markReadOnServer, addedAt) " +
-                    "VALUES ($id, '$kind', 'https://s$id.example/feed', 'S$id', $id, '$mode', $chosen, ${evidence?.let { "'$it'" } ?: "NULL"}, 3, 20000, 0, 1, 0)",
+    fun version6MovesWhatEachSourceLearnedAndChoseToItsOwnPublication() {
+        helper.createDatabase(DB, 6).use { db ->
+            fun source(id: Int, kind: String, mode: String, chosen: Int, evidence: String?, max: Int?, section: String?) = db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextEvidence, fullTextStreak, fullTextDay, " +
+                    "paused, markReadOnServer, addedAt, maxArticles, section) VALUES ($id, '$kind', 'https://s$id.example/feed', 'S$id', $id, '$mode', $chosen, " +
+                    "${evidence?.let { "'$it'" } ?: "NULL"}, 3, 20000, 0, 1, 0, ${max ?: "NULL"}, ${section?.let { "'$it'" } ?: "NULL"})",
             )
-            source(1, "FEED", "FEED", 0, "BLOCKED")
-            source(2, "FEED", "PAGE", 1, null)
-            source(3, "FEED", "AUTO", 0, null)
-            source(4, "READING_LIST", "PAGE", 0, null)
+            source(1, "FEED", "FEED", 0, "BLOCKED", null, null)
+            source(2, "FEED", "PAGE", 1, null, 2, "World")
+            source(3, "FEED", "AUTO", 0, null, null, "World")
+            source(4, "READING_LIST", "PAGE", 0, null, null, "Saved for later")
+            source(5, "LIST", "PAGE", 0, null, 1, null)
         }
 
-        helper.runMigrationsAndValidate(DB, 6, true, AppDatabase.MIGRATION_5_6).use { db ->
-            db.query("SELECT sourceId, `key`, contentMode, fullTextEvidence, fullTextStreak, checkedDay FROM publications").use { c ->
-                assertTrue(c.moveToFirst())
-                assertEquals(1L, c.getLong(0))
-                assertEquals("", c.getString(1))
-                assertEquals("FEED", c.getString(2))
-                assertEquals("BLOCKED", c.getString(3))
-                assertEquals(3, c.getInt(4))
-                assertTrue("checked again soon", c.isNull(5))
-                assertTrue("only the feed that had learned something", !c.moveToNext())
+        helper.runMigrationsAndValidate(DB, 7, true, AppDatabase.MIGRATION_6_7).use { db ->
+            db.query("SELECT sourceId, `key`, contentMode, fullTextEvidence, fullTextStreak, checkedDay, chosenMode, maxArticles FROM publications ORDER BY sourceId").use { c ->
+                assertEquals(
+                    listOf(
+                        listOf("1", "", "FEED", "BLOCKED", "3", null, null, null),
+                        listOf("2", "", "AUTO", null, "0", null, "PAGE", "2"),
+                        listOf("5", "", "AUTO", null, "0", null, null, "1"),
+                    ),
+                    rows(c),
+                )
             }
-            db.query("SELECT id, contentMode, contentModeChosen FROM sources ORDER BY id").use { c ->
-                val modes = generateSequence { if (c.moveToNext()) c.getString(1) to c.getInt(2) else null }.toList()
-                assertEquals(listOf("AUTO" to 0, "PAGE" to 1, "AUTO" to 0, "PAGE" to 0), modes)
+            db.query("SELECT contentMode, contentModeChosen, fullTextEvidence, maxArticles, section, feedsListedAt FROM sources ORDER BY id").use { c ->
+                assertEquals(
+                    "the reading list and curated lists still fetch pages; nothing else is left on the source",
+                    listOf("AUTO", "AUTO", "AUTO", "PAGE", "PAGE").map { listOf(it, "0", null, null, null, null) },
+                    rows(c),
+                )
             }
         }
     }
 
     @Test
-    fun version6LeftOutFeedsBecomeLeftOutPublicationsKeepingWhatTheCheckLearned() {
+    fun version6LeftOutFeedsBecomeLeftOutPublications() {
         helper.createDatabase(DB, 6).use { db ->
             db.execSQL(
                 "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt) " +
                     "VALUES (1, 'TTRSS', 'https://rss.example/api/', 'Tiny Tiny RSS', 0, 'AUTO', 0, 0, 0, 1, 0)",
             )
-            db.execSQL(
-                "INSERT INTO publications (sourceId, `key`, contentMode, fullTextEvidence, fullTextStreak, fullTextDay) VALUES " +
-                    "(1, '42', 'PAGE', 'PAGE_LONGER', 3, 20000), (1, '9', 'FEED', 'FEED_FULL', 3, 20000)",
-            )
-            db.execSQL("INSERT INTO left_out_feeds (sourceId, originId, title) VALUES (1, '42', 'Teasers'), (1, '7', 'Press releases')")
+            db.execSQL("INSERT INTO left_out_feeds (sourceId, originId, title) VALUES (1, '42', 'Press releases')")
         }
 
         helper.runMigrationsAndValidate(DB, 7, true, AppDatabase.MIGRATION_6_7).use { db ->
-            db.query("SELECT `key`, contentMode, title, leftOut FROM publications ORDER BY `key`").use { c ->
-                val rows = generateSequence { if (c.moveToNext()) listOf(c.getString(0), c.getString(1), c.getString(2), c.getInt(3).toString()) else null }.toList()
-                assertEquals(
-                    listOf(listOf("42", "PAGE", "Teasers", "1"), listOf("7", "AUTO", "Press releases", "1"), listOf("9", "FEED", null, "0")),
-                    rows,
-                )
+            db.query("SELECT `key`, contentMode, title, leftOut, listed FROM publications").use { c ->
+                assertEquals(listOf(listOf("42", "AUTO", "Press releases", "1", "0")), rows(c))
             }
+            db.query("SELECT name FROM sqlite_master WHERE name = 'left_out_feeds'").use { c -> assertEquals(0, c.count) }
         }
     }
 
     @Test
-    fun version7MovesTheReadersChoicesAndCapsToEachSourcesOwnPublicationAndDropsSections() {
-        helper.createDatabase(DB, 7).use { db ->
-            fun source(id: Int, kind: String, mode: String, chosen: Int, max: String, section: String) = db.execSQL(
-                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt, maxArticles, section) " +
-                    "VALUES ($id, '$kind', 'https://s$id.example/feed', 'S$id', $id, '$mode', $chosen, 0, 0, 1, 0, $max, $section)",
+    fun version5SourcesDontSkipPaidPostsAndNoArticleIsOne() {
+        helper.createDatabase(DB, 5).use { db ->
+            db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt) " +
+                    "VALUES (1, 'FEED', 'https://a.example/feed', 'A', 0, 'AUTO', 0, 0, 0, 1, 0)",
             )
-            source(1, "FEED", "PAGE", 1, "2", "'World'")
-            source(2, "FEED", "AUTO", 0, "NULL", "NULL")
-            source(3, "READING_LIST", "PAGE", 0, "NULL", "'Saved for later'")
-            source(4, "LIST", "PAGE", 0, "1", "NULL")
-            db.execSQL("INSERT INTO publications (sourceId, `key`, contentMode, fullTextStreak, leftOut) VALUES (1, '', 'AUTO', 0, 0), (2, '', 'FEED', 3, 0)")
+            db.execSQL("INSERT INTO articles (id, sourceId, guid, url, title, discoveredAt, state, reportedRead) VALUES (7, 1, 'g', 'https://a.example/1', 'Kept', 0, 'NEW', 0)")
         }
 
-        helper.runMigrationsAndValidate(DB, 8, true, AppDatabase.MIGRATION_7_8).use { db ->
-            db.query("SELECT sourceId, contentMode, chosenMode, maxArticles FROM publications WHERE `key` = '' ORDER BY sourceId").use { c ->
-                val rows = generateSequence {
-                    if (c.moveToNext()) listOf(c.getLong(0).toString(), c.getString(1), c.getString(2), c.getString(3)) else null
-                }.toList()
-                assertEquals(
-                    "a section alone leaves nothing to keep",
-                    listOf(
-                        listOf("1", "AUTO", "PAGE", "2"),
-                        listOf("2", "FEED", null, null),
-                        listOf("4", "AUTO", null, "1"),
-                    ),
-                    rows,
-                )
-            }
-            db.query("SELECT contentMode, contentModeChosen, maxArticles, section FROM sources ORDER BY id").use { c ->
-                val rows = generateSequence { if (c.moveToNext()) listOf(c.getString(0), c.getString(1), c.getString(2), c.getString(3)) else null }.toList()
-                assertEquals(
-                    "the reading list and curated lists still fetch pages; nothing else is left on the source",
-                    listOf(listOf("AUTO", "0", null, null), listOf("AUTO", "0", null, null), listOf("PAGE", "0", null, null), listOf("PAGE", "0", null, null)),
-                    rows,
-                )
+        helper.runMigrationsAndValidate(DB, 6, true, AppDatabase.MIGRATION_5_6).use { db ->
+            db.query("SELECT skipPaidPosts FROM sources WHERE id = 1").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+            db.query("SELECT paidOnly, paidSkipped, state FROM articles WHERE id = 7").use { c ->
+                c.moveToFirst()
+                assertEquals(0, c.getInt(0))
+                assertEquals(0, c.getInt(1))
+                assertEquals("NEW", c.getString(2))
             }
         }
     }

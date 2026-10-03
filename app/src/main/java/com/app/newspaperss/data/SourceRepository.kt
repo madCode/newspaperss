@@ -54,6 +54,9 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     fun observeRecentArticles(id: Long, key: String, limit: Int = 30): Flow<List<ArticleEntity>> =
         if (key == PublicationEntity.OWN) observeRecentArticles(id, limit) else db.articles().observeRecentForFeed(id, key, limit)
 
+    /** See [ArticleDao.observeHistory], by article. */
+    fun observeHistory(id: Long): Flow<Map<Long, ArticleHistory>> = db.articles().observeHistory(id).map { rows -> rows.associateBy { it.articleId } }
+
     /**
      * A tt-rss account's feeds, A to Z. Once tt-rss has listed them, the feeds it takes articles
      * from (see [SourceEntity.feedsListedAt]), and any that has sent articles since: one subscribed
@@ -120,6 +123,13 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     suspend fun update(source: SourceEntity) = sources.update(source)
 
     suspend fun setPaused(id: Long, paused: Boolean) = sources.setPaused(id, paused)
+
+    suspend fun setSkipPaidPosts(id: Long, skip: Boolean) = sources.setSkipPaidPosts(id, skip)
+
+    fun observePaidOnly(id: Long): Flow<PaidOnlyCount> = db.articles().observePaidOnly(id)
+
+    /** See [ArticleDao.markPaidOnly]. */
+    suspend fun markPaidOnly(articleId: Long, skip: Boolean) = db.articles().markPaidOnly(articleId, skip)
 
     /** At most [max] articles per edition from the publication; null follows the edition setting. */
     suspend fun setMaxArticles(sourceId: Long, key: String, max: Int?) = editPublication(sourceId, key) { it.copy(maxArticles = max) }

@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.epub
 
+import com.app.newspaperss.core.extract.HtmlCleaner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -154,6 +155,20 @@ class EpubWriterTest {
         val zipFiles = epub.files.keys - setOf("mimetype", "META-INF/container.xml", "OEBPS/content.opf")
         assertEquals(zipFiles, manifestFiles)
         assertEquals(epub.entries.size, epub.files.size) // no duplicate entry names
+    }
+
+    @Test
+    fun aComicsHoverTextCaptionReachesTheBook() {
+        val cleaned = HtmlCleaner.clean(
+            "<img src=\"https://imgs.xkcd.com/comics/sandwich.png\" title=\"Proper User Policy apparently means Simon Says.\" alt=\"Sandwich\" />",
+            "https://xkcd.com/149/",
+        ).html.replace("https://imgs.xkcd.com/comics/sandwich.png", "images/a1-0.png")
+        val epub = write(unsectioned(article(body = cleaned, images = listOf(EpubImage("images/a1-0.png", "image/png", byteArrayOf(1))))))
+
+        val page = epub.xml("OEBPS/" + epub.articleHrefs().single())
+        val figure = page.documentElement.elements("figure").single()
+        assertEquals(listOf("figure", "img", "figcaption"), figure.elements("*").map { it.localName })
+        assertEquals("Proper User Policy apparently means Simon Says.", figure.elements("figcaption").single().textContent)
     }
 
     @Test
@@ -464,6 +479,47 @@ class EpubWriterTest {
         }
         epub.xml("OEBPS/toc.ncx")
         epub.xml("OEBPS/content.opf")
+    }
+
+    /** A Kindle's footnote popup shows only what the marker points at, so that must be the footnote's text, not its number. */
+    @Test
+    fun aFootnoteMarkerPointsAtTheWholeFootnote() {
+        val body = "<p>Some context.<a id=\"footnote-anchor-3\" href=\"#footnote-3\">3</a><a id=\"footnote-anchor-4\" href=\"#footnote-4\">4</a></p>" +
+            "<div><a id=\"footnote-3\" href=\"#footnote-anchor-3\">3</a><div><p>Read the first one.</p></div></div>" +
+            "<div><a id=\"footnote-4\" href=\"#footnote-anchor-4\">4</a><div><p>Read the second one.</p></div></div>"
+        val page = write(unsectioned(article(body = body))).let { it.xml("OEBPS/" + it.articleHrefs().single()) }
+        val byId = page.elements("*").filter { it.getAttribute("id").isNotEmpty() }.associateBy { it.getAttribute("id") }
+        val paragraph = page.elements("p").single { it.textContent.startsWith("Some context") }
+        val markers = page.elements("a").filter { it.parentNode === paragraph }
+        assertEquals("side by side, each is its own word to tap", "Some context.3, 4", paragraph.textContent)
+        for ((marker, text) in markers.zip(listOf("Read the first one.", "Read the second one."))) {
+            val footnote = byId.getValue(marker.getAttribute("href").removePrefix("#"))
+            assertEquals("div", footnote.localName)
+            assertTrue(footnote.textContent, text in footnote.textContent)
+            // The number still links back to the text.
+            val back = footnote.elements("a").first()
+            assertEquals(marker, byId.getValue(back.getAttribute("href").removePrefix("#")))
+        }
+    }
+
+    /** A marker opening a paragraph isn't a footnote, and one block holding every footnote can't stand for one of them. */
+    @Test
+    fun onlyAFootnoteOnItsOwnTakesItsNumbersPlace() {
+        val body = "<p><a id=\"r1\" href=\"#n1\">1</a> Starts a paragraph.<a id=\"r2\" href=\"#n2\">2</a></p>" +
+            "<p><a id=\"n1\" href=\"#r1\">1</a> First.<br/><a id=\"n2\" href=\"#r2\">2</a> Second.</p>"
+        val page = write(unsectioned(article(body = body))).let { it.xml("OEBPS/" + it.articleHrefs().single()) }
+        assertTrue(page.elements("p").none { it.getAttribute("id").isNotEmpty() })
+    }
+
+    /** Footnotes that already keep their id on the footnote (WordPress's list items) are left as they are. */
+    @Test
+    fun aFootnoteWithItsIdOnTheBlockStaysAsItIs() {
+        val body = "<p>Text<a id=\"fnref1\" href=\"#fn1\">1</a> and more.</p><ol><li id=\"fn1\"><p>The note. <a href=\"#fnref1\">↩</a></p></li></ol>"
+        val page = write(unsectioned(article(body = body))).let { it.xml("OEBPS/" + it.articleHrefs().single()) }
+        val marker = page.elements("a").single { it.textContent == "1" }
+        val target = page.elements("*").single { it.getAttribute("id") == marker.getAttribute("href").removePrefix("#") }
+        assertEquals("li", target.localName)
+        assertTrue(page.elements("p").any { it.textContent == "Text1 and more." })
     }
 
     @Test

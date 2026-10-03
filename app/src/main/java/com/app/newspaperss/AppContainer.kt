@@ -23,6 +23,7 @@ import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.edition.EditionRun
 import com.app.newspaperss.edition.NotesSaver
 import com.app.newspaperss.delivery.FolderDelivery
+import com.app.newspaperss.delivery.KindleSends
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
@@ -39,9 +40,10 @@ class AppContainer(
     context: Context,
     val http: HttpClient = OkHttpHttpClient(OkHttpHttpClient.defaultClient(File(context.cacheDir, "http"))),
     val db: AppDatabase = AppDatabase.open(context),
-    content: ArticleContentProvider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, evidence, text ->
-        val sources = SourceRepository(db)
-        if (text.day != null) sources.recordFullText(sourceId, originId, evidence, text.check, text.day) else sources.recordFullText(sourceId, originId, evidence, text.check)
+    content: ArticleContentProvider = SourceRepository(db).let { sources ->
+        ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly) { sourceId, originId, evidence, text ->
+            if (text.day != null) sources.recordFullText(sourceId, originId, evidence, text.check, text.day) else sources.recordFullText(sourceId, originId, evidence, text.check)
+        }
     },
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
@@ -55,8 +57,9 @@ class AppContainer(
     val readingList = ReadingListRepository(db, onUntitled = fetchReadingListTitles)
     val readingListTitles = ReadingListTitles(db, http)
     val notifier = Notifier(context)
+    val kindleSends = KindleSends()
     // A sent edition's Ready notification comes down: its Send would offer an edition already sent.
-    val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead)
+    val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead, kindleSends = kindleSends)
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)

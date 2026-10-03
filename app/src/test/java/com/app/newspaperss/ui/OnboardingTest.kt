@@ -2,6 +2,9 @@ package com.app.newspaperss.ui
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -29,6 +32,9 @@ import com.app.newspaperss.testutil.testCipher
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.KindleEmail
+import com.app.newspaperss.testutil.MAIL_APP
+import com.app.newspaperss.testutil.installApp
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.FakeHttp
@@ -44,6 +50,8 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -69,11 +77,35 @@ class OnboardingTest {
     private fun scrollAndClick(text: String) = compose.onNodeWithText(text).performScrollTo().performClick()
 
     @Test
-    fun aKindleReaderPicksAPackAndGetsADailySharedEdition() {
+    fun aKindleReaderSetsUpEmailToTheirKindleAndGetsADailyEdition() {
+        installApp(ApplicationProvider.getApplicationContext())
         compose.setContent { OnboardingScreen(vm) }
         click("Get started")
         scrollAndClick("Kindle")
-        compose.onNodeWithText("Send to Kindle", substring = true).assertExists()
+        compose.onNodeWithText("Send it straight to your Kindle").assertExists()
+        compose.onNodeWithText("Next").assertIsNotEnabled()
+
+        compose.onNodeWithText("Needed to go on.", substring = true).assertExists()
+        val field = compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address"))
+        field.performTextInput("me_42@kindle")
+        // Still typing: no error yet, but it says why Next waits.
+        compose.onNodeWithText("That isn't a whole email address yet.").assertDoesNotExist()
+        compose.onNodeWithText("Needed to go on.", substring = true).assertExists()
+        compose.onNodeWithText("Next").assertIsNotEnabled()
+
+        field.performImeAction()
+        compose.onNodeWithText("That isn't a whole email address yet.").assertExists()
+        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "That isn't a whole email address yet."))
+        compose.onNode(hasText("That isn't a whole email address yet.") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).assertExists()
+
+        field.performTextInput(".com")
+        compose.onNodeWithText("That isn't a whole email address yet.").assertDoesNotExist()
+        compose.onNodeWithText("Find it on Amazon", substring = true).assertExists()
+        compose.onNodeWithText("Needed to go on.", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Next").assertIsEnabled()
+
+        compose.onNodeWithText("Ask each time").performScrollTo().performClick()
+        click("Example Mail")
         click("Next")
         val science = StarterPacks.all.first { it.name == "Science" }
         compose.onNodeWithContentDescription("All of Science").performScrollTo().performClick()
@@ -84,11 +116,54 @@ class OnboardingTest {
         val s = finished!!
         assertEquals(true, s.onboarded)
         assertEquals(Device.KINDLE, s.device)
-        assertEquals(DeliveryMethod.SHARE, s.delivery)
+        assertEquals(DeliveryMethod.KINDLE_EMAIL, s.delivery)
+        assertEquals(KindleEmail("me_42@kindle.com", MAIL_APP), s.kindleEmailTarget)
         assertEquals(true, s.scheduleEnabled)
         val urls = runBlocking { db.sources().all() }.map { it.url }.toSet()
         assertEquals(science.feeds.map { it.url }.toSet(), urls)
         assertEquals("starter feeds keep their names", "Quanta Magazine", runBlocking { db.sources().byUrl(science.feeds.first().url)!!.title })
+    }
+
+    @Test
+    fun anAddressThatIsntAKindlesIsQueriedButAllowed() {
+        compose.setContent { OnboardingScreen(vm) }
+        click("Get started")
+        scrollAndClick("Kindle")
+        compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address")).performTextInput("me@example.org")
+        compose.onNodeWithText("Kindle addresses end in @kindle.com", substring = true).assertExists()
+        compose.onNodeWithText("Next").assertIsEnabled()
+    }
+
+    @Test
+    fun aKindleReaderCanUseTheKindleAppInstead() {
+        compose.setContent { OnboardingScreen(vm) }
+        click("Get started")
+        scrollAndClick("Kindle")
+        compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address")).performTextInput("me_42@kindle.com")
+        scrollAndClick("Use the Kindle app instead")
+
+        compose.onNodeWithText("Send to Kindle", substring = true).assertExists()
+        compose.onNodeWithText("Send it straight to your Kindle").assertDoesNotExist()
+        vm.toggleFeed(StarterPacks.all.first().feeds.first().url)
+        click("Next")
+        click("Next")
+        click("Make my first edition")
+
+        idleUntil { finished != null }
+        assertEquals(DeliveryMethod.SHARE, finished!!.delivery)
+        assertNull("an address typed before changing their mind isn't kept", finished!!.kindleEmail)
+    }
+
+    @Test
+    fun aKindleReaderWhoChoseTheAppCanComeBackToEmail() {
+        vm.next()
+        vm.chooseDevice(Device.KINDLE)
+        vm.useKindleApp()
+        assertTrue(vm.state.value.canContinue)
+        compose.setContent { OnboardingScreen(vm) }
+        scrollAndClick("Email it to your Kindle instead")
+        compose.onNodeWithText("Send it straight to your Kindle").assertExists()
+        compose.onNodeWithText("Next").assertIsNotEnabled()
     }
 
     @Test
@@ -125,7 +200,7 @@ class OnboardingTest {
         val sourcesVm = SourcesViewModel(sources, FeedFinder(http), TtrssRepository(db, http, accounts, sources)) {}
         compose.setContent { OnboardingScreen(vm, sourcesVm) }
         click("Get started")
-        scrollAndClick("Kindle")
+        scrollAndClick("Kobo")
         click("Next")
         compose.onNodeWithText("Next").assertIsNotEnabled()
 
@@ -149,7 +224,7 @@ class OnboardingTest {
         val sourcesVm = SourcesViewModel(sources, FeedFinder(http)) {}
         compose.setContent { OnboardingScreen(vm, sourcesVm) }
         click("Get started")
-        scrollAndClick("Kindle")
+        scrollAndClick("Kobo")
         click("Next")
         compose.onNodeWithText("Connect tt-rss").assertDoesNotExist()
 
@@ -195,7 +270,7 @@ class OnboardingTest {
         compose.setContent { OnboardingScreen(vm) }
         vm.next()
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Step 1 of 3")).assertExists()
-        vm.chooseDevice(Device.KINDLE)
+        vm.chooseDevice(Device.KOBO)
         vm.next()
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Step 2 of 3")).assertExists()
     }
@@ -218,6 +293,9 @@ class OnboardingTest {
         first.next()
         first.chooseDevice(Device.KOREADER)
         first.chooseFolder("content://tree/books", "Books")
+        first.editKindleEmail("me_42@kindle.com")
+        first.chooseMailApp(MAIL_APP)
+        first.useKindleApp()
         first.toggleFeed(StarterPacks.all.first().feeds.first().url)
         first.setMinutes(45)
         idleUntil { handle.get<Int>("onboarding.minutes") == 45 }
@@ -230,5 +308,17 @@ class OnboardingTest {
         assertEquals("Books", restored.folderName)
         assertEquals(setOf(StarterPacks.all.first().feeds.first().url), restored.chosen)
         assertEquals(45, restored.minutes)
+        assertEquals("me_42@kindle.com", restored.kindleEmail)
+        assertEquals(MAIL_APP, restored.mailApp)
+        assertFalse(restored.kindleByEmail)
+    }
+
+    @Test
+    fun anAddressThatLooksFinishedButIsntIsFlaggedWithoutLeavingTheField() {
+        compose.setContent { OnboardingScreen(vm) }
+        click("Get started")
+        scrollAndClick("Kindle")
+        compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address")).performTextInput("me@@kindle.com")
+        compose.onNodeWithText("That isn't a whole email address yet.").assertExists()
     }
 }

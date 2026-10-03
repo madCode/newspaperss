@@ -53,7 +53,10 @@ import com.app.newspaperss.ui.components.BUILDING_NOTE
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.ui.today.failureColor
+import com.app.newspaperss.delivery.EditionEmail
 import com.app.newspaperss.delivery.EditionIntents
+import com.app.newspaperss.delivery.KindleSend
+import com.app.newspaperss.settings.KindleEmail
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -63,13 +66,22 @@ import kotlin.math.roundToInt
 /**
  * @param preferOpen the reader reads on this device (a Boox), so opening an edition delivers it.
  * @param offerOpen false for a Kindle or Kobo, whose reader sends the book rather than opening it here.
+ * @param kindleEmail Send emails the edition to this Kindle address rather than sharing it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, onReadArticle: (position: Int) -> Unit = {}, preferOpen: Boolean = false, offerOpen: Boolean = true) {
+fun EditionDetailScreen(
+    viewModel: EditionDetailViewModel,
+    onBack: () -> Unit,
+    onReadArticle: (position: Int) -> Unit = {},
+    preferOpen: Boolean = false,
+    offerOpen: Boolean = true,
+    kindleEmail: KindleEmail? = null,
+) {
     val detail by viewModel.detail.collectAsState()
     val message by viewModel.message.collectAsState()
     val building by viewModel.building.collectAsState()
+    val sentToKindle by viewModel.sentToKindle.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     fun launch(intent: Intent): Boolean = try {
@@ -148,7 +160,13 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
                 Header(
                     edition,
                     fileMissing = current.file == null,
-                    onSend = { current.file?.let { launch(EditionIntents.share(context, it, edition.title, edition.id)) } },
+                    sentToKindle = sentToKindle,
+                    onSend = {
+                        current.file?.let {
+                            val body = kindleEmail?.let { EditionEmail.body(edition.title, current.contents.map(EditionContent::entry)) }
+                            EditionIntents.launchSend(context, it, edition.title, edition.id, kindleEmail, body, onMailAppOpened = viewModel::markEmailed)
+                        }
+                    },
                     onOpen = if (offerOpen) {
                         { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } }
                     } else null,
@@ -195,7 +213,7 @@ fun EditionDetailScreen(viewModel: EditionDetailViewModel, onBack: () -> Unit, o
 }
 
 @Composable
-private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> Unit, onOpen: (() -> Unit)?, onSent: () -> Unit, onNotSent: () -> Unit) {
+private fun Header(edition: EditionEntity, fileMissing: Boolean, sentToKindle: KindleSend?, onSend: () -> Unit, onOpen: (() -> Unit)?, onSent: () -> Unit, onNotSent: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(edition.title, style = MaterialTheme.typography.headlineSmall)
         Text(dateOf(edition.createdAt), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
@@ -207,6 +225,7 @@ private fun Header(edition: EditionEntity, fileMissing: Boolean, onSend: () -> U
             val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"
             Text("$articles · about ${minutes(edition.minutes)} min", style = MaterialTheme.typography.bodyMedium)
         }
+        if (edition.status == EditionStatus.DELIVERED) sentToKindle?.let { KindleNote(it) }
         if (edition.status == EditionStatus.READY || edition.status == EditionStatus.DELIVERED) {
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (edition.status == EditionStatus.READY) {

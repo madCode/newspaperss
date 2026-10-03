@@ -58,9 +58,10 @@ class FeedSyncTest {
     @Test
     fun failuresAreRecordedAndClearedByTheNextSuccess() = runTest {
         val id = repo.addFeed(url, "Blog")
-        http.page(url, "oops", code = 500)
+        http.page(url, "oops", code = 403)
         assertEquals(1, sync.syncAll().failedSources)
-        assertEquals("The site answered with error 500.", db.sources().byId(id)!!.lastError)
+        // The same plain words as adding the site, not a bare "error 403".
+        assertEquals("The site turned newspapeRSS away (error 403). Some sites block apps: try again later.", db.sources().byId(id)!!.lastError)
         val firstFailure = now
 
         now = now.plus(Duration.ofDays(1))

@@ -6,6 +6,7 @@ import com.app.newspaperss.core.feed.LinkPosts
 import com.app.newspaperss.core.net.withoutTracking
 import com.app.newspaperss.core.lists.CuratedLists
 import com.app.newspaperss.core.lists.ListLayoutChangedException
+import com.app.newspaperss.core.net.ErrorAnswers
 import com.app.newspaperss.core.net.HttpClient
 import androidx.room.withTransaction
 import org.jsoup.nodes.Entities
@@ -36,7 +37,7 @@ class FeedSync(
     private val http: HttpClient,
     private val clock: Clock = Clock.systemUTC(),
     /** Unpicked feed articles older than this expire, so there's never a backlog to feel behind on. */
-    private val keepFor: Duration = Duration.ofDays(7),
+    private val keepFor: Duration = KEEP_WAITING,
     private val ttrssAccounts: TtrssAccountStore? = null,
     /** How many unpicked links a curated list keeps; older ones expire as new ones arrive. */
     private val listKeep: Int = 12,
@@ -80,7 +81,7 @@ class FeedSync(
                 db.sources().recordSuccess(source.id, now, feed.title, feed.siteUrl, SourceRepository.hostOf(source.url))
                 return added
             }
-            "The site answered with error ${response.code}."
+            ErrorAnswers.message(response.code)
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
@@ -295,7 +296,7 @@ class FeedSync(
                     if (untitled.isNotEmpty()) runCatching { onUntitled(untitled) }
                     return added
                 }
-                "The site answered with error ${response.code}."
+                ErrorAnswers.message(response.code, curatedList = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
@@ -315,6 +316,9 @@ class FeedSync(
     companion object {
         private val UNTITLED_LOOKUP_FOR: Duration = Duration.ofDays(2)
         private val LIST_FEEDS_EVERY: Duration = Duration.ofDays(1)
+
+        /** How long an unpicked article waits, from when it was found, before it expires. */
+        val KEEP_WAITING: Duration = Duration.ofDays(7)
 
         const val LIST_LAYOUT_CHANGED =
             "This page has changed its layout, so newspapeRSS can't tell which links are new and took none. An app update should fix it."

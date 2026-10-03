@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import com.app.newspaperss.ui.components.BUILDING_NOTE
+import com.app.newspaperss.ui.components.historyLine
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -252,6 +253,12 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                             cap()
                         }
                     }
+                    val paidOnly = detail?.paidOnly
+                    // Only once the source has had one: most never do, and the page has enough on it.
+                    // A setting of the whole account, so not on one of its feeds' pages.
+                    if (!viewModel.isFeed && source.kind != SourceKind.READING_LIST && paidOnly != null && (source.skipPaidPosts || paidOnly.found > 0)) {
+                        PaidPostsOption(source.skipPaidPosts, paidOnly.skipped, source.kind == SourceKind.TTRSS, viewModel::setSkipPaidPosts)
+                    }
                     HorizontalDivider(Modifier.padding(top = 16.dp))
                     ArticlesHeading(articles, selecting, onSelect = { selecting = true })
                     if (building && articles.isNotEmpty()) {
@@ -261,6 +268,13 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 items(articles, key = { it.id }) { article ->
                     RecentArticle(
                         article,
+                        historyLine(
+                            article,
+                            detail?.history?.get(article.id),
+                            // A curated list expires by count (its newest 12), so no day count there.
+                            expires = source.kind == SourceKind.FEED || source.kind == SourceKind.TTRSS,
+                            paused = source.paused,
+                        ),
                         locale,
                         building,
                         selection = if (selecting) article.id in selected else null,
@@ -384,6 +398,33 @@ private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onM
 }
 
 @Composable
+private fun PaidPostsOption(skip: Boolean, skipped: Int, wholeAccount: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .toggleable(value = skip, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Skip paid posts with nothing free")
+            Text(
+                listOfNotNull(
+                    when {
+                        skip && skipped > 0 -> "${plural(skipped, "paid post")} skipped so far: a title and a picture, nothing to read."
+                        skip -> "A post that's only a title and a picture won't take a place."
+                        else -> "Some of its posts are for paying subscribers, with only a title and a picture free."
+                    },
+                    "For every feed in this account.".takeIf { wholeAccount },
+                ).joinToString(" "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = skip, onCheckedChange = null)
+    }
+}
+
+@Composable
 private fun FeedsRow(feeds: List<FeedChoice>, onChange: (FeedChoice, Boolean) -> Unit) {
     if (feeds.isEmpty()) return
     var choosing by rememberSaveable { mutableStateOf(false) }
@@ -492,7 +533,7 @@ private fun CategoryChoice(label: String, selected: Boolean, onClick: () -> Unit
 }
 
 /** The font scale from which rows stack rather than squeeze. */
-private const val LARGE_TEXT = 1.3f
+internal const val LARGE_TEXT = 1.3f
 
 @Composable
 private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowDefault: () -> Unit) {
@@ -506,7 +547,7 @@ private fun ArticleCap(own: Int?, default: Int, onStep: (Int) -> Unit, onFollowD
             )
             Text(
                 if (own == null) "Your edition setting. Choose fewer or more to give this site a firm limit."
-                else "Your edition setting: ${plural(default, "article")} from each site, then more if there's room",
+                else "Your edition setting: ${plural(default, "article")} from each source, then more if there's room",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -693,6 +734,7 @@ private val IdSetSaver = Saver<Set<Long>, LongArray>(save = { it.toLongArray() }
 @Composable
 private fun RecentArticle(
     article: ArticleEntity,
+    status: String,
     locale: Locale,
     building: Boolean,
     selection: Boolean?,
@@ -702,7 +744,6 @@ private fun RecentArticle(
     onStartSelecting: () -> Unit,
 ) {
     val context = LocalContext.current
-    val status = articleStatus(article)
     val details = buildAnnotatedString {
         // When it was published: a tt-rss backlog arrives all at once, and every row would show
         // the day it was fetched.
@@ -814,14 +855,6 @@ private fun modeName(publication: PublicationEntity?) = when (publication?.chose
 /** Where a publication's text comes from, including while the automatic check is still deciding. */
 private fun textLine(publication: PublicationEntity?): String =
     fullTextLine(publication) ?: "Still working out whether this site sends full articles"
-
-internal fun articleStatus(article: ArticleEntity): String = if (isStarred(article)) "Starred for your next edition" else when (article.state) {
-    ArticleState.NEW -> "Waiting for an edition"
-    ArticleState.IN_EDITION -> "In an edition you haven't sent yet"
-    ArticleState.DELIVERED -> "Delivered"
-    ArticleState.SKIPPED -> "Marked as read"
-    ArticleState.EXPIRED -> "Not picked before it got old"
-}
 
 /** Null until a failure has lasted past the day it started: one bad sync isn't worth a second line. */
 internal fun failingLine(since: Instant?, locale: Locale, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? {

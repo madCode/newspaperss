@@ -39,7 +39,13 @@ class EditionRunTest {
     private val editions by lazy { EditionRepository(db, tmp.newFolder("editions")) }
     private val notices = mutableListOf<String>()
     private val notifier = object : EditionNotifier {
-        override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean) { notices += if (openInstead) "open ${edition.title}" else "ready ${edition.title}" }
+        override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean, byEmail: Boolean) {
+            notices += when {
+                openInstead -> "open ${edition.title}"
+                byEmail -> "email ${edition.title}"
+                else -> "ready ${edition.title}"
+            }
+        }
         override fun editionDelivered(edition: EditionEntity, where: String) { notices += "delivered to $where" }
         override fun problem(title: String, reason: String) { notices += "problem: $reason" }
         override fun dismissFor(editionId: Long) {}
@@ -171,5 +177,21 @@ class EditionRunTest {
         settings.update { it.copy(device = com.app.newspaperss.settings.Device.BOOX) }
         run.run(scheduled = true)
         assertTrue(notices.single().startsWith("open"))
+    }
+
+    @Test
+    fun aKindleEmailReaderIsOfferedAnEmailToTheirKindle() = runTest {
+        oneSource()
+        settings.update { it.copy(device = com.app.newspaperss.settings.Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "me_1@kindle.com", mailApp = "com.example.mail") }
+        run.run(scheduled = true)
+        assertTrue(notices.single(), notices.single().startsWith("email"))
+    }
+
+    @Test
+    fun emailDeliveryWithNoAddressFallsBackToTheShareSheet() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = null) }
+        run.run(scheduled = true)
+        assertTrue(notices.single().startsWith("ready"))
     }
 }

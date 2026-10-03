@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
+import com.app.newspaperss.delivery.KindleSend
+import com.app.newspaperss.settings.KindleEmail
 import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.settings.Device
@@ -49,6 +51,10 @@ data class TodayState(
     val deviceName: String = "e-reader",
     /** Starred articles not yet in an edition, from sources that aren't paused. */
     val starredWaiting: Int = 0,
+    /** Editions just sent to a Kindle, and how, which can take a few minutes to arrive. */
+    val sentToKindle: Map<Long, KindleSend> = emptyMap(),
+    /** Where Send emails editions, or null when it shares them. */
+    val kindleEmail: KindleEmail? = null,
 )
 
 class TodayViewModel(
@@ -58,11 +64,15 @@ class TodayViewModel(
     online: Flow<Boolean> = flowOf(true),
     private val now: () -> ZonedDateTime = { ZonedDateTime.now() },
     private val lastDue: () -> Long = { 0L },
+    sentToKindle: Flow<Map<Long, KindleSend>> = flowOf(emptyMap()),
     private val startBuild: () -> Unit,
 ) : ViewModel() {
-    val state: StateFlow<TodayState> = combine(editions.observeAll(), work, settings, online, editions.observeStarredWaiting()) { list, info, s, isOnline, starred ->
+    private val editionsAndKindle = combine(editions.observeAll(), sentToKindle, ::Pair)
+
+    val state: StateFlow<TodayState> = combine(editionsAndKindle, work, settings, online, editions.observeStarredWaiting()) { (list, kindle), info, s, isOnline, starred ->
         TodayState(
             editions = list,
+            sentToKindle = kindle,
             build = buildStateOf(info, isOnline),
             next = nextEdition(s, now(), lastDue()),
             preferOpen = s.device == Device.BOOX,
@@ -74,6 +84,7 @@ class TodayViewModel(
                 else -> "e-reader"
             },
             starredWaiting = starred,
+            kindleEmail = s.kindleEmailTarget,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayState(null, BuildState.Idle))
 
@@ -81,10 +92,17 @@ class TodayViewModel(
 
     fun fileOf(edition: EditionEntity): File? = editions.fileOf(edition)
 
+    fun emailBody(editionId: Long): Flow<String?> = editions.observeEmailBody(editionId)
+
     fun markSent(edition: EditionEntity) = markSent(edition.id)
 
     fun markSent(editionId: Long) {
         viewModelScope.launch { editions.markSent(editionId) }
+    }
+
+    /** The mail app was opened to email [editionId] to the reader's Kindle, which counts as sent. */
+    fun markEmailed(editionId: Long) {
+        viewModelScope.launch { editions.markEmailedToKindle(editionId) }
     }
 
     fun markNotSent(editionId: Long) {

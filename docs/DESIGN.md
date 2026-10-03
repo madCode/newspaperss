@@ -79,6 +79,26 @@ module so it's all unit-tested without Android.
   preview. If the page can't be fetched (or is over 5 MB, too big to parse
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
+- **Paid posts.** A post for paying subscribers goes in as its free part,
+  with a note saying so. It's known by what the platform puts on the page
+  in place of the rest: Ghost's upgrade box or Substack's paywall. Not
+  schema.org's `isAccessibleForFree`: metered news sites set it to false
+  and serve the whole story. A feed text ending in "Read more" back to the
+  post (Substack's paid openings, excerpt feeds) counts as an excerpt
+  however long, so the page is fetched; that link and the pitch over the
+  paywall are removed. One with next to nothing free (under 50 words: a
+  title and a picture) can be left out instead, per source, with **Skip
+  paid posts with nothing free** on its page. That switch shows once the
+  source has had one, is off until turned on, and says how many it has
+  skipped (on a tt-rss account, for every feed in it). Only a first find
+  is skipped: it counts as not picked ("Skipped: a paid post") and isn't
+  fetched again. Starring it or marking it unread asks for it, so it goes
+  in. An edition whose every new article was skipped is nothing new, not
+  a failure.
+- **Embeds.** A video can't play in a book: a video's poster frame stands
+  in for it, and a YouTube or Vimeo player becomes a link to the video
+  (with YouTube's thumbnail). tt-rss passes no players on, so a caption
+  left without its video becomes a plain paragraph.
 - **Link posts.** Some feeds mostly pitch stories on other sites
   (Longreads' picks: a few paragraphs, then "Read the story" at
   `equator.org/…?src=longreads`). A feed or tt-rss item counts as a link
@@ -121,7 +141,9 @@ module so it's all unit-tested without Android.
 - **Comics and image posts.** A feed item that's just an image counts as
   content. When a page's text is clearly not the article, the page's main
   image is used, and a webcomic's own comic (all its panels) beats the
-  feed's thumbnail.
+  feed's thumbnail. An image's title text (xkcd's hover joke) becomes a
+  caption under it, unless it only repeats the image's description or file
+  name, or the article already shows it.
 - **Which text to use, per publication.** A publication is who wrote the
   articles: a feed added here, or one feed inside a tt-rss account, each
   learning on its own. Each article whose page was read is evidence:
@@ -132,7 +154,7 @@ module so it's all unit-tested without Android.
   Three days pointing the same way set the publication to that; the reader
   can override it on its page, a tt-rss feed's included ("Article text:
   Automatic / Feed's text / Full page").
-  - A short item always has its page read. A long one is taken from the feed,
+  - A short item, or one ending in "Read more", always has its page read. A long one is taken from the feed,
     so it only counts once checked: each edition reads the pages of up to 5
     long items, one per publication, from publications still being worked
     out, or settled on the feed's text and not checked for 14 days (daily
@@ -157,7 +179,9 @@ module so it's all unit-tested without Android.
     5 minutes or more, a "Next" link with the next one's source and time (a
     pause after a long piece; after a short one, turning the page is enough);
   - footnotes that work in the book, even from tt-rss, which strips the
-    ids they point at (they're paired up again by number), and Substack
+    ids they point at (they're paired up again by number). A marker points
+    at the whole footnote, so a Kindle's popup shows its text, and markers
+    side by side are split with a comma ("3, 4"). Substack
     Notes quoted where the post embeds them (from Substack's own feed: tt-rss
     strips the Note's text);
   - "That's all for today", a chapter in the contents, with the day's
@@ -194,12 +218,27 @@ module so it's all unit-tested without Android.
 
 | Device | How it gets there | Unattended? |
 |---|---|---|
-| Kindle | Share to the Kindle app, one tap from the "ready" notification | One tap |
+| Kindle | Email it to the Kindle's own address: Send opens your mail app with everything filled in, and you tap Send | One tap, then Send in the mail app |
+| Kindle, without email | Share to the Kindle app, one tap from the "ready" notification. It goes to the cloud library, or straight to the Kindle with "Add to your library" turned off in its form (then it doesn't sync) | One tap |
 | Kobo | Share to Dropbox, into the folder the Kobo syncs (`Apps/Rakuten Kobo`) | One tap |
 | PocketBook | Share to an email app, to your `@pbsync.com` address | One tap |
 | KOReader | Save to a folder that syncs to the device (Syncthing) | Yes |
 | Boox | Open it in the device's reader, from the app or the notification | Yes |
 | Anything else | The share sheet | One tap |
+
+**Email to a Kindle.** Each Kindle has its own Send-to-Kindle address
+(…@kindle.com), and a book emailed there is delivered to that device by
+itself. The app doesn't send mail: Send opens the mail app chosen in
+setup, straight to a compose screen with the Kindle's address, the
+edition's title as the subject and the EPUB attached. The body lists the
+edition's articles, so your Sent folder shows what each one held (Amazon
+ignores it). "Ask each time", or
+a chosen app that's been uninstalled, opens the share sheet with the same
+email instead. Android can't choose the "From" account for another app,
+so the address you send from has to be on Amazon's approved list
+(Personal Document Settings), and setup says so. The notification's Send uses the
+settings as they are when it's tapped. The app's mail apps are
+the ones that both write mail and take an EPUB.
 
 Folders use Android's folder picker. Google Drive and Dropbox don't offer
 whole folders to other apps that way, so cloud delivery goes through a
@@ -207,10 +246,18 @@ share for now (a direct Dropbox connection is in the backlog).
 
 **When is an edition delivered?** Saving it to your folder; choosing an app
 in the share sheet (Android reports the choice back, from the notification
-too); or opening it on a Boox. **I've sent it** covers any other route, and
+too); opening the mail app to email it to a Kindle; or opening it on a Boox. **I've sent it** covers any other route, and
 **Send again** is there if a send didn't arrive. An edition still "ready"
 when the next one is built was never sent: it's marked not sent and its
 articles go back, keeping their stars, before the new one is planned.
+
+**Send to Kindle is slow.** A book can take a few minutes to reach a
+Kindle, so for half an hour after a send the edition (on Today and its own
+page) says so: "Sent to Kindle. It can take a few minutes to show up in
+your library." after the Kindle app, or "Emailed to your Kindle. It can
+take a few minutes to arrive; it shows up by itself." after an email. Any
+other delivery, or marking it as not sent, takes the note away. It's only
+remembered while the app is running.
 
 **A send that didn't arrive can be undone.** A failed Send to Kindle still
 counts as sent, because Android only reports the app you chose.
@@ -226,8 +273,9 @@ article brought back into a newer edition since stays in that one.
 
 **The app you send to can read the book after its screen closes.** A share
 only lets the receiving screen read the file, and Send to Kindle uploads
-after its form closes. So the Kindle app, and whichever app you pick, is
-allowed to read that edition's file until the phone restarts.
+after its form closes. So the Kindle app, the mail app that emails it, and
+whichever app you pick, are allowed to read that edition's file until the
+phone restarts.
 
 ## 7. What happens to articles you didn't read
 
@@ -309,7 +357,11 @@ allowed to read that edition's file until the phone restarts.
 1. **Welcome.**
 2. **Where do you read?** Kindle, Kobo, Boox, PocketBook, KOReader, or
    "just the file". This picks the delivery method; KOReader asks for its
-   folder.
+   folder. Kindle sets up email to the Kindle: its address (Next waits for
+   one that looks like an email address, and an address not at kindle.com
+   or kindle.cn gets a warning), the mail app to send with, and a reminder
+   to approve the sending address on Amazon. **Use the Kindle app
+   instead** shares to the Kindle app.
 3. **Pick your sources:** starter packs of well-known public feeds; paste
    any website (the app finds its feed); import an OPML file (its folders
    are ignored: the paper has no sections); connect a
@@ -324,7 +376,9 @@ allowed to read that edition's file until the phone restarts.
 - **Today** (home): when the next edition is due, how many starred articles
   will go in the next one (only when some will), and the latest edition with
   **Send**, **Open** and **I've sent it** (**Send again** and **Didn't
-  arrive? Mark as not sent** once delivered).
+  arrive? Mark as not sent** once delivered). The line under the buttons
+  says what counts as sent: choosing an app, or, with email to a Kindle,
+  opening the mail app.
   **Make an edition now** is the main button only before the first edition;
   after that it's a quiet **Make another edition**, since today's paper is
   done. A failed build or edition offers **Try again** after saying what
@@ -334,7 +388,14 @@ allowed to read that edition's file until the phone restarts.
 - **Edition:** the same buttons as Today's card, including **Mark as not sent**,
   and its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
-  network). **Notes** exports a Markdown file for a notes app: front matter
+  network). **Aa** in the preview's top bar sets its text size (Small,
+  Default, Large, Larger), kept for next time, on top of Android's own font
+  size. **Share** beside it sends the article's original link to Android's
+  share sheet, for the page on screen; it's hidden when an article has no web
+  link. Large pictures that stand
+  alone fill the width (small ones keep their size), and the page can be
+  pinched to zoom into a comic. **Notes** exports a Markdown file for a
+  notes app: front matter
   (date, edition, sources, a tag) for Obsidian, the closing page's question and
   a few reflection prompts at the top, then per article its source, author, date, link, a citation and room for notes.
   **Delete edition** is in the ⋮ menu, and asks by name, saying what happens
@@ -369,6 +430,12 @@ allowed to read that edition's file until the phone restarts.
   Read, delivered and too-old rows have a dimmed title, in a lighter weight
   as well as a muted colour so it shows on e-ink, so what's still to come
   stands out. A starred one isn't dimmed: it's going out again.
+  The details line ends with where the article stands: "Waiting, N days
+  left" (it expires 7 days after it was found; curated lists and saved
+  links just say "Waiting"), "In your next edition" (starred; "Starred,
+  source paused" while paused), "In Thursday's edition", "Sent Wednesday"
+  (when its link last went out), "Read", "Not picked" (it waited a
+  week, or the list moved on), or "Skipped: a paid post".
   - **Select** (or pressing and holding a row) enters selection mode:
     checkboxes take the status marks' place, the top bar says "N
     selected", and a bar at the bottom has **☆ Next edition** and
@@ -386,9 +453,29 @@ allowed to read that edition's file until the phone restarts.
   checklist (compatible with the library); Pocket and Instapaper exports
   import too. **✕** removes a link at once, with **Undo** in a snackbar, since
   removing is routine and a confirm would only be tapped through.
-- **Settings:** the edition (size, per-source cap, order), the schedule
-  (time and days), your e-reader, delivery (share or folder), reading notes, and the
-  app's version.
+- **Settings** is a summary: one row per page, each with a line saying
+  how it's set now ("About 30 minutes · 1 per source · take turns",
+  "Ready by 6:30 AM, weekdays", "Kindle · emailed to …", "Off"), then the
+  app's version. Tapping a row opens its page, with a back arrow. Anything
+  that needs fixing (no days picked, notifications off, a folder it can't
+  reach, a Kindle address missing) also shows on the row in red, so it
+  isn't a tap away. The pages:
+  - **Your edition:** size, how many from each source, order. At large
+    text sizes, the − and + for the per-source count go below its words.
+  - **Schedule:** on or off, the time and the days. With notifications off, a warning for every delivery:
+    a shared or emailed edition's Send is in its notification, and a
+    folder save that fails is only reported there.
+  - **E-reader & delivery:** the e-reader in a dropdown at the top, then
+    "How it gets there". They share a page because the e-reader decides
+    which delivery options show: **Email it to your Kindle** (shown for a Kindle, or once
+    chosen) with the Kindle's address and the mail app to send with
+    (without a working address it says Send opens the share sheet until
+    one is added); **Send it myself** (tap Send and choose an app), with
+    a tip on sending to your e-reader under it while it's chosen; or
+    **Save to a folder**. A folder the app can no longer reach (its access
+    was revoked, or its app uninstalled) says "Can't reach <name>. Tap to
+    choose it again." instead of saving automatically, and tapping picks
+    it again; so does the notes folder, which also offers **Turn off**.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
     delivered, by share, folder or Open, in the background so a slow cloud folder
@@ -401,7 +488,7 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 
 ## 10. Architecture
 
-### Modules
+How the code is built, with diagrams, is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```
 :core  (Kotlin/JVM, no Android)          :app  (Android, Compose)
@@ -418,65 +505,6 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 ├─ ttrss/    the tt-rss API
 └─ net/      HttpClient (OkHttp)
 ```
-
-### Data
-
-```mermaid
-erDiagram
-    SOURCE ||--o{ PUBLICATION : carries
-    SOURCE ||--o{ ARTICLE : "brings in"
-    PUBLICATION ||--o{ ARTICLE : "wrote"
-    EDITION ||--o{ EDITION_ARTICLE : holds
-    ARTICLE ||--o{ EDITION_ARTICLE : "goes in"
-    SOURCE {
-        string kind "feed, reading list, tt-rss, curated list"
-        string contentMode "page for kinds with no feed text"
-        instant feedsListedAt "tt-rss: last full feed list"
-    }
-    PUBLICATION {
-        string key "empty for its source's own, the tt-rss feed id"
-        string chosenMode "the reader's article text"
-        string contentMode "what the check learned"
-        int maxArticles "its cap"
-        bool leftOut "kept out of the paper"
-        string feedUrl "tt-rss: from the feed list"
-        bool listed "tt-rss: in the latest list"
-    }
-    ARTICLE {
-        string originId "the tt-rss feed id"
-        string state
-    }
-```
-
-- **Sources carry, publications write.** A source is how articles arrive
-  (a feed address, a tt-rss account, the reading list, a curated list):
-  sync, read sync, sign-in and Pause are per source, and so is "always the
-  page" for the kinds with no feed text. A publication is who wrote them:
-  article text, cap and leaving out are per publication, and the
-  planner takes turns between publications. A feed added here and a feed
-  in tt-rss differ only in which source carries them.
-- A publication's row is written only once there's something to keep; no
-  row means the defaults. The reading list is one publication whatever
-  sites its links are from: one voice, one turn.
-- `delivered_urls` (links already sent) stands alone.
-
-### Choosing an article's text
-
-```mermaid
-flowchart TD
-    A[Article in plan order] --> B{Reader chose a mode for its publication?}
-    B -- yes --> M[Use it]
-    B -- no --> C{Long item, publication due a check,<br/>fewer than 5 checks this edition?}
-    C -- yes --> P[Read the page and compare]
-    P --> E[Evidence for its publication]
-    P --> T{Teaser?}
-    T -- yes --> PG[Page text]
-    T -- no --> FT[Feed text]
-    C -- no --> L[The publication's learned mode,<br/>short items still read the page]
-    E --> S[Three days the same way settles the publication]
-```
-
-### Notes
 
 - **`:core` is pure Kotlin,** so the planner, parser, extractor and EPUB
   writer run as fast JVM tests.

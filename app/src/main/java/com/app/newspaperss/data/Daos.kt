@@ -112,6 +112,9 @@ interface SourceDao {
     @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")
     suspend fun setMarkReadOnServer(id: Long, markRead: Boolean)
 
+    @Query("UPDATE sources SET skipPaidPosts = :skip WHERE id = :id")
+    suspend fun setSkipPaidPosts(id: Long, skip: Boolean)
+
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 
@@ -223,6 +226,48 @@ interface ArticleDao {
 
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt DESC, id DESC")
     fun observeAllForSource(sourceId: Long): Flow<List<ArticleEntity>>
+
+    /**
+     * What a source's page says happened to its articles: when a delivered one's link went out,
+     * and which unsent edition holds one that's in an edition. An article can sit in two unsent
+     * editions (see [release]); the newest is named.
+     */
+    @Query(
+        """SELECT a.id AS articleId, d.deliveredAt AS sentAt, NULL AS editionTitle
+           FROM articles a JOIN delivered_urls d ON d.url = a.url
+           WHERE a.sourceId = :sourceId AND a.state = 'DELIVERED' AND a.url != ''
+           UNION ALL
+           SELECT ea.articleId AS articleId, NULL AS sentAt, e.title AS editionTitle
+           FROM edition_articles ea JOIN editions e ON e.id = ea.editionId JOIN articles a ON a.id = ea.articleId
+           WHERE a.sourceId = :sourceId AND a.state = 'IN_EDITION' AND e.status IN ('READY', 'BUILDING')
+             AND e.id = (SELECT e2.id FROM edition_articles ea2 JOIN editions e2 ON e2.id = ea2.editionId
+                         WHERE ea2.articleId = ea.articleId AND e2.status IN ('READY', 'BUILDING')
+                         ORDER BY e2.createdAt DESC, e2.id DESC LIMIT 1)""",
+    )
+    fun observeHistory(sourceId: Long): Flow<List<ArticleHistory>>
+
+    /**
+     * A paid post an edition found next to nothing free in; [skip] leaves it out for good, as
+     * [ArticleEntity.paidSkipped]. Not a starred one, nor one that's already left the waiting articles:
+     * a star given while the edition was being made wins.
+     */
+    @Query(
+        """UPDATE articles SET paidOnly = 1,
+               paidSkipped = CASE WHEN :skip AND state = 'NEW' AND starredAt IS NULL THEN 1 ELSE paidSkipped END,
+               state = CASE WHEN :skip AND state = 'NEW' AND starredAt IS NULL THEN 'EXPIRED' ELSE state END
+           WHERE id = :id""",
+    )
+    suspend fun markPaidOnly(id: Long, skip: Boolean)
+
+    /** How many of a source's articles were paid posts with nothing free, and how many of them are left out. */
+    @Query(
+        """SELECT COUNT(*) AS found, COALESCE(SUM(CASE WHEN paidSkipped = 1 AND state = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS skipped
+           FROM articles WHERE sourceId = :sourceId AND paidOnly = 1""",
+    )
+    fun observePaidOnly(sourceId: Long): Flow<PaidOnlyCount>
+
+    @Query("SELECT COUNT(*) FROM articles WHERE id IN (:ids) AND paidSkipped = 1 AND state = 'EXPIRED'")
+    suspend fun countPaidSkipped(ids: Collection<Long>): Int
 
     /** Newest first by the date a source's page shows ([ArticleEntity.shownDate]). */
     @Query(
@@ -362,7 +407,7 @@ interface ArticleDao {
      * sync marks it unread (see [unreportedUnread]).
      */
     @Query(
-        """UPDATE articles SET state = 'NEW', discoveredAt = :now,
+        """UPDATE articles SET state = 'NEW', discoveredAt = :now, paidSkipped = 0,
                reportedRead = CASE WHEN state = 'DELIVERED' THEN 1 ELSE reportedRead END
            WHERE id = :id AND state IN ('SKIPPED', 'EXPIRED', 'DELIVERED')""",
     )
@@ -484,6 +529,12 @@ interface ArticleDao {
 private const val DELIVERED_SINCE = """SELECT ea.articleId FROM edition_articles ea JOIN editions e ON e.id = ea.editionId
     WHERE ea.editionId != :editionId AND ea.articleId IS NOT NULL AND e.status = 'DELIVERED'
     AND e.deliveredAt > COALESCE((SELECT deliveredAt FROM editions WHERE id = :editionId), 0)"""
+
+/** A source's paid posts with next to nothing free: how many were found, and how many are left out. */
+data class PaidOnlyCount(val found: Int, val skipped: Int)
+
+/** One fact about what happened to an article: when it went out, or which unsent edition holds it. */
+data class ArticleHistory(val articleId: Long, val sentAt: Instant?, val editionTitle: String?)
 
 /** A tt-rss article's guid and the tt-rss feed it came from. */
 data class TtrssRef(val guid: String, val originId: String?)

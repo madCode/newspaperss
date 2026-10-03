@@ -295,6 +295,70 @@ class HtmlCleanerTest {
         assertNull(HtmlCleaner.bestSrcsetCandidate(""))
     }
 
+    /** tt-rss joins the candidates it passes on with bare commas; a CDN's commas inside URLs mustn't split them. */
+    @Test
+    fun srcsetJoinedWithBareCommasStillOffersEveryCandidate() {
+        assertEquals(
+            "https://img.example.com/w_1200,q_80/x.jpg",
+            HtmlCleaner.bestSrcsetCandidate("https://img.example.com/w_400,q_80/x.jpg 400w,https://img.example.com/w_1200,q_80/x.jpg 1200w"),
+        )
+        assertEquals("b.jpg", HtmlCleaner.bestSrcsetCandidate("a.jpg 1x,b.jpg 2x"))
+        assertEquals("b.jpg", HtmlCleaner.bestSrcsetCandidate("a.jpg 1.5x,b.jpg 2x"))
+    }
+
+    /** A video can't play in a book; its poster can show, so its caption still has something to describe. */
+    @Test
+    fun aVideoBecomesItsPosterAndAPlayerALink() {
+        val video = clean("""<figure><video src="/v.mp4" poster="/v.jpg"></video><figcaption>The robot prison</figcaption></figure><p>$longText</p>""")
+        assertTrue(video, video.contains("""<figure><img src="https://example.com/v.jpg" alt="Video" /><figcaption>The robot prison</figcaption></figure>"""))
+        val player = clean("""<iframe src="https://www.youtube.com/embed/6PkAr_RKzlY?feature=oembed" title="How I grew a newsletter"></iframe><p>$longText</p>""")
+        assertTrue(player, player.contains("""<a href="https://www.youtube.com/watch?v=6PkAr_RKzlY"><img src="https://i.ytimg.com/vi/6PkAr_RKzlY/hqdefault.jpg" alt="How I grew a newsletter" /></a>"""))
+        assertTrue(player, player.contains("""<p><a href="https://www.youtube.com/watch?v=6PkAr_RKzlY">Watch on YouTube: How I grew a newsletter</a></p>"""))
+        assertTrue(clean("""<iframe src="https://player.vimeo.com/video/123456"></iframe><p>$longText</p>""").contains("""<a href="https://vimeo.com/123456">Watch on Vimeo</a>"""))
+        assertFalse("other players still go", clean("""<iframe src="https://ads.example.com/x"></iframe><p>$longText</p>""").contains("iframe"))
+    }
+
+    /** tt-rss passes no iframes on: the caption left behind becomes a paragraph rather than captioning nothing. */
+    @Test
+    fun aCaptionWhoseVideoIsGoneBecomesAParagraph() {
+        assertEquals("<p>The robot prison</p><p>$longText</p>".trim(), clean("""<figure><figcaption>The robot prison</figcaption></figure><p>$longText</p>""").trim())
+        assertEquals("<p>Two</p><p>lines</p>", clean("""<figure><figcaption><p>Two</p><p>lines</p></figcaption></figure>"""))
+    }
+
+    /** Substack ends a paid post's opening in its feed with "Read more" back to the post; the book links to it anyway. */
+    @Test
+    fun aClosingReadMoreToThePostItselfGoes() {
+        val result = HtmlCleaner.clean("""<p>$longText</p><p> <a href="$base"> Read more </a> </p>""", base, null)
+        assertTrue(result.teaser)
+        assertFalse(result.html, result.html.contains("Read more"))
+        val elsewhere = HtmlCleaner.clean("""<p>$longText</p><p><a href="https://other.example.com/story">Read more</a></p>""", base, null)
+        assertFalse("a link to another page is the author's", elsewhere.teaser)
+        assertTrue(elsewhere.html.contains("Read more"))
+        val midway = HtmlCleaner.clean("""<p><a href="$base">Read more</a></p><p>$longText</p>""", base, null)
+        assertFalse("only at the very end", midway.teaser)
+    }
+
+    @Test
+    fun newsletterPitchesGoButAnAuthorsOwnLineStays() {
+        for (pitch in listOf(
+            "Countercraft is a reader-supported publication. To receive new posts and support my work, consider becoming a free or paid subscriber.",
+            "Subscribe to Slow Boring to keep reading this post and get 7 days of free access to the full post archives.",
+            "Don't miss what's next. Subscribe to Computer Things:",
+            "<em>The Marginalian</em> has a free weekly newsletter. It comes out on Sundays. Like? <a href=\"/newsletter/\">Sign up.</a>",
+        )) assertFalse(pitch, clean("<p>$pitch</p><p>$longText</p>").contains("ubscri") || clean("<p>$pitch</p><p>$longText</p>").contains("Sign up"))
+        assertEquals("", clean("<h5>Add a comment:</h5><h3>newsletter</h3>"))
+        for (own in listOf(
+            "If you're reading this on the web, you can subscribe here. Updates are once a week.",
+            "Three newsletters I subscribe to and love:",
+            "As the banner put it, \"subscribe to The Atlantic to keep reading\", which I did not.",
+        )) assertTrue(own, clean("<p>$own</p><p>$longText</p>").contains(own.replace("\"", "&quot;")) || clean("<p>$own</p><p>$longText</p>").contains(own))
+        val micro = "Just launched my newsletter, go <a href=\"https://example.com/n\">sign up</a>."
+        assertTrue("a sign-up link mid-sentence is the author's", clean("<p>$micro</p>").contains("launched my newsletter"))
+        val shortPost = "<div><p>Worth reading: a fine essay on slowness.</p><p>Thanks for reading Foo! Subscribe for free to receive new posts and support my work.</p></div>"
+        assertTrue("a wrapper holding a pitch isn't one", clean(shortPost).contains("Worth reading"))
+        assertFalse(clean(shortPost).contains("Subscribe"))
+    }
+
     @Test
     fun removesLeadingTitleAndDemotesHeadings() {
         assertEquals("<p>Intro</p><h2>Section</h2><h4>Sub</h4>", clean("<h1>The Title!</h1><p>Intro</p><h1>Section</h1><h3>Sub</h3>", "The title"))
@@ -329,6 +393,61 @@ class HtmlCleanerTest {
     fun countsWordsOfTheCleanedText() {
         val result = HtmlCleaner.clean("<p>One two three.</p><script>var a = b c d;</script><div class=\"share\">Share</div><p>Four</p>", base, null)
         assertEquals(4, result.wordCount)
+    }
+
+    private val xkcd = "<img src=\"https://imgs.xkcd.com/comics/sandwich.png\" title=\"Proper User Policy apparently means Simon Says.\" alt=\"Sandwich\" />"
+
+    /** A webcomic's hover text is often its second joke, and e-readers have no hover. */
+    @Test
+    fun anImagesTitleTextBecomesItsCaption() {
+        val result = HtmlCleaner.clean(xkcd, base)
+        assertEquals(
+            "<figure><img src=\"https://imgs.xkcd.com/comics/sandwich.png\" alt=\"Sandwich\" />" +
+                "<figcaption>Proper User Policy apparently means Simon Says.</figcaption></figure>",
+            result.html,
+        )
+        // Still a picture with no words, so the rules for comics treat it as one.
+        assertEquals(0, result.wordCount)
+        // Linked, and alone in a paragraph, as feeds often wrap a comic: the figure takes their place.
+        val linked = clean("<p><a href=\"https://xkcd.com/149/\">$xkcd</a></p>")
+        assertEquals("<figure><p><a href=\"https://xkcd.com/149/\"><img", linked.substringBefore(" src="))
+        assertTrue(linked, linked.endsWith("</a></p><figcaption>Proper User Policy apparently means Simon Says.</figcaption></figure>"))
+        // A figure of its own gets the caption, unless it has one.
+        assertTrue(clean("<figure>$xkcd</figure>").endsWith("<figcaption>Proper User Policy apparently means Simon Says.</figcaption></figure>"))
+        assertEquals(1, Jsoup.parse(clean("<figure>$xkcd<figcaption>By Randall</figcaption></figure>")).select("figcaption").size)
+    }
+
+    @Test
+    fun aTitleThatAddsNothingIsNoCaption() {
+        val titles = listOf("", "  ", "Sandwich", "sandwich.png", "sandwich", "IMG 1234")
+        for (title in titles) {
+            val src = if (title == "IMG 1234") "https://example.com/IMG_1234.jpg" else "https://example.com/sandwich.png"
+            val html = clean("<img src=\"$src\" title=\"$title\" alt=\"Sandwich\"><p>$longText</p>")
+            assertFalse("\"$title\": $html", html.contains("figcaption"))
+        }
+        // Already on the page under the image: not said twice.
+        val shown = clean("$xkcd<p>Proper User Policy apparently means Simon Says.</p>")
+        assertFalse(shown, shown.contains("figcaption"))
+        // An image within a line of text can't take a figure there; the text is left as it is.
+        val inline = clean("<p>Here it is $xkcd in the middle.</p>")
+        assertFalse(inline, inline.contains("figure"))
+        for (line in listOf(
+            "<ul><li><img src=\"https://example.com/pdf.png\" title=\"PDF document\"> Download the report</li></ul>",
+            "<div>Text <a href=\"https://example.com/x\"><img src=\"https://example.com/i.png\" title=\"A picture\"></a> more</div>",
+            "Before $xkcd after",
+        )) {
+            val html = clean("$line<p>$longText</p>")
+            assertFalse(html, html.contains("figure"))
+        }
+    }
+
+    @Test
+    fun panelsSharingOneTitleAreCaptionedOnce() {
+        // As PageExtractor gives a comic's panels, each in its own figure.
+        val panels = (1..3).joinToString("") { "<figure><img src=\"https://example.com/strip-$it.png\" title=\"One joke for the strip\" alt=\"\"></figure>" }
+        val html = clean("<div>$panels</div>")
+        assertEquals(html, 1, Jsoup.parse(html).select("figcaption").size)
+        assertEquals(3, Jsoup.parse(html).select("img").size)
     }
 
     @Test

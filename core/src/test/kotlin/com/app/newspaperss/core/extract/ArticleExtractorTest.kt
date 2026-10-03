@@ -4,6 +4,7 @@ import com.app.newspaperss.core.net.HttpBytes
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.net.HttpResponse
 import kotlinx.coroutines.test.runTest
+import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -84,6 +85,36 @@ class ArticleExtractorTest {
 
         assertEquals(listOf("https://example.com/comics/1-page.png"), article.imageUrls)
         assertTrue("the feed's words are the caption", "Edith has ideas" in article.html)
+    }
+
+    @Test
+    fun xkcdsHoverTextGoesUnderTheComicOnce() = runTest {
+        val hover = "Proper User Policy apparently means Simon Says."
+        val comic = "<img src=\"https://imgs.xkcd.com/comics/sandwich.png\" title=\"$hover\" alt=\"Sandwich\" />"
+        val page = "<html><body><div id=\"ctitle\">Sandwich</div><div id=\"comic\">$comic</div>$footer</body></html>"
+
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(comic, feedTitle = "Sandwich"))
+
+        assertEquals(listOf("https://imgs.xkcd.com/comics/sandwich.png"), article.imageUrls)
+        val captions = Jsoup.parse(article.html).select("figure > figcaption")
+        assertEquals(listOf(hover), captions.map { it.text() })
+    }
+
+    @Test
+    fun hoverTextOnBothTheThumbnailAndTheComicGoesUnderTheComic() = runTest {
+        val hover = "The building was never finished."
+        val feedItem = "<p><img src=\"https://example.com/comicsthumbs/1-page.png\" title=\"$hover\" /></p><p>New comic!</p>"
+        val page = "<html><body><div id=\"cc-comicbody\"><img title=\"$hover\" src=\"https://example.com/comics/1-page.png\" id=\"cc-comic\"/></div>" +
+            "$footer</body></html>"
+        val article = ArticleExtractor(FakeHttp(mapOf(url to page(page)))).extract(input(feedItem))
+
+        assertEquals(listOf("https://example.com/comics/1-page.png"), article.imageUrls)
+        val figures = Jsoup.parse(article.html).select("figure")
+        assertEquals(article.html, 1, figures.size)
+        assertEquals("https://example.com/comics/1-page.png", figures.single().selectFirst("img")!!.attr("src"))
+        assertEquals(hover, figures.single().selectFirst("figcaption")!!.text())
+        assertEquals("said once", 1, Regex(Regex.escape(hover)).findAll(article.html).count())
+        assertTrue("the feed's own words stay", "New comic!" in article.html)
     }
 
     @Test
@@ -374,5 +405,59 @@ class ArticleExtractorTest {
         assertNull(post.note)
         assertNull(post.siteName)
     }
-}
 
+    private val substackPaywall = """<div data-testid="paywall"><h2>Keep reading with a 7-day free trial</h2></div>"""
+
+    private fun paywalledPage(words: Int, marker: String = substackPaywall) =
+        page("<html><head><title>The Quiet Joy of Reading Slowly</title></head><body><article><h1>The Quiet Joy of Reading Slowly</h1>" +
+            "<p>${sentence.repeat(words / 16 + 1)}</p></article>$marker</body></html>")
+
+    /** A paid post's free part says so, and with next to nothing free it's flagged for the source's skip setting. */
+    @Test
+    fun aPaywalledPageIsThePaidPostsFreePart() = runTest {
+        val preview = ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(200)))).extract(input(teaser))
+        assertTrue(preview.paidPost)
+        assertEquals(ArticleExtractor.PAID_NOTE, preview.note)
+        assertFalse(preview.nothingFree)
+        val ghost = """<aside class="gh-post-upgrade-cta"><h2>This post is for paying subscribers only</h2></aside>"""
+        val bare = ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(10, ghost)))).extract(input("<p>A sentence of preview.</p>"))
+        assertTrue(bare.nothingFree)
+    }
+
+    /** Metered sites mark their pages as not free and serve the whole story; a subscriber's own feed is whole too. */
+    @Test
+    fun aWholeArticleIsntCalledPaidWhateverThePageSays() = runTest {
+        val metered = paywalledPage(400, """<script type="application/ld+json">{"@type":"NewsArticle","isAccessibleForFree":false}</script>""")
+        assertFalse(ArticleExtractor(FakeHttp(mapOf(url to metered))).extract(input(teaser)).paidPost)
+        val whole = "<p>${sentence.repeat(30)}</p>"
+        assertFalse(ArticleExtractor(FakeHttp(mapOf(url to paywalledPage(200)))).extract(input(whole, ContentMode.PAGE)).paidPost)
+    }
+
+    /**
+     * Substack ends a paid post's opening in its feed with "Read more" back to the post: however
+     * long the opening, it's an excerpt, so the page is fetched and its paywall seen.
+     */
+    @Test
+    fun aLongFeedTextEndingInReadMoreIsAnExcerpt() = runTest {
+        val opening = "<p>${sentence.repeat(30)}</p><p><a href=\"$url\">Read more</a></p>"
+        val http = FakeHttp(mapOf(url to paywalledPage(100)))
+        val article = ArticleExtractor(http).extract(input(opening))
+        assertEquals(listOf(url), http.requested)
+        assertTrue(article.paidPost)
+        assertTrue(article.usedFeedContent)
+        assertFalse(article.html.contains("Read more"))
+        val free = ArticleExtractor(FakeHttp(mapOf(url to page()))).extract(input(opening))
+        assertFalse("an excerpt feed's page is the whole post", free.paidPost)
+    }
+
+    /** A link post's pitch is the pitcher's own words, free whatever the story's site does. */
+    @Test
+    fun aLinkPostsPitchIsntAPaidPost() = runTest {
+        val story = "https://other.example.com/story"
+        val pitchHtml = "<p>${sentence.repeat(3)}</p>"
+        val article = ArticleExtractor(FakeHttp(mapOf(story to paywalledPage(20).let { HttpResponse(200, story, it.contentType, it.body) })))
+            .extract(ExtractInput(story, "The Quiet Joy of Reading Slowly", pitchHtml, null, feedUrl = url))
+        assertTrue(article.usedFeedContent)
+        assertFalse(article.paidPost)
+    }
+}

@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 7,
-    "identityHash": "79dc9c9efab47e03c8449429eb02e264",
+    "identityHash": "6cf1f66971be8448b016c69390cadac5",
     "entities": [
       {
         "tableName": "sources",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `section` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `contentModeChosen` INTEGER NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `paused` INTEGER NOT NULL, `maxArticles` INTEGER, `ttrssCategoryId` INTEGER, `ttrssCategoryTitle` TEXT, `markReadOnServer` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `failingSince` INTEGER, `serverNote` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `siteUrl` TEXT, `position` INTEGER NOT NULL, `contentMode` TEXT NOT NULL, `paused` INTEGER NOT NULL, `section` TEXT, `contentModeChosen` INTEGER NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `maxArticles` INTEGER, `ttrssCategoryId` INTEGER, `ttrssCategoryTitle` TEXT, `markReadOnServer` INTEGER NOT NULL, `feedsListedAt` INTEGER, `addedAt` INTEGER NOT NULL, `lastFetchedAt` INTEGER, `lastError` TEXT, `failingSince` INTEGER, `serverNote` TEXT, `skipPaidPosts` INTEGER NOT NULL DEFAULT 0)",
         "fields": [
           {
             "fieldPath": "id",
@@ -38,11 +38,6 @@
             "affinity": "TEXT"
           },
           {
-            "fieldPath": "section",
-            "columnName": "section",
-            "affinity": "TEXT"
-          },
-          {
             "fieldPath": "position",
             "columnName": "position",
             "affinity": "INTEGER",
@@ -53,6 +48,17 @@
             "columnName": "contentMode",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "paused",
+            "columnName": "paused",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "section",
+            "columnName": "section",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "contentModeChosen",
@@ -77,12 +83,6 @@
             "affinity": "INTEGER"
           },
           {
-            "fieldPath": "paused",
-            "columnName": "paused",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
             "fieldPath": "maxArticles",
             "columnName": "maxArticles",
             "affinity": "INTEGER"
@@ -102,6 +102,11 @@
             "columnName": "markReadOnServer",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "feedsListedAt",
+            "columnName": "feedsListedAt",
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "addedAt",
@@ -128,6 +133,13 @@
             "fieldPath": "serverNote",
             "columnName": "serverNote",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "skipPaidPosts",
+            "columnName": "skipPaidPosts",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -150,7 +162,7 @@
       },
       {
         "tableName": "articles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, `feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `starredAt` INTEGER, `originId` TEXT, `originTitle` TEXT, `pageWords` INTEGER, `reportedRead` INTEGER NOT NULL DEFAULT 0, `viaUrl` TEXT, FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `guid` TEXT NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `published` INTEGER, `feedHtml` TEXT, `discoveredAt` INTEGER NOT NULL, `state` TEXT NOT NULL, `starredAt` INTEGER, `originId` TEXT, `originTitle` TEXT, `pageWords` INTEGER, `reportedRead` INTEGER NOT NULL DEFAULT 0, `viaUrl` TEXT, `paidOnly` INTEGER NOT NULL DEFAULT 0, `paidSkipped` INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -240,6 +252,20 @@
             "fieldPath": "viaUrl",
             "columnName": "viaUrl",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "paidOnly",
+            "columnName": "paidOnly",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "paidSkipped",
+            "columnName": "paidSkipped",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -490,7 +516,7 @@
       },
       {
         "tableName": "publications",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, `leftOut` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, `leftOut` INTEGER NOT NULL DEFAULT 0, `chosenMode` TEXT, `maxArticles` INTEGER, `feedUrl` TEXT, `category` TEXT, `listed` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "sourceId",
@@ -542,6 +568,33 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
+          },
+          {
+            "fieldPath": "chosenMode",
+            "columnName": "chosenMode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "maxArticles",
+            "columnName": "maxArticles",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "feedUrl",
+            "columnName": "feedUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "listed",
+            "columnName": "listed",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -568,7 +621,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '79dc9c9efab47e03c8449429eb02e264')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6cf1f66971be8448b016c69390cadac5')"
     ]
   }
 }

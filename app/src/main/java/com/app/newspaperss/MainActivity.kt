@@ -3,6 +3,8 @@ package com.app.newspaperss
 import android.net.Uri
 
 import com.app.newspaperss.settings.offersOpen
+import com.app.newspaperss.settings.PreviewTextSize
+import androidx.compose.runtime.remember
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.ComponentActivity
@@ -55,6 +57,8 @@ import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
 import com.app.newspaperss.ui.readinglist.ReadingListScreen
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
+import com.app.newspaperss.ui.settings.SettingsPage
+import com.app.newspaperss.ui.settings.SettingsPageScreen
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.work.SyncWorker
@@ -74,6 +78,7 @@ private const val SOURCE = "source/{id}"
 /** One of a tt-rss account's feeds: the account's source id and the feed's id there. */
 private const val FEED = "source/{id}/feed/{key}"
 private const val LEFT_OUT = "source/{id}/left-out"
+private const val SETTINGS_PAGE = "settings/{page}"
 
 class MainActivity : ComponentActivity() {
     @Volatile private var settingsLoaded = false
@@ -104,7 +109,7 @@ class MainActivity : ComponentActivity() {
                         val readingList = viewModel { ReadingListViewModel(container.readingList) }
                         OnboardingScreen(vm, sources, readingList)
                     }
-                    true -> App(container, preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX, offerOpen = settings?.device.offersOpen)
+                    true -> App(container, preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX, offerOpen = settings?.device.offersOpen, kindleEmail = settings?.kindleEmailTarget)
                 }
             }
         }
@@ -112,7 +117,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean) {
+private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean, kindleEmail: com.app.newspaperss.settings.KindleEmail?) {
     val nav = rememberNavController()
     val current by nav.currentBackStackEntryAsState()
     Scaffold(
@@ -120,7 +125,8 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
             NavigationBar {
                 Tab.entries.forEach { tab ->
                     val route = current?.destination?.route
-                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE || route == FEED || route == LEFT_OUT)) || (tab == Tab.TODAY && (route == EDITION || route == ARTICLE))
+                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE || route == FEED || route == LEFT_OUT)) ||
+                        (tab == Tab.TODAY && (route == EDITION || route == ARTICLE)) || (tab == Tab.SETTINGS && route == SETTINGS_PAGE)
                     NavigationBarItem(
                         selected = inTab,
                         onClick = {
@@ -151,16 +157,17 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
         ) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }) { EditionWorker.buildNow(context) } }
+                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }, sentToKindle = container.kindleSends.recent) { EditionWorker.buildNow(context) } }
                 TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes, container.notifier::dismissFor) }
+                val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes, container.kindleSends.recent, container.notifier::dismissFor) }
                 EditionDetailScreen(
                     vm,
                     preferOpen = preferOpen,
                     offerOpen = offerOpen,
+                    kindleEmail = kindleEmail,
                     onBack = { nav.navigateUp() },
                     onReadArticle = { position -> nav.navigate("edition/$id/article/$position") { launchSingleTop = true } },
                 )
@@ -173,11 +180,14 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                 val position = entry.arguments?.getInt("position") ?: 0
                 val contents by container.editions.observeContents(id).collectAsState(initial = emptyList())
                 val editionTitle by produceState<String?>(null, id) { value = container.editions.byId(id)?.title }
+                val textSize by remember { container.settings.settings.map { it.previewTextSize } }.collectAsState(initial = null)
                 ArticlePreviewScreen(
                     loadFile = { container.editions.byId(id)?.let(container.editions::fileOf) },
                     position = position,
                     title = contents.getOrNull(position)?.entry?.title ?: editionTitle.orEmpty(),
                     onBack = { nav.navigateUp() },
+                    textSize = textSize ?: PreviewTextSize.DEFAULT,
+                    onTextSize = { size -> container.appScope.launch { container.settings.update { it.copy(previewTextSize = size) } } },
                 )
             }
             composable(Tab.SOURCES.route) {
@@ -220,10 +230,18 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                 ReadingListScreen(vm, onBack = { nav.navigateUp() })
             }
             composable(Tab.SETTINGS.route) {
-                val context = LocalContext.current.applicationContext
-                val vm = viewModel { SettingsViewModel(container.settings) { container.appScope.launch { EditionScheduler.reschedule(context, it) } } }
-                SettingsScreen(vm)
+                SettingsScreen(settingsViewModel(container), onOpen = { nav.navigate("settings/${it.slug}") { launchSingleTop = true } })
+            }
+            composable(SETTINGS_PAGE, arguments = listOf(navArgument("page") { type = NavType.StringType })) { entry ->
+                val page = SettingsPage.of(entry.arguments?.getString("page")) ?: SettingsPage.EDITION
+                SettingsPageScreen(settingsViewModel(container), page, onBack = { nav.navigateUp() })
             }
         }
     }
+}
+
+@Composable
+private fun settingsViewModel(container: AppContainer): SettingsViewModel {
+    val context = LocalContext.current.applicationContext
+    return viewModel { SettingsViewModel(container.settings) { container.appScope.launch { EditionScheduler.reschedule(context, it) } } }
 }

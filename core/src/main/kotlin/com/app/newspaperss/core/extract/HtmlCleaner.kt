@@ -21,6 +21,12 @@ data class CleanResult(
     val wordCount: Int,
     /** Absolute http(s) URLs of the images left in [html], in document order, without duplicates. */
     val imageUrls: List<String>,
+    /**
+     * It ended in a lone "Read more" link back to its own page, so it's an excerpt however long it
+     * is: Substack ends a paid post's opening that way, as excerpt feeds do every item. The link
+     * itself is removed.
+     */
+    val teaser: Boolean = false,
 )
 
 /**
@@ -44,24 +50,32 @@ object HtmlCleaner {
         val doc = Jsoup.parse(source, baseUrl)
         val body = doc.body()
         removeComments(body)
-        body.select(REMOVE_TAGS.joinToString(",")).remove()
+        // Before players become links: a hidden player stays hidden.
         removeHidden(body)
+        keepVideosAsLinks(body)
+        body.select(REMOVE_TAGS.joinToString(",")).remove()
         expandSubstackNotes(body)
         removeScreenReaderOnly(body)
         removeJunk(body)
         removeRelatedLinks(body)
         removeBoilerplate(body)
         fixPictures(body)
-        fixImages(body, baseUrl)
+        val titleTexts = fixImages(body, baseUrl)
         body.select("source").remove()
         flattenLayoutTables(body)
         stripTagsAndAttributes(body)
         fixLinks(body, baseUrl)
         if (!title.isNullOrBlank()) removeLeadingTitle(body, title)
+        val teaser = removeReadMore(body, baseUrl)
         normalizeHeadings(body)
         removeEmpty(body)
+        unwrapCaptionsWithoutMedia(body)
         collapseBlankLines(body)
         demoteStrayCaptions(body)
+        // Counted before the captions go in: hover text isn't article text, and a comic's feed item
+        // would otherwise read as a short text post to the rules that tell the two apart.
+        val wordCount = countWords(body)
+        addTitleCaptions(body, titleTexts)
 
         doc.outputSettings()
             .prettyPrint(false)
@@ -69,8 +83,9 @@ object HtmlCleaner {
             .escapeMode(Entities.EscapeMode.xhtml)
         return CleanResult(
             html = body.html().trim(),
-            wordCount = countWords(body),
+            wordCount = wordCount,
             imageUrls = body.select("img").map { it.attr("src") }.distinct(),
+            teaser = teaser,
         )
     }
 
@@ -282,7 +297,81 @@ object HtmlCleaner {
         for (el in body.select("p, div, li, span, h2, h3, h4, h5, h6")) {
             if (!el.isAttached()) continue
             val text = el.text().trim()
-            if (text.split(WHITESPACE).size <= BOILERPLATE_MAX_WORDS && BOILERPLATE.containsMatchIn(text)) el.remove()
+            val words = text.split(WHITESPACE).size
+            if (words <= BOILERPLATE_MAX_WORDS && BOILERPLATE.containsMatchIn(text) || words <= PITCH_MAX_WORDS && isPitch(el, text)) el.remove()
+        }
+    }
+
+    /**
+     * A newsletter's pitch for subscribing: Substack's widget (its class is gone after tt-rss), the
+     * line over a paid post's paywall, a sign-up form's leftover label, or a box ending in its
+     * "Sign up" link. Only a block of its own, not one holding others: a short post can be one
+     * paragraph and a pitch in the same wrapper.
+     */
+    private fun isPitch(el: Element, text: String): Boolean {
+        if (el.children().any { it.tagName() in BLOCK_TAGS || it.tagName() == "li" }) return false
+        if (SUBSCRIBE_PITCH.containsMatchIn(text)) return true
+        val last = el.childNodes().lastOrNull { !(it is TextNode && it.isBlank) }
+        return "newsletter" in text.lowercase() && last is Element && last.tagName() == "a" && SIGN_UP.matches(last.text().trim())
+    }
+
+    /**
+     * An embedded video can't play on an e-reader, and without it its caption would describe
+     * nothing. A video with a poster frame becomes that picture; a YouTube or Vimeo player becomes
+     * a link to the video, with YouTube's thumbnail. Other players go, as before. tt-rss passes no
+     * iframes on at all, which [unwrapCaptionsWithoutMedia] deals with.
+     */
+    private fun keepVideosAsLinks(body: Element) {
+        for (video in body.select("video[poster]")) {
+            video.replaceWith(Element("img").attr("src", video.attr("poster")).attr("alt", "Video"))
+        }
+        for (frame in body.select("iframe[src]")) {
+            val src = frame.absUrl("src").ifEmpty { frame.attr("src") }
+            val title = frame.attr("title").trim()
+            val youtube = YOUTUBE_EMBED.find(src)?.groupValues?.get(1)
+            val vimeo = VIMEO_EMBED.find(src)?.groupValues?.get(1)
+            val (watch, label) = when {
+                youtube != null -> "https://www.youtube.com/watch?v=$youtube" to "YouTube"
+                vimeo != null -> "https://vimeo.com/$vimeo" to "Vimeo"
+                else -> continue
+            }
+            val link = Element("a").attr("href", watch)
+            if (youtube != null) link.appendElement("img").attr("src", "https://i.ytimg.com/vi/$youtube/hqdefault.jpg").attr("alt", title.ifEmpty { "Video" })
+            val text = Element("p").appendChild(Element("a").attr("href", watch).text(if (title.isEmpty()) "Watch on $label" else "Watch on $label: $title"))
+            frame.replaceWith(link)
+            // A paragraph can't hold another: WordPress puts its classic embeds inside one.
+            (link.closest("p") ?: link).after(text)
+        }
+    }
+
+    /**
+     * Removes a final link back to the article's own page that only says "Read more": Substack ends
+     * a paid post's opening with one in its feed, and the book already links to the original.
+     *
+     * @return whether there was one.
+     */
+    private fun removeReadMore(body: Element, baseUrl: String): Boolean {
+        var last: Element? = body.children().lastOrNull() ?: return false
+        while (last != null && last.childrenSize() == 1 && last.tagName() != "a" && last.ownText().isBlank()) last = last.child(0)
+        if (last == null || last.tagName() != "a" || !READ_MORE.matches(last.text().trim())) return false
+        if (comparable(last.absUrl("href").ifEmpty { last.attr("href") }) != comparable(baseUrl)) return false
+        var gone: Element = last
+        while (gone.parent() !== body && gone.parent()?.text()?.trim() == last.text().trim()) gone = gone.parent()!!
+        gone.remove()
+        return true
+    }
+
+    /**
+     * A figure left with only its caption (its video or embed couldn't come along) would caption
+     * nothing: the caption becomes a plain paragraph.
+     */
+    private fun unwrapCaptionsWithoutMedia(body: Element) {
+        for (figure in body.select("figure").reversed()) {
+            // select() includes the figure itself, so one more figure is a nested one.
+            if (figure.selectFirst("img, table, pre, blockquote") != null || figure.select("figure").size > 1) continue
+            val caption = figure.children().firstOrNull { it.tagName() == "figcaption" } ?: continue
+            if (caption.children().any { it.tagName() in BLOCK_TAGS || it.tagName() == "li" }) caption.unwrap() else caption.tagName("p")
+            figure.unwrap()
         }
     }
 
@@ -313,20 +402,80 @@ object HtmlCleaner {
         }
     }
 
-    private fun fixImages(body: Element, baseUrl: String) {
+    /** Returns the images whose `title` is worth keeping (see [titleText]), with that title. */
+    private fun fixImages(body: Element, baseUrl: String): Map<Element, String> {
+        val titles = LinkedHashMap<Element, String>()
         for (img in body.select("img")) {
             val isTrackingPixel = listOf("width", "height").any { dim ->
                 img.attr(dim).trim().removeSuffix("px").toIntOrNull()?.let { it <= 2 } == true
             }
-            val src = if (isTrackingPixel) null else imageSource(img)?.let { absoluteUrl(it, baseUrl) }
+            val src = if (isTrackingPixel) null else imageSource(img)?.let { absoluteUrl(it, baseUrl) }?.takeUnless { TRACKER.containsMatchIn(it) }
             if (src == null) {
                 img.remove()
                 continue
             }
             val alt = img.attr("alt").trim()
+            titleText(img.attr("title"), alt, src)?.let { titles[img] = it }
             img.clearAttributes()
             img.attr("src", src).attr("alt", alt)
         }
+        return titles
+    }
+
+    /**
+     * An image's `title` as a caption: a webcomic's hover text (xkcd's second joke). Not when it
+     * only repeats the alt text or names the file, as CMSs fill it in by default.
+     */
+    private fun titleText(title: String, alt: String, src: String): String? {
+        val text = title.replace(WHITESPACE, " ").trim()
+        if (text.isEmpty() || text.equals(alt, ignoreCase = true)) return null
+        val file = src.substringBefore('?').substringBefore('#').substringAfterLast('/')
+        val fileWords = file.substringBeforeLast('.').replace(FILE_NAME_SEPARATORS, " ").trim()
+        if (text.equals(file, ignoreCase = true) || text.replace(FILE_NAME_SEPARATORS, " ").equals(fileWords, ignoreCase = true)) return null
+        return text
+    }
+
+    /**
+     * Puts each image's title text in a `<figcaption>` under it: in its own figure if it has one
+     * without a caption, else in a new figure around the image (and the link or paragraph holding
+     * only it). An image inside a line of text is left alone, since a figure can't go there, and
+     * so is text the article already shows, such as a caption repeating the hover text or the
+     * same title on an earlier image.
+     */
+    private fun addTitleCaptions(body: Element, titles: Map<Element, String>) {
+        if (titles.isEmpty()) return
+        var shown = body.text().replace(WHITESPACE, " ").lowercase()
+        for ((img, title) in titles) {
+            if (img.root() !== body.root() || title.lowercase() in shown) continue
+            var block: Element = img
+            while (true) {
+                val parent = block.parent() ?: break
+                if (parent === body || parent.tagName() !in SOLE_IMAGE_WRAPPERS || parent.text().isNotBlank()) break
+                if (parent.childNodes().any { it !== block && !(it is TextNode && it.isBlank) }) break
+                block = parent
+            }
+            val parent = block.parent() ?: continue
+            val figure = when {
+                parent.tagName() == "figure" ->
+                    parent.takeIf { it.select("img").size == 1 && it.children().none { c -> c.tagName() == "figcaption" } }
+                (parent === body || parent.tagName() in FIGURE_PARENTS) && onItsOwnLine(block) ->
+                    Element("figure").also { block.replaceWith(it); it.appendChild(block) }
+                else -> null
+            } ?: continue
+            figure.appendElement("figcaption").text(title)
+            shown += " " + title.lowercase()
+        }
+    }
+
+    /** Nothing but blocks, or nothing at all, either side of [element]: it isn't part of a line of text. */
+    private fun onItsOwnLine(element: Element): Boolean {
+        fun isBlock(node: Node?): Boolean = node == null || (node is Element && node.tagName() in BLOCK_TAGS)
+        fun neighbour(step: (Node) -> Node?): Node? {
+            var node = step(element)
+            while (node is TextNode && node.isBlank) node = step(node)
+            return node
+        }
+        return isBlock(neighbour { it.previousSibling() }) && isBlock(neighbour { it.nextSibling() })
     }
 
     private fun isLayoutTable(table: Element): Boolean {
@@ -532,6 +681,7 @@ object HtmlCleaner {
     private const val PREFERRED_IMAGE_WIDTH = 1000
     private const val LAYOUT_TABLE_CELL_WORDS = 80
     private const val BOILERPLATE_MAX_WORDS = 12
+    private const val PITCH_MAX_WORDS = 40
 
     private val REMOVE_TAGS = setOf(
         "script", "style", "noscript", "iframe", "object", "embed", "applet", "form", "input", "button",
@@ -570,7 +720,8 @@ object HtmlCleaner {
     // "Further reading" aren't here: authors use them for their own references.
     private val FURNITURE_HEADING = Regex(
         "recommended( (stories|articles|reading|for you))?|read (next|more)|you (may|might) also like|" +
-            "most (read|popular)|more (on|from) .{1,40}|related (stories|articles|coverage|posts|content)",
+            "most (read|popular)|more( (stories|picks|posts|articles|essays|reads))? (on|from) .{1,40}|" +
+            "related (stories|articles|coverage|posts|content)",
         RegexOption.IGNORE_CASE,
     )
     // The ones no article uses for a section of its own paragraphs ("More on the method" can be), so they
@@ -595,13 +746,37 @@ object HtmlCleaner {
         "blockquote", "em", "i", "strong", "b", "u", "small", "table", "tr", "td", "th", "tbody", "thead",
     )
     private val CELL_TAGS = setOf("td", "th")
+    // Wrappers that can hold just an image, and blocks a <figure> may go in.
+    private val SOLE_IMAGE_WRAPPERS = setOf("a", "p", "div")
+    private val FIGURE_PARENTS = setOf("div", "blockquote", "li", "dd", "td", "th")
+    private val BLOCK_TAGS = setOf(
+        "p", "div", "figure", "ul", "ol", "dl", "blockquote", "pre", "table", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+    )
+    private val FILE_NAME_SEPARATORS = Regex("[-_+\\s]+")
 
     private val BOILERPLATE = Regex(
         "^(listen to (this|the) (article|essay|story|episode)|\\d+[ -]min(ute)?s? (read|listen)|share (this|on)\\b|" +
             "advertisement$|sign up (for|to)\\b|subscribe (to|now|today)\\b|read more:|related:|recommended:|" +
-            "click here to\\b|follow us on\\b|skip past newsletter|after newsletter promotion)",
+            "click here to\\b|follow us on\\b|skip past newsletter|after newsletter promotion|(add|leave|post) a comment:?$|" +
+            "newsletter$)",
         RegexOption.IGNORE_CASE,
     )
+
+    // Substack's own wording anywhere in the block; the rest only as the block's opening.
+    private val SUBSCRIBE_PITCH = Regex(
+        "consider becoming a (free or )?paid subscriber|is a reader-supported publication|" +
+            "subscribe (for free )?to receive new posts and support|" +
+            "^(subscribe to .{1,60} to keep reading|this post is for (paid |paying )?subscribers|" +
+            "([^.!?]{1,30}[.!?] )?subscribe to [^.!?]{1,60}:$)",
+        RegexOption.IGNORE_CASE,
+    )
+    private val SIGN_UP = Regex("sign up\\.?", RegexOption.IGNORE_CASE)
+    // Feeds' view counters, known by address: tt-rss strips the width="1" that gives them away.
+    private val TRACKER = Regex("medium\\.com/_/stat\\?|pixel\\.wp\\.com/|stats\\.wordpress\\.com/|feeds\\.feedburner\\.com/~r/|feedproxy\\.google\\.com/~r/")
+    private val READ_MORE = Regex("(read more|continue reading|keep reading)(…|\\.\\.\\.)?", RegexOption.IGNORE_CASE)
+    // A video's id; "videoseries" is a playlist, which has no one video to link to.
+    private val YOUTUBE_EMBED = Regex("youtube(?:-nocookie)?\\.com/embed/(?!videoseries)([A-Za-z0-9_-]{6,})")
+    private val VIMEO_EMBED = Regex("player\\.vimeo\\.com/video/(\\d+)")
 
     private val HTML_TAG = Regex("<\\s*[a-zA-Z!/]")
     private val WHITESPACE = Regex("\\s+")
@@ -613,8 +788,9 @@ object HtmlCleaner {
     private val TOKEN_SEPARATOR = Regex("[\\s_\\-]+")
     private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
     private val INVALID_ID_CHARS = Regex("[^A-Za-z0-9_.\\-]")
-    // Candidates are separated by a comma *and* whitespace: image CDNs put bare commas inside URLs.
-    private val SRCSET_SEPARATOR = Regex(",\\s+")
+    // A comma and whitespace, or a bare comma right after a descriptor: image CDNs put bare commas
+    // inside URLs, and tt-rss joins the candidates it passes on with bare commas.
+    private val SRCSET_SEPARATOR = Regex(",\\s+|(?<=\\s\\d{1,6}[wx]),|(?<=\\s\\d{1,3}\\.\\d{1,3}x),")
     private val DESCRIPTOR = Regex("([\\d.]+)([wx])")
     private val MANGLED_URL = Regex("[\"\\\\<>]")
     private val URL_SAFE = ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" + "-._~:/?@!$&'()*+,;=").toSet()

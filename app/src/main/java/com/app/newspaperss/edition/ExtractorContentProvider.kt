@@ -27,6 +27,8 @@ import java.io.IOException
  * Extracts each article and embeds its images. The edition-wide image size budget is applied
  * later by [EditionBuilder], in reading order.
  *
+ * @param onPaidOnly told of each paid post with next to nothing free, and whether it was left out
+ *   for its source's [SourceEntity.skipPaidPosts], for [com.app.newspaperss.data.SourceRepository.markPaidOnly].
  * @param onEvidence receives what each article showed about where its publication's full text is
  *   (null if nothing, which is still passed on for a check, so the check counts as done), with the
  *   article's [TextChoice], for [com.app.newspaperss.data.SourceRepository.recordFullText].
@@ -35,6 +37,7 @@ class ExtractorContentProvider(
     private val extractor: ArticleExtractor,
     private val http: HttpClient,
     private val encoder: ImageEncoder,
+    private val onPaidOnly: suspend (articleId: Long, skipped: Boolean) -> Unit = { _, _ -> },
     private val onEvidence: suspend (sourceId: Long, originId: String?, FullTextEvidence?, TextChoice) -> Unit,
 ) : ArticleContentProvider {
     // Downloads overlap but decoding doesn't: a decoded photo can take tens of MB of heap.
@@ -60,6 +63,13 @@ class ExtractorContentProvider(
         // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
         // reader saved on purpose waits for the next edition instead of being used up as a stub.
         if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
+        if (extracted.nothingFree) {
+            // A star asks for this article whatever it turns out to be, and one found before and
+            // still here was let in or brought back by the reader: only a first find is skipped.
+            val skip = source.skipPaidPosts && article.starredAt == null && !article.paidOnly
+            onPaidOnly(article.id, skip)
+            if (skip) return null
+        }
         val encoded = download(ArticleImages.wanted(extracted.imageUrls), refererFor(article.url), images)
         val embedded = ArticleImages.embed(extracted.html, "a${article.id}", encoded)
         return ArticleContent(
@@ -95,19 +105,18 @@ class ExtractorContentProvider(
 
     private companion object {
         /**
-         * A publication the check settled on the feed's text still has its short items checked against
-         * the page: otherwise it could never find out that the site stopped blocking or started
-         * sending teasers. A mode the reader chose is used as is. A link post's story is always
-         * fetched unless the reader chose the feed's text: its pitch is never the article.
+         * A publication the check settled on the feed's text still has its short items, and ones
+         * ending in "Read more", checked against the page: otherwise it could never find out that
+         * the site stopped blocking or started sending teasers, or tell a paid post's opening. AUTO
+         * does that and takes a long feed text as it is. A mode the reader chose is used as is. A
+         * link post's story is always fetched unless the reader chose the feed's text: its pitch
+         * is never the article.
          */
         fun modeFor(article: ArticleEntity, source: SourceEntity, text: TextChoice): ContentMode {
             if (article.viaUrl != null) return if (text.chosen == ContentMode.FEED) ContentMode.FEED else ContentMode.PAGE
             text.chosen?.let { return it }
             val mode = text.learned ?: source.contentMode
-            if (mode != ContentMode.FEED) return mode
-            // Counted as the extractor counts, after cleaning, so the two agree on what's long.
-            val words = article.feedHtml?.let { HtmlCleaner.clean(it, article.url, article.title).wordCount } ?: 0
-            return if (words < ArticleExtractor.FULL_TEXT_WORDS) ContentMode.AUTO else ContentMode.FEED
+            return if (mode == ContentMode.FEED) ContentMode.AUTO else mode
         }
 
         /**

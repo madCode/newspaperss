@@ -38,6 +38,8 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.delivery.EditionIntents
+import com.app.newspaperss.delivery.KindleSend
+import com.app.newspaperss.ui.edition.KindleNote
 import com.app.newspaperss.ui.edition.MarkNotSent
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -106,6 +108,8 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         if (!readyWaiting) item(key = "build") { BuildPanel(state.build, announcer, make, hadOne = latest != null, onMake = viewModel::makeOneNow) }
         if (latest != null) {
             item(key = "latest") {
+                // Ready before Send is tapped: the mail app has to open while the screen is still in front.
+                val emailBody by remember(latest.id) { viewModel.emailBody(latest.id) }.collectAsState(null)
                 LatestEdition(
                     latest,
                     first = editions.size == 1,
@@ -113,9 +117,16 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                     deviceName = state.deviceName,
                     preferOpen = state.preferOpen,
                     offerOpen = state.offerOpen,
+                    sentToKindle = state.sentToKindle[latest.id],
+                    // Only when Send opens the mail app itself; otherwise it's the share sheet, as usual.
+                    emailsKindle = state.kindleEmail?.let { remember(it) { EditionIntents.mailAppFor(context, it) } } != null,
                     onRetry = viewModel::makeOneNow,
                     onDetails = { onOpenEdition(latest.id) },
-                    onSend = { viewModel.fileOf(latest)?.let { launch(EditionIntents.share(context, it, latest.title, latest.id)) } },
+                    onSend = {
+                        viewModel.fileOf(latest)?.let {
+                            EditionIntents.launchSend(context, it, latest.title, latest.id, state.kindleEmail, emailBody) { viewModel.markEmailed(latest.id) }
+                        }
+                    },
                     onOpen = {
                         viewModel.fileOf(latest)?.let {
                             // Reading here is how an edition reaches a Boox.
@@ -238,6 +249,8 @@ private fun LatestEdition(
     deviceName: String,
     preferOpen: Boolean,
     offerOpen: Boolean,
+    sentToKindle: KindleSend?,
+    emailsKindle: Boolean,
     onRetry: () -> Unit,
     onDetails: () -> Unit,
     onSend: () -> Unit,
@@ -279,8 +292,11 @@ private fun LatestEdition(
                         }
                     }
                     Text(
-                        if (preferOpen) "Opening it here counts as sent. Read it another way? Tell us so these articles don't come back."
-                        else "Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back.",
+                        when {
+                            preferOpen -> "Opening it here counts as sent. Read it another way? Tell us so these articles don't come back."
+                            emailsKindle -> "Send opens your mail app, ready to go. Opening it counts as sent. Sent it another way? Tell us so these articles don't come back."
+                            else -> "Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 12.dp),
                     )
@@ -288,6 +304,7 @@ private fun LatestEdition(
                     TextButton(onClick = onSent, contentPadding = PaddingValues(end = 12.dp)) { Text("I've sent it") }
                 }
                 EditionStatus.DELIVERED -> {
+                    sentToKindle?.let { KindleNote(it) }
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = onSend) { Text("Send again") }
                         if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.data.ArticleEntity
+import com.app.newspaperss.data.ArticleHistory
+import com.app.newspaperss.data.PaidOnlyCount
 import com.app.newspaperss.data.MarkedRead
 import com.app.newspaperss.data.StarBatch
 import com.app.newspaperss.core.plural
@@ -31,7 +33,16 @@ import kotlinx.coroutines.launch
  * [text] is the publication shown: its settings and what the full-text check found; null until
  * it has any.
  */
-data class SourceDetail(val source: SourceEntity?, val articles: List<ArticleEntity>, val defaultMax: Int, val text: PublicationEntity? = null)
+data class SourceDetail(
+    val source: SourceEntity?,
+    val articles: List<ArticleEntity>,
+    val defaultMax: Int,
+    val text: PublicationEntity? = null,
+    /** When each delivered article went out, and which edition holds each one in an unsent edition. */
+    val history: Map<Long, ArticleHistory> = emptyMap(),
+    /** Its paid posts with next to nothing free so far, and how many were left out. */
+    val paidOnly: PaidOnlyCount = PaidOnlyCount(0, 0),
+)
 
 /** The tt-rss category chooser: loading, the choices, or why they couldn't be loaded. */
 sealed interface CategoryPicker {
@@ -59,8 +70,11 @@ class SourceDetailViewModel(
 
     /** Null until loaded. */
     val detail: StateFlow<SourceDetail?> =
-        combine(repository.observe(id), repository.observeRecentArticles(id, key), defaultMax, repository.observePublication(id, key)) { source, articles, max, publication ->
-            SourceDetail(source, articles, max, publication)
+        combine(
+            combine(repository.observe(id), repository.observeRecentArticles(id, key), defaultMax, ::Triple),
+            repository.observePublication(id, key), repository.observeHistory(id), repository.observePaidOnly(id),
+        ) { (source, articles, max), publication, history, paidOnly ->
+            SourceDetail(source, articles, max, publication, history, paidOnly)
         }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -90,6 +104,10 @@ class SourceDetailViewModel(
     fun togglePaused() {
         val source = detail.value?.source ?: return
         viewModelScope.launch { repository.setPaused(source.id, !source.paused) }
+    }
+
+    fun setSkipPaidPosts(skip: Boolean) {
+        viewModelScope.launch { repository.setSkipPaidPosts(id, skip) }
     }
 
     fun chooseContentMode(mode: ContentMode) {

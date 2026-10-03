@@ -2,7 +2,12 @@ package com.app.newspaperss.data
 
 import android.util.Log
 import androidx.room.withTransaction
+import com.app.newspaperss.delivery.KindleSend
+import com.app.newspaperss.delivery.KindleSends
+import com.app.newspaperss.delivery.EditionEmail
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import java.io.File
 import java.time.Clock
 
@@ -13,11 +18,13 @@ import java.time.Clock
  * @param onTtrssChanged called with an edition's id once it's delivered, or marked as not sent,
  *   with tt-rss articles in it, to mark them read or unread on the server to match. It must
  *   return quickly and leave the work to run elsewhere: delivery doesn't wait for tt-rss.
+ * @param kindleSends told how each edition was delivered, for the note after a send to a Kindle.
  */
 class EditionRepository(
     private val db: AppDatabase,
     val editionsDir: File,
     private val clock: Clock = Clock.systemUTC(),
+    private val kindleSends: KindleSends = KindleSends(),
     private val onDelivered: (editionId: Long) -> Unit = {},
     private val onTtrssChanged: (editionId: Long) -> Unit = {},
 ) {
@@ -31,16 +38,40 @@ class EditionRepository(
 
     suspend fun byId(id: Long): EditionEntity? = db.editions().byId(id)
 
+    /** The [EditionEmail] body for an edition, or null once it's been deleted. */
+    fun observeEmailBody(id: Long): Flow<String?> = combine(observe(id), observeArticles(id)) { edition, articles ->
+        edition?.takeIf { it.status != EditionStatus.DELETED }?.let { EditionEmail.body(it.title, articles) }
+    }
+
+    suspend fun emailBody(id: Long): String? = observeEmailBody(id).first()
+
     fun fileOf(edition: EditionEntity): File? = edition.fileName?.let { File(editionsDir, it) }?.takeIf { it.exists() }
 
     /**
      * The reader handed a ready edition to an app. An edition already delivered, or released
      * because it wasn't sent in time, is left alone: its articles may be in a newer one now.
+     *
+     * @param sentWith the package of the app picked in the share sheet, if it said.
      */
-    suspend fun markSent(id: Long) = markDelivered(id, onlyIfReady = true)
+    suspend fun markSent(id: Long, sentWith: String? = null) {
+        markDelivered(id, onlyIfReady = true)
+        // After markDelivered, which clears the note: a Send again with Kindle is noted too.
+        if (sentWith != null) kindleSends.record(id, sentWith)
+    }
+
+    /**
+     * The reader's mail app was opened, or picked, to email an edition to their Kindle's own
+     * address. Like picking an app in the share sheet, that's as close as the app gets to knowing
+     * it was sent; see [markSent].
+     */
+    suspend fun markEmailedToKindle(id: Long) {
+        markDelivered(id, onlyIfReady = true)
+        kindleSends.record(id, KindleSend.EMAIL)
+    }
 
     /** Delivery succeeded: only now are the edition's articles used up. */
     suspend fun markDelivered(id: Long, onlyIfReady: Boolean = false) {
+        kindleSends.clear(id)
         val firstTime = db.withTransaction {
             val edition = db.editions().byId(id) ?: return@withTransaction null
             // Checked inside the transaction: a build may be releasing unsent editions at the same
@@ -86,6 +117,7 @@ class EditionRepository(
      * @return false if it isn't delivered, or its EPUB is gone so it couldn't be sent again.
      */
     suspend fun markNotSent(id: Long): Boolean {
+        kindleSends.clear(id)
         val undone = db.withTransaction {
             val edition = db.editions().byId(id)?.takeIf { it.status == EditionStatus.DELIVERED && fileOf(it) != null }
                 ?: return@withTransaction false

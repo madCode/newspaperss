@@ -15,30 +15,26 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Explain per device what counts as "delivered" *(personas)*
 
 ### Sources and fetching
-- [ ] **Platform pass** *(you asked)*: a test corpus of real posts from the big blog and newsletter platforms (Substack, Ghost, WordPress, Medium, Blogger, Tumblr, Buttondown, beehiiv, Micro.blog), from their own feeds and through tt-rss, each checked in the book for footnotes, embeds (Notes, tweets and Bluesky posts, YouTube, galleries), pull quotes and captions, paywall teasers and link posts. Fix what breaks, and keep the corpus as regression tests. The first finds: Substack Notes and footnotes after tt-rss (#109)
+- [ ] **Platform pass** *(you asked)*: a test corpus of real posts from the big blog and newsletter platforms, from their own feeds and through tt-rss, checked for footnotes, embeds, captions, paywall teasers and link posts; what breaks gets fixed and the corpus keeps it fixed (`PlatformCorpusTest`). Round 1 covered Substack, Ghost, WordPress, Medium, Blogger, Buttondown and Micro.blog. Still to add: Tumblr (it answers 429 to the collector), beehiiv, posts with galleries, tweets and Bluesky embeds, and more footnote styles
 - [ ] Paywalled and summary-only sites: warn when a site is added; keep stubs from eating the budget; drop metered sites from starter packs *(personas)*
 - [ ] "No feed found" in onboarding: offer the reading list there too (done in Sources) *(personas)*
 - [ ] Page cleanup's furniture patterns ("Recommended stories", "Subscribe to", "Read more:") are English only, so "Lire aussi", "Mehr zum Thema" and "Lee también" slip into French, German and Spanish articles. Key them by the article's language *(live)*
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
-- [ ] Webcomic title text (xkcd's hover text) is dropped; show it as a caption *(device)*
 
 ### The book
 - [ ] Video and audio players vanish without a trace: the cleaner drops every iframe, video and audio, leaving "Watch:" or a heading over nothing. In a sample of 405 recent items from 41 feeds (Oct 2), 8% had a player (16% outside the starter packs), almost all YouTube. Put a line where each was ("▶ Video: title, youtube.com/…") *(live)*
 - [ ] EPUB design, round 2: the cover image and a look on real devices (Kindle, Kobo, KOReader) *(device)*
-- [ ] A text size setting for the article preview *(your brother asked; medium priority)*
-- [ ] Comics in the article preview: let a strip fill the page width, and allow pinch to zoom *(you asked)*
 - [ ] Substack Notes embedded in posts that come through tt-rss: tt-rss strips the Note's text, so the sentence introducing it hangs. Fetching the post's page would bring it back (the full post is in the page's data), at one page fetch per Substack article *(device)*
 
 ### Delivery and schedule
 - [ ] Dropbox connection (OAuth PKCE) so Kobo delivery is automatic; waiting on an app key ([#18](https://github.com/madCode/newspaperss/issues/18)) *(personas)*
 - [ ] Boox: offer folder delivery into the Books folder, so editions stay in the library *(personas)*
 - [ ] Folder delivery: tt-rss marks articles read as soon as the file is saved, before Syncthing has synced; old editions pile up in the folder *(personas)*
-- [ ] After a send to the Kindle app, say it can take a few minutes to show up in the library, so a slow arrival doesn't look like a failure *(device)*
 - [ ] Verify folder delivery and the chooser from the notification on a real device
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
-- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page, is built (cycles 71–73). Still open: adding feeds to tt-rss from here. Sections were taken out (cycle 74)
+- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page, is built (cycles 77–79). Still open: adding feeds to tt-rss from here, and how this joins "tt-rss and Google Reader API servers as full backends" below. Sections were taken out (cycle 80)
 - [ ] A quiet tt-rss feed says so under its row ("Nothing new in 3 weeks"). tt-rss's feed list gives when it last fetched a feed, not when it last posted, so this needs the newest article's date from getHeadlines, once a day
 - [ ] Search on the account page's feed list (F4), if scrolling 50+ feeds on Sources gets slow
 - [ ] Several categories, and tt-rss's Starred and Published as choices
@@ -54,7 +50,6 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Read sync: an article marked unread in tt-rss further back than its feed's newest five unread only comes back here once it's among them. Ask tt-rss about delivered articles directly if that turns out to matter
 
 ### From the UX pass *(ux)*
-- [ ] Sync errors on a source's page still read "The site answered with error 403"; give them the plain words the add dialog now uses ("turned newspapeRSS away… try again later")
 - [ ] An edition released because another was made by hand keeps its Ready notification (with Send) until the next timed one replaces it
 - [ ] Boox: consider turning off ripples on e-ink (they cause partial refreshes); Boox's own refresh modes may make it moot
 
@@ -77,7 +72,7 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] `SettingsScreenTest` can fail under full-suite load (DataStore "Unable to rename …tmp", a write still running when the temp folder is deleted). Give test DataStores a scope that finishes before cleanup
 
 ### Later
-- [ ] SMTP delivery (low priority: sharing to the Kindle app and Calibre cover most email needs)
+- [ ] Send the email itself (SMTP, an app password), so a Kindle edition arrives with no tap and from a chosen account; email delivery through the mail app is done (#123)
 
 ## Feature proposals
 
@@ -86,6 +81,38 @@ Let the reader mark articles that stayed with them (in the app, or by finishing 
 the e-reader), and let the planner lean towards similar ones from their own feeds. It stays on the phone,
 is visible and adjustable, and mustn't narrow the paper into an echo chamber: "nobody's algorithm" is the
 pitch, so it has to be the reader's own.
+
+### Smart order: rare posts first *(you asked)*
+Taking turns treats every source alike, so a source that posts once a month waits its turn behind
+daily ones, and its one post can expire unread. A "Smart" order would let sources that post rarely go
+first. It replaces "Source by source", which only differs from Take turns with the per-source cap off;
+a reader who chose it moves to Smart. The orders become Take turns, Smart and Shuffle.
+
+- **How often a source posts** comes from what the app has already seen: the typical gap between its
+  articles' dates over the last few months (the median, so one burst doesn't count as a habit). A new
+  source has no history and is treated as average.
+- **Who goes first:** sources with the longest gap. A daily feed will have another article tomorrow; a
+  monthly one won't. Within that, an article close to its keep window ending goes ahead of a fresh one.
+- **Still finite and fair:** the per-source cap and the budget hold, and stars still come first. Smart
+  changes only who goes first, so frequent sources still get their turns once the rare ones are in.
+- **Visible:** a source's page could say "posts about once a month", which also explains the order.
+- **Open questions:** whether Smart should also replace Take turns (it behaves the same when sources
+  post equally often); and whether rare sources need a longer keep window too, which would also catch a
+  monthly post that lands the day after an edition is full. Count how many rare sources' articles
+  expire once Smart is in: if it stays near zero, the longer window isn't needed.
+
+### High-priority sources *(you asked)*
+Mark a source as high priority and its new posts go first, the way a star puts one article first.
+The reader's own choice, visible on the source's page, rather than the app guessing.
+
+- **Order, not count:** a priority source goes to the front of the turns when it has something new,
+  still within its per-source cap and the budget; stars still come first. "Allow more" stays the
+  setting for how many.
+- **Too many means none:** when priority sources alone fill an edition, they take turns among
+  themselves like everyone else; say so on Settings rather than quietly dropping the rest.
+- **With Smart:** Smart is for readers who never set anything; priority is the reader's override on
+  top. Build whichever is missed first: in a simulation of one reader's 80 feeds, daily 30-minute
+  editions with Take turns already lost almost no posts from rarely-posting sources.
 
 ### Sharing an article
 Share an article with someone. The link is easy; the full extracted text raises copyright questions and
@@ -114,6 +141,23 @@ then show up in their other reader apps too, and read state stays in one place. 
 - which tt-rss category it goes in;
 - whether the phone-side source is then dropped, so articles don't arrive twice;
 - what to do for an OPML import.
+
+### tt-rss and Google Reader API servers as full backends *(you asked)*
+Consider letting a reader server be the backend for every source it can handle, rather than one
+source among many. A feed the reader's server already follows would come from the server: fetched
+there, read state kept there, and the same in their other reader apps. Sources the server can't
+handle (saved links, curated lists) stay on the phone.
+- Which servers: tt-rss (done as one source today) and the
+  [Google Reader API](https://freshrss.github.io/FreshRSS/en/developers/06_GoogleReader_API.html),
+  which [FreshRSS](https://freshrss.org), [Miniflux](https://miniflux.app/docs/google_reader.html),
+  [Inoreader](https://www.inoreader.com/developers/), The Old Reader and BazQux speak. One Google
+  Reader client covers all of them, and it lessens the risk of tt-rss living on as a
+  [fork](https://linuxiac.com/tt-rss-shuts-down-but-the-project-lives-on-under-a-new-fork/).
+- What a server's feed is, is settled (cycles 77–79): a publication the account's source carries,
+  with its own settings and page, not a source of its own. A Google Reader API account would be
+  another source carrying publications the same way. Still to settle: how this joins "Add sources
+  to tt-rss".
+- An architecture change: the server, not the phone, would fetch and track those feeds.
 
 ### Languages
 What to do with non-English sources and readers. Today:
@@ -197,7 +241,7 @@ phone. What's missing:
   the competitors do, not what this app is for.
 
 ### Sections in the paper (taken out)
-Taken out in cycle 74, with OPML folders, the reading list's "Saved for later" heading, tt-rss
+Taken out in cycle 80, with OPML folders, the reading list's "Saved for later" heading, tt-rss
 categories as sections and balancing by section. A 30-minute paper is often 8 articles, so headings
 mostly sat over one article each, and they added a setting to every feed's page. Feed readers group
 feeds into folders to find them, which is what the inset list on Sources does; the paper doesn't
@@ -228,6 +272,13 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 - [x] Your tt-rss feeds on Sources: inset under the tt-rss row, folded until you open them, each with its own page (leave out, article text, cap, its articles); a daily feed list from tt-rss names every feed; article text and cap are per publication, so a tt-rss feed has its own
 - [x] Article text is checked, not assumed: each edition reads the pages of up to 5 long items, one per publication (a feed here, or one feed in tt-rss), which each learn on their own; pictures the feed's copy lacks count for the page
+- [x] Email editions straight to your Kindle: its own address, your mail app opened ready to send *(you asked, #123)*
+- [x] Paid posts say they're only the free part; a source can skip the ones with nothing free (a title and a picture), off by default, with a count on its page *(you asked)*
+- [x] After a send with the Kindle app, a line says it can take a few minutes to show up in the library *(device)*
+- [x] A text size setting for the article preview (Aa in its top bar) *(your brother asked)*
+- [x] Comics in the preview: large pictures standing alone fill the width, and the page can be pinched to zoom *(you asked)*
+- [x] A webcomic's hover text (xkcd's title text) is a caption under the image in the book *(device)*
+- [x] Sync errors on a source's page use the add dialog's plain words, with advice that fits a source already added *(ux)*
 - [x] A tt-rss timeout says the server took too long, not that it couldn't be reached *(personas)*
 - [x] tt-rss: leave a feed out of the paper from the source's page; it isn't fetched, and its waiting articles go except starred ones *(personas)*
 - [x] No Open for Kindle and Kobo readers, who send the book rather than open it on the phone *(personas)*

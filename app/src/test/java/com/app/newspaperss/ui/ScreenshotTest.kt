@@ -34,16 +34,24 @@ import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.edition.EditionNotes
+import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
+import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import com.app.newspaperss.ui.edition.EditionDetailScreen
+import com.app.newspaperss.core.epub.EditionArticle
+import com.app.newspaperss.core.epub.EditionDoc
+import com.app.newspaperss.core.epub.EditionSection
+import com.app.newspaperss.core.epub.EpubWriter
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
+import com.app.newspaperss.ui.settings.SettingsPage
+import com.app.newspaperss.ui.settings.SettingsPageScreen
 import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
@@ -64,7 +72,11 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * Renders each main screen with real graphics. It catches screens that crash
@@ -106,7 +118,7 @@ class ScreenshotTest {
 
     @Test
     fun onboardingDevice() {
-        val vm = onboarding().apply { next(); chooseDevice(Device.KINDLE) }
+        val vm = onboarding().apply { next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com") }
         shoot("02-onboarding-device") { OnboardingScreen(vm) }
     }
 
@@ -119,7 +131,7 @@ class ScreenshotTest {
     @Test
     fun onboardingSize() {
         val vm = onboarding().apply {
-            next(); chooseDevice(Device.KINDLE); next(); toggleFeed(StarterPacks.all[0].feeds[0].url); next()
+            next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com"); next(); toggleFeed(StarterPacks.all[0].feeds[0].url); next()
         }
         shoot("04-onboarding-size") { OnboardingScreen(vm) }
     }
@@ -171,6 +183,19 @@ class ScreenshotTest {
     }
 
     @Test
+    fun articlePreview() {
+        val file = tmp.newFile("p.epub")
+        val article = EditionArticle(title = "The quiet return of the night train", sourceTitle = "The Example Review", url = "https://example.com/night-train", bodyHtml = "<p>Sleeper services are coming back.</p>", minutes = 4.0)
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("Tuesday Morning Edition", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
+        }
+        // The page itself is a WebView, which Robolectric doesn't draw; this shoots the top bar.
+        shoot("05c-article-preview", ready = { compose.onAllNodes(hasText("Opening…")).fetchSemanticsNodes().isEmpty() }) {
+            ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {})
+        }
+    }
+
+    @Test
     fun sources() {
         val repo = SourceRepository(db)
         runBlocking {
@@ -182,7 +207,7 @@ class ScreenshotTest {
         shoot("06-sources", ready = { vm.rows.value?.isNotEmpty() == true }) { SourcesScreen(vm) }
     }
 
-    /** A source with a row in each state the design shows: waiting, starred, marked read, in an unsent edition, delivered, got old. */
+    /** A source with a row in each state the design shows: waiting, starred, marked read, in an unsent edition, delivered (two days ago), got old. */
     private fun sourceWithArticles(): SourceDetailViewModel {
         val repo = SourceRepository(db)
         val id = runBlocking {
@@ -200,7 +225,11 @@ class ScreenshotTest {
             repo.setStarred(ids[1], true)
             db.articles().setState(listOf(ids[2]), ArticleState.SKIPPED)
             db.articles().setState(listOf(ids[3]), ArticleState.IN_EDITION)
+            val today = LocalDate.now().dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+            val edition = db.editions().insert(EditionEntity(title = "$today Morning Edition", status = EditionStatus.READY))
+            db.editions().insertArticles(listOf(EditionArticleEntity(editionId = edition, articleId = ids[3], position = 0, title = titles[3], sourceTitle = "The Guardian: World", minutes = 6.0)))
             db.articles().setState(listOf(ids[4]), ArticleState.DELIVERED)
+            db.articles().rememberDelivered(listOf(ids[4]), Instant.now().minus(Duration.ofDays(2)))
             db.articles().setState(listOf(ids[5]), ArticleState.EXPIRED)
             db.sources().recordSuccess(id, Instant.now(), null, "https://www.theguardian.com", "")
             db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, ContentMode.PAGE, FullTextEvidence.PAGE_LONGER, 3))
@@ -374,8 +403,49 @@ class ScreenshotTest {
 
     @Test
     fun settings() {
+        runBlocking { store.update { it.copy(device = Device.KINDLE, scheduleEnabled = true, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "name_abc123@kindle.com") } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07-settings", ready = { vm.settings.value != null }) { SettingsScreen(vm, onOpen = {}) }
+    }
+
+    @Test
+    @Config(fontScale = 2f)
+    fun settingsAtLargeText() {
+        val vm = SettingsViewModel(store) {}
+        shoot("07b-settings-200", ready = { vm.settings.value != null }) { SettingsScreen(vm, onOpen = {}) }
+    }
+
+    @Test
+    fun settingsEdition() {
+        val vm = SettingsViewModel(store) {}
+        shoot("07c-settings-edition", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.EDITION, onBack = {}) }
+    }
+
+    @Test
+    fun settingsSchedule() {
         runBlocking { store.update { it.copy(scheduleEnabled = true) } }
         val vm = SettingsViewModel(store) {}
-        shoot("07-settings", ready = { vm.settings.value != null }) { SettingsScreen(vm) }
+        shoot("07d-settings-schedule", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.SCHEDULE, onBack = {}) }
+    }
+
+    @Test
+    fun settingsDelivery() {
+        runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "name_abc123@kindle.com") } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07e-settings-delivery", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.DELIVERY, onBack = {}) }
+    }
+
+    @Test
+    @Config(fontScale = 2f)
+    fun settingsDeliveryAtLargeText() {
+        runBlocking { store.update { it.copy(device = Device.BOOX) } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07g-settings-delivery-200", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.DELIVERY, onBack = {}) }
+    }
+
+    @Test
+    fun settingsNotes() {
+        val vm = SettingsViewModel(store) {}
+        shoot("07f-settings-notes", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.NOTES, onBack = {}) }
     }
 }

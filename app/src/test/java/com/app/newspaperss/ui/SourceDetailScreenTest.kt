@@ -126,8 +126,8 @@ class SourceDetailScreenTest {
         idleUntil { visible("Pause") }
         val list = compose.onNode(hasScrollAction())
         list.performScrollToNode(hasText("Went out"))
-        compose.onNodeWithText("Delivered", substring = true).assertExists()
-        list.performScrollToNode(hasText("Waiting for an edition", substring = true))
+        compose.onNodeWithText("· Sent", substring = true).assertExists()
+        list.performScrollToNode(hasText("· Waiting, ", substring = true))
         list.performScrollToIndex(0)
 
         compose.onNodeWithContentDescription("More options").performClick()
@@ -344,7 +344,7 @@ class SourceDetailScreenTest {
         compose.onNodeWithText("Tap ● to mark one read or unread, and ☆ to put it in your next edition.").assertExists()
 
         star("Article delivered").performClick()
-        settle { visible("Starred for your next edition") }
+        settle { visible("In your next edition") }
         star("Article delivered").assertIsOn().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Starred"))
         val delivered = runBlocking { db.articles().byId(ids.getValue("delivered"))!! }
         assertEquals("a star is a flag, not a state", ArticleState.DELIVERED, delivered.state)
@@ -393,7 +393,7 @@ class SourceDetailScreenTest {
         markRead("Article waiting").performClick()
 
         settle { state(waiting) == ArticleState.SKIPPED }
-        settle { visible("Marked as read") }
+        settle { visible("· Read") }
         assertEquals("the row doesn't move", top, compose.onNodeWithText("Article waiting").fetchSemanticsNode().boundsInRoot.top)
         assertNull("marking read clears the star", runBlocking { db.articles().byId(waiting)!!.starredAt })
         assertFalse("a second tap undoes it, so no snackbar", visible("Undo"))
@@ -794,5 +794,25 @@ class SourceDetailScreenTest {
         assertEquals("Last checked today at 6:02 PM", lastCheckedLine(evening, Locale.US, is24Hour = false, now = later, zone = utc)?.replace('\u202f', ' '))
         assertEquals("the phone's 24-hour setting wins", "Last checked today at 18:02", lastCheckedLine(evening, Locale.US, is24Hour = true, now = later, zone = utc))
         assertEquals("Last checked Sep 27", lastCheckedLine(Instant.parse("2026-09-27T06:02:00Z"), Locale.US, is24Hour = false, now = now, zone = utc))
+    }
+
+    /** The paid-posts switch only shows on a source that's had one, and says how many it left out. */
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun aSourceWithPaidPostsCanSkipTheOnesWithNothingFree() {
+        val (id, ids) = sourceWithArticles()
+        show(id)
+        assertFalse("not on a source that's never had one", visible("Skip paid posts"))
+
+        runBlocking { repo.markPaidOnly(ids.getValue("delivered"), skip = false) }
+        idleUntil { compose.waitForIdle(); visible("Skip paid posts with nothing free") }
+        assertTrue(visible("Some of its posts are for paying subscribers"))
+        compose.onNodeWithText("Skip paid posts with nothing free").performClick()
+        idleUntil { runBlocking { db.sources().byId(id)!!.skipPaidPosts } }
+
+        runBlocking { repo.markPaidOnly(ids.getValue("waiting"), skip = true) }
+        idleUntil { compose.waitForIdle(); visible("1 paid post skipped so far") }
+        assertTrue(visible("Skipped: a paid post"))
+        assertEquals(ArticleState.EXPIRED, state(ids.getValue("waiting")))
     }
 }

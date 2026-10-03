@@ -14,32 +14,73 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
-### Cycle 74: no sections; rules between the feeds
+### Cycle 80: no sections; rules between the feeds
 - **From you:** sections are complexity a 30-minute paper of 8 articles doesn't need; take them out, and bring them back if they're missed. 50+ feeds without rules between them would be overwhelming.
-- **Shipped:** the paper is one list in your sources' order, with no headings, the reading list's "Saved for later" included; there's no Section setting, OPML folders are ignored on import and not written on export. The feeds under tt-rss have an inset rule between each. Database version 8 (not yet released) simply doesn't have sections.
+- **Shipped:** the paper is one list in your sources' order, with no headings, the reading list's "Saved for later" included; there's no Section setting, OPML folders are ignored on import and not written on export. The feeds under tt-rss have an inset rule between each. Database version 7 simply doesn't have sections.
 
-### Cycle 73: your tt-rss feeds on Sources, each with a page
+### Cycle 79: your tt-rss feeds on Sources, each with a page
 - **From you:** build the rest of "sources carry, publications write", through to the inset feeds on Sources.
-- **Shipped:** the article text you choose and the cap now belong to each publication, so a tt-rss feed can have its own ("at most 2 from Morning Wire"). Once a day tt-rss is asked for its whole feed list, read feeds included, with addresses and categories. On Sources, tt-rss is last, with a ▾ button that shows its feeds just beneath it, each opening a page like a feed's own, and a Left out list. The same site on the phone and in tt-rss says so on both rows. Database version 8.
+- **Shipped:** the article text you choose and the cap now belong to each publication, so a tt-rss feed can have its own ("at most 2 from Morning Wire"). Once a day tt-rss is asked for its whole feed list, read feeds included, with addresses and categories. On Sources, tt-rss is last, with a ▾ button that shows its feeds just beneath it, each opening a page like a feed's own, and a Left out list. The same site on the phone and in tt-rss says so on both rows. Database version 7.
 - **Left for later:** "Nothing new in 3 weeks" for quiet feeds (tt-rss's feed list says when it last fetched a feed, not when it last posted).
 
-### Cycle 72: left out moves onto the publication
+### Cycle 78: left out moves onto the publication
 - **From you:** go with "sources carry, publications write": settings about the writing belong to the publication, settings about the connection to the source.
 - **Shipped:** the first step. Leaving a tt-rss feed out is now a flag on its publication, beside what the text check learned, instead of a table of its own. Nothing changes on screen. Database version 7.
 - **Review caught:** signing in again after the phone lost the password's key (same user, same server) wiped every left-out feed, and would now wipe what each feed had learned too. The saved address and username are now compared, which stay readable without the password.
 
 ## Day 5 · Fri 2 Oct
 
-### Cycle 71: article text, checked and per publication
+### Cycle 77: article text, checked and per publication
 - **From you:** Automatic should look at the page now and then before deciding a feed is full text; tt-rss feeds should each learn on their own; count pictures, not just words.
 - **Found:** a long item (300+ words) counted as proof the feed was full without its page ever being read, so a feed of long teasers settled on "Full articles". tt-rss feeds learned nothing at all.
-- **Shipped:** what the check learns lives per publication (a feed here, or one feed in tt-rss), moved from the source row. Each edition reads the pages of up to 5 long items, one per publication, while it's still working out or every 14 days once settled on the feed; a teaser found that way gets its page in that edition. A page with pictures the feed's copy lacks counts for the page. Database version 6.
+- **Shipped:** what the check learns lives per publication (a feed here, or one feed in tt-rss), moved from the source row. Each edition reads the pages of up to 5 long items, one per publication, while it's still working out or every 14 days once settled on the feed; a teaser found that way gets its page in that edition. A page with pictures the feed's copy lacks counts for the page.
 
 ## Day 4 · Thu 1 Oct
 
-### Cycle 70: what tt-rss is as a source, explored
+### Cycle 76: what tt-rss is as a source, explored
 - **From you:** each tt-rss feed as its own source? add what you subscribe to here back to tt-rss? does either clutter?
-- **Did:** competitors, today's screens and clickable proposals, each critiqued by the personas over several rounds; in [docs/research/ttrss-backend/](research/ttrss-backend/index.html). Recommended: tt-rss stays one row with its feeds inset under it, folded; each feed learns its article text (cycle 71); sections and balance later; adding to tt-rss only by hand for now.
+- **Did:** competitors, today's screens and clickable proposals, each critiqued by the personas over several rounds; in [docs/research/ttrss-backend/](research/ttrss-backend/index.html). Recommended: tt-rss stays one row with its feeds inset under it, folded; each feed learns its article text (cycle 77); sections and balance later; adding to tt-rss only by hand for now.
+### Cycle 75: a tidier Settings page
+- **From you:** a pass over Settings, to clean it up.
+- **Shipped:**
+  - Your e-reader comes before Delivery, which depends on it.
+  - The share tip sits under "Send it myself", and only shows when that's chosen.
+  - Every delivery warns when notifications are off.
+  - A folder the app can no longer reach says so, and tapping it picks it again.
+  - The two folder buttons say which folder they change.
+  - "Source" instead of "site" throughout.
+  - At large text, the per-source buttons go under the words.
+- **Review caught:** tapping an unreachable notes folder's row turned notes off, despite its line saying "choose it again". Fixed, with a separate Turn off.
+
+### Cycle 74: editions emailed straight to your Kindle ([#123](https://github.com/madCode/newspaperss/issues/123))
+- **From you:** sharing to the Kindle app put editions in the library but not on the Kindle; the Kindle app's send screen turned out to offer library or device, not both, and it still errors on a cold first tap.
+- **Shipped:** "Email it to your Kindle" delivery. Set your Kindle's own address and a mail app once; Send opens that app with everything filled in and counts as sent. Onboarding offers it for Kindle readers; Settings › Delivery has it first. "Ask each time" or a missing app falls back to the share sheet.
+- **Review caught:** the notification's Send used an address from when it was posted, overlapping share sheets overwrote each other, hints and error messages that were wrong in the fallback, a blank address falling back silently, and an address field that went red as you typed. All fixed.
+
+### Cycle 73: skipping paid posts with nothing free
+- **From you:** detect premium posts with no content at all, and let a source opt in to skipping them.
+- **Shipped:** a paid post with under 50 words free (a title and a picture) is remembered when an edition tries it. Its source's page then offers "Skip paid posts with nothing free", off until you turn it on. Skipped posts read "Skipped: a paid post", aren't fetched again, and are counted on the page. A starred one still goes in.
+
+### Cycle 72: the platform pass, round 1
+- **From you:** test against the big blog and newsletter platforms, from their own feeds and through tt-rss.
+- **Built:** a corpus of 40 real posts from Substack, Ghost, WordPress, Medium, Blogger, Buttondown and Micro.blog, with their words scrambled. Each one is run through tt-rss's own sanitizer as well. A test runs the extractor over every post both ways.
+- **Found and fixed:**
+  - Pictures through tt-rss came out at a third of the size.
+  - Paid posts weren't told apart: Substack's "Read more" and paywall pitch reached the book, and a Ghost paid post was a picture and a sentence. They now say they're the free part.
+  - Substack's subscribe box got through tt-rss.
+  - Videos and YouTube players vanished, leaving their captions.
+  - Medium's tracking pixel got in through tt-rss.
+  - Newsletter sign-up boxes and comment-form labels got in.
+- **Not yet:** Tumblr turned the collector away (429); galleries, tweets and beehiiv are for round 2.
+
+### Cycle 71: five small asks
+- **From you:** the backlog's quick ones, after the README catch-up.
+- **Shipped:** "It can take a few minutes to show up" after a send with the Kindle app; a text size for the article preview; comics in the preview fill the width and pinch to zoom; xkcd's hover text as a caption in the book; sync errors on a source's page in plain words.
+- **Review caught:** captions put in the middle of a line of text, every figure stretched in the preview, advice to re-add a built-in list, and the Kindle note coming back after Mark as not sent. All fixed.
+
+### Cycle 70: each article says where it stands
+- **From you:** option B's plain lines from the read/unread mockups ([#111](https://github.com/madCode/newspaperss/issues/111)), with days left on waiting ones.
+- **Shipped:** a source's rows end with "Waiting, 3 days left", "In your next edition", "In Thursday's edition", "Sent Wednesday", "Read" or "Not picked". The reading list uses the same words, without days left.
 
 ## Day 3 · Wed 30 Sep
 
