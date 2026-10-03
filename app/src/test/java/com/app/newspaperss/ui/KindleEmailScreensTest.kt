@@ -6,6 +6,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.room.Room
@@ -34,6 +35,7 @@ import com.app.newspaperss.testutil.installApp
 import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.edition.KINDLE_EMAIL_NOTE
+import com.app.newspaperss.ui.edition.MARK_NOT_SENT
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
 import kotlinx.coroutines.flow.flowOf
@@ -102,7 +104,8 @@ class KindleEmailScreensTest {
         waitFor(KINDLE_EMAIL_NOTE)
 
         // It didn't arrive after all: the note would contradict the edition waiting to be sent.
-        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
+        compose.onNodeWithContentDescription("More options for Tuesday Morning Edition").performClick()
+        compose.onNodeWithText(MARK_NOT_SENT).performClick()
         compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
         waitFor("I've sent it")
         compose.onNodeWithText(KINDLE_EMAIL_NOTE).assertDoesNotExist()

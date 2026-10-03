@@ -1,6 +1,10 @@
 package com.app.newspaperss.ui
 
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
@@ -9,7 +13,9 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -31,14 +37,18 @@ import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.delivery.EditionIntents
+import com.app.newspaperss.delivery.KindleSend
 import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
+import com.app.newspaperss.testutil.installApp
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.core.epub.EditionArticle
@@ -69,6 +79,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
 import java.io.File
 import java.time.Duration
 import java.time.Instant
@@ -101,8 +112,29 @@ class ScreenshotTest {
         compose.waitForIdle()
         act()
         compose.waitForIdle()
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
-        File(out, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(out, "$name.png").outputStream().use { capture().compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    /**
+     * The screen with any open menu or dialog drawn over it where it sits. They are windows of their
+     * own, and Robolectric captures another window's root as the screen's pixels, so each is drawn
+     * from its view instead.
+     */
+    private fun capture(): Bitmap {
+        val roots = compose.onAllNodes(isRoot()).fetchSemanticsNodes()
+        if (roots.size == 1) return compose.onRoot().captureToImage().asAndroidBitmap()
+        val screen = roots.first()
+        val bitmap = compose.onAllNodes(isRoot())[0].captureToImage().asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(bitmap)
+        val global = Class.forName("android.view.WindowManagerGlobal").getMethod("getInstance").invoke(null)
+        val windows = ReflectionHelpers.getField<List<View>>(global, "mViews")
+        roots.drop(1).zip(windows.takeLast(roots.size - 1)).forEach { (root, view) ->
+            canvas.save()
+            canvas.translate(root.positionOnScreen.x - screen.positionOnScreen.x, root.positionOnScreen.y - screen.positionOnScreen.y)
+            view.draw(canvas)
+            canvas.restore()
+        }
+        return bitmap
     }
 
     private fun onboarding() = OnboardingViewModel(store, SourceRepository(db), FeedFinder(FakeHttp())) {}
@@ -143,8 +175,58 @@ class ScreenshotTest {
         shoot("05-today", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
     }
 
+    private fun installKindle() = installApp(
+        ApplicationProvider.getApplicationContext(),
+        packageName = EditionIntents.KINDLE_PACKAGE,
+        label = "Kindle",
+        filters = listOf(IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) }),
+    )
+
+    /** Today with yesterday's edition and today's, both sent, for a reader with [device]. */
+    private fun todaySent(name: String, device: Device, kindleNote: Boolean = false, act: () -> Unit = {}) {
+        if (device == Device.KINDLE) installKindle()
+        val files = tmp.newFolder().apply { resolve("x.epub").writeText("epub") }
+        val latest = runBlocking {
+            val now = Instant.parse("2026-09-29T06:30:00Z")
+            db.editions().insert(EditionEntity(title = "Monday Morning Edition", createdAt = now.minusSeconds(86_400), status = EditionStatus.DELIVERED, articleCount = 7, minutes = 31.0))
+            db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = now, status = EditionStatus.DELIVERED, fileName = "x.epub", articleCount = 8, minutes = 33.4, deliveredAt = now))
+        }
+        val sent = if (kindleNote) mapOf(latest to KindleSend.APP) else emptyMap()
+        val vm = TodayViewModel(EditionRepository(db, files), flowOf(null), settings = flowOf(Settings(device = device)), sentToKindle = flowOf(sent)) {}
+        shoot(name, ready = { vm.state.value.editions?.isNotEmpty() == true }, act = act) { TodayScreen(vm) }
+    }
+
+    /** Opens a sent edition's menu, where there is one (not before it was added). */
+    private fun openMenu(description: String) {
+        val menu = hasContentDescription(description)
+        if (compose.onAllNodes(menu).fetchSemanticsNodes().isNotEmpty()) compose.onNode(menu).performClick()
+    }
+
+    @Test
+    fun todaySentKindle() = todaySent("05d-today-sent-kindle", Device.KINDLE, kindleNote = true)
+
+    @Test
+    fun todaySentBoox() = todaySent("05e-today-sent-boox", Device.BOOX)
+
+    @Test
+    fun todaySentMenu() = todaySent("05f-today-sent-menu", Device.KINDLE) { openMenu("More options for Tuesday Morning Edition") }
+
     @Test
     fun editionDetail() {
+        val vm = sentEdition()
+        shoot("05b-edition-detail", ready = { vm.detail.value?.contents?.isNotEmpty() == true }) { EditionDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    fun editionDetailKindleMenu() {
+        installKindle()
+        val vm = sentEdition()
+        shoot("05g-edition-detail-kindle-menu", ready = { vm.detail.value?.contents?.isNotEmpty() == true }, act = { openMenu("More options") }) {
+            EditionDetailScreen(vm, onBack = {}, offerOpen = false, kindleReader = true)
+        }
+    }
+
+    private fun sentEdition(): EditionDetailViewModel {
         val id = runBlocking {
             val source = db.sources().insert(SourceEntity(url = "https://example.com/feed", title = "The Example Review"))
             val titles = listOf(
@@ -172,8 +254,7 @@ class ScreenshotTest {
             )
             edition
         }
-        val vm = EditionDetailViewModel(EditionRepository(db, tmp.newFolder().apply { resolve("e.epub").writeText("epub") }), id, EditionNotes(db, tmp.newFolder())) {}
-        shoot("05b-edition-detail", ready = { vm.detail.value?.contents?.isNotEmpty() == true }) { EditionDetailScreen(vm, onBack = {}) }
+        return EditionDetailViewModel(EditionRepository(db, tmp.newFolder().apply { resolve("e.epub").writeText("epub") }), id, EditionNotes(db, tmp.newFolder())) {}
     }
 
     @Test

@@ -1,15 +1,12 @@
 package com.app.newspaperss.ui.edition
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.unit.dp
+
+/** The menu item on a sent edition that opens [MarkNotSentDialog]. */
+const val MARK_NOT_SENT = "Didn't arrive? Mark as not sent"
 
 /**
  * For a sent edition that never reached the e-reader: a failed Send to Kindle still counts as
@@ -17,18 +14,12 @@ import androidx.compose.ui.unit.dp
  * next edition holds.
  */
 @Composable
-fun MarkNotSent(title: String, onConfirm: () -> Unit) {
-    // Keyed by the edition: a newer one can take its place on Today while the dialog is open.
-    var asking by rememberSaveable(title) { mutableStateOf(false) }
-    // No start padding, so it lines up with the text and buttons above rather than sitting indented.
-    TextButton(onClick = { asking = true }, contentPadding = PaddingValues(end = 12.dp)) { Text("Didn't arrive? Mark as not sent") }
-    if (asking) {
-        AlertDialog(
-            onDismissRequest = { asking = false },
-            title = { Text("Mark “$title” as not sent?") },
-            text = { Text("It goes back to ready to send, so you can send it again. If you don't, its articles go into your next edition.") },
-            confirmButton = { TextButton(onClick = { asking = false; onConfirm() }) { Text("Mark as not sent") } },
-            dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
-        )
-    }
+fun MarkNotSentDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mark “$title” as not sent?") },
+        text = { Text("It goes back to ready to send, so you can send it again. If you don't, its articles go into your next edition.") },
+        confirmButton = { TextButton(onClick = { onDismiss(); onConfirm() }) { Text("Mark as not sent") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
