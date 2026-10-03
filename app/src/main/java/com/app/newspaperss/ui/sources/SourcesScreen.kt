@@ -218,6 +218,9 @@ fun SourcesScreen(
     }
 }
 
+// Every group heading is pinned, not just the categories': a pinned heading stays until the
+// next one pushes it off, so the last category's would otherwise sit over the groups after it.
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SourceList(
     shown: SourcesList,
@@ -231,7 +234,7 @@ private fun SourceList(
     val list = shown.rows
     val srv = shown.server
     val account = srv?.account
-    val folded by viewModel.folded.collectAsState()
+    val folded = viewModel.folded.collectAsState().value ?: return
     LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
         item(key = "reading-list") {
             ReadingListRow(onOpenReadingList)
@@ -250,7 +253,7 @@ private fun SourceList(
         val mover = viewModel.mover
         val moving = shown.phoneFeeds?.takeIf { mover != null }
         if (feeds.isNotEmpty() || moving != null) {
-            item(key = "on-phone") { SectionHeading("Still on this phone") }
+            stickyHeader(key = "on-phone") { SectionHeading("Still on this phone") }
             if (mover != null && moving != null) {
                 item(key = "phone-feeds") { PhoneFeedsBanner(moving, onMove = { mover.open() }, onMoveOthers = mover::open) }
             }
@@ -262,7 +265,7 @@ private fun SourceList(
         }
         if (account != null) serverCategories(account.id, srv, folded, viewModel::toggleCategory, onOpenFeed)
         if (lists.isNotEmpty()) {
-            item(key = "lists") { SectionHeading("Curated lists") }
+            stickyHeader(key = "lists") { SectionHeading("Curated lists") }
             itemsIndexed(lists, key = { _, it -> "source/${it.source.id}" }) { i, row ->
                 if (i > 0) RowDivider()
                 SourceItem(row, onOpen = { onOpenSource(row.source.id) })
@@ -386,8 +389,9 @@ private fun LazyListScope.serverCategories(
 }
 
 /** The account's feeds that aren't in the paper: outside its category, and left out. */
+@OptIn(ExperimentalFoundationApi::class)
 private fun LazyListScope.outsidePaper(accountId: Long, server: ServerSources, onOpenLeftOut: (Long) -> Unit, onOpenNotInPaper: (Long) -> Unit) {
-    if (server.outside.isNotEmpty() || server.leftOut > 0) item(key = "outside-heading") { SectionHeading("Not in your paper") }
+    if (server.outside.isNotEmpty() || server.leftOut > 0) stickyHeader(key = "outside-heading") { SectionHeading("Not in your paper") }
     if (server.outside.isNotEmpty()) {
         item(key = "not-in-paper") {
             val title = server.account?.ttrssCategoryTitle?.let { "Outside $it" } ?: "Outside your category"
@@ -416,7 +420,7 @@ private fun SectionHeading(text: String) {
     Text(
         text,
         style = headingStyle,
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 4.dp).semantics { heading() },
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 4.dp).semantics { heading() },
     )
 }
 

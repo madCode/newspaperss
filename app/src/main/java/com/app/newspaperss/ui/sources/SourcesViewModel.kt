@@ -223,9 +223,12 @@ class SourcesViewModel(
             }
         }
 
-    /** The tt-rss categories folded on Sources, by name ("" for Uncategorized), kept across restarts. */
-    val folded: StateFlow<Set<String>> = (settings?.settings?.map { it.foldedCategories } ?: flowOf(emptySet()))
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    /**
+     * The tt-rss categories folded on Sources, by name ("" for Uncategorized), kept across
+     * restarts. Null until read, so the list doesn't draw them open and then fold them.
+     */
+    val folded: StateFlow<Set<String>?> = (settings?.settings?.map { it.foldedCategories } ?: flowOf(emptySet()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun toggleCategory(name: String) {
         val store = settings ?: return

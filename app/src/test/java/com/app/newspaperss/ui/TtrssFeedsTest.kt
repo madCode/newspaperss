@@ -27,6 +27,10 @@ import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.settings.FeedsFrom
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasContentDescription
 import java.time.ZoneOffset
@@ -95,6 +99,22 @@ class TtrssFeedsTest {
     private fun sources(from: FeedsFrom): SourcesViewModel {
         runBlocking { settings.update { it.copy(feedsFrom = from) } }
         return SourcesViewModel(repo, FeedFinder(FakeHttp()), settings = settings) {}
+    }
+
+    /** The last category's heading is pinned while its feeds scroll by, but not over the groups after it. */
+    @Config(qualifiers = "w320dp-h360dp")
+    @Test
+    fun theLastCategorysHeadingDoesNotCoverTheGroupsAfterIt() {
+        account()
+        runBlocking { repo.addList(com.app.newspaperss.core.lists.CuratedLists.all.first()) }
+        val vm = sources(FeedsFrom.SERVER)
+        compose.setContent { SourcesScreen(vm) }
+        idleUntil { compose.waitForIdle(); visible("Quarterly Review") }
+
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Left out"))
+        compose.waitForIdle()
+        compose.onNode(isHeading("Uncategorized, 2 feeds")).assertIsNotDisplayed()
+        compose.onNodeWithText("Not in your paper").assertIsDisplayed()
     }
 
     @Test
