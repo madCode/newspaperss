@@ -47,6 +47,8 @@ data class TodayState(
     val preferOpen: Boolean = false,
     /** False for a Kindle or Kobo, where the book is sent, never opened here. */
     val offerOpen: Boolean = true,
+    /** A sent edition offers to open the Kindle app, where it shows up. */
+    val kindleReader: Boolean = false,
     /** What to call the reader's e-reader in prompts. */
     val deviceName: String = "e-reader",
     /** Starred articles not yet in an edition, from sources that aren't paused. */
@@ -77,6 +79,7 @@ class TodayViewModel(
             next = nextEdition(s, now(), lastDue()),
             preferOpen = s.device == Device.BOOX,
             offerOpen = s.device.offersOpen,
+            kindleReader = s.device == Device.KINDLE,
             deviceName = when (s.device) {
                 Device.KINDLE -> "Kindle"
                 Device.KOBO -> "Kobo"
