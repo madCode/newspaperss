@@ -63,6 +63,10 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     var subscribeGate: CompletableDeferred<Unit>? = null
     /** Names tt-rss gives feeds subscribed to, by address; otherwise their host. */
     val titles = mutableMapOf<String, String>()
+    /** subscribeToFeed answers with these status codes for these addresses instead of subscribing. */
+    val refuse = mutableMapOf<String, Int>()
+    /** Run once each subscribeToFeed has been decided: something else happening while tt-rss answers. */
+    var afterSubscribe: (suspend (url: String) -> Unit)? = null
     /** subscribeToFeed calls: address and category id. */
     val subscribed = mutableListOf<Pair<String, Int>>()
     /** unsubscribeFeed calls, by feed id. */
@@ -205,6 +209,7 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                 val existing = feeds.entries.firstOrNull { it.value.url == url }?.key
                 val (code, id) = when {
                     subscribeCode != null -> subscribeCode!! to null
+                    url in refuse -> refuse.getValue(url) to null
                     existing != null -> 0 to existing
                     else -> {
                         val id = nextFeedId++
@@ -212,6 +217,7 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                         1 to id
                     }
                 }
+                afterSubscribe?.invoke(url)
                 ok(buildJsonObject { put("status", buildJsonObject { put("code", code); if (id != null && !subscribeWithoutId) put("feed_id", id) }) })
             }
             "unsubscribeFeed" -> {

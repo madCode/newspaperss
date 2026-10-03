@@ -438,7 +438,30 @@ phone restarts.
       last listed."). It opens Settings › Where your feeds come from. With no
       working account, **Sign in to your tt-rss** takes its place.
     - **On this phone:** the reading list, curated lists, and any feeds
-      still fetched by the phone.
+      still fetched by the phone, last, under a banner: "8 feeds are
+      fetched by this phone, not your tt-rss", with **Move them to
+      tt-rss**. Curated lists and the reading list stay on the phone in
+      both setups, so they never count. The banner shows only with a
+      working account.
+    - **Moving them:** a sheet lists every phone feed, ticked. One tt-rss
+      already has at the same address says "Already in your tt-rss: just
+      removed here". One category for the new ones (the paper's, else the
+      last used; a different one is warned about), and "Their settings here
+      come along". **Move N** starts it in the background; the banner then
+      shows stepped lines, "✓ Aeon · subscribed", then "Moving 5 of 8 ·
+      Quanta Magazine", changing once per feed. At the end a snackbar says
+      "Moved 8 feeds to your tt-rss". If some couldn't move, the banner says
+      "Moved 5 of 8", why each other one didn't, and **Move the other 3**,
+      which opens the sheet with just those ticked. If tt-rss stops
+      answering, the rest stop with it rather than each waiting in turn.
+    - **What a move does:** each feed is subscribed in tt-rss (or found
+      there), then its settings are carried onto its tt-rss feed: article
+      text, the cap, Skip paid posts, left out, and what the text check
+      learned. A feed paused on the phone is left out in tt-rss. The phone
+      feed stops fetching and leaves Sources at once, but it's only deleted
+      when nothing starred, waiting or in an unsent edition is left in it:
+      until then editions still take from it, so stars are kept. A link
+      already delivered isn't delivered again when tt-rss brings it.
     - **From your tt-rss:** each category a heading, "News · 9 feeds"
       ("News, 9 feeds" to TalkBack), its feeds A to Z under it. Feeds with
       no category go under **Uncategorized**, last. A line under a feed only
@@ -551,10 +574,15 @@ phone restarts.
     tt-rss · host"; in red, "Not signed in" or "Can't sign in to tt-rss"):
     the two setups as radio rows. Picking the other one changes nothing
     until it's confirmed. **My own RSS server** opens the sign-in, in place
-    of the page (Back returns to it). **This phone** asks first, saying
+    of the page (Back returns to it). Signed in from the phone setup with
+    phone feeds, the page offers the move at once: "Signed in. 58 feeds in
+    7 categories. Move your 8 phone feeds to tt-rss?", **Move 8** (the same
+    sheet as Sources) or **Not now** (the banner on Sources stays). **This phone** asks first, saying
     what happens: newspapeRSS signs out of tt-rss and removes it here, with
     its waiting and starred articles; nothing changes in tt-rss; its feeds
     don't come along yet (add sites again, or import tt-rss's OPML export).
+    Feeds moved to tt-rss and still kept for their stars become phone feeds
+    again, and a move under way stops.
     With a server, the page also has the account: its address, who's
     signed in or why the login fails, when it was last checked, **Sign in
     again** (the address and username filled in; the same user keeps their

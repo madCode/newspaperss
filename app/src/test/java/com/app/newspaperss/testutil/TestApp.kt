@@ -17,6 +17,8 @@ class TestApp : NewspaperssApp() {
     val titlesRequested = mutableListOf<Long>()
     /** Delivered editions whose notes the app asked to save in the background. */
     val notesRequested = mutableListOf<Long>()
+    /** How many times the app asked for the work that moves phone feeds into tt-rss. */
+    var movesRequested = 0
 
     override fun createContainer() = AppContainer(
         this,
@@ -26,6 +28,7 @@ class TestApp : NewspaperssApp() {
         markTtrssRead = { markedTtrssRead += it },
         fetchReadingListTitles = { titlesRequested += it },
         saveNotes = { notesRequested += it },
+        moveFeeds = { movesRequested++ },
     )
 
     override fun scheduleWork() {}

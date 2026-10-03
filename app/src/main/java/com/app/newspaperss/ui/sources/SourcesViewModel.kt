@@ -23,6 +23,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import com.app.newspaperss.data.FeedChoice
+import com.app.newspaperss.data.FeedMoves
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.data.sortTitle
 import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.settings.SettingsStore
@@ -72,8 +74,11 @@ data class ServerSources(
     val waitingForList get() = account?.ttrssCategoryId != null && account.feedsListedAt == null
 }
 
-/** Sources as shown: [rows] on this phone, and [server] in the server setup (null in the phone setup). */
-data class SourcesList(val rows: List<SourceRow>, val server: ServerSources?, val needsSignIn: Boolean)
+/**
+ * Sources as shown: [rows] on this phone, and [server] in the server setup (null in the phone
+ * setup). [phoneFeeds] is what the server setup's banner says about feeds still on the phone.
+ */
+data class SourcesList(val rows: List<SourceRow>, val server: ServerSources?, val needsSignIn: Boolean, val phoneFeeds: PhoneFeeds? = null)
 
 /** A server category and its feeds, A to Z; [name] null is Uncategorized. */
 data class FeedCategory(val name: String?, val feeds: List<FeedChoice>)
@@ -159,6 +164,7 @@ const val UNCATEGORIZED_ID = 0
 /**
  * @param ttrss with [settings], says when the server setup has no working account.
  * @param subscriptions with [ttrss], adds sites to tt-rss in the server setup.
+ * @param moves with [ttrss] and [settings], moves phone feeds into tt-rss in the server setup.
  */
 class SourcesViewModel(
     private val repository: SourceRepository,
@@ -168,16 +174,22 @@ class SourcesViewModel(
     private val saveToReadingList: (suspend (url: String) -> Boolean)? = null,
     private val settings: SettingsStore? = null,
     private val subscriptions: TtrssSubscriptions? = null,
+    moves: FeedMoves? = null,
     private val onSourcesChanged: () -> Unit,
 ) : ViewModel() {
+    /** Moving phone feeds into tt-rss; null where that isn't offered. */
+    val mover: PhoneFeedMover? =
+        if (moves != null && ttrss != null && settings != null) PhoneFeedMover(moves, ttrss, settings, repository, viewModelScope) else null
+
     /**
      * The sources on this phone, in the reader's order, as the edition takes them. A tt-rss
-     * account is never among them: in the server setup it has its own part of the screen.
+     * account is never among them: in the server setup it has its own part of the screen. Nor
+     * is a feed moved to tt-rss and kept only for its stars.
      */
     private val phoneRows: Flow<List<SourceRow>> =
-        combine(repository.observe(), repository.observeActivity(), repository.observeOwnPublications()) { sources, activity, texts ->
+        combine(repository.observe(), repository.observeActivity(), repository.observeOwnPublications(), moves?.state ?: flowOf(FeedMoves.State())) { sources, activity, texts, moving ->
             val bySource = activity.associate { it.sourceId to it.lastNew }
-            sources.filter { it.kind != SourceKind.READING_LIST && it.kind != SourceKind.TTRSS }.map { s -> SourceRow(s, bySource[s.id], texts[s.id]) }
+            sources.filter { it.kind != SourceKind.READING_LIST && it.kind != SourceKind.TTRSS && !moving.hides(it) }.map { s -> SourceRow(s, bySource[s.id], texts[s.id]) }
         }
 
     /** The phone's sources alone, for onboarding's count; Sources itself shows [screen]. */
@@ -417,8 +429,23 @@ class SourcesViewModel(
      * a part arriving late (the account row, the sign-in banner) would land above rows already
      * shown, and the list keeps its first visible row in place, so it would open scrolled past it.
      */
-    val screen: StateFlow<SourcesList?> = combine(phoneRows, serverPart, signInNeeded, ::SourcesList)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val screen: StateFlow<SourcesList?> = combine(phoneRows, serverPart, signInNeeded, mover?.status ?: flowOf(null)) { rows, server, signIn, phoneFeeds ->
+        // Only with an account to move them to; a move under way shows whatever happens to the account.
+        val shown = phoneFeeds?.takeIf { server != null && (!signIn || it is PhoneFeeds.Moving) }
+        SourcesList(rows, server, signIn, shown)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    init {
+        // Said once, whichever screen started the move.
+        mover?.let { m ->
+            viewModelScope.launch {
+                m.movedAll.collect { moved ->
+                    if (moved > 0) notify("Moved ${plural(moved, "feed")} to your tt-rss")
+                    m.resultShown()
+                }
+            }
+        }
+    }
 
     fun refresh() = onSourcesChanged()
 

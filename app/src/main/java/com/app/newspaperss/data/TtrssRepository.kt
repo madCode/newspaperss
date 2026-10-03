@@ -292,26 +292,12 @@ class TtrssRepository(
         // undo is a new row, never a near-duplicate address the reader already had.
         val before = listedKeys(source.id)
         val client = account.client(http)
-        val answer = try {
-            client.subscribeToFeed(feedUrl, category.id)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: TtrssException) {
-            logOut(client)
-            return Subscribed.Failed(e.message ?: "tt-rss reported an error.")
-        } catch (e: IOException) {
-            logOut(client)
-            // tt-rss may still add it after the app stops waiting.
-            return Subscribed.Failed(
-                if (FeedSync.tooSlow(e)) "tt-rss took too long to answer. It may still add it: check in tt-rss before trying again." else FeedSync.ttrssUnreachable(e),
-            )
-        } catch (e: Exception) {
-            logOut(client)
-            return Subscribed.Failed("Something went wrong asking tt-rss.")
-        }
-        if (answer is TtrssSubscription.Refused) {
-            logOut(client)
-            return Subscribed.Failed(answer.reason, answer.couldntFetch)
+        val answer = when (val asked = ask(client, feedUrl, category.id)) {
+            is Asked.Answered -> asked.answer
+            is Asked.Failed -> {
+                logOut(client)
+                return asked.failed
+            }
         }
         // tt-rss has it now: nothing after this may report a failure.
         val id = when (answer) {
@@ -343,6 +329,103 @@ class TtrssRepository(
                 login = login,
             )
         }
+    }
+
+    private sealed interface Asked {
+        /** tt-rss subscribed to it, or has it already. */
+        data class Answered(val answer: TtrssSubscription) : Asked
+        /** [unreachable]: tt-rss didn't answer, rather than saying no. */
+        data class Failed(val failed: Subscribed.Failed, val unreachable: Boolean = false) : Asked
+    }
+
+    /** Asks tt-rss to subscribe; a refusal or no answer at all comes back as [Asked.Failed], in words. */
+    private suspend fun ask(client: TtrssClient, feedUrl: String, categoryId: Int): Asked {
+        val answer = try {
+            client.subscribeToFeed(feedUrl, categoryId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TtrssException) {
+            return Asked.Failed(Subscribed.Failed(e.message ?: "tt-rss reported an error."))
+        } catch (e: IOException) {
+            // tt-rss may still add it after the app stops waiting.
+            return Asked.Failed(
+                Subscribed.Failed(
+                    if (FeedSync.tooSlow(e)) "tt-rss took too long to answer. It may still add it: check in tt-rss before trying again." else FeedSync.ttrssUnreachable(e),
+                ),
+                unreachable = true,
+            )
+        } catch (e: Exception) {
+            return Asked.Failed(Subscribed.Failed("Something went wrong asking tt-rss."))
+        }
+        if (answer is TtrssSubscription.Refused) return Asked.Failed(Subscribed.Failed(answer.reason, answer.couldntFetch))
+        return Asked.Answered(answer)
+    }
+
+    /** The login the account's source can be used with now, or null. */
+    suspend fun login(): Login? = usableAccount()?.let { (account, _) -> Login(account.apiUrl, account.user) }
+
+    /** The account's feeds as last listed, by key: what a move compares with to find a new feed. */
+    suspend fun listedKeys(): Set<String> = db.sources().ofKind(SourceKind.TTRSS).firstOrNull()?.let { listedKeys(it.id) }.orEmpty()
+
+    /** What asking tt-rss to take a phone feed came to. */
+    sealed interface MoveAnswer {
+        /** In tt-rss now; [already] it was there before. [feedId] is null when tt-rss didn't say it. */
+        data class In(val feedId: Int?, val already: Boolean) : MoveAnswer
+        /** [unreachable]: tt-rss didn't answer, so asking about the next feed now is likely no use either. */
+        data class Failed(val reason: String, val unreachable: Boolean = false) : MoveAnswer
+    }
+
+    /**
+     * Subscribes to [feedUrl] in [categoryId] for a move, only while [login] is still the one
+     * signed in: a move started under one login mustn't put feeds into another's account. Unlike
+     * [subscribe], the feeds aren't listed after each one; [listFor] does that once for the batch.
+     */
+    suspend fun subscribeForMove(feedUrl: String, categoryId: Int, login: Login): MoveAnswer {
+        val (account, _) = usableAccount() ?: return MoveAnswer.Failed(FeedSync.SIGN_IN_AGAIN)
+        if (Login(account.apiUrl, account.user) != login) return MoveAnswer.Failed(SIGNED_IN_AGAIN)
+        val client = account.client(http)
+        return try {
+            when (val asked = ask(client, feedUrl, categoryId)) {
+                is Asked.Failed -> MoveAnswer.Failed(asked.failed.reason, asked.unreachable)
+                is Asked.Answered -> when (val answer = asked.answer) {
+                    is TtrssSubscription.Added -> MoveAnswer.In(answer.feedId, already = false)
+                    is TtrssSubscription.AlreadySubscribed -> MoveAnswer.In(answer.feedId, already = true)
+                    is TtrssSubscription.Refused -> MoveAnswer.Failed(answer.reason)
+                }
+            }
+        } finally {
+            logOut(client)
+        }
+    }
+
+    /**
+     * Lists the account's feeds again, if [login] is still the one signed in: otherwise the list
+     * would be another account's, filed under this one. Returns whether it listed them.
+     */
+    suspend fun listFor(login: Login): Boolean {
+        val (account, source) = usableAccount() ?: return false
+        if (Login(account.apiUrl, account.user) != login) return false
+        val client = account.client(http)
+        return try {
+            listTtrssFeeds(db, client, source, clock.instant())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        } finally {
+            logOut(client)
+        }
+    }
+
+    /**
+     * The feed a move put [feedUrl] in as, once listed: by the id tt-rss gave, else for a feed it
+     * already had by address, else the feed new since [before] (see [newFeedAt]). Null when none
+     * is sure: carrying settings onto a guess could give them to another feed.
+     */
+    suspend fun movedFeedAt(feedUrl: String, feedId: Int?, already: Boolean, before: Set<String>): PublicationEntity? {
+        val source = db.sources().ofKind(SourceKind.TTRSS).firstOrNull() ?: return null
+        feedId?.let { id -> return db.sources().publication(source.id, id.toString()) ?: PublicationEntity(source.id, id.toString()) }
+        return if (already) feedAt(feedUrl) else newFeedAt(source.id, feedUrl, before)
     }
 
     /**
@@ -412,6 +495,11 @@ class TtrssRepository(
         } ?: return null
         // Feed and category ids mean nothing on another server.
         return if (account.apiUrl == source.url) account to source else null
+    }
+
+    companion object {
+        /** Another login signed in while a move was under way. */
+        const val SIGNED_IN_AGAIN = "You signed in to tt-rss again while it was moving. Move it again to put it in this account."
     }
 
     /** Nothing in the app pauses a tt-rss account, but one can already be paused: this is the way back. */

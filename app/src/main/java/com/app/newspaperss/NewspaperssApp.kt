@@ -20,6 +20,8 @@ open class NewspaperssApp : Application() {
         // With the start-up work tests leave out: every test app writing settings at start
         // would race the deletion of the last test's files. Screens don't wait for it.
         container.appScope.launch { container.settleFeedsFrom() }
+        // WorkManager keeps work it was given, but not a batch stored just before the app died.
+        container.appScope.launch { container.feedMoves.resumeIfPending() }
         container.notifier.createChannels()
         SyncWorker.schedulePeriodic(this)
         // Arms the timer if none is pending (first run, after an update or a

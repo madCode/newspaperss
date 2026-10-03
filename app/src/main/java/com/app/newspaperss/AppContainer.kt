@@ -8,6 +8,7 @@ import com.app.newspaperss.core.net.OkHttpHttpClient
 import com.app.newspaperss.data.AesGcmCipher
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.EditionRepository
+import com.app.newspaperss.data.FeedMoves
 import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.ReadingListTitles
@@ -29,6 +30,7 @@ import com.app.newspaperss.delivery.KindleSends
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
+import com.app.newspaperss.work.MoveFeedsWorker
 import com.app.newspaperss.work.NotesWorker
 import com.app.newspaperss.work.ReadingListTitleWorker
 import com.app.newspaperss.work.TtrssMarkReadWorker
@@ -51,6 +53,7 @@ class AppContainer(
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
     fetchReadingListTitles: (articleIds: List<Long>) -> Unit = { ReadingListTitleWorker.enqueue(context, it) },
     saveNotes: (editionId: Long) -> Unit = { NotesWorker.enqueue(context, it) },
+    moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -66,8 +69,9 @@ class AppContainer(
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)
     val ttrssSubscriptions = TtrssSubscriptions(ttrss, appScope)
+    val feedMoves = FeedMoves(context, db, ttrss, moveFeeds)
     val feedSync = FeedSync(db, http, ttrssAccounts = ttrssAccounts, onUntitled = fetchReadingListTitles)
-    val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render)
+    val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render, retiring = feedMoves::retiringIds)
     val settings = SettingsStore(context)
     val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))
     private val folderDelivery = FolderDelivery(context.contentResolver)

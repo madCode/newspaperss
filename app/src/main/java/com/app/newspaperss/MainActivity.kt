@@ -199,7 +199,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                 val vm = viewModel {
                     SourcesViewModel(
                         container.sources, container.feedFinder, container.ttrss, saveToReadingList = { container.readingList.save(it) },
-                        settings = container.settings, subscriptions = container.ttrssSubscriptions,
+                        settings = container.settings, subscriptions = container.ttrssSubscriptions, moves = container.feedMoves,
                     ) {
                         SyncWorker.syncNow(context)
                     }
@@ -249,7 +249,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
             composable(SETTINGS_PAGE, arguments = listOf(navArgument("page") { type = NavType.StringType })) { entry ->
                 val page = SettingsPage.of(entry.arguments?.getString("page")) ?: SettingsPage.EDITION
                 val context = LocalContext.current.applicationContext
-                val feedsFrom = if (page != SettingsPage.FEEDS) null else viewModel { FeedsFromViewModel(container.settings, container.ttrss) { SyncWorker.syncNow(context) } }
+                val feedsFrom = if (page != SettingsPage.FEEDS) null else viewModel { FeedsFromViewModel(container.settings, container.ttrss, container.feedMoves, container.sources) { SyncWorker.syncNow(context) } }
                 SettingsPageScreen(settingsViewModel(container), page, onBack = { nav.navigateUp() }, feedsFrom = feedsFrom)
             }
         }

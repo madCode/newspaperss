@@ -17,6 +17,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +40,10 @@ import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssStatus
 import com.app.newspaperss.settings.FeedsFrom
+import com.app.newspaperss.ui.sources.MoveOffer
+import com.app.newspaperss.ui.sources.MoveProgress
+import com.app.newspaperss.ui.sources.MoveSheetDialog
+import com.app.newspaperss.ui.sources.PhoneFeeds
 import com.app.newspaperss.ui.sources.lastCheckedLine
 import com.app.newspaperss.ui.ttrss.TtrssSignInFields
 
@@ -92,6 +97,7 @@ internal fun FeedsFromSection(vm: FeedsFromViewModel) {
         return
     }
     Account(source, s.ttrss)
+    PhoneFeedsHere(vm)
     if (source.paused) {
         Text("Paused: nothing comes from your tt-rss until you resume it.", modifier = Modifier.padding(bottom = 4.dp))
         OutlinedButton(onClick = vm::resume, modifier = Modifier.padding(vertical = 4.dp)) { Text("Resume") }
@@ -104,6 +110,25 @@ internal fun FeedsFromSection(vm: FeedsFromViewModel) {
     categories?.let { CategoryDialog(it, source.ttrssCategoryId, vm::chooseCategory, vm::closeCategories) }
     val leaving by vm.leaving.collectAsState()
     if (leaving) LeaveDialog(onConfirm = vm::leave, onDismiss = vm::cancelLeaving)
+}
+
+/** The offer to move the phone's feeds, straight after signing in, and the move under way. */
+@Composable
+private fun PhoneFeedsHere(vm: FeedsFromViewModel) {
+    val mover = vm.mover ?: return
+    val offer by vm.offer.collectAsState()
+    val status by mover.status.collectAsState(initial = null)
+    when (val st = status) {
+        is PhoneFeeds.Offer -> offer?.let { MoveOffer(st, it.found, onMove = vm::moveFromOffer, onNotNow = vm::notNow) }
+        is PhoneFeeds.Moving -> Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        ) { Column(Modifier.padding(16.dp)) { MoveProgress(st) } }
+        else -> {}
+    }
+    val sheet by mover.sheet.collectAsState()
+    sheet?.let { MoveSheetDialog(it, mover) }
 }
 
 @Composable

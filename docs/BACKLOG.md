@@ -139,8 +139,7 @@ With a server, Add a site now subscribes in tt-rss, into a category the reader p
 Still open:
 - a site tt-rss can't fetch: offer to fetch it from the phone instead, labelled as the one
   exception to "never mixed"? Today it offers only the reading list;
-- unsubscribing in tt-rss from a feed's page;
-- phone feeds already added move with step (d).
+- unsubscribing in tt-rss from a feed's page.
 
 ### tt-rss and Google Reader API servers as full backends *(you asked)*
 Consider letting a reader server be the backend for every source it can handle, rather than one
@@ -149,8 +148,9 @@ there, read state kept there, and the same in their other reader apps. Sources t
 handle (saved links, curated lists) stay on the phone.
 - Designed: two setups, server or phone, never mixed, with a build order ([research/server-mode.md](research/server-mode.md)).
   Steps (a), the choice in onboarding and Settings (cycle 83), (b), Sources for a server
-  (cycle 84), and (c), adding a site to the server (cycle 85), are built. Next: (d) moving phone
-  feeds there, (e) leaving brings them back.
+  (cycle 84), (c), adding a site to the server (cycle 85), and (d), moving phone feeds there
+  (cycle 86), are built. Next: (e) leaving a server (its feeds become phone feeds, starred
+  articles go to the reading list).
 - Which servers: tt-rss (done as one source today) and the
   [Google Reader API](https://freshrss.github.io/FreshRSS/en/developers/06_GoogleReader_API.html),
   which [FreshRSS](https://freshrss.org), [Miniflux](https://miniflux.app/docs/google_reader.html),
@@ -274,6 +274,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Moving your phone feeds into tt-rss: a banner on Sources and an offer right after signing in, a sheet with every feed ticked and one category, stepped progress in the background, "Move the other 3" for what didn't move; settings carried over, and a moved feed kept, paused and hidden, until its stars are delivered; step (d) of [research/server-mode](research/server-mode.md) *(you asked)*
 - [x] Adding a site with a server subscribes in your tt-rss, in a category you pick (the last one used), with Undo; already there, no feed, or tt-rss refusing each say so and offer the reading list or a curated list; OPML items give way to Where your feeds come from; step (c) of [research/server-mode](research/server-mode.md) *(you asked)*
 - [x] Sources for a server: your tt-rss account first, then what's on this phone, then the server's categories as headings with their feeds A to Z, Uncategorized, Not in your paper and Left out last; without a server, nothing of tt-rss; step (b) of [research/server-mode](research/server-mode.md) *(you asked)*
 - [x] Server or phone, chosen up front: a question in onboarding, a Settings page for the choice and the tt-rss account, and a "Sign in to your tt-rss" state; step (a) of [research/server-mode](research/server-mode.md) *(you asked)*

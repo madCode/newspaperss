@@ -214,6 +214,21 @@ class EditionBuilderTest {
     }
 
     @Test
+    fun aFeedMovedToTtrssStillGivesWhatItHoldsThoughPaused() = runTest {
+        // Paused so it fetches nothing more; its star is still the reader asking for that article.
+        val moved = source("a", "a1")
+        db.articles().setStarred(idOf("a1"), true, clock.instant())
+        sources.setPaused(moved, true)
+        val stillPaused = source("b", "b1")
+        sources.setPaused(stillPaused, true)
+        val withMoved = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC, retiring = { setOf(moved) })
+
+        val built = withMoved.build(EditionSettings()) as BuildResult.Built
+
+        assertEquals(listOf("a a1"), editions.observeArticles(built.editionId).first().map { it.title })
+    }
+
+    @Test
     fun anEditionThatWasNeverSentDoesntCountAsTheirTurn() = runTest {
         for (name in listOf("a", "b", "c", "d")) source(name, "${name}1", "${name}2", "${name}3")
         val settings = EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)

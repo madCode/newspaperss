@@ -192,7 +192,17 @@ fun SourcesScreen(
                     item(key = "on-phone") { SectionHeading("On this phone") }
                 }
                 item(key = "reading-list") { ReadingListRow(onOpenReadingList) }
-                items(list, key = { "source/${it.source.id}" }) { row ->
+                // With a server, the phone's own feeds come last, under the banner offering to move them.
+                val (feeds, others) = if (srv == null) emptyList<SourceRow>() to list else list.partition { it.source.kind == SourceKind.FEED }
+                items(others, key = { "source/${it.source.id}" }) { row ->
+                    SourceItem(row, onOpen = { onOpenSource(row.source.id) })
+                    HorizontalDivider()
+                }
+                shown.phoneFeeds?.let { status ->
+                    val mover = viewModel.mover
+                    if (mover != null) item(key = "phone-feeds") { PhoneFeedsBanner(status, onMove = { mover.open() }, onMoveOthers = mover::open) }
+                }
+                items(feeds, key = { "source/${it.source.id}" }) { row ->
                     SourceItem(row, onOpen = { onOpenSource(row.source.id) })
                     HorizontalDivider()
                 }
@@ -203,6 +213,10 @@ fun SourcesScreen(
     }
     val curatedLists by viewModel.curatedLists.collectAsState()
     AddSourceDialog(add, curatedLists, viewModel, server)
+    viewModel.mover?.let { mover ->
+        val sheet by mover.sheet.collectAsState()
+        sheet?.let { MoveSheetDialog(it, mover) }
+    }
 }
 
 /** The server setup with no working account: nothing comes from tt-rss until the reader signs in. */

@@ -239,6 +239,7 @@ twice.
 | `NotesWorker` | First delivery | `notes-<edition>`, KEEP | Saves the notes file to the notes folder. |
 | `TtrssMarkReadWorker` | Delivery, mark not sent | `ttrss-mark-read-<edition>`, REPLACE | Up to 4 attempts. Reads the edition's state when it runs. |
 | `ReadingListTitleWorker` | New untitled links | `reading-list-titles`, APPEND_OR_REPLACE | Batches of 20, one batch at a time. |
+| `MoveFeedsWorker` | Moving phone feeds to tt-rss; app start, if a move is stored | `move-feeds`, APPEND_OR_REPLACE | Connected. Runs `FeedMoves.run`; what's left is in DataStore, so a run stopped part way carries on in the next. Appended so a run finishing up can't swallow a new move. |
 
 Timed editions use a chain of one-off timers, not periodic work, because
 periodic work can't say "6:30 on weekdays" and its start time drifts
@@ -369,6 +370,7 @@ stays as a `DELETED` row to keep its title taken.
 |---|---|---|
 | Settings | DataStore (Preferences) | `app/settings/SettingsStore.kt` |
 | tt-rss account | Its own DataStore; the password encrypted with an Android Keystore AES-GCM key, excluded from backups | `app/data/TtrssAccountStore.kt`, `app/data/SecretCipher.kt` |
+| A move of phone feeds to tt-rss, and moved feeds still kept | Its own DataStore, `feed_moves` | `app/data/FeedMoves.kt` |
 | Timer state | SharedPreferences `edition-schedule` | `app/work/EditionScheduler.kt` |
 | EPUBs | `files/editions/`; only the newest 14 keep their file (unsent ones always do) | `EditionRepository.pruneFiles` |
 | Notes files | `files/notes/` | `app/edition/EditionNotes.kt` |
@@ -420,6 +422,38 @@ can be reached. A feed tt-rss hasn't fetched yet (`last_updated` 0) is
 `awaitingFirstFetch` until a sync sees unread articles from it or the
 next list. The last category used is the setting `lastCategoryId`.
 
+**Moving phone feeds to tt-rss** (`FeedMoves`, run by `MoveFeedsWorker`;
+the sheet and banner are `PhoneFeedMover` in `ui/sources/MoveFeeds.kt`).
+`start` stores the batch in its DataStore: the source ids still to ask
+about, the category, the login signed in, and the account's feed keys as
+listed then. `run` takes the queue in Sources' order. A feed `feedAt`
+finds (by `sameFeed`) isn't subscribed again; any other goes through
+`TtrssRepository.subscribeForMove`, whose "already subscribed" (code 0)
+counts as there too. Each answer is stored before the next feed, so a run
+stopped by the app dying or WorkManager's time limit picks up after the
+last answer; the feed it was asking about is asked again, which tt-rss
+answers with code 0. A different login, or none, stops the rest; so does
+tt-rss not answering. Once the queue is empty the feeds are listed once
+(`listFor`, only under the same login), and each moved feed's tt-rss
+publication is found (`movedFeedAt`: the id tt-rss gave; on old servers
+the feed new since the batch began, at that address, never one listed
+before). The settings are copied from `(phoneSourceId, "")` onto
+`(ttrssId, feedId)` and the phone source paused in one transaction; the
+fields `listTtrssFeeds` owns (title, address, category, the list flags)
+are left to it.
+
+**Retiring a moved phone feed:** deleting a source cascades to its
+articles, starred ones too, so a moved feed is paused and kept in
+`FeedMoves`' `retiring` set instead, which Sources hides (only while it's
+paused: resumed from its page it's a phone feed again). `EditionBuilder`
+takes `retiring` sources' articles though they're paused, so stars and
+waiting articles still reach the paper. `FeedMoves.tidy`, after each
+periodic sync and each move, deletes them with `SourceDao.deleteSpent`,
+one statement that checks nothing starred, waiting or `IN_EDITION` is
+left. Delivered links are in `delivered_urls`, so tt-rss's copies of them
+aren't delivered again. Leaving the server (`FeedMoves.restore`) unpauses
+the ones still kept and drops a move under way.
+
 ## Doing things safely at the same time
 
 - **One build at a time:** the build's unique work name with KEEP.
@@ -436,6 +470,9 @@ next list. The last category used is the setting `lastCategoryId`.
   container's `appScope`, and work that may be slow (notes to a cloud
   folder, tt-rss) goes to a worker. Subscribing in tt-rss is the
   exception, in `appScope`, since its answer goes back to the screen.
+- **One move at a time:** `FeedMoves.start` refuses a batch while one is
+  stored, checked inside the DataStore edit, and each step of a batch
+  writes only if its batch is still the stored one.
 - **One subscribe per feed at a time:** `TtrssSubscriptions` won't ask
   tt-rss about a feed it's already asking about, so a double tap sends one
   request.

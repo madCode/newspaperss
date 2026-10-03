@@ -70,6 +70,9 @@ import com.app.newspaperss.ui.today.TodayViewModel
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import com.app.newspaperss.data.TtrssSubscriptions
+import com.app.newspaperss.data.FeedMoves
+import com.app.newspaperss.ui.sources.PhoneFeeds
+import kotlinx.coroutines.launch
 import com.app.newspaperss.ui.sources.AddState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -777,6 +780,112 @@ class ScreenshotTest {
             ) { SourcesScreen(vm) }
         } finally {
             scope.cancel()
+        }
+    }
+
+    /**
+     * Moving phone feeds into tt-rss, at [ready]: signed in to a tt-rss with four categories that
+     * has Aeon already, and four phone feeds besides a curated list.
+     */
+    private fun shootMove(
+        name: String,
+        ready: (SourcesViewModel) -> Boolean,
+        dialog: Boolean = false,
+        server: FakeTtrss.() -> Unit = {},
+        act: (SourcesViewModel, FeedMoves, CoroutineScope) -> Unit = { _, _, _ -> },
+    ) {
+        val fake = FakeTtrss(ttrssHttp).apply {
+            listOf("Essays", "News", "Science", "Tech").forEachIndexed { i, n -> categories[i + 1] = n }
+            feeds[1] = FakeTtrss.Feed("Aeon", "https://aeon.co/feed.rss", categoryId = 1)
+            server()
+        }
+        val repo = SourceRepository(db)
+        runBlocking {
+            assertNull(ttrss.connect("rss.example.com/tt-rss", fake.user, fake.password))
+            store.update { it.copy(feedsFrom = FeedsFrom.SERVER) }
+            ttrss.listFor(ttrss.login()!!)
+            repo.addList(com.app.newspaperss.core.lists.CuratedLists.all.first())
+            listOf(
+                "https://aeon.co/feed.rss" to "Aeon",
+                "https://www.theguardian.com/world/rss" to "The Guardian: World",
+                "https://www.quantamagazine.org/feed/" to "Quanta Magazine",
+                "https://www.themarginalian.org/feed/" to "The Marginalian",
+            ).forEach { (url, title) -> repo.addFeed(url, title) }
+            db.sources().all().forEach { db.sources().recordSuccess(it.id, Instant.now(), null, null, it.title) }
+        }
+        val moves = FeedMoves(PreferenceDataStoreFactory.create { tmp.newFile("moves.preferences_pb") }, db, ttrss) {}
+        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val vm = SourcesViewModel(repo, FeedFinder(ttrssHttp), ttrss, settings = store, moves = moves) {}
+        try {
+            shoot(
+                name, ready = { vm.screen.value?.phoneFeeds != null }, dialog = dialog,
+                act = {
+                    act(vm, moves, scope)
+                    idleUntil { compose.waitForIdle(); ready(vm) }
+                },
+            ) { SourcesScreen(vm) }
+        } finally {
+            fake.subscribeGate?.complete(Unit)
+            scope.cancel()
+        }
+    }
+
+    private fun phoneFeedIds() = runBlocking { db.sources().all().filter { it.kind == com.app.newspaperss.data.SourceKind.FEED }.map { it.id } }
+
+    @Test
+    fun moveBanner() = shootMove("10a-move-banner", { it.screen.value?.phoneFeeds is PhoneFeeds.Offer })
+
+    @Test
+    fun moveSheet() = shootMove("10b-move-sheet", { it.mover?.sheet?.value?.categories != null }, dialog = true) { vm, _, _ -> vm.mover!!.open() }
+
+    @Test
+    fun moveProgress() = shootMove(
+        "10c-move-progress",
+        { (it.screen.value?.phoneFeeds as? PhoneFeeds.Moving)?.step == 3 },
+        server = { afterSubscribe = { url -> if (url.contains("theguardian")) subscribeGate = CompletableDeferred() } },
+    ) { _, moves, scope ->
+        runBlocking { moves.start(phoneFeedIds(), com.app.newspaperss.core.ttrss.TtrssCategory(1, "Essays")) }
+        scope.launch { moves.run() }
+    }
+
+    @Test
+    fun movePartlyDone() = shootMove(
+        "10d-move-partial",
+        { it.screen.value?.phoneFeeds is PhoneFeeds.Partial },
+        server = {
+            refuse["https://www.quantamagazine.org/feed/"] = 5
+            refuse["https://www.themarginalian.org/feed/"] = 6
+        },
+    ) { _, moves, _ ->
+        runBlocking {
+            moves.start(phoneFeedIds(), com.app.newspaperss.core.ttrss.TtrssCategory(1, "Essays"))
+            moves.run()
+        }
+    }
+
+    /** Settings straight after signing in from the phone setup, with phone feeds to move. */
+    @Test
+    fun moveOfferAfterSignIn() {
+        val fake = sampleServer()
+        val repo = SourceRepository(db)
+        runBlocking {
+            store.update { it.copy(feedsFrom = FeedsFrom.PHONE) }
+            repo.addFeed("https://aeon.co/feed.rss", "Aeon")
+            repo.addFeed("https://www.quantamagazine.org/feed/", "Quanta Magazine")
+            repo.addFeed("https://feed3.example/rss", "Feed 3")
+        }
+        val moves = FeedMoves(PreferenceDataStoreFactory.create { tmp.newFile("moves.preferences_pb") }, db, ttrss) {}
+        val settingsVm = SettingsViewModel(store, ttrss.observeStatus()) {}
+        val feeds = FeedsFromViewModel(store, ttrss, moves, repo).apply {
+            openSignIn()
+            editSignIn(form.value!!.copy(address = "rss.example.com/tt-rss", user = fake.user, password = fake.password))
+            signIn()
+        }
+        shoot(
+            "10e-move-offer", ready = { feeds.offer.value != null && feeds.form.value == null },
+            act = { idleUntil { compose.waitForIdle(); compose.onAllNodes(hasText("Move 3")).fetchSemanticsNodes().isNotEmpty() } },
+        ) {
+            SettingsPageScreen(settingsVm, SettingsPage.FEEDS, onBack = {}, feedsFrom = feeds)
         }
     }
 }

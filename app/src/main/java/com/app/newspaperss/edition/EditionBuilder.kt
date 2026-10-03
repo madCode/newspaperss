@@ -67,13 +67,19 @@ class EditionBuilder(
     private val clock: Clock = Clock.systemDefaultZone(),
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val imageBudgetBytes: Long = ImageRules.MAX_EDITION_BYTES,
+    /**
+     * Phone feeds moved to tt-rss: paused so they fetch nothing, but what they still hold, stars
+     * above all, goes in as if they weren't (see [com.app.newspaperss.data.FeedMoves]).
+     */
+    private val retiring: suspend () -> Set<Long> = { emptySet() },
     private val cover: (CoverInfo) -> EpubImage? = { null },
 ) {
     suspend fun build(settings: EditionSettings, dueAt: Instant? = null, onProgress: (done: Int) -> Unit = {}): BuildResult {
         failInterrupted()
         releaseUndelivered()
         // tt-rss last, after what's on the phone, as Sources lists them.
-        val sources = db.sources().all().filter { !it.paused }.sortedBy { it.kind == SourceKind.TTRSS }
+        val moved = retiring()
+        val sources = db.sources().all().filter { !it.paused || it.id in moved }.sortedBy { it.kind == SourceKind.TTRSS }
         val sourcesById = sources.associateBy { it.id }
 
         // A timed edition is built ahead of its time; it's titled and dated for when it's due.

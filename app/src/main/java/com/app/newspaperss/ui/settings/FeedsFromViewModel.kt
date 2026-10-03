@@ -3,7 +3,11 @@ package com.app.newspaperss.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.ttrss.TtrssCategory
+import com.app.newspaperss.core.plural
+import com.app.newspaperss.data.FeedMoves
+import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.ui.sources.PhoneFeedMover
 import com.app.newspaperss.data.TtrssStatus
 import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.settings.SettingsStore
@@ -16,8 +20,12 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** The offer to move the phone's feeds after signing in; [found] says what the sign-in found. */
+data class MoveOfferState(val found: String?)
 
 /** The setup chosen, and the tt-rss account as it is now. */
 data class FeedsFromState(val choice: FeedsFrom, val ttrss: TtrssStatus)
@@ -35,12 +43,29 @@ sealed interface CategoryPicker {
  * one way, the leaving dialog the other.
  *
  * @param onSourcesChanged asks for a sync, after a change to what the account fetches.
+ * @param moves with [sources], offers to move phone feeds into tt-rss straight after signing in.
  */
 class FeedsFromViewModel(
     private val settings: SettingsStore,
     private val ttrss: TtrssRepository,
+    private val moves: FeedMoves? = null,
+    sources: SourceRepository? = null,
     private val onSourcesChanged: () -> Unit = {},
 ) : ViewModel() {
+    /** Moving phone feeds into tt-rss; null where that isn't offered. */
+    val mover: PhoneFeedMover? = if (moves != null && sources != null) PhoneFeedMover(moves, ttrss, settings, sources, viewModelScope) else null
+
+    private val _offer = MutableStateFlow<MoveOfferState?>(null)
+    /** Offering to move the phone's feeds, after signing in from the phone setup; null once answered. */
+    val offer: StateFlow<MoveOfferState?> = _offer.asStateFlow()
+
+    fun notNow() { _offer.value = null }
+
+    fun moveFromOffer() {
+        _offer.value = null
+        mover?.open()
+    }
+
     /** Null until loaded. */
     val state: StateFlow<FeedsFromState?> = combine(settings.settings, ttrss.observeStatus()) { s, status ->
         FeedsFromState(s.feedsFrom(hasServer = status.source != null), status)
@@ -71,12 +96,18 @@ class FeedsFromViewModel(
         val form = _form.value?.takeIf { it.canSubmit } ?: return
         _form.value = form.copy(testing = true, error = null)
         signingIn = viewModelScope.launch {
+            val fromPhone = settings.current().feedsFrom(hasServer = ttrss.observeStatus().first().source != null) == FeedsFrom.PHONE
             val result = ttrss.signIn(form.address, form.user, form.password) { settings.update { it.copy(feedsFrom = FeedsFrom.SERVER) } }
             when (result) {
                 is TtrssRepository.SignIn.Failed -> _form.value = form.copy(error = result.message)
                 is TtrssRepository.SignIn.SignedIn -> {
                     _form.value = null
                     onSourcesChanged()
+                    // Only on the way from the phone: signing in again isn't the moment to ask.
+                    if (fromPhone && mover != null) {
+                        val found = result.found?.takeIf { it.feeds > 0 }?.let { " ${plural(it.feeds, "feed")} in ${plural(it.categories, "category", "categories")}." }
+                        _offer.value = MoveOfferState("Signed in.${found.orEmpty()}")
+                    }
                 }
             }
         }
@@ -109,8 +140,12 @@ class FeedsFromViewModel(
         // Not cancelled by leaving the page straight after: the reader asked for this phone.
         // Signed out first: if the app dies between, it's the server setup with no account,
         // which says so; the other way round would leave a phone setup still fetching tt-rss.
+        _offer.value = null
         viewModelScope.launch {
             withContext(NonCancellable) {
+                // Moved feeds still kept for their stars are phone feeds again: with no server
+                // to come from, they'd otherwise stay hidden until deleted.
+                moves?.restore()
                 ttrss.signOut()
                 settings.update { it.copy(feedsFrom = FeedsFrom.PHONE) }
             }

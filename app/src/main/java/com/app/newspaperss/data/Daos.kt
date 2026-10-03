@@ -121,6 +121,19 @@ interface SourceDao {
 
     @Delete
     suspend fun delete(source: SourceEntity)
+
+    /**
+     * Deletes the phone feeds among [ids], moved to tt-rss and paused, that have nothing left to
+     * give: no starred article, none waiting, none in an unsent edition. Deleting a source deletes
+     * its articles, stars and all, so the check and the delete are one statement: an article
+     * starred or picked for an edition in between keeps its source.
+     */
+    @Query(
+        """DELETE FROM sources WHERE id IN (:ids) AND paused = 1 AND kind = 'FEED' AND NOT EXISTS (
+               SELECT 1 FROM articles WHERE articles.sourceId = sources.id
+               AND (articles.starredAt IS NOT NULL OR articles.state IN ('NEW', 'IN_EDITION')))""",
+    )
+    suspend fun deleteSpent(ids: Collection<Long>): Int
 }
 
 /**
