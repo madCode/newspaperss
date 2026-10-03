@@ -495,10 +495,11 @@ whose Kindle and KOReader answers ask for more on the same page).
       read on the phone, isn't delivered again when tt-rss brings it.
       Signing in as another tt-rss user makes feeds still kept phone feeds
       again, to move into that account if wanted.
-    - **The server's feeds:** each category a heading, "News · 9"
-      ("News, 9 feeds" to TalkBack), black where the page's own headings
-      are rust, and pinned at the top while its feeds scroll by; its feeds
-      A to Z under it. Feeds with
+    - **The server's feeds:** each category a heading with its count and
+      an arrow ("News, 9 feeds, Expanded" to TalkBack), pinned at the top
+      while its feeds scroll by; its feeds A to Z under it. Tapping the
+      heading folds the category to just that line, and folded categories
+      stay folded, kept by name in the app's settings. Feeds with
       no category go under **Uncategorized**, last. A line under a feed only
       when it says something: "Not fetched by tt-rss yet" for a feed
       just added, or its own settings ("Feed's text", "Full page", "At most
@@ -513,8 +514,11 @@ whose Kindle and KOReader answers ask for more on the same page).
       whose page lists the other categories with their feeds and points to
       Articles from in Settings; and **Left out** ("2 feeds"), whose page
       lists the left-out feeds, each opening its page to bring it back.
-    - Headings and the space above them separate the groups; rules only
-      divide the rows within one.
+    - Every group (the reading list, Still on this phone, each category,
+      Curated lists, Not in your paper) has the same heading, semibold
+      serif in black like Settings' own (rust is for what you tap), and
+      ends with a rule across the page. Shorter rules, starting at the
+      text, divide the rows within one.
   - A source's page shows its recent articles, pause, its cap and, for a
     feed, the article-text setting; **Remove source** is in its ⋮ menu. A
     tt-rss account has no page of its own: its settings, and leaving it,

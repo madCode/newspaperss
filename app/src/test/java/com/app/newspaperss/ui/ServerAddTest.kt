@@ -144,7 +144,7 @@ class ServerAddTest {
         assertEquals(listOf(feedUrl to 4), server.subscribed)
         assertFalse("the dialog has closed", visible("Subscribe in your tt-rss"))
         waitFor("Science Weekly")
-        assertTrue("its row, under Science", visible("Science · 1") && visible("Not fetched by tt-rss yet"))
+        assertTrue("its row, under Science", visible("Science") && visible("Not fetched by tt-rss yet"))
         assertEquals(4, runBlocking { settings.current().lastCategoryId })
 
         compose.onNodeWithText("Undo").performClick()

@@ -27,6 +27,7 @@ import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.settings.FeedsFrom
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasContentDescription
 import java.time.ZoneOffset
 import java.util.Locale
@@ -96,6 +97,29 @@ class TtrssFeedsTest {
         return SourcesViewModel(repo, FeedFinder(FakeHttp()), settings = settings) {}
     }
 
+    @Test
+    fun aFoldedCategoryHidesItsFeedsAndStaysFolded() {
+        account()
+        val vm = sources(FeedsFrom.SERVER)
+        compose.setContent { SourcesScreen(vm) }
+        idleUntil { compose.waitForIdle(); visible("The Bay Dispatch") }
+
+        compose.onNode(isHeading("News, 2 feeds")).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Expanded")).performClick()
+        idleUntil { compose.waitForIdle(); !visible("The Bay Dispatch") }
+        assertFalse(visible("Morning Wire"))
+        assertTrue("the others stay open", visible("Quarterly Review") && visible("Garden Log"))
+        compose.onNode(isHeading("News, 2 feeds")).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Collapsed"))
+        assertEquals("kept for next time", setOf("News"), runBlocking { settings.current().foldedCategories })
+
+        compose.onNode(isHeading("Uncategorized, 2 feeds")).performClick()
+        idleUntil { compose.waitForIdle(); !visible("Garden Log") }
+        assertEquals("Uncategorized is folded by its own key", setOf("News", ""), runBlocking { settings.current().foldedCategories })
+
+        compose.onNode(isHeading("News, 2 feeds")).performClick()
+        idleUntil { compose.waitForIdle(); visible("The Bay Dispatch") && visible("Morning Wire") }
+        assertEquals(setOf(""), runBlocking { settings.current().foldedCategories })
+    }
+
     private fun isHeading(description: String) =
         SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and hasContentDescription(description)
 
@@ -132,7 +156,7 @@ class TtrssFeedsTest {
         assertFalse("with nothing wrong, nothing about the account", visible("Your tt-rss") || visible("Settings"))
 
         fun top(text: String) = compose.onNode(hasText(text)).fetchSemanticsNode().boundsInRoot.top
-        val order = listOf("Your reading list", "Still on this phone", "The Wire, on the phone", "Essays · 1", "Uncategorized · 2", "Curated lists", "Not in your paper", "Left out")
+        val order = listOf("Your reading list", "Still on this phone", "The Wire, on the phone", "Essays", "Uncategorized", "Curated lists", "Not in your paper", "Left out")
         assertEquals("the reading list, the phone's feeds to move, the server's, curated lists, then what's not in the paper", order, order.sortedBy(::top))
 
         compose.onNodeWithText("Quarterly Review").performClick()

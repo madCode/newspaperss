@@ -223,6 +223,17 @@ class SourcesViewModel(
             }
         }
 
+    /** The tt-rss categories folded on Sources, by name ("" for Uncategorized), kept across restarts. */
+    val folded: StateFlow<Set<String>> = (settings?.settings?.map { it.foldedCategories } ?: flowOf(emptySet()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    fun toggleCategory(name: String) {
+        val store = settings ?: return
+        viewModelScope.launch {
+            store.update { s -> s.copy(foldedCategories = if (name in s.foldedCategories) s.foldedCategories - name else s.foldedCategories + name) }
+        }
+    }
+
     /** The curated lists not added yet, offered in the add dialog. */
     val curatedLists: StateFlow<List<CuratedList>> = repository.observe().map { sources ->
         val added = sources.map { it.url }.toSet()

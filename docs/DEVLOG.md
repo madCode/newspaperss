@@ -14,6 +14,10 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 90: categories that fold
+- **From you:** a line after a category's last feed; categories you can fold; and whether categories should be at the page's own heading level.
+- **Shipped:** yes, one level: with no "Your tt-rss" heading, categories and the page's own groups are siblings. Every group heading is now the same semibold serif in black, as Settings' are (rust was only on Sources, and rust is what you tap). Each group ends with a rule across the page; rows within it keep the shorter rule. A category's heading shows its count and an arrow, and tapping it folds the category to that one line; folded categories stay folded, kept by name in the settings ("" for Uncategorized). TalkBack hears "News, 9 feeds, Expanded".
+
 ### Cycle 89: a calmer Sources
 - **From you:** Sources felt overwhelming, and the category headings looked random next to the rest of the page.
 - **Shipped:** two critique passes. A rule ran under every row and above and below every category, about 25 on a page of 18 feeds; now rules only divide rows within a group, start at the text, and the space above each heading separates groups. Categories were small sans text boxed in by rules, reading like rows; they're now the page's serif a size down, in black ("Essays · 4"), and pinned at the top while a long category scrolls by. The page's own groups (Still on this phone, Curated lists, Not in your paper) keep the rust heading. The page ends with a **Not in your paper** heading over **Outside News** and **Left out**, each with its count. "Waiting for tt-rss's first fetch" is now "Not fetched by tt-rss yet".

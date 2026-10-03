@@ -95,6 +95,8 @@ data class Settings(
     val feedsFrom: FeedsFrom? = null,
     /** The tt-rss category a site was last added to, offered first next time; 0 is Uncategorized. */
     val lastCategoryId: Int? = null,
+    /** The tt-rss categories folded on Sources, by name; "" is Uncategorized. */
+    val foldedCategories: Set<String> = emptySet(),
 ) {
     /**
      * The setup chosen, or before it's settled, the one [SettingsStore.settleFeedsFrom] will
@@ -139,6 +141,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val mailApp = stringPreferencesKey("kindle_email_mail_app")
         val feedsFrom = stringPreferencesKey("feeds_from")
         val lastCategoryId = intPreferencesKey("ttrss_last_category_id")
+        val foldedCategories = stringSetPreferencesKey("sources_folded_categories")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
@@ -169,6 +172,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             if (s.mailApp != null) prefs[Keys.mailApp] = s.mailApp else prefs.remove(Keys.mailApp)
             if (s.feedsFrom != null) prefs[Keys.feedsFrom] = s.feedsFrom.name else prefs.remove(Keys.feedsFrom)
             if (s.lastCategoryId != null) prefs[Keys.lastCategoryId] = s.lastCategoryId else prefs.remove(Keys.lastCategoryId)
+            prefs[Keys.foldedCategories] = s.foldedCategories
             prefs.remove(Keys.legacyNotesWithEdition)
         }
     }
@@ -216,6 +220,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             mailApp = p[Keys.mailApp],
             feedsFrom = p[Keys.feedsFrom]?.let { runCatching { FeedsFrom.valueOf(it) }.getOrNull() },
             lastCategoryId = p[Keys.lastCategoryId],
+            foldedCategories = p[Keys.foldedCategories] ?: emptySet(),
         )
     }
 }

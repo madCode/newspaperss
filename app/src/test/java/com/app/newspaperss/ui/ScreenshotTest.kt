@@ -379,6 +379,15 @@ class ScreenshotTest {
         ) { SourceDetailScreen(vm, onBack = {}) }
     }
 
+    /** News and Science folded: a heading and its count, closed by a rule. */
+    @Test
+    @Config(qualifiers = "w411dp-h2000dp-xxhdpi")
+    fun sourcesWithAServerFolded() {
+        val vm = serverSources()
+        runBlocking { store.update { it.copy(foldedCategories = setOf("News", "Science")) } }
+        shoot("08n-sources-server-folded", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true }) { SourcesScreen(vm) }
+    }
+
     @Test
     @Config(fontScale = 2f)
     fun sourceDetailAtTwiceTheFontSize() {
