@@ -24,6 +24,9 @@ import android.net.Uri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -204,8 +207,6 @@ class OnboardingViewModel(
         _state.update { it.copy(forking = true) }
         viewModelScope.launch {
             try {
-                // An import still reading would add its sites after the server's removal of them.
-                importing?.cancelAndJoin()
                 if (choice == FeedsFrom.PHONE && ttrss != null) {
                     // A sign-in still running would add its account after the sign-out.
                     signingIn?.cancelAndJoin()
@@ -214,10 +215,17 @@ class OnboardingViewModel(
                 }
                 // Never mixed: sites added on the phone path go when the reader picks the server
                 // instead. The question asks first.
-                if (choice == FeedsFrom.SERVER) sources.observe().first().filter { it.kind == SourceKind.FEED }.forEach { sources.remove(it) }
+                if (choice == FeedsFrom.SERVER) {
+                    // An import still running would add its sites after these are removed. Not
+                    // joined: a file still downloading can take any time, and the reader waits.
+                    importing?.cancel()
+                    adding.withLock { sources.observe().first().filter { it.kind == SourceKind.FEED }.forEach { sources.remove(it) } }
+                }
                 settings.update { it.copy(feedsFrom = choice) }
-                // An earlier file's result would read as this visit's; the sites it added still count.
-                _state.update { it.copy(step = it.path[it.path.indexOf(Step.FEEDS_FROM) + 1], fileImport = null) }
+                // An earlier file's result would read as this visit's; one still reading reports when done.
+                _state.update {
+                    it.copy(step = it.path[it.path.indexOf(Step.FEEDS_FROM) + 1], fileImport = it.fileImport.takeIf { f -> f == FileImport.Reading })
+                }
             } finally {
                 _state.update { it.copy(forking = false) }
             }
@@ -243,7 +251,10 @@ class OnboardingViewModel(
                 val text = withContext(Dispatchers.IO) {
                     resolver.openInputStream(uri)?.use { it.bufferedReader().readText() } ?: throw IOException("no stream")
                 }
-                sources.importOpml(text).let { FileImport.Done(it.inFile, it.added) }
+                adding.withLock {
+                    ensureActive()
+                    sources.importOpml(text).let { FileImport.Done(it.inFile, it.added) }
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) {
                     _state.update { it.copy(fileImport = null) }
@@ -257,6 +268,8 @@ class OnboardingViewModel(
 
     private var signingIn: Job? = null
     private var importing: Job? = null
+    /** Held while an import adds sites, and while leaving for the server removes them. */
+    private val adding = Mutex()
 
     fun editSignIn(form: TtrssForm) = _state.update { s -> if (s.signIn.testing) s else s.copy(signIn = form.copy(error = null)) }
 

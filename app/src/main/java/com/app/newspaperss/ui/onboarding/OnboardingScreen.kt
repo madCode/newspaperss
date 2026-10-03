@@ -119,7 +119,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
                 }
             }
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (s.step != Step.WELCOME) TextButton(onClick = viewModel::back, enabled = !s.signIn.testing) { Text("Back") }
+                if (s.step != Step.WELCOME) TextButton(onClick = viewModel::back, enabled = !s.signIn.testing && !s.forking) { Text("Back") }
                 Spacer(Modifier.weight(1f))
                 when {
                     s.step == Step.WELCOME -> Button(onClick = viewModel::next) { Text("Get started") }
@@ -360,7 +360,8 @@ private fun FeedsFromStep(s: OnboardingState, vm: OnboardingViewModel) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 12.dp),
     )
-    if (confirmServer) {
+    // After process death the dialog is back before the count is: it waits for one.
+    if (confirmServer && s.phoneFeeds > 0) {
         AlertDialog(
             onDismissRequest = { confirmServer = false },
             title = { Text("Remove the ${plural(s.phoneFeeds, "site")} you added?") },

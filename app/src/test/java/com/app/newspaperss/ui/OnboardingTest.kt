@@ -667,10 +667,11 @@ class OnboardingTest {
 
         vm.back()
         vm.answer(FeedsAnswer.SERVER)
-        Thread { fifo.writeText("""<opml version="2.0"><body><outline type="rss" text="A" xmlUrl="https://a.example/feed"/></body></opml>""") }.start()
         idleUntil { vm.state.value.step == Step.SIGN_IN }
+        // Only now does the file arrive: the reader didn't wait for it.
+        Thread { fifo.writeText("""<opml version="2.0"><body><outline type="rss" text="A" xmlUrl="https://a.example/feed"/></body></opml>""") }.start()
+        idleUntil { vm.state.value.fileImport == null }
         assertTrue("never mixed", runBlocking { db.sources().all() }.none { it.kind == SourceKind.FEED })
-        assertNull(vm.state.value.fileImport)
         assertEquals(FeedsFrom.SERVER, runBlocking { store.current().feedsFrom })
     }
 }
