@@ -114,6 +114,21 @@ then show up in their other reader apps too, and read state stays in one place. 
 - whether the phone-side source is then dropped, so articles don't arrive twice;
 - what to do for an OPML import.
 
+### tt-rss and Google Reader API servers as full backends *(you asked)*
+Consider letting a reader server be the backend for every source it can handle, rather than one
+source among many. A feed the reader's server already follows would come from the server: fetched
+there, read state kept there, and the same in their other reader apps. Sources the server can't
+handle (saved links, curated lists) stay on the phone.
+- Which servers: tt-rss (done as one source today) and the
+  [Google Reader API](https://freshrss.github.io/FreshRSS/en/developers/06_GoogleReader_API.html),
+  which [FreshRSS](https://freshrss.org), [Miniflux](https://miniflux.app/docs/google_reader.html),
+  [Inoreader](https://www.inoreader.com/developers/), The Old Reader and BazQux speak. One Google
+  Reader client covers all of them, and it lessens the risk of tt-rss living on as a
+  [fork](https://linuxiac.com/tt-rss-shuts-down-but-the-project-lives-on-under-a-new-fork/).
+- Settle first: "Decide what tt-rss is as a source" above, since a backend makes each server feed
+  its own source; and how this joins "Add sources to tt-rss".
+- An architecture change: the server, not the phone, would fetch and track those feeds.
+
 ### Languages
 What to do with non-English sources and readers. Today:
 - the book's language is always `en`;
