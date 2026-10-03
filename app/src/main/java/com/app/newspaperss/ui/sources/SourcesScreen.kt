@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.MoreVert
 import com.app.newspaperss.core.plural
 import androidx.compose.material.icons.filled.Refresh
@@ -134,6 +133,8 @@ fun SourcesScreen(
         }
     }
     val server = screen?.server != null
+    val locale = LocalConfiguration.current.locales[0]
+    val is24Hour = DateFormat.is24HourFormat(context)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -185,29 +186,15 @@ fun SourcesScreen(
             }
             // Nothing folds or moves, and every key is unique and stable: on e-ink a list that
             // shifts is redrawn whole, and two equal keys crash the list.
-            else -> LazyColumn(contentPadding = PaddingValues(bottom = 96.dp), modifier = Modifier.padding(padding)) {
-                if (srv != null) {
-                    if (shown.needsSignIn) item(key = "sign-in") { SignInBanner(onOpenAccount) }
-                    else srv.account?.let { a -> item(key = "account") { AccountRow(a, srv, onOpenAccount) } }
-                    item(key = "on-phone") { SectionHeading("On this phone") }
-                }
-                item(key = "reading-list") { ReadingListRow(onOpenReadingList) }
-                // With a server, the phone's own feeds come last, under the banner offering to move them.
-                val (feeds, others) = if (srv == null) emptyList<SourceRow>() to list else list.partition { it.source.kind == SourceKind.FEED }
-                items(others, key = { "source/${it.source.id}" }) { row ->
-                    SourceItem(row, onOpen = { onOpenSource(row.source.id) })
-                    HorizontalDivider()
-                }
-                shown.phoneFeeds?.let { status ->
-                    val mover = viewModel.mover
-                    if (mover != null) item(key = "phone-feeds") { PhoneFeedsBanner(status, onMove = { mover.open() }, onMoveOthers = mover::open) }
-                }
-                items(feeds, key = { "source/${it.source.id}" }) { row ->
-                    SourceItem(row, onOpen = { onOpenSource(row.source.id) })
-                    HorizontalDivider()
-                }
+            else -> Column(Modifier.padding(padding)) {
+                // With a server, the account itself only shows when something needs doing: its
+                // settings are in Settings, and nearly everything listed comes from it. Above the
+                // list rather than in it: the list keeps its first row in place, so a banner
+                // appearing later as its first item would land out of sight.
                 val account = srv?.account
-                if (account != null) serverFeeds(account.id, srv, onOpenFeed, onOpenLeftOut, onOpenNotInPaper)
+                if (srv != null && shown.needsSignIn) SignInBanner(onOpenAccount)
+                else account?.let { accountProblem(it, locale, is24Hour) }?.let { AccountProblemBanner(it, onOpenAccount) }
+                SourceList(shown, viewModel, onOpenReadingList, onOpenSource, onOpenFeed, onOpenLeftOut, onOpenNotInPaper)
             }
         }
     }
@@ -216,6 +203,54 @@ fun SourcesScreen(
     viewModel.mover?.let { mover ->
         val sheet by mover.sheet.collectAsState()
         sheet?.let { MoveSheetDialog(it, mover) }
+    }
+}
+
+@Composable
+private fun SourceList(
+    shown: SourcesList,
+    viewModel: SourcesViewModel,
+    onOpenReadingList: () -> Unit,
+    onOpenSource: (Long) -> Unit,
+    onOpenFeed: (sourceId: Long, key: String) -> Unit,
+    onOpenLeftOut: (sourceId: Long) -> Unit,
+    onOpenNotInPaper: (sourceId: Long) -> Unit,
+) {
+    val list = shown.rows
+    val srv = shown.server
+    val account = srv?.account
+    LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
+        item(key = "reading-list") { ReadingListRow(onOpenReadingList) }
+        if (srv == null) {
+            items(list, key = { "source/${it.source.id}" }) { row ->
+                SourceItem(row, onOpen = { onOpenSource(row.source.id) })
+                HorizontalDivider()
+            }
+            return@LazyColumn
+        }
+        val (feeds, lists) = list.partition { it.source.kind == SourceKind.FEED }
+        // Above the server's feeds, since they ask for something: moving into tt-rss.
+        val mover = viewModel.mover
+        val moving = shown.phoneFeeds?.takeIf { mover != null }
+        if (feeds.isNotEmpty() || moving != null) {
+            item(key = "on-phone") { SectionHeading("Still on this phone") }
+            if (mover != null && moving != null) {
+                item(key = "phone-feeds") { PhoneFeedsBanner(moving, onMove = { mover.open() }, onMoveOthers = mover::open) }
+            }
+            items(feeds, key = { "source/${it.source.id}" }) { row ->
+                SourceItem(row, onOpen = { onOpenSource(row.source.id) })
+                HorizontalDivider()
+            }
+        }
+        if (account != null) serverCategories(account.id, srv, onOpenFeed)
+        if (lists.isNotEmpty()) {
+            item(key = "lists") { SectionHeading("Curated lists") }
+            items(lists, key = { "source/${it.source.id}" }) { row ->
+                SourceItem(row, onOpen = { onOpenSource(row.source.id) })
+                HorizontalDivider()
+            }
+        }
+        if (account != null) outsidePaper(account.id, srv, onOpenLeftOut, onOpenNotInPaper)
     }
 }
 
@@ -266,15 +301,25 @@ private fun EmptySources(modifier: Modifier) {
     }
 }
 
-/** The paper's feeds from tt-rss, under its categories, then what's left out of the paper. */
-private fun LazyListScope.serverFeeds(
-    accountId: Long,
-    server: ServerSources,
-    onOpenFeed: (sourceId: Long, key: String) -> Unit,
-    onOpenLeftOut: (Long) -> Unit,
-    onOpenNotInPaper: (Long) -> Unit,
-) {
-    item(key = "from-server") { SectionHeading("From your tt-rss") }
+/** The problem with the tt-rss account, and the way to Settings, where it's put right. */
+@Composable
+private fun AccountProblemBanner(problem: String, onOpen: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(problem, style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = onOpen, modifier = Modifier.padding(top = 8.dp).semantics { contentDescription = "Your tt-rss settings" }) {
+                Text("Settings")
+            }
+        }
+    }
+}
+
+/** The paper's feeds from tt-rss, under its categories. */
+private fun LazyListScope.serverCategories(accountId: Long, server: ServerSources, onOpenFeed: (sourceId: Long, key: String) -> Unit) {
     if (server.categories.isEmpty()) {
         item(key = "no-feeds") {
             val category = server.account?.ttrssCategoryTitle
@@ -303,6 +348,10 @@ private fun LazyListScope.serverFeeds(
             HorizontalDivider()
         }
     }
+}
+
+/** The account's feeds that aren't in the paper: outside its category, and left out. */
+private fun LazyListScope.outsidePaper(accountId: Long, server: ServerSources, onOpenLeftOut: (Long) -> Unit, onOpenNotInPaper: (Long) -> Unit) {
     if (server.outside.isNotEmpty()) {
         item(key = "not-in-paper") {
             val feeds = plural(server.outside.sumOf { it.feeds.size }, "feed")
@@ -349,42 +398,12 @@ private fun LinkRow(title: String, detail: String, onOpen: () -> Unit) {
 }
 
 /**
- * The tt-rss account: its address, and how many feeds it gives the paper or what's wrong. A
- * problem is marked with ⚠ as well as colour, which e-ink doesn't show.
- */
-@Composable
-private fun AccountRow(account: SourceEntity, server: ServerSources, onOpen: () -> Unit) {
-    val locale = LocalConfiguration.current.locales[0]
-    val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
-    val problem = accountProblem(account, locale, is24Hour)
-    ListItem(
-        headlineContent = { Text("Your tt-rss · ${SourceRepository.hostOf(account.url)}") },
-        supportingContent = {
-            Text(
-                problem ?: accountLine(account, server),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (problem != null && !account.paused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        leadingContent = { Icon(Icons.Default.RssFeed, contentDescription = null) },
-        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-        modifier = Modifier.clickable(onClickLabel = "Open your tt-rss settings", onClick = onOpen),
-    )
-    HorizontalDivider()
-}
-
-/** What the account gives the paper: "54 feeds in your paper", and the category if one is chosen. */
-internal fun accountLine(account: SourceEntity, server: ServerSources): String {
-    val feeds = if (server.waitingForList || (account.lastFetchedAt == null && server.inPaper == 0)) "Checking…" else "${plural(server.inPaper, "feed")} in your paper"
-    return account.ttrssCategoryTitle?.let { "$feeds · Articles from $it" } ?: feeds
-}
-
-/**
  * Why nothing new is coming from the account, or null: paused, its last sync's error and since
- * when, or a problem telling tt-rss what was read.
+ * when, or a problem telling tt-rss what was read. A problem is marked with ⚠, as colour doesn't
+ * show on e-ink.
  */
 internal fun accountProblem(account: SourceEntity, locale: Locale, is24Hour: Boolean, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? = when {
-    account.paused -> "Paused"
+    account.paused -> "Your tt-rss is paused: nothing new comes from it until you resume it in Settings."
     account.lastError != null -> listOfNotNull(
         "⚠ ${account.lastError}",
         account.failingSince?.let { failingSinceLine(it, locale, is24Hour, now, zone) },

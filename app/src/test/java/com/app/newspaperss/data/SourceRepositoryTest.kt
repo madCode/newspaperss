@@ -47,11 +47,11 @@ class SourceRepositoryTest {
               <outline text="Science"><outline text="B" xmlUrl="https://b.example/rss"/></outline>
             </body></opml>
         """.trimIndent()
-        assertEquals(1, repo.importOpml(opml))
+        assertEquals(SourceRepository.OpmlImport(inFile = 2, added = 1), repo.importOpml(opml))
 
         val other = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
             .allowMainThreadQueries().build()
-        assertEquals(2, SourceRepository(other).importOpml(repo.exportOpml()))
+        assertEquals(2, SourceRepository(other).importOpml(repo.exportOpml()).added)
         other.close()
     }
 

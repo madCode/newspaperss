@@ -369,17 +369,34 @@ phone restarts.
    or kindle.cn gets a warning), the mail app to send with, and a reminder
    to approve the sending address on Amazon. **Use the Kindle app
    instead** shares to the Kindle app.
-3. **Where do your sites come from?** A radio group, then Next: **This
-   phone finds and fetches them** ("Most people. Nothing to set up.") or
-   **My own RSS server** (tt-rss today), with "Not sure? It's this phone."
-   The chosen one has a thicker border, which shows on e-ink. The choice is
-   saved on Next. "Step N of M" follows the path: 4 steps with this phone,
-   5 with a server.
-4. **With this phone, pick your sources:** starter packs of well-known
+3. **Where do your feeds live now?** Three cards; tapping one answers and
+   moves on, with no Next:
+   - **I'll pick some sites** ("Newspapers, magazines, blogs, newsletters.
+     Most people start here."): this phone's sources step.
+   - **On my own RSS server** ("Tiny Tiny RSS. Your feeds stay there; the
+     paper is made from them."): sign-in.
+   - **In another reader app** ("Feedly, Inoreader and others: bring your
+     list as a file."): this phone too, starting with the import step.
+
+   Each card is a full-width bordered button with an arrow, one TalkBack
+   button read as its title and description, with no selected state to
+   show in colour. Below: "You can change this later in Settings." Sites
+   already added on this phone are said to go if the server is chosen,
+   before the tap. The answer is saved as the tap moves on. "Step N of M"
+   follows the path: 4 steps for picking sites, 5 for a server or another
+   reader app.
+4. **From another reader app, bring your list:** "In Feedly or Inoreader,
+   look for Export or OPML in settings. Save the file, then choose it
+   here." **Choose the file** opens the system file picker; the step then
+   says "Added 42 sites", what was there already, or a plain error with
+   **Try again**. **Skip** (Next once sites are in) goes on to the sources
+   step below, which the import counts towards. The result survives the app
+   being closed in the picker.
+5. **With this phone, pick your sources:** starter packs of well-known
    public feeds; paste any website (the app finds its feed); import an OPML
    file (its folders are ignored: the paper has no sections); or import
    saved links from Pocket or Instapaper, which alone are enough to start.
-5. **With a server, sign in**, then see what's there: the address,
+6. **With a server, sign in**, then see what's there: the address,
    username and password on the step itself, one message per cause when it
    fails (API off, wrong password, can't reach it), with what was typed
    kept, and **Use this phone instead**. Signed in, the same step says
@@ -389,10 +406,15 @@ phone restarts.
    lists. No starter packs. Going back to the question and choosing this
    phone signs out, so no half-made account is left; going back from this
    phone's sources and choosing the server removes the sites added there,
-   and the step says so first. Back waits while signing in.
-6. **How much, and when?** A 10–90 minute slider, "A new edition every
+   and the question says so first. Back waits while signing in.
+7. **How much, and when?** A 10–90 minute slider, "A new edition every
    day", and a "Ready by" time.
-7. **The first edition** builds right away, with its progress on Today.
+8. **The first edition** builds right away, with its progress on Today.
+
+Tap cards are for a single choice that moves you forward with nothing else
+to set on the page; multiple choices are checkboxes; a choice with a usual
+default on a page with more to set stays a radio group (Where do you read?,
+whose Kindle and KOReader answers ask for more on the same page).
 
 ## 9. Screens
 
@@ -431,18 +453,21 @@ phone restarts.
   - **Without a server:** the reading list, then each source in your order
     with its health ("Full articles", "Summaries only", "Site blocks
     fetching", "Failing for N days"). No headings, and nothing about servers.
-  - **With a server**, top to bottom:
-    - **Your tt-rss · host**, with "54 feeds in your paper" (and "Articles
-      from News" when a category is chosen), "Paused", or what's wrong, in
-      words with a ⚠ ("Couldn't reach tt-rss. Since 6:10 AM. Showing what it
-      last listed."). It opens Settings › Where your feeds come from. With no
-      working account, **Sign in to your tt-rss** takes its place.
-    - **On this phone:** the reading list, curated lists, and any feeds
-      still fetched by the phone, last, under a banner: "8 feeds are
-      fetched by this phone, not your tt-rss", with **Move them to
-      tt-rss**. Curated lists and the reading list stay on the phone in
-      both setups, so they never count. The banner shows only with a
-      working account.
+  - **With a server**, one list, not split into tt-rss and this phone:
+    nearly everything on it is tt-rss's, and the account's settings are in
+    Settings. Top to bottom:
+    - **Only when something needs doing**, a banner above the list (so one
+      that appears later isn't scrolled out of sight): **Sign in to your
+      tt-rss** with no working account; otherwise what's wrong in words
+      ("⚠ Couldn't reach tt-rss. Since 6:10 AM. Showing what it last
+      listed.", or that it's paused) with **Settings**, which opens
+      Settings › Where your feeds come from. Nothing when all is well.
+    - **The reading list.**
+    - **Still on this phone**, a heading, only while there are phone feeds:
+      a banner, "8 feeds are fetched by this phone, not your tt-rss", with
+      **Move them to tt-rss** (only with a working account), then those
+      feeds. Above the server's feeds, since it asks for something; it goes
+      once they're moved.
     - **Moving them:** a sheet lists every phone feed, ticked. One tt-rss
       already has at the same address says "Already in your tt-rss: just
       removed here". One category for the new ones (the paper's, else the
@@ -466,7 +491,7 @@ phone restarts.
       read on the phone, isn't delivered again when tt-rss brings it.
       Signing in as another tt-rss user makes feeds still kept phone feeds
       again, to move into that account if wanted.
-    - **From your tt-rss:** each category a heading, "News · 9 feeds"
+    - **The server's feeds:** each category a heading, "News · 9 feeds"
       ("News, 9 feeds" to TalkBack), its feeds A to Z under it. Feeds with
       no category go under **Uncategorized**, last. A line under a feed only
       when it says something: "Waiting for tt-rss's first fetch" for a feed
@@ -475,6 +500,8 @@ phone restarts.
       tt-rss · category News". Right after Articles from changes,
       until the next check lists the new category, it says "Your feeds in
       Science show here after the next check" instead.
+    - **Curated lists**, a heading, when there are any. They and the
+      reading list stay on the phone in both setups, and are never moved.
     - **Not in your paper**, when the paper takes from one category: "43
       feeds in 6 other categories". Its page lists those categories with
       their feeds, and points to Articles from in Settings.

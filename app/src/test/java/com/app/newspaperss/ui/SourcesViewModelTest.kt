@@ -126,6 +126,16 @@ class SourcesViewModelTest {
     }
 
     @Test
+    fun aFileWithNoSitesSaysSoRatherThanNothingNew() {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(FakeHttp())) {}
+        val empty = java.io.File(ctx.cacheDir, "empty.opml").apply { writeText("<html><body>Not a list</body></html>") }
+        vm.importOpml(ctx.contentResolver, android.net.Uri.fromFile(empty))
+        idleUntil { vm.message.value != null }
+        assertEquals("No sites in that file. Is it an OPML export from another reader?", vm.message.value)
+    }
+
+    @Test
     fun aFileThatIsntOpmlSaysSo() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val vm = SourcesViewModel(SourceRepository(db), FeedFinder(FakeHttp())) {}

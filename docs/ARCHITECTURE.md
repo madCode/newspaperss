@@ -387,9 +387,10 @@ screens read it the same way (`Settings.feedsFrom(hasServer)`). `SERVER`
 with no working account (no tt-rss source, or a password the phone can't
 read, e.g. after a restore) is a state of its own, `TtrssStatus`, which
 Sources and Settings show as "Sign in to your tt-rss". Sources reads the
-setup too: with `SERVER` it shows the account, then what's on the phone,
-then the account's feeds by `publications.category`; with `PHONE` nothing
-of tt-rss. Its rows, the tt-rss part and the sign-in state load as one
+setup too: with `SERVER` it shows the account only as a banner when it has
+a problem, then the reading list, the phone feeds still to move, the
+account's feeds by `publications.category`, and curated lists; with
+`PHONE` nothing of tt-rss. Its rows, the tt-rss part and the sign-in state load as one
 value (`SourcesViewModel.screen`), so nothing lands above rows already
 shown. The once-a-day feed list (`listTtrssFeeds`, in `FeedSync.kt`) marks feeds in the
 chosen category `listed` and, with a category chosen, asks for the rest

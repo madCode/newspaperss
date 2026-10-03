@@ -107,6 +107,7 @@ class MoveFeedsTest {
 
         runBlocking { db.sources().delete(db.sources().all().single { it.title == "Aeon" }) }
         waitGone("fetched by this phone")
+        assertFalse("with nothing to move, no group for it", visible("Still on this phone"))
         assertTrue("a curated list stays on the phone in both setups", visible(CuratedLists.all.first().title))
 
         phoneFeed("https://aeon.example/feed", "Aeon")
@@ -126,6 +127,7 @@ class MoveFeedsTest {
         phoneFeed("https://wire.example/rss", "Morning Wire (phone)")
         showSources()
         waitFor("2 feeds are fetched by this phone")
+        assertTrue(visible("Still on this phone"))
 
         compose.onNodeWithText("Move them to tt-rss").performClick()
         waitFor("Move 2 feeds to tt-rss")
@@ -141,6 +143,7 @@ class MoveFeedsTest {
         waitFor("Moved 2 feeds to your tt-rss")
         assertFalse(visible("fetched by this phone"))
         assertFalse(visible("Morning Wire (phone)"))
+        assertFalse("once they're moved, the group goes", visible("Still on this phone"))
     }
 
     @Test

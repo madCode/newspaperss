@@ -51,7 +51,7 @@ data class SourceRow(
 )
 
 /**
- * Sources in the server setup, below what's on this phone.
+ * The tt-rss part of Sources in the server setup.
  *
  * @property account the tt-rss account's source; null while there's none to show (signed out).
  * @property categories the feeds in the paper, under the server's categories.
@@ -64,8 +64,6 @@ data class ServerSources(
     val leftOut: Int = 0,
     val outside: List<FeedCategory> = emptyList(),
 ) {
-    val inPaper get() = categories.sumOf { it.feeds.size }
-
     /**
      * A category was chosen and its feeds haven't been listed yet. Until they are, the feeds
      * known are from before, and many aren't in the new category: none are shown but the
@@ -462,11 +460,12 @@ class SourcesViewModel(
                 val text = withContext(Dispatchers.IO) {
                     resolver.openInputStream(uri)?.use { it.bufferedReader().readText() } ?: throw IOException("empty")
                 }
-                val added = repository.importOpml(text)
+                val (inFile, added) = repository.importOpml(text)
                 if (added > 0) onSourcesChanged()
-                when (added) {
-                    0 -> "No new sites in that file."
-                    1 -> "Added 1 site."
+                when {
+                    inFile == 0 -> "No sites in that file. Is it an OPML export from another reader?"
+                    added == 0 -> "No new sites in that file."
+                    added == 1 -> "Added 1 site."
                     else -> "Added $added sites."
                 }
             } catch (e: Exception) {

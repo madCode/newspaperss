@@ -14,6 +14,31 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 87: onboarding in the reader's words; one list on Sources
+- **From you:** the clean-room wording for the onboarding question, as cards that move on when tapped, with a third answer for a list in another reader app; and Sources with a server as one list, since nearly all of it is tt-rss and its settings are in Settings.
+- **Shipped:** onboarding asks "Where do your feeds live now?" with three full-width cards: **I'll pick some sites**, **On my own RSS server** (Tiny Tiny RSS only, as it's the one that works) and **In another reader app**. A tap answers and moves on; each card is one TalkBack button read as its title and description, with an arrow and no state shown only in colour. Under them, "You can change this later in Settings", and, if sites were added on this phone already, that the server removes them (said before the tap now there's no Next). Another reader app is the phone setup starting with a step of its own: how to get the file from Feedly or Inoreader, **Choose the file**, then "Added 42 sites", what was there already, "No sites in that file", or "Couldn't read that file" with **Try again**; **Skip** goes on to picking sites. Its path counts 5 steps; going back and picking the server removes what it added, as the question says first. The result survives the app being killed in the file picker. With a server, Sources drops the account row and the "On this phone" and "From your tt-rss" headings: a banner only when the account needs something (sign in, can't reach it since a time, paused, a problem marking read) with **Settings**; then the reading list; **Still on this phone** with the Move banner and its feeds while there are any; the server's categories; **Curated lists**; Not in your paper and Left out. Sources' own OPML import now says when a file has no sites in it rather than "No new sites".
+- **Review caught:** (after review)
+- **Decided for you:**
+  - The onboarding audit, by the rule (a single choice that moves you forward with nothing else to set becomes cards; multi-select stays checkboxes; a choice with a usual default on a page with more to set stays radios):
+
+    | Step | Choice | Decision | Why |
+    |---|---|---|---|
+    | Welcome | none | unchanged | Nothing to choose. |
+    | Where do you read? | device, single | stays radios | Kindle opens its email setup and KOReader its folder on the same page, and the others show a tip to read before going on. |
+    | ↳ Kindle's mail app | single, in a menu | stays a menu | "Ask each time" is the usual answer, on a page with the address to type. |
+    | Where do your feeds live now? | single | **cards** | Moves you on, with nothing else on the page. |
+    | Bring your list | none (a file) | unchanged | One button. |
+    | What do you like to read? | starter packs and sites, multiple | stays chips and checkboxes | Several at once. |
+    | Sign in to your tt-rss | none (a form) | unchanged | Fields to fill. |
+    | Also on this phone | curated lists, multiple | stays checkboxes | Several at once, or none. |
+    | How big, how often? | slider, switch, time | unchanged | No single choice. |
+  - The import step reads the file itself, with the same SourceRepository import as Sources, so its result is part of onboarding's saved state.
+  - Skip on the import step goes to the starter packs rather than straight to the end: someone whose file didn't work still needs sites.
+  - The account banner sits above the list rather than in it: a banner appearing while the list was open landed above the first row, out of sight (caught by the new banner test).
+  - Coming back to the question shows no answer as chosen: each card is a way forward, not a setting.
+  - The account's "54 feeds in your paper" and "Articles from News" lines went with the row; Not in your paper ("43 feeds outside News") still says which category the paper takes.
+  - Settings › Where your feeds come from keeps its own wording (This phone / My own RSS server): it's a setting with a current value, so radios fit there.
+
 ### Cycle 86: moving your phone feeds into tt-rss
 - **From you:** build step (d) of the server-or-phone design: phone feeds move into tt-rss in one tap, with their settings, and stars kept.
 - **Shipped:** with a server, Sources puts the phone's own feeds last under On this phone, beneath a banner, "8 feeds are fetched by this phone, not your tt-rss", with **Move them to tt-rss** (only with a working account; curated lists and the reading list never count). The sheet lists them all ticked, says "Already in your tt-rss: just removed here" for one tt-rss has at the same address, takes one category for the new ones, and says their settings come along. The move runs in the background, one feed at a time, as stepped lines: "✓ Aeon · subscribed", "Moving 3 of 4 · Quanta Magazine". At the end, "Moved 8 feeds to your tt-rss"; if some couldn't move, "Moved 5 of 8", why each didn't, and **Move the other 3**. Signing in from the phone setup in Settings offers the same at once: "Move your 8 phone feeds to tt-rss?", Move 8 or Not now. Each moved feed's article text, cap, Skip paid posts, left out and what the text check learned go onto its tt-rss feed; the phone feed stops fetching and leaves Sources, and is deleted only when nothing starred, waiting or in an unsent edition is left in it.

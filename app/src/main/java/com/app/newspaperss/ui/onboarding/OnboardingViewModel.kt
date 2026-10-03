@@ -19,6 +19,12 @@ import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.KindleAddress
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
+import android.content.ContentResolver
+import android.net.Uri
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -36,10 +42,22 @@ import kotlinx.coroutines.launch
 import java.time.LocalTime
 
 /**
- * The steps in order. After [FEEDS_FROM] the path forks: this phone goes to [SOURCES], a server
- * to [SIGN_IN] and [EXTRAS]; both end at [SIZE]. See [OnboardingState.path].
+ * The steps in order. After [FEEDS_FROM] the path forks: this phone goes to [SOURCES] (through
+ * [IMPORT] for a list from another reader app), a server to [SIGN_IN] and [EXTRAS]; all end at
+ * [SIZE]. See [OnboardingState.path].
  */
-enum class Step { WELCOME, DEVICE, FEEDS_FROM, SOURCES, SIGN_IN, EXTRAS, SIZE, }
+enum class Step { WELCOME, DEVICE, FEEDS_FROM, IMPORT, SOURCES, SIGN_IN, EXTRAS, SIZE, }
+
+/** The answers to "Where do your feeds live now?". */
+enum class FeedsAnswer { SITES, SERVER, OTHER_APP }
+
+/** Reading an OPML file on [Step.IMPORT]. */
+sealed interface FileImport {
+    data object Reading : FileImport
+    /** [inFile] sites were in the file, [added] of them new here. */
+    data class Done(val inFile: Int, val added: Int) : FileImport
+    data object Failed : FileImport
+}
 
 data class OnboardingState(
     val step: Step = Step.WELCOME,
@@ -77,18 +95,24 @@ data class OnboardingState(
     val lists: Set<String> = emptySet(),
     /** Leaving the fork: saving the choice and, for this phone, signing out of tt-rss. */
     val forking: Boolean = false,
-    /** Sites added on the phone's sources step (one by one, or from OPML) and saved already. */
+    /** Sites added on the phone's sources or import step and saved already. */
     val phoneFeeds: Int = 0,
+    /** The phone setup, starting from a list exported from another reader app. */
+    val fromOtherApp: Boolean = false,
+    /** The import step's file; null before one is chosen. */
+    val fileImport: FileImport? = null,
 ) {
     val server get() = feedsFrom == FeedsFrom.SERVER
 
     /**
      * The steps after the welcome, on the path chosen. Before choosing, the phone's: it's the
-     * one most people take, and the count only grows if the server is picked.
+     * one most people take, and the count only grows if another is picked.
      */
-    val path: List<Step> get() =
-        if (server) listOf(Step.DEVICE, Step.FEEDS_FROM, Step.SIGN_IN, Step.EXTRAS, Step.SIZE)
-        else listOf(Step.DEVICE, Step.FEEDS_FROM, Step.SOURCES, Step.SIZE)
+    val path: List<Step> get() = when {
+        server -> listOf(Step.DEVICE, Step.FEEDS_FROM, Step.SIGN_IN, Step.EXTRAS, Step.SIZE)
+        fromOtherApp -> listOf(Step.DEVICE, Step.FEEDS_FROM, Step.IMPORT, Step.SOURCES, Step.SIZE)
+        else -> listOf(Step.DEVICE, Step.FEEDS_FROM, Step.SOURCES, Step.SIZE)
+    }
 
     /** "Step N of M", counted along [path]; 0 for the welcome, which isn't a step. */
     val stepNumber get() = path.indexOf(step) + 1
@@ -101,8 +125,10 @@ data class OnboardingState(
         Step.WELCOME -> true
         Step.DEVICE -> device != null && (!emailsKindle || KindleAddress.isValid(kindleEmail))
         Step.FEEDS_FROM -> feedsFrom != null && !forking
+        // A file that can't be read, or isn't to hand, can be skipped for the starter packs.
+        Step.IMPORT -> fileImport != FileImport.Reading
         // Saved links alone are enough: for someone leaving Pocket, they're the paper.
-        Step.SOURCES -> chosen.isNotEmpty() || added > 0 || savedLinks > 0
+        Step.SOURCES -> chosen.isNotEmpty() || added > 0 || phoneFeeds > 0 || savedLinks > 0
         Step.SIGN_IN -> signedIn
         // The account is the paper; curated lists and saved links are extras.
         Step.EXTRAS -> true
@@ -130,10 +156,10 @@ class OnboardingViewModel(
     init {
         viewModelScope.launch { _state.collect { store(it, saved) } }
         viewModelScope.launch { savedLinks.collect { n -> _state.update { it.copy(savedLinks = n) } } }
-        // From the database rather than the sign-in's result, so it's right after process death
-        // too. Only from the fork on and on the server path: before it there's nothing to find.
+        // From the database rather than the sign-in's or import's result, so it's right after
+        // process death too. Only from the fork on: before it there's nothing to find.
         viewModelScope.launch {
-            _state.map { it.server || it.signedIn || it.step == Step.FEEDS_FROM }.distinctUntilChanged()
+            _state.map { it.server || it.signedIn || it.step >= Step.FEEDS_FROM }.distinctUntilChanged()
                 .flatMapLatest { watch ->
                     if (!watch) flowOf(false to 0)
                     else sources.observe().map { all -> all.any { it.kind == SourceKind.TTRSS } to all.count { it.kind == SourceKind.FEED } }
@@ -157,7 +183,14 @@ class OnboardingViewModel(
         s.copy(step = if (i <= 0) Step.WELCOME else s.path[i - 1])
     }
 
-    fun chooseFeedsFrom(choice: FeedsFrom) = _state.update { it.copy(feedsFrom = choice) }
+    /** Answers the question and moves on: a card, not a choice confirmed with Next. */
+    fun answer(answer: FeedsAnswer) {
+        if (state.value.step != Step.FEEDS_FROM || state.value.forking) return
+        _state.update {
+            it.copy(feedsFrom = if (answer == FeedsAnswer.SERVER) FeedsFrom.SERVER else FeedsFrom.PHONE, fromOtherApp = answer == FeedsAnswer.OTHER_APP)
+        }
+        next()
+    }
 
     /**
      * Saves the choice, so the app knows it even if onboarding stops here. Choosing this phone
@@ -180,7 +213,7 @@ class OnboardingViewModel(
                 // instead. The step says so before Next.
                 if (choice == FeedsFrom.SERVER) sources.observe().first().filter { it.kind == SourceKind.FEED }.forEach { sources.remove(it) }
                 settings.update { it.copy(feedsFrom = choice) }
-                _state.update { it.copy(step = if (choice == FeedsFrom.SERVER) Step.SIGN_IN else Step.SOURCES) }
+                _state.update { it.copy(step = it.path[it.path.indexOf(Step.FEEDS_FROM) + 1]) }
             } finally {
                 _state.update { it.copy(forking = false) }
             }
@@ -190,8 +223,29 @@ class OnboardingViewModel(
     /** "Use this phone instead", from the sign-in step; not while signing in, as for [back]. */
     fun usePhoneInstead() {
         if (state.value.signIn.testing) return
-        _state.update { it.copy(feedsFrom = FeedsFrom.PHONE, step = Step.FEEDS_FROM) }
+        _state.update { it.copy(feedsFrom = FeedsFrom.PHONE, fromOtherApp = false, step = Step.FEEDS_FROM) }
         next()
+    }
+
+    /**
+     * Adds the sites in an OPML file exported from another reader. Read here rather than by
+     * Sources' import so the result is part of the step's state and survives process death.
+     */
+    fun importOpml(resolver: ContentResolver, uri: Uri) {
+        if (state.value.fileImport == FileImport.Reading) return
+        _state.update { it.copy(fileImport = FileImport.Reading) }
+        viewModelScope.launch {
+            val result = try {
+                val text = withContext(Dispatchers.IO) {
+                    resolver.openInputStream(uri)?.use { it.bufferedReader().readText() } ?: throw IOException("no stream")
+                }
+                sources.importOpml(text).let { FileImport.Done(it.inFile, it.added) }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                FileImport.Failed
+            }
+            _state.update { it.copy(fileImport = result) }
+        }
     }
 
     private var signingIn: Job? = null
@@ -317,6 +371,13 @@ private fun store(s: OnboardingState, saved: SavedStateHandle) {
     saved[KEY + "foundFeeds"] = s.serverFound?.feeds
     saved[KEY + "foundCategories"] = s.serverFound?.categories
     saved[KEY + "lists"] = ArrayList(s.lists)
+    saved[KEY + "fromOtherApp"] = s.fromOtherApp
+    // Not while reading: the read dies with the process, and the sites it added are counted anyway.
+    when (val f = s.fileImport) {
+        is FileImport.Done -> saved[KEY + "import"] = intArrayOf(f.inFile, f.added)
+        FileImport.Failed -> saved[KEY + "import"] = intArrayOf(-1, 0)
+        else -> saved.remove<IntArray>(KEY + "import")
+    }
 }
 
 private fun restore(saved: SavedStateHandle): OnboardingState {
@@ -341,5 +402,7 @@ private fun restore(saved: SavedStateHandle): OnboardingState {
         signIn = TtrssForm(address = saved[KEY + "address"] ?: "", user = saved[KEY + "user"] ?: ""),
         serverFound = saved.get<Int>(KEY + "foundFeeds")?.let { TtrssRepository.Found(it, saved[KEY + "foundCategories"] ?: 0) },
         lists = saved.get<ArrayList<String>>(KEY + "lists").orEmpty().toSet(),
+        fromOtherApp = saved[KEY + "fromOtherApp"] ?: false,
+        fileImport = saved.get<IntArray>(KEY + "import")?.let { (inFile, added) -> if (inFile < 0) FileImport.Failed else FileImport.Done(inFile, added) },
     )
 }

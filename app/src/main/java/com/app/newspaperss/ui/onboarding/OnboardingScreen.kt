@@ -23,13 +23,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +57,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -67,7 +71,6 @@ import com.app.newspaperss.ui.components.KindleEmailFields
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.core.lists.CuratedLists
-import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.ui.ttrss.TtrssSignInFields
 import com.app.newspaperss.ui.today.Masthead
 import java.time.LocalDate
@@ -104,6 +107,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
                     Step.WELCOME -> Welcome()
                     Step.DEVICE -> DeviceStep(s, viewModel)
                     Step.FEEDS_FROM -> FeedsFromStep(s, viewModel)
+                    Step.IMPORT -> ImportStep(s, viewModel)
                     Step.SOURCES -> SourcesStep(s, viewModel, sources, readingList)
                     Step.SIGN_IN -> SignInStep(s, viewModel)
                     Step.EXTRAS -> ExtrasStep(s, viewModel, readingList)
@@ -119,6 +123,9 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
                         Text(if (s.finishing) "Setting up…" else "Make my first edition")
                     }
                     s.step == Step.SIGN_IN && !s.signedIn -> Button(onClick = viewModel::signIn, enabled = s.signIn.canSubmit) { Text("Sign in") }
+                    // The cards move on themselves.
+                    s.step == Step.FEEDS_FROM -> Unit
+                    s.step == Step.IMPORT -> Button(onClick = viewModel::next, enabled = s.canContinue) { Text(if (s.phoneFeeds > 0) "Next" else "Skip") }
                     else -> Button(onClick = viewModel::next, enabled = s.canContinue) { Text("Next") }
                 }
             }
@@ -330,52 +337,102 @@ private fun FeedCheck(title: String, checked: Boolean, onToggle: () -> Unit) {
 
 @Composable
 private fun FeedsFromStep(s: OnboardingState, vm: OnboardingViewModel) {
-    Title("Where do your sites come from?")
-    // A radio group then Next, not cards that act on tap: TalkBack users hear both first, and a
-    // mis-tap on e-ink costs nothing.
-    Column(Modifier.selectableGroup()) {
-        SetupChoice(s.feedsFrom == FeedsFrom.PHONE, "This phone finds and fetches them", "Most people. Nothing to set up.") {
-            vm.chooseFeedsFrom(FeedsFrom.PHONE)
-        }
-        SetupChoice(s.feedsFrom == FeedsFrom.SERVER, "My own RSS server", "tt-rss today. FreshRSS and Miniflux are coming.") {
-            vm.chooseFeedsFrom(FeedsFrom.SERVER)
-        }
+    Title("Where do your feeds live now?")
+    AnswerCard("I'll pick some sites", "Newspapers, magazines, blogs, newsletters. Most people start here.", !s.forking) {
+        vm.answer(FeedsAnswer.SITES)
+    }
+    AnswerCard("On my own RSS server", "Tiny Tiny RSS. Your feeds stay there; the paper is made from them.", !s.forking) {
+        vm.answer(FeedsAnswer.SERVER)
+    }
+    AnswerCard("In another reader app", "Feedly, Inoreader and others: bring your list as a file.", !s.forking) {
+        vm.answer(FeedsAnswer.OTHER_APP)
     }
     Text(
-        "Not sure? It's this phone. You can change this later in Settings.",
+        "You can change this later in Settings.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 12.dp),
     )
-    if (s.server && s.phoneFeeds > 0) {
+    // Said before the tap, since the tap is the choice.
+    if (s.phoneFeeds > 0) {
         Text(
-            "The ${plural(s.phoneFeeds, "site")} you added on this phone will be removed: with a server, your sites come from it.",
+            "Choosing your own server removes the ${plural(s.phoneFeeds, "site")} you added on this phone: with a server, your sites come from it.",
             color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            modifier = Modifier.padding(top = 8.dp),
         )
     }
     if (s.forking && s.signedIn && !s.server) Text("Signing out of tt-rss…", Modifier.padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite })
 }
 
-/** On e-ink a filled background turns grey, so the chosen one has a thicker border too. */
+/**
+ * An answer that moves on when tapped: one TalkBack button read as its title and detail. A
+ * plain border and an arrow, with no selected state, so nothing depends on colour on e-ink.
+ */
 @Composable
-private fun SetupChoice(selected: Boolean, title: String, detail: String, onClick: () -> Unit) {
+private fun AnswerCard(title: String, detail: String, enabled: Boolean, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
+        enabled = enabled,
         shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).heightIn(min = 48.dp).semantics { role = Role.Button },
     ) {
-        Row(
-            Modifier.selectable(selected, role = Role.RadioButton, onClick = onClick).padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(selected = selected, onClick = null)
-            Column(Modifier.padding(start = 12.dp)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.padding(start = 8.dp))
         }
     }
+}
+
+/** The list from another reader app, as an OPML file, before the phone's own sources step. */
+@Composable
+private fun ImportStep(s: OnboardingState, vm: OnboardingViewModel) {
+    val context = LocalContext.current
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importOpml(context.contentResolver, uri)
+    }
+    Title("Bring your list")
+    Text(
+        "In Feedly or Inoreader, look for Export or OPML in settings. Save the file, then choose it here.",
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    val result = s.fileImport
+    val failed = result == FileImport.Failed || (result is FileImport.Done && result.inFile == 0)
+    Button(
+        onClick = { pick.launch(arrayOf("*/*")) },
+        enabled = result != FileImport.Reading,
+        modifier = Modifier.padding(top = 16.dp),
+    ) {
+        Text(
+            when {
+                result == null || result == FileImport.Reading -> "Choose the file"
+                failed -> "Try again"
+                else -> "Choose another file"
+            },
+        )
+    }
+    val status = when (result) {
+        null -> if (s.phoneFeeds > 0) "${plural(s.phoneFeeds, "site")} added." else null
+        FileImport.Reading -> "Reading the file…"
+        FileImport.Failed -> "Couldn't read that file. Try again, or skip and pick sites instead."
+        is FileImport.Done -> when {
+            result.inFile == 0 -> "No sites in that file. Is it the OPML export? Try again, or skip and pick sites instead."
+            result.added == 0 -> "All the sites in that file are added already."
+            result.added < result.inFile -> "Added ${plural(result.added, "site")}. " +
+                (if (result.inFile - result.added == 1) "The other one was added already." else "The other ${result.inFile - result.added} were added already.")
+            else -> "Added ${plural(result.added, "site")}."
+        }
+    }
+    // Always composed, so TalkBack hears it change.
+    Text(
+        status.orEmpty(),
+        style = MaterialTheme.typography.bodyLarge,
+        color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(top = 12.dp).semantics { liveRegion = LiveRegionMode.Polite },
+    )
 }
 
 /** The tt-rss sign-in, then, once signed in, what's in the account. */

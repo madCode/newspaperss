@@ -20,10 +20,7 @@ import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
-import com.app.newspaperss.ui.sources.FeedCategory
 import com.app.newspaperss.ui.sources.NotInPaperScreen
-import com.app.newspaperss.ui.sources.ServerSources
-import com.app.newspaperss.ui.sources.accountLine
 import com.app.newspaperss.ui.sources.accountProblem
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
@@ -107,13 +104,15 @@ class TtrssFeedsTest {
     @Test
     fun withAServerTheFeedsAreListedOpenUnderTheirCategories() {
         val account = account()
-        runBlocking { repo.addFeed("http://www.wire.example/rss/", "The Wire, on the phone") }
+        runBlocking {
+            repo.addFeed("http://www.wire.example/rss/", "The Wire, on the phone")
+            repo.addList(com.app.newspaperss.core.lists.CuratedLists.all.first())
+        }
         val vm = sources(FeedsFrom.SERVER)
         var feed: Pair<Long, String>? = null
         var leftOut: Long? = null
-        var settingsOpened = false
         compose.setContent {
-            SourcesScreen(vm, onOpenFeed = { id, key -> feed = id to key }, onOpenLeftOut = { leftOut = it }, onOpenAccount = { settingsOpened = true })
+            SourcesScreen(vm, onOpenFeed = { id, key -> feed = id to key }, onOpenLeftOut = { leftOut = it })
         }
         idleUntil { compose.waitForIdle(); visible("Quarterly Review") }
 
@@ -124,19 +123,48 @@ class TtrssFeedsTest {
         )
         compose.onNode(isHeading("News, 2 feeds")).assertExists()
         compose.onNode(isHeading("Uncategorized, 2 feeds")).assertExists()
-        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and hasText("On this phone")).assertExists()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and hasText("Still on this phone")).assertExists()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and hasText("Curated lists")).assertExists()
         assertTrue("its own settings, and nothing about the phone feed with its address", visible("At most 2") && visible("Skips paid posts"))
         assertFalse(visible("Also"))
         assertFalse("a left-out feed is counted, not listed", visible("Press Office"))
-        assertEquals("the phone's sources stay apart from tt-rss", listOf("The Wire, on the phone"), vm.screen.value!!.rows.map { it.source.title })
+        assertFalse("nothing splits tt-rss from the phone", visible("From your tt-rss") || visible("On this phone"))
+        assertFalse("with nothing wrong, nothing about the account", visible("Your tt-rss") || visible("Settings"))
+
+        fun top(text: String) = compose.onNode(hasText(text)).fetchSemanticsNode().boundsInRoot.top
+        val order = listOf("Your reading list", "Still on this phone", "The Wire, on the phone", "Essays · 1 feed", "Uncategorized · 2 feeds", "Curated lists", "Left out · 1")
+        assertEquals("the reading list, the phone's feeds to move, the server's, curated lists, then left out", order, order.sortedBy(::top))
 
         compose.onNodeWithText("Quarterly Review").performClick()
         assertEquals(account to "7", feed)
         compose.onNodeWithText("Left out · 1").performClick()
         assertEquals(account, leftOut)
-        compose.onNodeWithText("Your tt-rss · rss.example").performClick()
+    }
+
+    @Test
+    fun aProblemWithTheAccountIsABannerThatGoesWhenItsPutRight() {
+        val account = account()
+        runBlocking {
+            db.sources().recordSuccess(account, Instant.now(), null, null, SourceRepository.TTRSS_TITLE)
+            db.sources().recordFailure(account, Instant.now(), "Couldn't reach tt-rss.")
+        }
+        val vm = sources(FeedsFrom.SERVER)
+        var settingsOpened = false
+        compose.setContent { SourcesScreen(vm, onOpenAccount = { settingsOpened = true }) }
+        idleUntil { compose.waitForIdle(); visible("⚠ Couldn't reach tt-rss.") }
+        assertTrue("it says what's listed is from before", visible("Showing what it last listed.") && visible("Quarterly Review"))
+        compose.onNodeWithContentDescription("Your tt-rss settings").performClick()
         assertTrue(settingsOpened)
-        assertTrue(visible("5 feeds in your paper"))
+
+        runBlocking { db.sources().recordSuccess(account, Instant.now(), null, null, SourceRepository.TTRSS_TITLE) }
+        idleUntil { compose.waitForIdle(); !visible("Couldn't reach") }
+        assertFalse(visible("Settings"))
+
+        runBlocking { db.sources().setPaused(account, true) }
+        idleUntil { compose.waitForIdle(); visible("Your tt-rss is paused") }
+        runBlocking { db.sources().setServerNote(account, "Couldn't mark articles read") }
+        runBlocking { db.sources().setPaused(account, false) }
+        idleUntil { compose.waitForIdle(); visible("⚠ Couldn't mark articles read") }
     }
 
     @Test
@@ -149,7 +177,7 @@ class TtrssFeedsTest {
         assertNull(vm.screen.value!!.server)
         assertEquals(listOf("A phone feed"), vm.screen.value!!.rows.map { it.source.title })
         assertFalse(visible("tt-rss"))
-        assertFalse(visible("On this phone"))
+        assertFalse(visible("on this phone"))
     }
 
     /**
@@ -173,7 +201,6 @@ class TtrssFeedsTest {
         idleUntil { compose.waitForIdle(); visible("Not in your paper") }
 
         assertTrue(visible("3 feeds outside News"))
-        assertTrue(visible("Articles from News"))
         compose.onNodeWithText("Not in your paper").performClick()
         assertEquals(account, notIn)
 
@@ -182,7 +209,6 @@ class TtrssFeedsTest {
         idleUntil { compose.waitForIdle(); visible("Your feeds in Science show here after the next check.") }
         assertFalse(visible("Quarterly Review"))
         assertFalse(visible("Not in your paper"))
-        assertTrue(visible("Checking… · Articles from Science"))
         assertTrue("a left-out feed can still be brought back", visible("Left out · 1"))
     }
 
@@ -205,7 +231,7 @@ class TtrssFeedsTest {
     }
 
     @Test
-    fun theAccountRowSaysWhatsWrongInWords() {
+    fun theAccountsProblemIsSaidInWords() {
         val now = Instant.parse("2026-10-03T09:00:00Z")
         val account = SourceEntity(kind = SourceKind.TTRSS, url = "https://rss.example/api/", title = SourceRepository.TTRSS_TITLE, lastFetchedAt = now)
         fun problem(source: SourceEntity) = accountProblem(source, Locale.US, is24Hour = false, now = now, zone = ZoneOffset.UTC)
@@ -213,14 +239,8 @@ class TtrssFeedsTest {
         val down = problem(account.copy(lastError = "Couldn't reach tt-rss.", failingSince = Instant.parse("2026-10-03T06:10:00Z")))!!
         assertTrue(down, down.startsWith("⚠ Couldn't reach tt-rss. Since 6:10") && down.endsWith("Showing what it last listed."))
         assertTrue(problem(account.copy(lastError = "Couldn't reach tt-rss.", failingSince = Instant.parse("2026-09-30T06:10:00Z")))!!.contains("Since Sep 30."))
-        assertEquals("Paused", problem(account.copy(paused = true, lastError = "Couldn't reach tt-rss.")))
+        assertTrue("paused says so rather than the error", problem(account.copy(paused = true, lastError = "Couldn't reach tt-rss."))!!.startsWith("Your tt-rss is paused"))
         assertEquals("⚠ Couldn't mark articles read", problem(account.copy(serverNote = "Couldn't mark articles read")))
-
-        assertEquals("Checking…", accountLine(account.copy(lastFetchedAt = null), ServerSources(account)))
-        val waiting = account.copy(ttrssCategoryId = 4, ttrssCategoryTitle = "Science")
-        assertEquals("Checking… · Articles from Science", accountLine(waiting, ServerSources(waiting)))
-        val feeds = listOf(FeedCategory("News", listOf(FeedChoice("1", "A", inPaper = true), FeedChoice("2", "B", inPaper = true))))
-        assertEquals("2 feeds in your paper · Articles from News", accountLine(account.copy(ttrssCategoryTitle = "News"), ServerSources(account, feeds)))
     }
 
     @Test

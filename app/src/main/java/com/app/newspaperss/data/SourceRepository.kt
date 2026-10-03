@@ -279,16 +279,19 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
 
     fun observePublication(sourceId: Long, key: String): Flow<PublicationEntity?> = sources.observePublication(sourceId, key)
 
-    /** Returns how many feeds were new. */
-    suspend fun importOpml(xml: String): Int {
+    /** [inFile] feeds were in the file, [added] of them new. */
+    data class OpmlImport(val inFile: Int, val added: Int)
+
+    suspend fun importOpml(xml: String): OpmlImport {
+        val feeds = Opml.parse(xml)
         var added = 0
-        for (feed in Opml.parse(xml)) {
+        for (feed in feeds) {
             if (sources.byUrl(feed.url) == null) {
                 addFeed(feed.url, feed.title)
                 added++
             }
         }
-        return added
+        return OpmlImport(feeds.size, added)
     }
 
     suspend fun exportOpml(): String = Opml.write(

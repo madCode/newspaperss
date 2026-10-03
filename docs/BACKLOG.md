@@ -274,6 +274,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Onboarding asks "Where do your feeds live now?" with three tap cards (pick sites, your own RSS server, another reader app), and another reader app starts with importing its OPML file; Sources with a server is one list, the account only showing when something's wrong, phone feeds still to move under "Still on this phone", and curated lists in a group *(you asked)*
 - [x] Moving your phone feeds into tt-rss: a banner on Sources and an offer right after signing in, a sheet with every feed ticked and one category, stepped progress in the background, "Move the other 3" for what didn't move; settings carried over, and a moved feed kept, paused and hidden, until its stars are delivered; step (d) of [research/server-mode](research/server-mode.md) *(you asked)*
 - [x] Adding a site with a server subscribes in your tt-rss, in a category you pick (the last one used), with Undo; already there, no feed, or tt-rss refusing each say so and offer the reading list or a curated list; OPML items give way to Where your feeds come from; step (c) of [research/server-mode](research/server-mode.md) *(you asked)*
 - [x] Sources for a server: your tt-rss account first, then what's on this phone, then the server's categories as headings with their feeds A to Z, Uncategorized, Not in your paper and Left out last; without a server, nothing of tt-rss; step (b) of [research/server-mode](research/server-mode.md) *(you asked)*

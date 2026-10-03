@@ -8,6 +8,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -44,6 +45,8 @@ import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
 import com.app.newspaperss.ui.onboarding.Step
 import com.app.newspaperss.settings.FeedsFrom
+import com.app.newspaperss.ui.onboarding.FeedsAnswer
+import com.app.newspaperss.ui.onboarding.FileImport
 import com.app.newspaperss.data.StoredAccount
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -90,10 +93,9 @@ class OnboardingTest {
     private fun visible(text: String) = compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()
     private fun stepIs(text: String) = compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, text)).fetchSemanticsNodes().isNotEmpty()
 
-    /** At the fork: this phone, then Next. Saving the choice finishes off the main thread. */
+    /** At the fork: picking sites on this phone. Saving the choice finishes off the main thread. */
     private fun choosePhone() {
-        click("This phone finds and fetches them")
-        click("Next")
+        click("I'll pick some sites")
         idleUntil { compose.waitForIdle(); vm.state.value.step == Step.SOURCES || visible("Pick a few to start") }
     }
 
@@ -198,8 +200,7 @@ class OnboardingTest {
         click("Get started")
         scrollAndClick("Kobo")
         click("Next")
-        click("This phone finds and fetches them")
-        click("Next")
+        click("I'll pick some sites")
         idleUntil { compose.waitForIdle(); pocketVm.state.value.step == Step.SOURCES }
 
         compose.onNodeWithText("2 saved links waiting", substring = true).performScrollTo().assertExists()
@@ -215,8 +216,7 @@ class OnboardingTest {
     fun withNeitherSitesNorSavedLinksTheresNothingToMakeAPaperFrom() {
         vm.chooseDevice(Device.KOBO)
         vm.next(); vm.next()
-        vm.chooseFeedsFrom(FeedsFrom.PHONE)
-        vm.next()
+        vm.answer(FeedsAnswer.SITES)
         idleUntil { vm.state.value.step == Step.SOURCES }
         assertFalse(vm.state.value.canContinue)
     }
@@ -231,9 +231,7 @@ class OnboardingTest {
         click("Get started")
         scrollAndClick("Kobo")
         click("Next")
-        compose.onNodeWithText("Next").assertIsNotEnabled()
-        click("My own RSS server")
-        click("Next")
+        click("On my own RSS server")
         idleUntil { compose.waitForIdle(); visible("Sign in to your tt-rss") }
     }
 
@@ -300,7 +298,7 @@ class OnboardingTest {
         click("Next")
         click("Back")
         click("Back")
-        compose.onNodeWithText("Where do your sites come from?").assertExists()
+        compose.onNodeWithText("Where do your feeds live now?").assertExists()
 
         choosePhone()
         idleUntil { runBlocking { db.sources().all() }.isEmpty() }
@@ -318,7 +316,7 @@ class OnboardingTest {
         click("Sign in")
         idleUntil { compose.waitForIdle(); visible("Found 3 feeds") }
         click("Back")
-        click("Next")
+        click("On my own RSS server")
         idleUntil { compose.waitForIdle(); visible("Found 3 feeds") }
         assertEquals(listOf(SourceKind.TTRSS), runBlocking { db.sources().all() }.map { it.kind })
     }
@@ -332,9 +330,8 @@ class OnboardingTest {
         choosePhone()
         runBlocking { SourceRepository(db).addFeed("https://a.example/feed", "A") }
         click("Back")
-        click("My own RSS server")
-        idleUntil { compose.waitForIdle(); visible("The 1 site you added on this phone will be removed") }
-        click("Next")
+        idleUntil { compose.waitForIdle(); visible("Choosing your own server removes the 1 site you added on this phone") }
+        click("On my own RSS server")
         idleUntil { compose.waitForIdle(); visible("Sign in to your tt-rss") }
         assertTrue("never mixed", runBlocking { db.sources().all() }.isEmpty())
     }
@@ -346,7 +343,7 @@ class OnboardingTest {
         val answers = http.onPost
         http.onPost = { url, body -> answer.await(); answers(url, body) }
         vm.next(); vm.chooseDevice(Device.KOBO); vm.next()
-        vm.chooseFeedsFrom(FeedsFrom.SERVER); vm.next()
+        vm.answer(FeedsAnswer.SERVER)
         idleUntil { vm.state.value.step == Step.SIGN_IN }
         vm.editSignIn(vm.state.value.signIn.copy(address = "rss.example.com/tt-rss", user = server.user, password = server.password))
         vm.signIn()
@@ -377,8 +374,7 @@ class OnboardingTest {
         val handle = androidx.lifecycle.SavedStateHandle()
         val first = OnboardingViewModel(store, SourceRepository(db), FeedFinder(http), ttrss, handle) {}
         first.next(); first.chooseDevice(Device.KOBO); first.next()
-        first.chooseFeedsFrom(FeedsFrom.SERVER)
-        first.next()
+        first.answer(FeedsAnswer.SERVER)
         idleUntil { first.state.value.step == Step.SIGN_IN }
         first.editSignIn(first.state.value.signIn.copy(address = "rss.example.com/tt-rss", user = server.user, password = server.password))
         first.signIn()
@@ -410,7 +406,7 @@ class OnboardingTest {
 
         val resolver = ApplicationProvider.getApplicationContext<android.content.Context>().contentResolver
         sourcesVm.importOpml(resolver, android.net.Uri.fromFile(tmp.newFile("empty.opml").apply { writeText("<opml version=\"2.0\"><body/></opml>") }))
-        compose.waitUntil(5_000) { compose.onAllNodes(hasText("No new sites in that file", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("No sites in that file", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         val opml = tmp.newFile("feeds.opml").apply {
             writeText("""<opml version="2.0"><body><outline type="rss" text="A" xmlUrl="https://a.example/feed"/><outline type="rss" text="B" xmlUrl="https://b.example/feed"/></body></opml>""")
         }
@@ -432,8 +428,7 @@ class OnboardingTest {
         vm.next()
         vm.next()
         assertEquals("nor without saying where the sites come from", Step.FEEDS_FROM, vm.state.value.step)
-        vm.chooseFeedsFrom(FeedsFrom.PHONE)
-        vm.next()
+        vm.answer(FeedsAnswer.SITES)
         idleUntil { vm.state.value.step == Step.SOURCES }
         vm.next()
         assertEquals(Step.SOURCES, vm.state.value.step)
@@ -464,17 +459,19 @@ class OnboardingTest {
     fun theStepCountFollowsThePathChosen() {
         compose.setContent { OnboardingScreen(vm) }
         vm.next(); vm.chooseDevice(Device.KOBO); vm.next()
-        vm.chooseFeedsFrom(FeedsFrom.SERVER)
-        idleUntil { compose.waitForIdle(); stepIs("Step 2 of 5") }
-        vm.next()
-        idleUntil { compose.waitForIdle(); stepIs("Step 3 of 5") }
-        vm.back()
-        vm.chooseFeedsFrom(FeedsFrom.PHONE)
         idleUntil { compose.waitForIdle(); stepIs("Step 2 of 4") }
-        vm.next()
-        idleUntil { compose.waitForIdle(); stepIs("Step 3 of 4") }
+        vm.answer(FeedsAnswer.SERVER)
+        idleUntil { compose.waitForIdle(); vm.state.value.step == Step.SIGN_IN && stepIs("Step 3 of 5") }
+        vm.back()
+        vm.answer(FeedsAnswer.SITES)
+        idleUntil { compose.waitForIdle(); vm.state.value.step == Step.SOURCES && stepIs("Step 3 of 4") }
         vm.next()
         assertEquals("no sources yet, so it waits", Step.SOURCES, vm.state.value.step)
+        vm.back()
+        vm.answer(FeedsAnswer.OTHER_APP)
+        idleUntil { compose.waitForIdle(); vm.state.value.step == Step.IMPORT && stepIs("Step 3 of 5") }
+        vm.next()
+        idleUntil { compose.waitForIdle(); vm.state.value.step == Step.SOURCES && stepIs("Step 4 of 5") }
     }
 
     @Test
@@ -522,5 +519,125 @@ class OnboardingTest {
         scrollAndClick("Kindle")
         compose.onNode(hasSetTextAction() and hasText("Your Kindle's email address")).performTextInput("me@@kindle.com")
         compose.onNodeWithText("That isn't a whole email address yet.").assertExists()
+    }
+
+    private val resolver get() = ApplicationProvider.getApplicationContext<android.content.Context>().contentResolver
+    private fun opml(name: String, vararg urls: String) = android.net.Uri.fromFile(
+        tmp.newFile(name).apply {
+            writeText("<opml version=\"2.0\"><body>" + urls.joinToString("") { "<outline type=\"rss\" text=\"$it\" xmlUrl=\"$it\"/>" } + "</body></opml>")
+        },
+    )
+
+    /** Up to the import step, the question answered with another reader app. */
+    private fun toImport() {
+        compose.setContent { OnboardingScreen(vm) }
+        click("Get started")
+        scrollAndClick("Kobo")
+        click("Next")
+        click("In another reader app")
+        idleUntil { compose.waitForIdle(); vm.state.value.step == Step.IMPORT }
+    }
+
+    @Test
+    fun eachAnswerIsOneButtonThatTalkBackReadsWhole() {
+        compose.setContent { OnboardingScreen(vm) }
+        vm.next(); vm.chooseDevice(Device.KOBO); vm.next()
+        compose.onNodeWithText("Next").assertDoesNotExist()
+        listOf(
+            "I'll pick some sites" to "Most people start here.",
+            "On my own RSS server" to "Tiny Tiny RSS.",
+            "In another reader app" to "Feedly, Inoreader and others",
+        ).forEach { (title, detail) ->
+            compose.onNode(
+                hasText(title) and hasText(detail, substring = true) and hasClickAction() and
+                    SemanticsMatcher.expectValue(SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Button),
+            ).assertExists()
+        }
+        compose.onNodeWithText("You can change this later in Settings.").assertExists()
+    }
+
+    @Test
+    fun aReaderFromAnotherAppBringsTheirListThenPicksMore() {
+        toImport()
+        assertEquals(FeedsFrom.PHONE, runBlocking { store.current().feedsFrom })
+        assertTrue(stepIs("Step 3 of 5"))
+        compose.onNodeWithText("Skip").assertIsEnabled()
+
+        vm.importOpml(resolver, opml("feeds.opml", "https://a.example/feed", "https://b.example/feed"))
+        idleUntil { compose.waitForIdle(); visible("Added 2 sites.") }
+        click("Next")
+        idleUntil { compose.waitForIdle(); vm.state.value.step == Step.SOURCES }
+        assertTrue(stepIs("Step 4 of 5"))
+        assertTrue("the imported sites are enough to go on", vm.state.value.canContinue)
+
+        click("Back")
+        assertEquals(Step.IMPORT, vm.state.value.step)
+        click("Next")
+        click("Next")
+        click("Make my first edition")
+        idleUntil { finished != null }
+        assertEquals(FeedsFrom.PHONE, finished!!.feedsFrom)
+        assertEquals(setOf("https://a.example/feed", "https://b.example/feed"), runBlocking { db.sources().all() }.map { it.url }.toSet())
+    }
+
+    @Test
+    fun aFileThatCantBeReadSaysSoAndCanBeSkippedForTheStarterPacks() {
+        toImport()
+        vm.importOpml(resolver, android.net.Uri.fromFile(java.io.File(tmp.root, "missing.opml")))
+        idleUntil { compose.waitForIdle(); visible("Couldn't read that file.") }
+        compose.onNodeWithText("Try again").assertIsEnabled()
+        click("Skip")
+        idleUntil { compose.waitForIdle(); visible("Pick a few to start") }
+        assertTrue(stepIs("Step 4 of 5"))
+    }
+
+    @Test
+    fun aFileWithNothingNewSaysSoRatherThanAdded() {
+        runBlocking { SourceRepository(db).addFeed("https://a.example/feed", "A") }
+        toImport()
+        vm.importOpml(resolver, opml("none.opml"))
+        idleUntil { compose.waitForIdle(); visible("No sites in that file.") }
+        vm.importOpml(resolver, opml("known.opml", "https://a.example/feed", "https://a.example/feed"))
+        idleUntil { compose.waitForIdle(); visible("All the sites in that file are added already.") }
+        vm.importOpml(resolver, opml("some.opml", "https://a.example/feed", "https://b.example/feed"))
+        idleUntil { compose.waitForIdle(); visible("Added 1 site. The other one was added already.") }
+        assertEquals(2, runBlocking { db.sources().all() }.size)
+    }
+
+    @Test
+    fun theImportStepAndItsResultSurviveTheAppBeingKilled() {
+        val handle = androidx.lifecycle.SavedStateHandle()
+        val first = OnboardingViewModel(store, SourceRepository(db), FeedFinder(http), saved = handle) {}
+        first.next(); first.chooseDevice(Device.KOBO); first.next()
+        first.answer(FeedsAnswer.OTHER_APP)
+        idleUntil { first.state.value.step == Step.IMPORT }
+        first.importOpml(resolver, opml("feeds.opml", "https://a.example/feed"))
+        idleUntil { handle.get<IntArray>("onboarding.import") != null }
+
+        val restored = OnboardingViewModel(
+            store, SourceRepository(db), FeedFinder(http),
+            saved = androidx.lifecycle.SavedStateHandle(handle.keys().associateWith { handle.get<Any>(it) }),
+        ) {}
+        idleUntil { restored.state.value.phoneFeeds == 1 }
+        val s = restored.state.value
+        assertEquals(Step.IMPORT, s.step)
+        assertEquals(5, s.path.size)
+        assertEquals(FileImport.Done(inFile = 1, added = 1), s.fileImport)
+        restored.next()
+        assertEquals(Step.SOURCES, restored.state.value.step)
+        assertTrue(restored.state.value.canContinue)
+    }
+
+    @Test
+    fun goingBackFromTheImportAndChoosingTheServerRemovesTheImportedSites() {
+        toImport()
+        vm.importOpml(resolver, opml("feeds.opml", "https://a.example/feed"))
+        idleUntil { compose.waitForIdle(); visible("Added 1 site.") }
+        click("Back")
+        idleUntil { compose.waitForIdle(); visible("Choosing your own server removes the 1 site") }
+        click("On my own RSS server")
+        idleUntil { compose.waitForIdle(); visible("Sign in to your tt-rss") }
+        assertTrue("never mixed", runBlocking { db.sources().all() }.isEmpty())
+        assertTrue(stepIs("Step 3 of 5"))
     }
 }

@@ -51,6 +51,8 @@ import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
 import com.app.newspaperss.ui.onboarding.Step
+import com.app.newspaperss.ui.onboarding.FeedsAnswer
+import com.app.newspaperss.ui.onboarding.FileImport
 import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.data.TtrssAccountStore
 import com.app.newspaperss.data.TtrssRepository
@@ -144,14 +146,47 @@ class ScreenshotTest {
 
     @Test
     fun onboardingFeedsFrom() {
-        val vm = onboarding().apply { next(); chooseDevice(Device.KOBO); next(); chooseFeedsFrom(FeedsFrom.PHONE) }
+        val vm = onboarding().apply { next(); chooseDevice(Device.KOBO); next() }
         shoot("02b-onboarding-feeds-from") { OnboardingScreen(vm) }
+    }
+
+    /** At the import step, after the question was answered with another reader app. */
+    private fun atTheImportStep(): OnboardingViewModel = onboarding().apply {
+        next(); chooseDevice(Device.KOBO); next(); answer(FeedsAnswer.OTHER_APP)
+        idleUntil { state.value.step == Step.IMPORT }
+    }
+
+    @Test
+    fun onboardingImport() {
+        val vm = atTheImportStep()
+        shoot("02c-onboarding-import") { OnboardingScreen(vm) }
+    }
+
+    @Test
+    fun onboardingImported() {
+        val vm = atTheImportStep()
+        val file = tmp.newFile("feeds.opml").apply {
+            writeText(
+                "<opml version=\"2.0\"><body>" +
+                    StarterPacks.all.flatMap { it.feeds }.take(12).joinToString("") { "<outline type=\"rss\" text=\"${it.title}\" xmlUrl=\"${it.url}\"/>" } +
+                    "</body></opml>",
+            )
+        }
+        vm.importOpml(ApplicationProvider.getApplicationContext<android.content.Context>().contentResolver, android.net.Uri.fromFile(file))
+        shoot("02d-onboarding-imported", ready = { vm.state.value.fileImport is FileImport.Done && vm.state.value.phoneFeeds > 0 }) { OnboardingScreen(vm) }
+    }
+
+    @Test
+    fun onboardingImportFailed() {
+        val vm = atTheImportStep()
+        vm.importOpml(ApplicationProvider.getApplicationContext<android.content.Context>().contentResolver, android.net.Uri.fromFile(File(tmp.root, "missing.opml")))
+        shoot("02e-onboarding-import-failed", ready = { vm.state.value.fileImport == FileImport.Failed }) { OnboardingScreen(vm) }
     }
 
     /** Through the fork to this phone's sources step; saving the choice finishes off the main thread. */
     private fun onboardingOnThePhone(vm: OnboardingViewModel) = vm.apply {
         next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com"); next()
-        chooseFeedsFrom(FeedsFrom.PHONE); next()
+        answer(FeedsAnswer.SITES)
         idleUntil { state.value.step == Step.SOURCES }
     }
 
@@ -182,7 +217,7 @@ class ScreenshotTest {
     private fun onboardingOnTheServer(): OnboardingViewModel =
         OnboardingViewModel(store, SourceRepository(db), FeedFinder(ttrssHttp), ttrss) {}.apply {
             next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com"); next()
-            chooseFeedsFrom(FeedsFrom.SERVER); next()
+            answer(FeedsAnswer.SERVER)
             idleUntil { state.value.step == Step.SIGN_IN }
         }
 
@@ -501,6 +536,13 @@ class ScreenshotTest {
             db.sources().recordFailure(account, Instant.now().minusSeconds(3_600), "Couldn't reach tt-rss.")
         }
         shoot("08l-sources-server-down", ready = { vm.screen.value?.server?.account?.lastError != null }) { SourcesScreen(vm) }
+    }
+
+    @Test
+    fun sourcesWithAServerPaused() {
+        val vm = serverSources()
+        runBlocking { db.sources().setPaused(db.sources().ofKind(com.app.newspaperss.data.SourceKind.TTRSS).single().id, true) }
+        shoot("08m-sources-server-paused", ready = { vm.screen.value?.server?.account?.paused == true }) { SourcesScreen(vm) }
     }
 
     private fun feedPage(key: String): SourceDetailViewModel {
