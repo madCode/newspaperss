@@ -24,7 +24,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 
 ### The book
 - [ ] Video and audio players vanish without a trace: the cleaner drops every iframe, video and audio, leaving "Watch:" or a heading over nothing. In a sample of 405 recent items from 41 feeds (Oct 2), 8% had a player (16% outside the starter packs), almost all YouTube. Put a line where each was ("▶ Video: title, youtube.com/…") *(live)*
-- [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
+- [ ] EPUB design, round 2: the cover image and a look on real devices (Kindle, Kobo, KOReader) *(device)*
 - [ ] A text size setting for the article preview *(your brother asked; medium priority)*
 - [ ] Comics in the article preview: let a strip fill the page width, and allow pinch to zoom *(you asked)*
 - [ ] Substack Notes embedded in posts that come through tt-rss: tt-rss strips the Note's text, so the sentence introducing it hangs. Fetching the post's page would bring it back (the full post is in the page's data), at one page fetch per Substack article *(device)*
@@ -38,9 +38,8 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
-- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page, is built (cycles 71–73). Still open on its "For you to decide" list: sections from categories, balance, adding feeds to tt-rss from here
+- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page, is built (cycles 71–73). Still open: adding feeds to tt-rss from here. Sections were taken out (cycle 74)
 - [ ] A quiet tt-rss feed says so under its row ("Nothing new in 3 weeks"). tt-rss's feed list gives when it last fetched a feed, not when it last posted, so this needs the newest article's date from getHeadlines, once a day
-- [ ] tt-rss categories as sections, then balance by section (D in [research/ttrss-backend/](research/ttrss-backend/index.html))
 - [ ] Search on the account page's feed list (F4), if scrolling 50+ feeds on Sources gets slow
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] A heart for "loved this / keep it", synced to tt-rss *(you asked)*. The ☆ stays "put it in my next edition": two different wishes, and tt-rss's own star already means "keep" (which is why its stars aren't synced as ☆ today). Things to settle first:
@@ -105,12 +104,6 @@ Kindle (My Clippings), Kobo or KOReader; where notes should live (the app, or a 
 ### More than one schedule, and one-off editions
 Several timed editions (a weekday morning paper and Sunday long reads), and a one-off custom edition
 (pick sources, size) without changing the defaults.
-
-### tt-rss categories as sections
-newspapeRSS sits on top of a reader rather than replacing it. tt-rss is one source today, optionally
-one category; its categories could become the paper's sections. This is the direction rather than
-making the app a full client, and it pairs with "Add sources to tt-rss": sources found here get
-subscribed on the server, and the server's categories come back as the paper's sections.
 
 Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
 
@@ -203,6 +196,13 @@ phone. What's missing:
 - **Generated summaries:** not doing. The paper gives whole articles; AI-shortened digests are what
   the competitors do, not what this app is for.
 
+### Sections in the paper (taken out)
+Taken out in cycle 74, with OPML folders, the reading list's "Saved for later" heading, tt-rss
+categories as sections and balancing by section. A 30-minute paper is often 8 articles, so headings
+mostly sat over one article each, and they added a setting to every feed's page. Feed readers group
+feeds into folders to find them, which is what the inset list on Sources does; the paper doesn't
+need it. Bring back if longer papers make the contents hard to scan.
+
 ### Local news for your city or country (parked)
 Parked: hard to do well, and curated lists go stale. Adding a local paper by its address already works.
 Help people find news sources near them: local papers, public broadcasters, city blogs.
@@ -226,7 +226,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
-- [x] Your tt-rss feeds on Sources: inset under the tt-rss row, folded until you open them, each with its own page (leave out, article text, cap, section, its articles); a daily feed list from tt-rss names every feed; article text, cap and section are per publication, so a tt-rss feed has its own
+- [x] Your tt-rss feeds on Sources: inset under the tt-rss row, folded until you open them, each with its own page (leave out, article text, cap, its articles); a daily feed list from tt-rss names every feed; article text, cap and section are per publication, so a tt-rss feed has its own
 - [x] Article text is checked, not assumed: each edition reads the pages of up to 5 long items, one per publication (a feed here, or one feed in tt-rss), which each learn on their own; pictures the feed's copy lacks count for the page
 - [x] A tt-rss timeout says the server took too long, not that it couldn't be reached *(personas)*
 - [x] tt-rss: leave a feed out of the paper from the source's page; it isn't fetched, and its waiting articles go except starred ones *(personas)*

@@ -225,10 +225,8 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp + barRoom)) {
                 item {
-                    val sections by viewModel.sections.collectAsState()
-                    val writing: @Composable () -> Unit = {
+                    val cap: @Composable () -> Unit = {
                         ArticleCap(publication?.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
-                        SectionRow(publication?.section, sections, viewModel::setSection)
                     }
                     if (viewModel.isFeed) {
                         FeedHeader(source, publication)
@@ -241,7 +239,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                                 OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(publication)}") }
                             }
                         }
-                        if (!leftOut) writing()
+                        if (!leftOut) cap()
                     } else {
                         Health(source, publication, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
                         FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -255,7 +253,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                             val startingFresh by viewModel.startingFresh.collectAsState()
                             StartFresh(source, startingFresh, viewModel::startFresh)
                         } else {
-                            writing()
+                            cap()
                         }
                     }
                     HorizontalDivider(Modifier.padding(top = 16.dp))
@@ -341,54 +339,6 @@ private fun LeaveOutDialog(title: String, onConfirm: () -> Unit, onDismiss: () -
             Text("It stays in your tt-rss, so you can bring it back. It isn't fetched for the paper, and its waiting articles go, except ones you starred.")
         },
         confirmButton = { TextButton(onClick = onConfirm) { Text("Leave out") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-/** The heading the publication's articles go under in the edition's contents. */
-@Composable
-private fun SectionRow(section: String?, sections: List<String>, onChoose: (String?) -> Unit) {
-    var choosing by rememberSaveable { mutableStateOf(false) }
-    Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Section")
-            Text(section ?: "None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        TextButton(onClick = { choosing = true }) { Text("Change") }
-    }
-    if (choosing) SectionDialog(section, sections, onChoose = { choosing = false; onChoose(it) }, onDismiss = { choosing = false })
-}
-
-@Composable
-private fun SectionDialog(current: String?, sections: List<String>, onChoose: (String?) -> Unit, onDismiss: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Section") },
-        text = {
-            Column {
-                Text(
-                    "The heading its articles go under in the edition's contents.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-                Column(Modifier.weight(1f, fill = false).selectableGroup().verticalScroll(rememberScrollState())) {
-                    CategoryChoice("None", current == null) { onChoose(null) }
-                    sections.forEach { section -> CategoryChoice(section, section == current) { onChoose(section) } }
-                }
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Or a new section") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onChoose(name) }),
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                )
-            }
-        },
-        confirmButton = { TextButton(onClick = { onChoose(name) }, enabled = name.isNotBlank()) { Text("Add") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

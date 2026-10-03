@@ -136,7 +136,7 @@ data class ArticleEntity(
 /**
  * Who wrote a source's articles, as against how they arrive: a feed's own publication has [key]
  * "", and each feed in a tt-rss account is one, keyed by its id there ([ArticleEntity.originId]).
- * Settings about the writing live here (article text, cap, section, left out), settings about
+ * Settings about the writing live here (article text, cap, left out), settings about
  * the connection on the source. A row is written only once there's something to keep, so no
  * row means the defaults.
  */
@@ -171,8 +171,6 @@ data class PublicationEntity(
     val chosenMode: ContentMode? = null,
     /** At most this many articles per edition; null follows the edition setting. */
     val maxArticles: Int? = null,
-    /** The heading it goes under in the edition's contents; null for none. */
-    val section: String? = null,
     /** tt-rss only: the feed's own address, from the account's feed list. */
     val feedUrl: String? = null,
     /** tt-rss only: the category it's in there. */

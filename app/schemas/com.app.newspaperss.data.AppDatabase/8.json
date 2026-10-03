@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 8,
-    "identityHash": "b63bae02120a9cc0bb56c97266155e16",
+    "identityHash": "ff372d0e8883510cf029d3b721dfa24e",
     "entities": [
       {
         "tableName": "sources",
@@ -495,7 +495,7 @@
       },
       {
         "tableName": "publications",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, `leftOut` INTEGER NOT NULL DEFAULT 0, `chosenMode` TEXT, `maxArticles` INTEGER, `section` TEXT, `feedUrl` TEXT, `category` TEXT, `listed` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, `leftOut` INTEGER NOT NULL DEFAULT 0, `chosenMode` TEXT, `maxArticles` INTEGER, `feedUrl` TEXT, `category` TEXT, `listed` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "sourceId",
@@ -559,11 +559,6 @@
             "affinity": "INTEGER"
           },
           {
-            "fieldPath": "section",
-            "columnName": "section",
-            "affinity": "TEXT"
-          },
-          {
             "fieldPath": "feedUrl",
             "columnName": "feedUrl",
             "affinity": "TEXT"
@@ -605,7 +600,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b63bae02120a9cc0bb56c97266155e16')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ff372d0e8883510cf029d3b721dfa24e')"
     ]
   }
 }

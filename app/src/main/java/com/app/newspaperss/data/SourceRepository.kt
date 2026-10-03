@@ -86,13 +86,11 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
         if (!inPaper) db.articles().expireWaitingFromFeed(sourceId, feed.originId)
     }
 
-    /** Adds a feed unless one with this URL exists; returns its id either way. [section] is only given to a new one. */
-    suspend fun addFeed(url: String, title: String?, section: String? = null): Long = db.withTransaction {
-        sources.byUrl(url)?.let { return@withTransaction it.id }
+    /** Adds a feed unless one with this URL exists; returns its id either way. */
+    suspend fun addFeed(url: String, title: String?): Long {
+        sources.byUrl(url)?.let { return it.id }
         val id = sources.insert(SourceEntity(url = url, title = title?.takeIf { it.isNotBlank() } ?: hostOf(url), position = sources.nextPosition()))
-        if (id == -1L) return@withTransaction sources.byUrl(url)!!.id
-        if (section != null) sources.savePublication(PublicationEntity(id, PublicationEntity.OWN, section = section))
-        id
+        return if (id == -1L) sources.byUrl(url)!!.id else id
     }
 
     /**
@@ -129,10 +127,6 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     /** Steps from the publication's own cap, or from [default] if it has none, within 1..[limit]. */
     suspend fun stepMaxArticles(sourceId: Long, key: String, delta: Int, default: Int, limit: Int) =
         editPublication(sourceId, key) { it.copy(maxArticles = ((it.maxArticles ?: default) + delta).coerceIn(1, limit)) }
-
-    /** Null puts it under no heading. */
-    suspend fun setSection(sourceId: Long, key: String, section: String?) =
-        editPublication(sourceId, key) { it.copy(section = section?.trim()?.takeIf(String::isNotEmpty)) }
 
     /**
      * Reads and writes in one transaction, so two quick taps each count and a change made
@@ -259,29 +253,22 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
 
     fun observePublication(sourceId: Long, key: String): Flow<PublicationEntity?> = sources.observePublication(sourceId, key)
 
-    /** The sections the reader's publications go under, A to Z, to choose from. */
-    fun observeSections(): Flow<List<String>> =
-        sources.observePublications().map { list -> list.mapNotNull { it.section }.distinct().sortedBy { it.lowercase() } }
-
     /** Returns how many feeds were new. */
     suspend fun importOpml(xml: String): Int {
         var added = 0
         for (feed in Opml.parse(xml)) {
             if (sources.byUrl(feed.url) == null) {
-                addFeed(feed.url, feed.title, feed.folder)
+                addFeed(feed.url, feed.title)
                 added++
             }
         }
         return added
     }
 
-    suspend fun exportOpml(): String {
-        val sections = sources.allPublications().filter { it.key == PublicationEntity.OWN }.associate { it.sourceId to it.section }
-        return Opml.write(
-            "newspapeRSS sources",
-            sources.all().filter { it.kind == SourceKind.FEED }.map { OpmlFeed(it.url, it.title, sections[it.id]) },
-        )
-    }
+    suspend fun exportOpml(): String = Opml.write(
+        "newspapeRSS sources",
+        sources.all().filter { it.kind == SourceKind.FEED }.map { OpmlFeed(it.url, it.title, folder = null) },
+    )
 
     companion object {
         private val FEEDS_LISTED_FOR: Duration = Duration.ofDays(30)

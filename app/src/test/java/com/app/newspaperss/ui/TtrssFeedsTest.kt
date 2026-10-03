@@ -1,12 +1,10 @@
 package com.app.newspaperss.ui
 
-import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -123,10 +121,6 @@ class TtrssFeedsTest {
         compose.onNodeWithContentDescription("More articles from this site").performClick()
         idleUntil { runBlocking { db.sources().publication(account, "7")!!.maxArticles } == 2 }
 
-        compose.onNodeWithText("Change").performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("Long reads")
-        compose.onNodeWithText("Add").performClick()
-        idleUntil { runBlocking { db.sources().publication(account, "7")!!.section } == "Long reads" }
 
         compose.onNodeWithText("Article text: Automatic").performClick()
         compose.onNodeWithText("Always fetch the full page").performClick()
@@ -138,7 +132,7 @@ class TtrssFeedsTest {
         idleUntil { compose.waitForIdle(); visible("Left out of the paper") }
         val left = runBlocking { db.sources().publication(account, "7")!! }
         assertTrue(left.leftOut)
-        assertEquals("its settings stay for when it comes back", "Long reads", left.section)
+        assertEquals("its settings stay for when it comes back", 2, left.maxArticles)
 
         compose.onNodeWithText("Bring back").performClick()
         idleUntil { runBlocking { db.sources().publication(account, "7")!!.leftOut } == false }
@@ -167,8 +161,8 @@ class TtrssFeedsTest {
         assertNull(feedNote(row(null)))
         assertNull(feedNote(row(PublicationEntity(1, "7", title = "Q", listed = true))))
         assertEquals(
-            "Also on this phone · Feed's text · At most 1 · In Long reads",
-            feedNote(row(PublicationEntity(1, "7", chosenMode = ContentMode.FEED, maxArticles = 1, section = "Long reads"), alsoOnPhone = true)),
+            "Also on this phone · Feed's text · At most 1",
+            feedNote(row(PublicationEntity(1, "7", chosenMode = ContentMode.FEED, maxArticles = 1), alsoOnPhone = true)),
         )
         assertEquals("Full page", feedNote(row(PublicationEntity(1, "7", chosenMode = ContentMode.PAGE))))
         assertEquals("1 feed in your paper", feedsLine(listOf(row(null))))

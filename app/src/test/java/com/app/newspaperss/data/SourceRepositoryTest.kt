@@ -49,7 +49,6 @@ class SourceRepositoryTest {
             </body></opml>
         """.trimIndent()
         assertEquals(1, repo.importOpml(opml))
-        assertEquals("Science", db.sources().publication(db.sources().byUrl("https://b.example/rss")!!.id, PublicationEntity.OWN)?.section)
 
         val other = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
             .allowMainThreadQueries().build()
@@ -158,27 +157,22 @@ class SourceRepositoryTest {
         assertEquals(ContentMode.PAGE, learned(ttrss, "7"))
     }
 
-    /** A tt-rss feed's settings are its own: another feed in the account, and the account itself, keep theirs. */
+    /** A tt-rss feed's cap is its own: another feed in the account keeps the edition's. */
     @Test
-    fun aTtrssFeedsCapAndSectionAreItsOwnAndKeepItLeftOut() = runTest {
+    fun aTtrssFeedsCapIsItsOwnAndKeepsItLeftOut() = runTest {
         val ttrss = repo.addTtrss("https://rss.example/api/")
         repo.setFeedInPaper(ttrss, FeedChoice("7", "Teasers", inPaper = true), inPaper = false)
 
         repo.stepMaxArticles(ttrss, "7", delta = 1, default = 1, limit = 3)
         repo.stepMaxArticles(ttrss, "7", delta = 5, default = 1, limit = 3)
-        repo.setSection(ttrss, "7", "  Long reads ")
-        repo.setSection(ttrss, "8", "Front page")
 
         val seven = db.sources().publication(ttrss, "7")!!
         assertEquals(3, seven.maxArticles)
-        assertEquals("Long reads", seven.section)
         assertTrue("still left out", seven.leftOut)
         assertEquals(null, db.sources().publication(ttrss, "8")?.maxArticles)
-        assertEquals(listOf("Front page", "Long reads"), repo.observeSections().first())
 
-        repo.setSection(ttrss, "7", " ")
         repo.setMaxArticles(ttrss, "7", null)
-        assertEquals(null to null, db.sources().publication(ttrss, "7")!!.let { it.section to it.maxArticles })
+        assertEquals(null, db.sources().publication(ttrss, "7")!!.maxArticles)
     }
 
     /** The account page's checklist falls back to a feed's id for a name; that isn't saved as one. */
@@ -190,13 +184,6 @@ class SourceRepositoryTest {
         db.sources().savePublication(db.sources().publication(ttrss, "7")!!.copy(title = "Quarterly Review"))
         repo.setFeedInPaper(ttrss, FeedChoice("7", "A feed", inPaper = false), inPaper = true)
         assertEquals("the listed name stays", "Quarterly Review", db.sources().publication(ttrss, "7")!!.title)
-    }
-
-    @Test
-    fun aSavedLinksSectionIsTheReadingListsOwn() = runTest {
-        val list = ReadingListRepository(db).sourceId()
-        assertEquals(ReadingListRepository.SECTION, db.sources().publication(list, PublicationEntity.OWN)?.section)
-        assertEquals("asked again, the same list", list, ReadingListRepository(db).sourceId())
     }
 
     /** Articles by guid, each inserted in [states]' state, with the star given. */

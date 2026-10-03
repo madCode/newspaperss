@@ -126,8 +126,6 @@ class EditionBuilder(
         onProgress: (done: Int) -> Unit,
     ): BuildResult {
         val sourcesById = sources.associateBy { it.id }
-        val publicationsByKey = publications.associateBy { it.sourceId to it.key }
-        fun sectionOf(a: ArticleEntity) = publicationsByKey[a.sourceId to PublicationEntity.keyOf(a)]?.section
         val byId = articles.associateBy { it.id }
         // An aggregator's publications take turns and are capped one by one, like feeds of their
         // own, and together they take the aggregator's place in the reader's source order.
@@ -168,18 +166,16 @@ class EditionBuilder(
         }
         if (picked.isEmpty()) return fail(editionId, "None of the articles could be read.")
 
-        // Which articles made it is the planner's call; reading order is the reader's
-        // own: sections in the order they first appear, sources in list order within them.
+        // Which articles made it is the planner's call; reading order is the reader's own:
+        // sources in list order, a tt-rss account's feeds in the order they were picked.
         val sourceIndex = sources.withIndex().associate { (i, s) -> s.id to i }
         val pickedPublications = picked.map { publicationOf(it.first) }.distinct()
-        val inSourceOrder = picked.sortedWith(
+        val arranged = picked.sortedWith(
             compareBy<Pair<ArticleEntity, ArticleContent>>(
                 { (a, _) -> sourceIndex.getValue(a.sourceId) },
                 { (a, _) -> pickedPublications.indexOf(publicationOf(a)) },
             ),
         )
-        val sectionOrder = inSourceOrder.map { sectionOf(it.first) }.distinct()
-        val arranged = inSourceOrder.sortedBy { (a, _) -> sectionOrder.indexOf(sectionOf(a)) }
 
         val totalMinutes = arranged.sumOf { minutesOf(it.second) }
         val coverImage = coverFor(
@@ -203,9 +199,7 @@ class EditionBuilder(
             title = title,
             date = now.toLocalDate(),
             identifier = "urn:uuid:${UUID.randomUUID()}",
-            sections = withImages.groupBy { (a, _) -> sectionOf(a) }.map { (section, items) ->
-                EditionSection(section, items.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })
-            },
+            sections = listOf(EditionSection(null, withImages.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })),
             modified = clock.instant(),
             cover = coverImage,
             reflection = Reflection.forEdition(editionId),

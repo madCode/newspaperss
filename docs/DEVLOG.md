@@ -14,10 +14,14 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 74: no sections; rules between the feeds
+- **From you:** sections are complexity a 30-minute paper of 8 articles doesn't need; take them out, and bring them back if they're missed. 50+ feeds without rules between them would be overwhelming.
+- **Shipped:** the paper is one list in your sources' order, with no headings, the reading list's "Saved for later" included; there's no Section setting, OPML folders are ignored on import and not written on export. The feeds under tt-rss have an inset rule between each. Database version 8 (not yet released) simply doesn't have sections.
+
 ### Cycle 73: your tt-rss feeds on Sources, each with a page
 - **From you:** build the rest of "sources carry, publications write", through to the inset feeds on Sources.
-- **Shipped:** the article text you choose, the cap and the section now belong to each publication, so a tt-rss feed can have its own ("at most 2 from Morning Wire", "Long reads"); the reading list's "Saved for later" is its own publication's section. Once a day tt-rss is asked for its whole feed list, read feeds included, with addresses and categories. On Sources, tt-rss is last, with a ▾ button that shows its feeds just beneath it, each opening a page like a feed's own, and a Left out list. The same site on the phone and in tt-rss says so on both rows. A feed's page can set its section too. Database version 8.
-- **Left for later:** "Nothing new in 3 weeks" for quiet feeds (tt-rss's feed list says when it last fetched a feed, not when it last posted); categories as sections; balance by section.
+- **Shipped:** the article text you choose and the cap now belong to each publication, so a tt-rss feed can have its own ("at most 2 from Morning Wire"). Once a day tt-rss is asked for its whole feed list, read feeds included, with addresses and categories. On Sources, tt-rss is last, with a ▾ button that shows its feeds just beneath it, each opening a page like a feed's own, and a Left out list. The same site on the phone and in tt-rss says so on both rows. Database version 8.
+- **Left for later:** "Nothing new in 3 weeks" for quiet feeds (tt-rss's feed list says when it last fetched a feed, not when it last posted).
 
 ### Cycle 72: left out moves onto the publication
 - **From you:** go with "sources carry, publications write": settings about the writing belong to the publication, settings about the connection to the source.

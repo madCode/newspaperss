@@ -64,9 +64,6 @@ class SourceDetailViewModel(
         }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** The sections already in use, to choose from. */
-    val sections: StateFlow<List<String>> = repository.observeSections().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
     /**
      * Gives this publication its own number of articles per edition, one more or fewer than it has
      * now. Never below 1, so "fewer" at the edition's default of 1 makes that soft number a hard limit.
@@ -79,10 +76,6 @@ class SourceDetailViewModel(
     /** Back to the edition's own number, following it when it changes. */
     fun followEditionMax() {
         viewModelScope.launch { repository.setMaxArticles(id, key, null) }
-    }
-
-    fun setSection(section: String?) {
-        viewModelScope.launch { repository.setSection(id, key, section) }
     }
 
     /** A tt-rss feed's page: leaves the feed out of the paper, or brings it back. [title] if its name is known. */

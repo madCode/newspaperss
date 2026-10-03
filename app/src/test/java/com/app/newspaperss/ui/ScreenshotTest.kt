@@ -276,7 +276,7 @@ class ScreenshotTest {
             feed("1", "Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", "Tech"),
             feed("2", "BBC News", "https://feeds.bbci.co.uk/news/rss.xml", "News").copy(maxArticles = 1),
             feed("3", "Aeon", "https://aeon.co/feed.rss", "Essays"),
-            feed("4", "Longreads", "https://longreads.com/feed/", "Essays").copy(section = "Long reads", chosenMode = ContentMode.PAGE),
+            feed("4", "Longreads", "https://longreads.com/feed/", "Essays").copy(chosenMode = ContentMode.PAGE),
             feed("5", "Quanta Magazine", "https://www.quantamagazine.org/feed/", "Science"),
             feed("6", "The Marginalian", "https://www.themarginalian.org/feed/", "Essays"),
             feed("7", "Hacker News", "https://news.ycombinator.com/rss", "Tech").copy(leftOut = true),
@@ -349,18 +349,6 @@ class ScreenshotTest {
     }
 
     @Test
-    fun ttrssFeedSectionDialog() {
-        val vm = feedPage("5")
-        shoot(
-            "08f-section-dialog", ready = { vm.detail.value?.articles?.isNotEmpty() == true }, dialog = true,
-            act = {
-                compose.onNodeWithText("Change").performScrollTo().performClick()
-                idleUntil { compose.onAllNodes(hasText("Long reads")).fetchSemanticsNodes().isNotEmpty() }
-            },
-        ) { SourceDetailScreen(vm, onBack = {}) }
-    }
-
-    @Test
     fun ttrssFeedArticleTextDialog() {
         val vm = feedPage("5")
         shoot(
@@ -377,7 +365,7 @@ class ScreenshotTest {
         shoot("08h-left-out-list", ready = { vm.feeds.value.any { !it.inPaper } }) { LeftOutScreen(vm, onBack = {}, onOpenFeed = {}) }
     }
 
-    /** A phone feed's page from the top: its settings, now with a section. */
+    /** A phone feed's page from the top: its settings. */
     @Test
     fun phoneFeedSettings() {
         val vm = sourceWithArticles()

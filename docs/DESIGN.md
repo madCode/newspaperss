@@ -45,8 +45,7 @@ This document describes how the app works today. What's planned is in
 | Concept | What it is |
 |---|---|
 | **Source** | Where articles come from: an RSS, Atom or JSON feed; the **reading list** (links you shared or saved); a tt-rss account; or a **curated list**, a page that picks a few links a day (Arts & Letters Daily). |
-| **Publication** | Who wrote a source's articles, as against how they arrive: a feed added here is one, each feed inside a tt-rss account is one, and the reading list is one (your picks). Takes turns in the paper and holds the settings about the writing: article text, cap, section, left out. |
-| **Section** | A heading in the edition's contents, set per publication. Sections come from OPML folders or a feed's page, and the reading list is "Saved for later". |
+| **Publication** | Who wrote a source's articles, as against how they arrive: a feed added here is one, each feed inside a tt-rss account is one, and the reading list is one (your picks). Takes turns in the paper and holds the settings about the writing: article text, cap, left out. |
 | **Edition settings** | One recipe: size (minutes), per-source cap, order (take turns / in order / shuffle), and the time and days it should be ready. |
 | **Edition** | One built issue: a dated title ("Tuesday Morning Edition, Sep 29"), its articles, the EPUB and its status: building, ready, delivered, failed or deleted. |
 | **Article state** | `NEW`, then `IN_EDITION`, then `DELIVERED`; or `SKIPPED` (you marked it as read), or `EXPIRED` (older than the source keeps articles). |
@@ -151,9 +150,9 @@ module so it's all unit-tested without Android.
     spine;
   - a generated cover image (masthead, a large date, first headlines) so
     library thumbnails show which day's edition it is;
-  - "In this edition" contents with each section's and article's reading
-    time. Kindle opens the book here, like a paper's front page;
-  - each article: section and source, headline, "By … · date · N min read",
+  - "In this edition" contents with each article's reading time, in one
+    list: no section headings, since a 30-minute paper is often 8 articles. Kindle opens the book here, like a paper's front page;
+  - each article: source, headline, "By … · date · N min read",
     the body, an end mark, "Read the original at site", and, after a read of
     5 minutes or more, a "Next" link with the next one's source and time (a
     pause after a long piece; after a short one, turning the page is enough);
@@ -284,7 +283,7 @@ allowed to read that edition's file until the phone restarts.
     next sync; the sync itself has still succeeded. Changing the category
     lists the feeds again.
   - **Each feed is a publication** with its own page: leave it out or bring
-    it back, its article text, cap and section, and its own recent
+    it back, its article text and cap, and its own recent
     articles. A feed left out isn't fetched, and its waiting articles go
     too, except starred ones. It stays in tt-rss and on the Left out list,
     so it can come back. **Feeds in your paper** on the account's page
@@ -312,7 +311,8 @@ allowed to read that edition's file until the phone restarts.
    "just the file". This picks the delivery method; KOReader asks for its
    folder.
 3. **Pick your sources:** starter packs of well-known public feeds; paste
-   any website (the app finds its feed); import an OPML file; connect a
+   any website (the app finds its feed); import an OPML file (its folders
+   are ignored: the paper has no sections); connect a
    tt-rss account; or import saved links from Pocket or Instapaper, which
    alone are enough to start.
 4. **How much, and when?** A 10–90 minute slider, "A new edition every
@@ -343,14 +343,14 @@ allowed to read that edition's file until the phone restarts.
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). A source's page
-  shows its recent articles, its cap, section, pause and the article-text
+  shows its recent articles, its cap, pause and the article-text
   setting; **Remove source** is in its ⋮ menu, as on the list.
   - **tt-rss** is one row, always last so a feed added later doesn't land
     under it; the paper follows the same order. It says how many feeds are in the paper and how many are left
     out. A round **▾** button beside it shows its feeds just beneath it,
     indented, A to Z, folded until you open them and then left as you
-    left them. A line under a feed only when it says something: "Also on
-    this phone", or its own settings. **Left out · N** at the end opens
+    left them, with a rule between each. A line under a feed only when it
+    says something: "Also on this phone", or its own settings. **Left out · N** at the end opens
     the left-out feeds. Each feed opens its own page; the row itself opens
     the account's page.
   - A feed added here that's also in your tt-rss says "Also in your tt-rss",
@@ -381,8 +381,8 @@ allowed to read that edition's file until the phone restarts.
     doesn't redraw it.
   Add a source, import or export OPML, or add a tt-rss account.
 - **Reading list:** links you shared into the app, each with its title,
-  site and reading time (looked up in the background). They go into the
-  next edition under "Saved for later". Import and export as a Markdown
+  site and reading time (looked up in the background). They go first in
+  the next edition. Import and export as a Markdown
   checklist (compatible with the library); Pocket and Instapaper exports
   import too. **✕** removes a link at once, with **Undo** in a snackbar, since
   removing is routine and a confirm would only be tapped through.
@@ -438,7 +438,6 @@ erDiagram
         string chosenMode "the reader's article text"
         string contentMode "what the check learned"
         int maxArticles "its cap"
-        string section "its heading"
         bool leftOut "kept out of the paper"
         string feedUrl "tt-rss: from the feed list"
         bool listed "tt-rss: in the latest list"
@@ -453,7 +452,7 @@ erDiagram
   (a feed address, a tt-rss account, the reading list, a curated list):
   sync, read sync, sign-in and Pause are per source, and so is "always the
   page" for the kinds with no feed text. A publication is who wrote them:
-  article text, cap, section and leaving out are per publication, and the
+  article text, cap and leaving out are per publication, and the
   planner takes turns between publications. A feed added here and a feed
   in tt-rss differ only in which source carries them.
 - A publication's row is written only once there's something to keep; no

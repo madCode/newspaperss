@@ -231,7 +231,7 @@ class MigrationTest {
     }
 
     @Test
-    fun version7MovesTheReadersChoicesCapsAndSectionsToEachSourcesOwnPublication() {
+    fun version7MovesTheReadersChoicesAndCapsToEachSourcesOwnPublicationAndDropsSections() {
         helper.createDatabase(DB, 7).use { db ->
             fun source(id: Int, kind: String, mode: String, chosen: Int, max: String, section: String) = db.execSQL(
                 "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt, maxArticles, section) " +
@@ -245,16 +245,16 @@ class MigrationTest {
         }
 
         helper.runMigrationsAndValidate(DB, 8, true, AppDatabase.MIGRATION_7_8).use { db ->
-            db.query("SELECT sourceId, contentMode, chosenMode, maxArticles, section FROM publications WHERE `key` = '' ORDER BY sourceId").use { c ->
+            db.query("SELECT sourceId, contentMode, chosenMode, maxArticles FROM publications WHERE `key` = '' ORDER BY sourceId").use { c ->
                 val rows = generateSequence {
-                    if (c.moveToNext()) listOf(c.getLong(0).toString(), c.getString(1), c.getString(2), c.getString(3), c.getString(4)) else null
+                    if (c.moveToNext()) listOf(c.getLong(0).toString(), c.getString(1), c.getString(2), c.getString(3)) else null
                 }.toList()
                 assertEquals(
+                    "a section alone leaves nothing to keep",
                     listOf(
-                        listOf("1", "AUTO", "PAGE", "2", "World"),
-                        listOf("2", "FEED", null, null, null),
-                        listOf("3", "AUTO", null, null, "Saved for later"),
-                        listOf("4", "AUTO", null, "1", null),
+                        listOf("1", "AUTO", "PAGE", "2"),
+                        listOf("2", "FEED", null, null),
+                        listOf("4", "AUTO", null, "1"),
                     ),
                     rows,
                 )

@@ -165,6 +165,7 @@ fun SourcesScreen(
                         val inPaper = row.feeds.filter { it.feed.inPaper }
                         items(inPaper, key = { "${row.source.id}/${it.feed.originId}" }) { feed ->
                             InsetFeed(feed, onOpen = { onOpenFeed(row.source.id, feed.feed.originId) })
+                            InsetDivider()
                         }
                         val leftOut = row.feeds.size - inPaper.size
                         if (leftOut > 0) {
@@ -310,6 +311,12 @@ private fun EmptySources(modifier: Modifier) {
     }
 }
 
+/** Set in like the feeds, so the rules between them don't read as the end of the account's group. */
+@Composable
+private fun InsetDivider() {
+    HorizontalDivider(Modifier.padding(start = INSET + 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+}
+
 /** One of a tt-rss account's feeds, set in under its row. */
 @Composable
 private fun InsetFeed(row: FeedRow, onOpen: () -> Unit) {
@@ -342,7 +349,6 @@ internal fun feedNote(row: FeedRow): String? {
             else -> null
         },
         p?.maxArticles?.let { "At most $it" },
-        p?.section?.let { "In $it" },
     ).joinToString(" · ").ifEmpty { null }
 }
 
