@@ -52,12 +52,12 @@ class TtrssSubscriptions(private val ttrss: TtrssRepository, private val scope: 
         return true
     }
 
-    /** Undo: unsubscribes [feedId], the feed [request] added. */
-    fun unsubscribe(request: Request, feedId: Int) {
+    /** Undo: unsubscribes [feedId], the feed [request] added to [login]. */
+    fun unsubscribe(request: Request, feedId: Int, login: TtrssRepository.Login?) {
         if (!claim(request.feedUrl)) return
         scope.launch {
             try {
-                post(Outcome.Unsubscribed(request, ttrss.unsubscribe(feedId)))
+                post(Outcome.Unsubscribed(request, ttrss.unsubscribe(feedId, login)))
             } finally {
                 asking.update { it - request.feedUrl }
             }

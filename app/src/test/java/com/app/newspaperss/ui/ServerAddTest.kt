@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.test.espresso.Espresso
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -322,5 +323,37 @@ class ServerAddTest {
         compose.onNodeWithText("Add").performClick()
         idleUntil { runBlocking { db.sources().all() }.any { it.url == feedUrl } }
         assertTrue("a phone feed, nothing asked of tt-rss", server.subscribed.isEmpty())
+    }
+
+    @Test
+    fun backFromTheCategoryListGoesBackToTheSubscribeStep() {
+        signedIn()
+        show()
+        add("science.example")
+        idleUntil { compose.waitForIdle(); compose.onAllNodes(hasContentDescription("Category, ", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasContentDescription("Category, ", substring = true)).performClick()
+        compose.onNodeWithText("News").performClick()
+        Espresso.pressBack()
+        waitFor("Subscribe in your tt-rss")
+        compose.onNodeWithContentDescription("Category, News").assertExists()
+    }
+
+    @Test
+    fun anAnswerWaitsWhileAnotherAddIsOpenSoItsUndoCanBeReached() {
+        signedIn()
+        val gate = CompletableDeferred<Unit>()
+        server.subscribeGate = gate
+        val vm = show()
+        add("science.example")
+        idleUntil { compose.waitForIdle(); (vm.add.value as? AddState.Subscribing)?.categories != null }
+        compose.onNodeWithText("Subscribe").performClick()
+        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithText("Add a site", useUnmergedTree = true).performClick()
+        gate.complete(Unit)
+        idleUntil { compose.waitForIdle(); subscriptions.results.value.isEmpty() && vm.notices.value.isNotEmpty() }
+        assertFalse(visible("Added to your tt-rss"))
+
+        compose.onNodeWithText("Cancel").performClick()
+        waitFor("Added to your tt-rss, in Uncategorized.")
     }
 }

@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import android.text.format.DateFormat
@@ -124,6 +125,8 @@ fun SourcesScreen(
     LaunchedEffect(Unit) {
         viewModel.notices.collect { waiting ->
             val notice = waiting.firstOrNull() ?: return@collect
+            // A snackbar under an open dialog can't be reached, and its Undo would time out unseen.
+            viewModel.add.first { it == AddState.Closed }
             val undo = notice.undo
             val answer = snackbar.showSnackbar(notice.text, actionLabel = undo?.let { "Undo" }, duration = SnackbarDuration.Long)
             if (answer == SnackbarResult.ActionPerformed && undo != null) viewModel.undo(undo)
@@ -522,7 +525,8 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
     // The category list replaces the Subscribe step's content, then Done brings it back.
     var picking by remember(state is AddState.Subscribing) { mutableStateOf(false) }
     AlertDialog(
-        onDismissRequest = viewModel::closeAdd,
+        // Back from the category list returns to the Subscribe step rather than losing the feed found.
+        onDismissRequest = { if (picking) picking = false else viewModel.closeAdd() },
         title = {
             Text(
                 when (state) {

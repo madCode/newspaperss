@@ -410,9 +410,13 @@ waits in its `results` until Sources shows it, in the dialog if it's still
 open on that feed, else as a snackbar. A worker would survive the process
 dying, but an answer it got couldn't reach an open dialog or offer Undo;
 a subscribe cut off that way is in tt-rss anyway, and the next daily list
-shows it. Undo (`TtrssRepository.unsubscribe`) unsubscribes, expires the
-feed's waiting articles (a sync may have brought some in the meantime)
-and lists again. A feed tt-rss hasn't fetched yet (`last_updated` 0) is
+shows it. The list after subscribing runs only if the same login is still
+signed in, and from a tt-rss that doesn't return the id, Undo's id is a
+feed new since the subscribe. Undo (`TtrssRepository.unsubscribe`, for
+that login only) unsubscribes, leaves the feed out and expires its waiting
+articles (a sync may have brought some, or still be bringing them), and
+lists again. A snackbar waits while an Add dialog is open, so its Undo
+can be reached. A feed tt-rss hasn't fetched yet (`last_updated` 0) is
 `awaitingFirstFetch` until a sync sees unread articles from it or the
 next list. The last category used is the setting `lastCategoryId`.
 

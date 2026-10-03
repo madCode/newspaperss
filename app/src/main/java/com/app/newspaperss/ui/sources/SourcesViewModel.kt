@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -149,7 +150,7 @@ sealed interface AddState {
  * A line for the snackbar; with [undo], an Undo that unsubscribes the feed just added in tt-rss.
  */
 data class Notice(val id: Long, val text: String, val undo: Undone? = null) {
-    data class Undone(val request: TtrssSubscriptions.Request, val feedId: Int)
+    data class Undone(val request: TtrssSubscriptions.Request, val feedId: Int, val login: TtrssRepository.Login?)
 }
 
 /** tt-rss's category for feeds in none. */
@@ -222,10 +223,14 @@ class SourcesViewModel(
     val add: StateFlow<AddState> = _add.asStateFlow()
 
     /**
-     * Sites go to tt-rss rather than this phone: the server setup, as Sources shows it. Read
-     * from [screen], which the screen collects.
+     * Sites go to tt-rss rather than this phone: the server setup. Read from the settings rather
+     * than [screen], which may not have loaded when Add is tapped: a site would land on the phone.
      */
-    private val toServer get() = screen.value?.server != null && ttrss != null && subscriptions != null
+    private suspend fun toServer(): Boolean {
+        if (settings == null || ttrss == null || subscriptions == null) return false
+        val hasServer = repository.observe().first().any { it.kind == SourceKind.TTRSS }
+        return settings.current().feedsFrom(hasServer) == FeedsFrom.SERVER
+    }
 
     fun openAdd() { _add.value = AddState.Editing() }
     private var search: Job? = null
@@ -238,9 +243,9 @@ class SourcesViewModel(
 
     fun find() {
         val input = (add.value as? AddState.Editing)?.input ?: return
-        val server = toServer
         _add.value = AddState.Searching(input)
         search = viewModelScope.launch {
+            val server = toServer()
             when (val result = finder.find(input)) {
                 is FindResult.NotFound -> {
                     val page = result.page?.takeIf { saveToReadingList != null }
@@ -298,7 +303,8 @@ class SourcesViewModel(
         val subscriptions = subscriptions ?: return
         val request = TtrssSubscriptions.Request(s.feed.url, s.feed.title, category, s.page)
         _add.value = AddState.Asking(request)
-        // False when it's being asked already, from a dialog closed earlier: that answer comes here too.
+        // False while tt-rss is being asked about it already, from a dialog closed earlier or its
+        // Undo: that answer comes here too (see take).
         subscriptions.subscribe(request)
         viewModelScope.launch { settings?.update { it.copy(lastCategoryId = category.id) } }
     }
@@ -332,7 +338,7 @@ class SourcesViewModel(
                         val outside = screen.value?.server?.account?.ttrssCategoryTitle?.takeIf { answer.outsidePaper }
                         notify(
                             "Added to your tt-rss, in ${answer.category ?: UNCATEGORIZED}." + outside?.let { " Your paper takes articles from $it only." }.orEmpty(),
-                            answer.feedId?.let { Notice.Undone(request, it) },
+                            answer.feedId?.let { Notice.Undone(request, it, answer.login) },
                         )
                     }
                     is TtrssRepository.Subscribed.Already -> {
@@ -347,6 +353,11 @@ class SourcesViewModel(
             }
             is TtrssSubscriptions.Outcome.Unsubscribed -> {
                 val title = outcome.request.title ?: SourceRepository.hostOf(outcome.request.feedUrl)
+                // Added again while its Undo was running: that request couldn't start.
+                val asking = add.value as? AddState.Asking
+                if (asking?.request?.feedUrl == outcome.request.feedUrl) {
+                    _add.value = AddState.Refused(title, "It was being taken out of your tt-rss just then. Add it again now if you want it.", false, asking.request.page)
+                }
                 notify(outcome.error?.let { "Couldn't take $title out of your tt-rss. $it" } ?: "Took $title out of your tt-rss.")
             }
         }
@@ -354,7 +365,7 @@ class SourcesViewModel(
 
     /** Undo for a feed just added: unsubscribes it in tt-rss. */
     fun undo(undone: Notice.Undone) {
-        subscriptions?.unsubscribe(undone.request, undone.feedId)
+        subscriptions?.unsubscribe(undone.request, undone.feedId, undone.login)
     }
 
     /** A site with no feed, or one tt-rss can't follow: its page goes to the reading list instead, so the reader isn't left at a dead end. */
@@ -374,9 +385,8 @@ class SourcesViewModel(
 
     fun choose(feed: FoundFeed) {
         val choosing = add.value as? AddState.Choosing ?: return
-        val server = toServer
         search = viewModelScope.launch {
-            if (server) {
+            if (toServer()) {
                 toSubscribe(feed, choosing.page)
             } else {
                 subscribe(feed)

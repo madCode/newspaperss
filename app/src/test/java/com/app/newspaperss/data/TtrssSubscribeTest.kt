@@ -9,7 +9,11 @@ import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.FakeTtrss
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.testCipher
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -42,6 +46,16 @@ class TtrssSubscribeTest {
     private val sync by lazy { FeedSync(db, http, clock, Duration.ofDays(7), accounts) }
     private val science = TtrssCategory(4, "Science")
     private val feedUrl = "https://science.example/feed"
+
+    /** Lets other work run, some of it on other threads, until [condition] is false. */
+    private suspend fun idleWhile(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (condition()) {
+            check(System.currentTimeMillis() < deadline) { "still waiting" }
+            Thread.sleep(5)
+            yield()
+        }
+    }
 
     private suspend fun connect(): SourceEntity {
         server.categories[4] = "Science"
@@ -130,13 +144,14 @@ class TtrssSubscribeTest {
         http.timingOut.clear()
         accounts.clear()
         assertEquals(TtrssRepository.Subscribed.Failed(FeedSync.SIGN_IN_AGAIN), ttrss.subscribe(feedUrl, science))
-        assertEquals(FeedSync.SIGN_IN_AGAIN, ttrss.unsubscribe(1))
+        assertEquals(FeedSync.SIGN_IN_AGAIN, ttrss.unsubscribe(1, null))
     }
 
     @Test
     fun undoUnsubscribesAndLetsGoOfWhatItBroughtMeanwhile() = runTest {
         val account = connect()
-        val id = (ttrss.subscribe(feedUrl, science) as TtrssRepository.Subscribed.Added).feedId!!
+        val added = ttrss.subscribe(feedUrl, science) as TtrssRepository.Subscribed.Added
+        val id = added.feedId!!
         // tt-rss fetched it, and a sync brought its articles, before Undo was tapped.
         server.fetch(id)
         server.add(900, "A new comet", feedId = id, feedTitle = "science.example", categoryId = 4)
@@ -145,19 +160,58 @@ class TtrssSubscribeTest {
         val starred = db.articles().allForSource(account.id).single { it.guid == "ttrss:901" }
         sources.setStarred(starred.id, true)
 
-        assertNull(ttrss.unsubscribe(id))
+        assertNull(ttrss.unsubscribe(id, added.login))
 
         assertEquals(listOf(id), server.unsubscribed)
         assertFalse(id in server.feeds)
         assertFalse("gone from Sources", db.sources().publication(account.id, id.toString())!!.listed)
         assertNull(ttrss.feedAt(feedUrl))
         assertEquals(ArticleState.EXPIRED, db.articles().allForSource(account.id).single { it.guid == "ttrss:900" }.state)
+        assertTrue("one a sync still running brings in after this is skipped by the paper", db.sources().publication(account.id, id.toString())!!.leftOut)
         assertEquals("a starred one stays", ArticleState.NEW, db.articles().allForSource(account.id).single { it.guid == "ttrss:901" }.state)
     }
 
     @Test
     fun undoingAFeedAlreadyGoneFromTtrssIsDone() = runTest {
         connect()
-        assertNull(ttrss.unsubscribe(4242))
+        assertNull(ttrss.unsubscribe(4242, null))
+    }
+
+    @Test
+    fun anotherLoginSigningInMidSubscribeIsntGivenTheFirstOnesFeeds() = runTest {
+        connect()
+        val gate = CompletableDeferred<Unit>()
+        server.subscribeGate = gate
+        val pending = async { ttrss.subscribe(feedUrl, science) }
+        idleWhile { server.subscribed.isEmpty() }
+        server.user = "someone-else"
+        assertNull(ttrss.connect("rss.example.com/tt-rss", "someone-else", server.password))
+        gate.complete(Unit)
+        val added = pending.await() as TtrssRepository.Subscribed.Added
+
+        val account = db.sources().ofKind(SourceKind.TTRSS).single()
+        assertNull("not listed with the first login's client", account.feedsListedAt)
+        assertTrue(db.sources().observePublicationsOf(account.id).first().isEmpty())
+        assertEquals("You've signed in to tt-rss again since. Remove it in tt-rss itself.", ttrss.unsubscribe(added.feedId!!, added.login))
+        assertTrue(server.unsubscribed.isEmpty())
+    }
+
+    @Test
+    fun withoutAnIdUndoNeverPointsAtAFeedTheReaderAlreadyHad() = runTest {
+        connect()
+        // Already in tt-rss under the http address, subscribed after today's list.
+        server.feeds[8] = FakeTtrss.Feed("Science, older", "http://science.example/feed", categoryId = 4)
+        server.subscribeWithoutId = true
+        val added = ttrss.subscribe(feedUrl, science) as TtrssRepository.Subscribed.Added
+        assertEquals(server.feeds.entries.single { it.value.url == feedUrl }.key, added.feedId)
+    }
+
+    @Test
+    fun aFeedUnsubscribedInTtrssLongAgoDoesntCountAsThere() = runTest {
+        val account = connect()
+        db.sources().savePublication(PublicationEntity(account.id, "3", title = "Gone", feedUrl = feedUrl, category = "Science", listed = false))
+        // A category change clears the list's time until the next check.
+        db.sources().setTtrssCategory(account.id, 5, "News")
+        assertNull(ttrss.feedAt(feedUrl))
     }
 }
