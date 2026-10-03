@@ -495,10 +495,12 @@ whose Kindle and KOReader answers ask for more on the same page).
       read on the phone, isn't delivered again when tt-rss brings it.
       Signing in as another tt-rss user makes feeds still kept phone feeds
       again, to move into that account if wanted.
-    - **The server's feeds:** each category a heading, "News · 9 feeds"
-      ("News, 9 feeds" to TalkBack), its feeds A to Z under it. Feeds with
+    - **The server's feeds:** each category a heading, "News · 9"
+      ("News, 9 feeds" to TalkBack), black where the page's own headings
+      are rust, and pinned at the top while its feeds scroll by; its feeds
+      A to Z under it. Feeds with
       no category go under **Uncategorized**, last. A line under a feed only
-      when it says something: "Waiting for tt-rss's first fetch" for a feed
+      when it says something: "Not fetched by tt-rss yet" for a feed
       just added, or its own settings ("Feed's text", "Full page", "At most
       2", "Skips paid posts"). Each opens its own page, which says "In your
       tt-rss · category News". Right after Articles from changes,
@@ -506,11 +508,13 @@ whose Kindle and KOReader answers ask for more on the same page).
       Science show here after the next check" instead.
     - **Curated lists**, a heading, when there are any. They and the
       reading list stay on the phone in both setups, and are never moved.
-    - **Not in your paper**, when the paper takes from one category: "43
-      feeds in 6 other categories". Its page lists those categories with
-      their feeds, and points to Articles from in Settings.
-    - **Left out · N**, when some are, opens the left-out feeds, each
-      opening its page to bring it back.
+    - **Not in your paper**, a heading, when either of these is there:
+      **Outside News** ("43 feeds") when the paper takes from one category,
+      whose page lists the other categories with their feeds and points to
+      Articles from in Settings; and **Left out** ("2 feeds"), whose page
+      lists the left-out feeds, each opening its page to bring it back.
+    - Headings and the space above them separate the groups; rules only
+      divide the rows within one.
   - A source's page shows its recent articles, pause, its cap and, for a
     feed, the article-text setting; **Remove source** is in its ⋮ menu. A
     tt-rss account has no page of its own: its settings, and leaving it,

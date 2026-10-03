@@ -144,14 +144,14 @@ class ServerAddTest {
         assertEquals(listOf(feedUrl to 4), server.subscribed)
         assertFalse("the dialog has closed", visible("Subscribe in your tt-rss"))
         waitFor("Science Weekly")
-        assertTrue("its row, under Science", visible("Science · 1 feed") && visible("Waiting for tt-rss's first fetch"))
+        assertTrue("its row, under Science", visible("Science · 1") && visible("Not fetched by tt-rss yet"))
         assertEquals(4, runBlocking { settings.current().lastCategoryId })
 
         compose.onNodeWithText("Undo").performClick()
         waitFor("Took Science Weekly out of your tt-rss.")
         assertEquals(1, server.unsubscribed.size)
         assertTrue(server.feeds.values.none { it.url == feedUrl })
-        idleUntil { compose.waitForIdle(); !visible("Waiting for tt-rss's first fetch") }
+        idleUntil { compose.waitForIdle(); !visible("Not fetched by tt-rss yet") }
         assertNull(runBlocking { ttrss.feedAt(feedUrl) })
     }
 

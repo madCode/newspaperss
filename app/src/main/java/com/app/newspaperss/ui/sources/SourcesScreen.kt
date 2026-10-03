@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui.sources
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -12,8 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -227,9 +231,9 @@ private fun SourceList(
     LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
         item(key = "reading-list") { ReadingListRow(onOpenReadingList) }
         if (srv == null) {
-            items(list, key = { "source/${it.source.id}" }) { row ->
+            itemsIndexed(list, key = { _, it -> "source/${it.source.id}" }) { i, row ->
+                if (i > 0) RowDivider()
                 SourceItem(row, onOpen = { onOpenSource(row.source.id) })
-                HorizontalDivider()
             }
             return@LazyColumn
         }
@@ -242,17 +246,17 @@ private fun SourceList(
             if (mover != null && moving != null) {
                 item(key = "phone-feeds") { PhoneFeedsBanner(moving, onMove = { mover.open() }, onMoveOthers = mover::open) }
             }
-            items(feeds, key = { "source/${it.source.id}" }) { row ->
+            itemsIndexed(feeds, key = { _, it -> "source/${it.source.id}" }) { i, row ->
+                if (i > 0) RowDivider()
                 SourceItem(row, onOpen = { onOpenSource(row.source.id) })
-                HorizontalDivider()
             }
         }
         if (account != null) serverCategories(account.id, srv, onOpenFeed)
         if (lists.isNotEmpty()) {
             item(key = "lists") { SectionHeading("Curated lists") }
-            items(lists, key = { "source/${it.source.id}" }) { row ->
+            itemsIndexed(lists, key = { _, it -> "source/${it.source.id}" }) { i, row ->
+                if (i > 0) RowDivider()
                 SourceItem(row, onOpen = { onOpenSource(row.source.id) })
-                HorizontalDivider()
             }
         }
         if (account != null) outsidePaper(account.id, srv, onOpenLeftOut, onOpenNotInPaper)
@@ -287,7 +291,6 @@ private fun ReadingListRow(onClick: () -> Unit) {
         leadingContent = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
         modifier = Modifier.clickable(onClickLabel = "Open reading list", onClick = onClick),
     )
-    HorizontalDivider()
 }
 
 @Composable
@@ -325,6 +328,7 @@ private fun AccountProblemBanner(problem: String, onOpen: () -> Unit) {
 }
 
 /** The paper's feeds from tt-rss, under its categories. */
+@OptIn(ExperimentalFoundationApi::class)
 private fun LazyListScope.serverCategories(accountId: Long, server: ServerSources, onOpenFeed: (sourceId: Long, key: String) -> Unit) {
     if (server.categories.isEmpty()) {
         item(key = "no-feeds") {
@@ -344,53 +348,69 @@ private fun LazyListScope.serverCategories(accountId: Long, server: ServerSource
     server.categories.forEach { category ->
         val name = category.name ?: UNCATEGORIZED
         // A feed is listed once, under one category, so its id alone is a unique key.
-        item(key = category.name?.let { "category/$it" } ?: "uncategorized") { CategoryHeading(name, category.feeds.size) }
-        items(category.feeds, key = { "feed/${it.originId}" }) { feed ->
+        // Pinned while its feeds scroll by, so in a long category you know which one you're in.
+        stickyHeader(key = category.name?.let { "category/$it" } ?: "uncategorized") { CategoryHeading(name, category.feeds.size) }
+        itemsIndexed(category.feeds, key = { _, it -> "feed/${it.originId}" }) { i, feed ->
+            if (i > 0) RowDivider()
             ListItem(
                 headlineContent = { Text(feed.title) },
                 supportingContent = feedNote(feed)?.let { { Text(it, style = MaterialTheme.typography.bodySmall) } },
                 modifier = Modifier.clickable(onClickLabel = "Open ${feed.title}") { onOpenFeed(accountId, feed.originId) },
             )
-            HorizontalDivider()
         }
     }
 }
 
 /** The account's feeds that aren't in the paper: outside its category, and left out. */
 private fun LazyListScope.outsidePaper(accountId: Long, server: ServerSources, onOpenLeftOut: (Long) -> Unit, onOpenNotInPaper: (Long) -> Unit) {
+    if (server.outside.isNotEmpty() || server.leftOut > 0) item(key = "outside-heading") { SectionHeading("Not in your paper") }
     if (server.outside.isNotEmpty()) {
         item(key = "not-in-paper") {
-            val feeds = plural(server.outside.sumOf { it.feeds.size }, "feed")
-            LinkRow("Not in your paper", server.account?.ttrssCategoryTitle?.let { "$feeds outside $it" } ?: feeds) { onOpenNotInPaper(accountId) }
+            val title = server.account?.ttrssCategoryTitle?.let { "Outside $it" } ?: "Outside your category"
+            LinkRow(title, plural(server.outside.sumOf { it.feeds.size }, "feed")) { onOpenNotInPaper(accountId) }
         }
     }
     if (server.leftOut > 0) {
-        item(key = "left-out") { LinkRow("Left out · ${server.leftOut}", "Feeds you've left out of the paper") { onOpenLeftOut(accountId) } }
+        item(key = "left-out") {
+            if (server.outside.isNotEmpty()) RowDivider()
+            LinkRow("Left out", plural(server.leftOut, "feed")) { onOpenLeftOut(accountId) }
+        }
     }
 }
 
+/**
+ * A group of the page's own: the space above it is what separates groups, as rules only divide
+ * rows within one.
+ */
 @Composable
 private fun SectionHeading(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp).semantics { heading() },
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 4.dp).semantics { heading() },
     )
 }
 
-/** A server category as a TalkBack heading, read with its count: "News, 9 feeds". */
+/**
+ * A server category: the same serif as the sections a size down and in black, as there can be a
+ * dozen (rust is for what you tap, and turns a light grey on e-ink). Opaque, as it's pinned over
+ * the rows. TalkBack reads it with its count: "News, 9 feeds".
+ */
 @Composable
 private fun CategoryHeading(name: String, feeds: Int) {
-    Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { heading(); contentDescription = "$name, ${plural(feeds, "feed")}" }) {
-        Text(
-            "$name · ${plural(feeds, "feed")}",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-        )
-        HorizontalDivider()
-    }
+    Text(
+        "$name · $feeds",
+        style = MaterialTheme.typography.titleSmall.copy(fontFamily = MaterialTheme.typography.titleMedium.fontFamily, fontWeight = FontWeight.SemiBold),
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp)
+            .semantics { heading(); contentDescription = "$name, ${plural(feeds, "feed")}" },
+    )
 }
+
+/** Between two rows of one group, starting at the text so the groups' edges stay clean. */
+@Composable
+private fun RowDivider() = HorizontalDivider(Modifier.padding(start = 16.dp))
 
 @Composable
 private fun LinkRow(title: String, detail: String, onOpen: () -> Unit) {
@@ -400,7 +420,6 @@ private fun LinkRow(title: String, detail: String, onOpen: () -> Unit) {
         trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
         modifier = Modifier.clickable(onClickLabel = "Open $title", onClick = onOpen),
     )
-    HorizontalDivider()
 }
 
 /**
@@ -431,7 +450,7 @@ private fun failingSinceLine(since: Instant, locale: Locale, is24Hour: Boolean, 
 }
 
 /** A feed just subscribed to in tt-rss, which has nothing to give until tt-rss's own schedule fetches it. */
-internal const val WAITING_FOR_FIRST_FETCH = "Waiting for tt-rss's first fetch"
+internal const val WAITING_FOR_FIRST_FETCH = "Not fetched by tt-rss yet"
 
 /**
  * A line under a feed only when it has something to say: a first fetch still to come, or its own

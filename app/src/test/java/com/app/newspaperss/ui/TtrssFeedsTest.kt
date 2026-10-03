@@ -132,12 +132,12 @@ class TtrssFeedsTest {
         assertFalse("with nothing wrong, nothing about the account", visible("Your tt-rss") || visible("Settings"))
 
         fun top(text: String) = compose.onNode(hasText(text)).fetchSemanticsNode().boundsInRoot.top
-        val order = listOf("Your reading list", "Still on this phone", "The Wire, on the phone", "Essays · 1 feed", "Uncategorized · 2 feeds", "Curated lists", "Left out · 1")
-        assertEquals("the reading list, the phone's feeds to move, the server's, curated lists, then left out", order, order.sortedBy(::top))
+        val order = listOf("Your reading list", "Still on this phone", "The Wire, on the phone", "Essays · 1", "Uncategorized · 2", "Curated lists", "Not in your paper", "Left out")
+        assertEquals("the reading list, the phone's feeds to move, the server's, curated lists, then what's not in the paper", order, order.sortedBy(::top))
 
         compose.onNodeWithText("Quarterly Review").performClick()
         assertEquals(account to "7", feed)
-        compose.onNodeWithText("Left out · 1").performClick()
+        compose.onNodeWithText("Left out").performClick()
         assertEquals(account, leftOut)
     }
 
@@ -200,16 +200,16 @@ class TtrssFeedsTest {
         compose.setContent { SourcesScreen(vm, onOpenNotInPaper = { notIn = it }) }
         idleUntil { compose.waitForIdle(); visible("Not in your paper") }
 
-        assertTrue(visible("3 feeds outside News"))
-        compose.onNodeWithText("Not in your paper").performClick()
+        assertTrue(visible("Outside News") && visible("3 feeds"))
+        compose.onNodeWithText("Outside News").performClick()
         assertEquals(account, notIn)
 
         // Until the next list, the feeds known are the old category's: none are shown as in the paper.
         runBlocking { db.sources().setTtrssCategory(account, 4, "Science") }
         idleUntil { compose.waitForIdle(); visible("Your feeds in Science show here after the next check.") }
         assertFalse(visible("Quarterly Review"))
-        assertFalse(visible("Not in your paper"))
-        assertTrue("a left-out feed can still be brought back", visible("Left out · 1"))
+        assertFalse(visible("Outside News"))
+        assertTrue("a left-out feed can still be brought back", visible("Left out") && visible("1 feed"))
     }
 
     @Test

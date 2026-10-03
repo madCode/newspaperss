@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 89: a calmer Sources
+- **From you:** Sources felt overwhelming, and the category headings looked random next to the rest of the page.
+- **Shipped:** two critique passes. A rule ran under every row and above and below every category, about 25 on a page of 18 feeds; now rules only divide rows within a group, start at the text, and the space above each heading separates groups. Categories were small sans text boxed in by rules, reading like rows; they're now the page's serif a size down, in black ("Essays · 4"), and pinned at the top while a long category scrolls by. The page's own groups (Still on this phone, Curated lists, Not in your paper) keep the rust heading. The page ends with a **Not in your paper** heading over **Outside News** and **Left out**, each with its count. "Waiting for tt-rss's first fetch" is now "Not fetched by tt-rss yet".
+- **Critique caught, and left:** a fresh-eyes critic also suggested dropping the rules between feeds (kept: you asked for them with 50+ feeds), a "Your tt-rss" section heading (left: it brings back the split you removed), and one-line rows for phone feeds and curated lists, without the address and "Checking…" (open).
+
 ### Cycle 88: Settings in onboarding's words
 - **From you:** match the Settings wording to onboarding.
 - **Shipped:** the Settings page is now **Where your feeds live**, with onboarding's words for its two setups: **I pick my own sites** ("Newspapers, magazines, blogs, newsletters. This phone fetches them.") and **On my own RSS server** ("Tiny Tiny RSS. Your feeds stay there; the paper is made from them.", or "Tiny Tiny RSS · host" when signed in). It stays radio rows, as it shows what's chosen now. Onboarding's third answer, another reader app, is the phone setup plus an import, so with sites you pick a line says the import is in Sources' menu. The row on Settings says "Sites you pick" instead of "This phone"; leaving the server asks "Pick your own sites instead?" with **Stop using tt-rss**. The Sources menu item and the tt-rss error messages use the new page name.
