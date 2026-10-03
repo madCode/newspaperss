@@ -231,13 +231,22 @@ class FeedSync(
     /**
      * Once a day, fills in the account's publications from its full list of feeds: their names,
      * addresses and categories, and which are still there to show. Only unread feeds are fetched,
-     * so the articles alone would miss a feed read in tt-rss itself. A failure waits for the next
-     * sync: the sync it's part of has already succeeded.
+     * so the articles alone would miss a feed read in tt-rss itself. With a category chosen, the
+     * account's other feeds are listed too, as outside it, so Sources can say what isn't in the
+     * paper; they're asked for apart because a category takes in its subcategories' feeds. A
+     * failure waits for the next sync: the sync it's part of has already succeeded.
      */
     private suspend fun listFeeds(client: TtrssClient, source: SourceEntity, now: Instant) {
         if (source.feedsListedAt?.let { Duration.between(it, now) < LIST_FEEDS_EVERY } == true) return
-        val (feeds, categories) = try {
-            client.allFeeds(source.ttrssCategoryId) to client.categories().associate { it.id to it.title }
+        val category = source.ttrssCategoryId
+        val feeds: List<TtrssFeed>
+        val outside: List<TtrssFeed>
+        val categories: Map<Int, String>
+        try {
+            feeds = client.allFeeds(category)
+            val ids = feeds.map { it.id }.toSet()
+            outside = if (category == null) emptyList() else client.allFeeds().filter { it.id !in ids }
+            categories = client.categories().associate { it.id to it.title }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -248,17 +257,23 @@ class FeedSync(
             // A new category or sign-in since the sync began clears feedsListedAt: this list
             // would be for the wrong feeds, or another user's.
             val current = sources.byId(source.id) ?: return@withTransaction
-            if (current.ttrssCategoryId != source.ttrssCategoryId || current.feedsListedAt != source.feedsListedAt) return@withTransaction
+            if (current.ttrssCategoryId != category || current.feedsListedAt != source.feedsListedAt) return@withTransaction
             sources.unlistPublications(source.id)
-            for (feed in feeds) {
+            for ((feed, inPaperCategory) in feeds.map { it to true } + outside.map { it to false }) {
                 val key = feed.id.toString()
                 val publication = sources.publication(source.id, key) ?: PublicationEntity(source.id, key)
                 sources.savePublication(
                     publication.copy(
                         title = feed.title.ifBlank { publication.title.orEmpty() }.ifBlank { null },
                         feedUrl = feed.feedUrl ?: publication.feedUrl,
-                        category = feed.categoryId?.let(categories::get) ?: publication.category,
-                        listed = true,
+                        // Category 0 is tt-rss's Uncategorized, under whatever name the server's language gives it.
+                        category = when (val id = feed.categoryId) {
+                            null -> publication.category
+                            0 -> null
+                            else -> categories[id] ?: publication.category
+                        },
+                        listed = inPaperCategory,
+                        outsideCategory = !inPaperCategory,
                     ),
                 )
             }

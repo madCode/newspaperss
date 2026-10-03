@@ -43,6 +43,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.app.newspaperss.ui.sources.LeftOutScreen
+import com.app.newspaperss.ui.sources.NotInPaperScreen
 import com.app.newspaperss.ui.sources.SourceDetailScreen
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
@@ -79,6 +80,7 @@ private const val SOURCE = "source/{id}"
 /** One of a tt-rss account's feeds: the account's source id and the feed's id there. */
 private const val FEED = "source/{id}/feed/{key}"
 private const val LEFT_OUT = "source/{id}/left-out"
+private const val NOT_IN_PAPER = "source/{id}/not-in-paper"
 private const val SETTINGS_PAGE = "settings/{page}"
 private val FEEDS_FROM = "settings/${SettingsPage.FEEDS.slug}"
 
@@ -127,7 +129,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
             NavigationBar {
                 Tab.entries.forEach { tab ->
                     val route = current?.destination?.route
-                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE || route == FEED || route == LEFT_OUT)) ||
+                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE || route == FEED || route == LEFT_OUT || route == NOT_IN_PAPER)) ||
                         (tab == Tab.TODAY && (route == EDITION || route == ARTICLE)) || (tab == Tab.SETTINGS && route == SETTINGS_PAGE)
                     NavigationBarItem(
                         selected = inTab,
@@ -205,7 +207,8 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                     onOpenSource = { nav.navigate("source/$it") { launchSingleTop = true } },
                     onOpenFeed = { id, key -> nav.navigate("source/$id/feed/${Uri.encode(key)}") { launchSingleTop = true } },
                     onOpenLeftOut = { nav.navigate("source/$it/left-out") { launchSingleTop = true } },
-                    onSignIn = { nav.navigate(FEEDS_FROM) { launchSingleTop = true } },
+                    onOpenNotInPaper = { nav.navigate("source/$it/not-in-paper") { launchSingleTop = true } },
+                    onOpenAccount = { nav.navigate(FEEDS_FROM) { launchSingleTop = true } },
                 )
             }
             composable(FEED, arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("key") { type = NavType.StringType })) { entry ->
@@ -222,14 +225,16 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                 val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }) }
                 LeftOutScreen(vm, onBack = { nav.navigateUp() }, onOpenFeed = { nav.navigate("source/$id/feed/${Uri.encode(it)}") { launchSingleTop = true } })
             }
+            composable(NOT_IN_PAPER, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }) }
+                NotInPaperScreen(vm, onBack = { nav.navigateUp() }, onOpenAccount = { nav.navigate(FEEDS_FROM) { launchSingleTop = true } })
+            }
             composable(SOURCE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }) { SyncWorker.syncNow(context) } }
-                SourceDetailScreen(
-                    vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) },
-                    onOpenAccount = { nav.navigate(FEEDS_FROM) { launchSingleTop = true } },
-                )
+                SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) })
             }
             composable(READING_LIST) {
                 val vm = viewModel { ReadingListViewModel(container.readingList) }

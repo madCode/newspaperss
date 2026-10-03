@@ -13,14 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.MoreVert
 import com.app.newspaperss.core.plural
 import androidx.compose.material.icons.filled.Refresh
@@ -29,12 +29,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import android.text.format.DateFormat
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import com.app.newspaperss.data.FeedChoice
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,12 +90,11 @@ fun SourcesScreen(
     onOpenSource: (Long) -> Unit = {},
     onOpenFeed: (sourceId: Long, key: String) -> Unit = { _, _ -> },
     onOpenLeftOut: (sourceId: Long) -> Unit = {},
-    /** Opens Settings › Where your feeds come from, to sign in to tt-rss. */
-    onSignIn: () -> Unit = {},
+    onOpenNotInPaper: (sourceId: Long) -> Unit = {},
+    /** Opens Settings › Where your feeds come from: the tt-rss account, and signing in to it. */
+    onOpenAccount: () -> Unit = {},
 ) {
-    val rows by viewModel.rows.collectAsState()
-    val needsSignIn by viewModel.needsSignIn.collectAsState()
-    val feedsShown by viewModel.feedsShown.collectAsState()
+    val screen by viewModel.screen.collectAsState()
     val add by viewModel.add.collectAsState()
     val message by viewModel.message.collectAsState()
     val snackbar = remember { SnackbarHostState() }
@@ -142,43 +147,30 @@ fun SourcesScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        val list = rows
+        val shown = screen
+        val list = shown?.rows
+        val srv = shown?.server
         when {
             list == null -> Box(Modifier.fillMaxSize().padding(padding))
-            list.isEmpty() -> Column(Modifier.padding(padding)) {
-                if (needsSignIn) SignInBanner(onSignIn)
+            srv == null && list.isEmpty() -> Column(Modifier.padding(padding)) {
                 ReadingListRow(onOpenReadingList)
-                if (!needsSignIn) EmptySources(Modifier)
+                EmptySources(Modifier)
             }
+            // Nothing folds or moves, and every key is unique and stable: on e-ink a list that
+            // shifts is redrawn whole, and two equal keys crash the list.
             else -> LazyColumn(contentPadding = PaddingValues(bottom = 96.dp), modifier = Modifier.padding(padding)) {
-                if (needsSignIn) item(key = "sign-in") { SignInBanner(onSignIn) }
-                item { ReadingListRow(onOpenReadingList) }
-                list.forEach { row ->
-                    item(key = row.source.id) {
-                        SourceItem(
-                            row,
-                            onOpen = { onOpenSource(row.source.id) },
-                            feedsShown = feedsShown.takeIf { row.feeds.isNotEmpty() },
-                            onShowFeeds = viewModel::showFeeds,
-                        )
-                        HorizontalDivider()
-                    }
-                    if (feedsShown && row.feeds.isNotEmpty()) {
-                        val inPaper = row.feeds.filter { it.feed.inPaper }
-                        val leftOut = row.feeds.size - inPaper.size
-                        itemsIndexed(inPaper, key = { _, it -> "${row.source.id}/${it.feed.originId}" }) { i, feed ->
-                            InsetFeed(feed, onOpen = { onOpenFeed(row.source.id, feed.feed.originId) })
-                            // The last one's rule would sit on the group's closing rule.
-                            if (i < inPaper.lastIndex || leftOut > 0) InsetDivider()
-                        }
-                        if (leftOut > 0) {
-                            item(key = "${row.source.id}/left-out") {
-                                InsetRow("Left out · $leftOut", null, "Open the feeds left out of your paper") { onOpenLeftOut(row.source.id) }
-                            }
-                        }
-                        item(key = "${row.source.id}/end") { HorizontalDivider() }
-                    }
+                if (srv != null) {
+                    if (shown.needsSignIn) item(key = "sign-in") { SignInBanner(onOpenAccount) }
+                    else srv.account?.let { a -> item(key = "account") { AccountRow(a, srv, onOpenAccount) } }
+                    item(key = "on-phone") { SectionHeading("On this phone") }
                 }
+                item(key = "reading-list") { ReadingListRow(onOpenReadingList) }
+                items(list, key = { "source/${it.source.id}" }) { row ->
+                    SourceItem(row, onOpen = { onOpenSource(row.source.id) })
+                    HorizontalDivider()
+                }
+                val account = srv?.account
+                if (account != null) serverFeeds(account.id, srv, onOpenFeed, onOpenLeftOut, onOpenNotInPaper)
             }
         }
     }
@@ -233,63 +225,165 @@ private fun EmptySources(modifier: Modifier) {
     }
 }
 
-/** Set in like the feeds, so the rules between them don't read as the end of the account's group. */
-@Composable
-private fun InsetDivider() {
-    HorizontalDivider(Modifier.padding(start = INSET + 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+/** The paper's feeds from tt-rss, under its categories, then what's left out of the paper. */
+private fun LazyListScope.serverFeeds(
+    accountId: Long,
+    server: ServerSources,
+    onOpenFeed: (sourceId: Long, key: String) -> Unit,
+    onOpenLeftOut: (Long) -> Unit,
+    onOpenNotInPaper: (Long) -> Unit,
+) {
+    item(key = "from-server") { SectionHeading("From your tt-rss") }
+    if (server.categories.isEmpty()) {
+        item(key = "no-feeds") {
+            val category = server.account?.ttrssCategoryTitle
+            Text(
+                when {
+                    server.waitingForList -> "Your feeds${category?.let { " in $it" }.orEmpty()} show here after the next check."
+                    server.account?.lastFetchedAt == null -> "Your feeds show here once your tt-rss has been checked."
+                    else -> "None of your feeds are in the paper."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+    }
+    server.categories.forEach { category ->
+        val name = category.name ?: UNCATEGORIZED
+        // A feed is listed once, under one category, so its id alone is a unique key.
+        item(key = category.name?.let { "category/$it" } ?: "uncategorized") { CategoryHeading(name, category.feeds.size) }
+        items(category.feeds, key = { "feed/${it.originId}" }) { feed ->
+            ListItem(
+                headlineContent = { Text(feed.title) },
+                supportingContent = feedNote(feed)?.let { { Text(it, style = MaterialTheme.typography.bodySmall) } },
+                modifier = Modifier.clickable(onClickLabel = "Open ${feed.title}") { onOpenFeed(accountId, feed.originId) },
+            )
+            HorizontalDivider()
+        }
+    }
+    if (server.outside.isNotEmpty()) {
+        item(key = "not-in-paper") {
+            val feeds = plural(server.outside.sumOf { it.feeds.size }, "feed")
+            LinkRow("Not in your paper", server.account?.ttrssCategoryTitle?.let { "$feeds outside $it" } ?: feeds) { onOpenNotInPaper(accountId) }
+        }
+    }
+    if (server.leftOut > 0) {
+        item(key = "left-out") { LinkRow("Left out · ${server.leftOut}", "Feeds you've left out of the paper") { onOpenLeftOut(accountId) } }
+    }
 }
 
-/** One of a tt-rss account's feeds, set in under its row. */
 @Composable
-private fun InsetFeed(row: FeedRow, onOpen: () -> Unit) {
-    InsetRow(row.feed.title, feedNote(row), "Open ${row.feed.title}", onOpen)
-}
-
-@Composable
-private fun InsetRow(title: String, note: String?, openLabel: String, onOpen: () -> Unit) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = note?.let { { Text(it, style = MaterialTheme.typography.bodySmall) } },
-        // Indented, so the feeds read as the account's and not as sources of their own.
-        modifier = Modifier.clickable(onClickLabel = openLabel, onClick = onOpen).padding(start = INSET),
+private fun SectionHeading(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp).semantics { heading() },
     )
 }
 
-private val INSET = 32.dp
+/** A server category as a TalkBack heading, read with its count: "News, 9 feeds". */
+@Composable
+private fun CategoryHeading(name: String, feeds: Int) {
+    Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { heading(); contentDescription = "$name, ${plural(feeds, "feed")}" }) {
+        Text(
+            "$name · ${plural(feeds, "feed")}",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+        )
+        HorizontalDivider()
+    }
+}
+
+@Composable
+private fun LinkRow(title: String, detail: String, onOpen: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(detail, style = MaterialTheme.typography.bodySmall) },
+        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+        modifier = Modifier.clickable(onClickLabel = "Open $title", onClick = onOpen),
+    )
+    HorizontalDivider()
+}
 
 /**
- * A line under a feed only when it has something to say: the same site added here, or its own
- * settings. A line under all of them would be noise.
+ * The tt-rss account: its address, and how many feeds it gives the paper or what's wrong. A
+ * problem is marked with ⚠ as well as colour, which e-ink doesn't show.
  */
-internal fun feedNote(row: FeedRow): String? {
-    val p = row.feed.publication
+@Composable
+private fun AccountRow(account: SourceEntity, server: ServerSources, onOpen: () -> Unit) {
+    val locale = LocalConfiguration.current.locales[0]
+    val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
+    val problem = accountProblem(account, locale, is24Hour)
+    ListItem(
+        headlineContent = { Text("Your tt-rss · ${SourceRepository.hostOf(account.url)}") },
+        supportingContent = {
+            Text(
+                problem ?: accountLine(account, server),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (problem != null && !account.paused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        leadingContent = { Icon(Icons.Default.RssFeed, contentDescription = null) },
+        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+        modifier = Modifier.clickable(onClickLabel = "Open your tt-rss settings", onClick = onOpen),
+    )
+    HorizontalDivider()
+}
+
+/** What the account gives the paper: "54 feeds in your paper", and the category if one is chosen. */
+internal fun accountLine(account: SourceEntity, server: ServerSources): String {
+    val feeds = if (server.waitingForList || (account.lastFetchedAt == null && server.inPaper == 0)) "Checking…" else "${plural(server.inPaper, "feed")} in your paper"
+    return account.ttrssCategoryTitle?.let { "$feeds · Articles from $it" } ?: feeds
+}
+
+/**
+ * Why nothing new is coming from the account, or null: paused, its last sync's error and since
+ * when, or a problem telling tt-rss what was read.
+ */
+internal fun accountProblem(account: SourceEntity, locale: Locale, is24Hour: Boolean, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? = when {
+    account.paused -> "Paused"
+    account.lastError != null -> listOfNotNull(
+        "⚠ ${account.lastError}",
+        account.failingSince?.let { failingSinceLine(it, locale, is24Hour, now, zone) },
+        "Showing what it last listed.",
+    ).joinToString(" ")
+    account.serverNote != null -> "⚠ ${account.serverNote}"
+    else -> null
+}
+
+/** "Since 6:10 AM" today, or "Since Sep 30". */
+private fun failingSinceLine(since: Instant, locale: Locale, is24Hour: Boolean, now: Instant, zone: ZoneId): String {
+    val date = since.atZone(zone)
+    val skeleton = when {
+        date.toLocalDate() == now.atZone(zone).toLocalDate() -> if (is24Hour) "Hm" else "hma"
+        date.year == now.atZone(zone).year -> "MMMd"
+        else -> "yMMMd"
+    }
+    return "Since ${DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)}."
+}
+
+/**
+ * A line under a feed only when it has something to say: its own settings. A line under all of
+ * them would be noise.
+ */
+internal fun feedNote(feed: FeedChoice): String? {
+    val p = feed.publication
     return listOfNotNull(
-        "Also on this phone".takeIf { row.alsoOnPhone },
         when (p?.chosenMode) {
             ContentMode.FEED -> "Feed's text"
             ContentMode.PAGE -> "Full page"
             else -> null
         },
         p?.maxArticles?.let { "At most $it" },
+        "Skips paid posts".takeIf { p?.skipPaidPosts == true },
     ).joinToString(" · ").ifEmpty { null }
 }
 
-/** How many of a tt-rss account's feeds go in the paper, for its row. */
-internal fun feedsLine(feeds: List<FeedRow>): String {
-    val leftOut = feeds.count { !it.feed.inPaper }
-    val inPaper = "${plural(feeds.size - leftOut, "feed")} in your paper"
-    return if (leftOut == 0) inPaper else "$inPaper, $leftOut left out"
-}
-
-/**
- * A source's row: tapping it opens the source's page, where its settings are. Nothing else on
- * the row but a tt-rss account's fold button, so 50+ rows stay plain.
- *
- * @param feedsShown for a tt-rss row with feeds, whether they're shown under it; null for any
- *   other row.
- */
+/** A source's row: tapping it opens the source's page, where its settings are. Nothing else on the row, so 50+ rows stay plain. */
 @Composable
-private fun SourceItem(row: SourceRow, onOpen: () -> Unit, feedsShown: Boolean? = null, onShowFeeds: (Boolean) -> Unit = {}) {
+private fun SourceItem(row: SourceRow, onOpen: () -> Unit) {
     val s = row.source
     val fullText = if (s.kind == SourceKind.FEED) fullTextLine(row.text) else null
     val status = statusLine(s, row.lastNew)
@@ -306,24 +400,6 @@ private fun SourceItem(row: SourceRow, onOpen: () -> Unit, feedsShown: Boolean? 
                 )
                 if (fullText != null) {
                     Text(fullText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (row.alsoInTtrss) {
-                    Text("Also in your tt-rss", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (row.feeds.isNotEmpty()) {
-                    Text(feedsLine(row.feeds), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        },
-        trailingContent = feedsShown?.let { shown ->
-            {
-                val count = row.feeds.count { it.feed.inPaper }
-                // Its own button, not the row: the row opens the account's page, as every row opens its source.
-                IconButton(onClick = { onShowFeeds(!shown) }) {
-                    Icon(
-                        if (shown) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (shown) "Hide the feeds" else "Show ${plural(count, "feed")} in your paper",
-                    )
                 }
             }
         },

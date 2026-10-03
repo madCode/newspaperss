@@ -196,6 +196,11 @@ data class PublicationEntity(
      * isn't.
      */
     @ColumnInfo(defaultValue = "0") val listed: Boolean = false,
+    /**
+     * tt-rss only: in the account but outside the category the paper takes articles from, in the
+     * same list as [listed]. Sources counts these as "Not in your paper".
+     */
+    @ColumnInfo(defaultValue = "0") val outsideCategory: Boolean = false,
 ) {
     companion object {
         /** The key of a source's own feed, and of an article with no [ArticleEntity.originId]. */

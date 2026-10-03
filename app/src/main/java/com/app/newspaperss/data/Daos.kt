@@ -106,7 +106,7 @@ interface SourceDao {
     @Query("UPDATE sources SET feedsListedAt = :at WHERE id = :id")
     suspend fun setFeedsListed(id: Long, at: Instant)
 
-    @Query("UPDATE publications SET listed = 0 WHERE sourceId = :sourceId")
+    @Query("UPDATE publications SET listed = 0, outsideCategory = 0 WHERE sourceId = :sourceId")
     suspend fun unlistPublications(sourceId: Long)
 
     @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")

@@ -147,6 +147,14 @@ class FeedsFromViewModel(
         }
     }
 
+    fun resume() {
+        val source = state.value?.ttrss?.source ?: return
+        viewModelScope.launch {
+            ttrss.resume(source.id)
+            onSourcesChanged()
+        }
+    }
+
     fun setMarkRead(markRead: Boolean) {
         val source = state.value?.ttrss?.source ?: return
         viewModelScope.launch { ttrss.setMarkRead(source.id, markRead) }

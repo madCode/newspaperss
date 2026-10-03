@@ -20,14 +20,25 @@ import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
-import com.app.newspaperss.ui.sources.FeedRow
+import com.app.newspaperss.ui.sources.FeedCategory
+import com.app.newspaperss.ui.sources.NotInPaperScreen
+import com.app.newspaperss.ui.sources.ServerSources
+import com.app.newspaperss.ui.sources.accountLine
+import com.app.newspaperss.ui.sources.accountProblem
+import com.app.newspaperss.data.SourceEntity
+import com.app.newspaperss.data.SourceKind
+import com.app.newspaperss.settings.FeedsFrom
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasContentDescription
+import java.time.ZoneOffset
+import java.util.Locale
 import com.app.newspaperss.ui.sources.LeftOutScreen
 import com.app.newspaperss.ui.sources.SourceDetailScreen
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.sources.feedNote
-import com.app.newspaperss.ui.sources.feedsLine
 import com.app.newspaperss.ui.sources.sameFeed
 import com.app.newspaperss.core.extract.ContentMode
 import kotlinx.coroutines.flow.first
@@ -44,7 +55,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.time.Instant
 
-/** A tt-rss account's feeds: inset under its row on Sources, each with a page of its own. */
+/** A tt-rss account's feeds: on Sources under their categories in the server setup, each with a page of its own. */
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
 class TtrssFeedsTest {
@@ -58,14 +69,20 @@ class TtrssFeedsTest {
 
     private fun visible(text: String) = compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()
 
-    /** An account listed by tt-rss with three feeds, one left out, and a phone feed that's also one of them. */
+    /**
+     * An account listed by tt-rss: feeds in two categories, one left out, two uncategorized (one
+     * with no category at all, one in tt-rss's own Uncategorized).
+     */
     private fun account(): Long = runBlocking {
         val account = repo.addTtrss("https://rss.example/api/")
-        fun listed(key: String, title: String, url: String, category: String) =
+        fun listed(key: String, title: String, url: String, category: String?) =
             PublicationEntity(account, key, title = title, feedUrl = url, category = category, listed = true)
         db.sources().savePublication(listed("7", "Quarterly Review", "https://quarterly.example/feed", "Essays"))
         db.sources().savePublication(listed("8", "Morning Wire", "https://wire.example/rss", "News").copy(maxArticles = 2))
+        db.sources().savePublication(listed("9", "The Bay Dispatch", "https://bay.example/rss", "News").copy(skipPaidPosts = true))
         db.sources().savePublication(listed("42", "Press Office", "https://press.example/feed", "News").copy(leftOut = true))
+        db.sources().savePublication(listed("50", "Garden Log", "https://garden.example/rss", " "))
+        db.sources().savePublication(listed("51", "A Friend's Journal", "https://friend.example/rss", "Uncategorized"))
         db.sources().setFeedsListed(account, Instant.now())
         db.articles().insertNew(
             listOf("7" to "Quarterly Review", "8" to "Morning Wire").flatMap { (feed, title) ->
@@ -75,36 +92,135 @@ class TtrssFeedsTest {
         account
     }
 
-    // Tall enough for the open feeds under the tt-rss row.
+    private val settings by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("settings.preferences_pb") }) }
+
+    private fun sources(from: FeedsFrom): SourcesViewModel {
+        runBlocking { settings.update { it.copy(feedsFrom = from) } }
+        return SourcesViewModel(repo, FeedFinder(FakeHttp()), settings = settings) {}
+    }
+
+    private fun isHeading(description: String) =
+        SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and hasContentDescription(description)
+
+    // Tall enough for the whole list, so every row is composed.
     @Config(qualifiers = "w411dp-h1400dp")
     @Test
-    fun theFeedsFoldUnderTheTtrssRowWhichComesLast() {
+    fun withAServerTheFeedsAreListedOpenUnderTheirCategories() {
         val account = account()
         runBlocking { repo.addFeed("http://www.wire.example/rss/", "The Wire, on the phone") }
-        val settings = SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("settings.preferences_pb") })
-        val vm = SourcesViewModel(repo, FeedFinder(FakeHttp()), settings = settings) {}
+        val vm = sources(FeedsFrom.SERVER)
         var feed: Pair<Long, String>? = null
         var leftOut: Long? = null
-        compose.setContent { SourcesScreen(vm, onOpenFeed = { id, key -> feed = id to key }, onOpenLeftOut = { leftOut = it }) }
-        idleUntil { compose.waitForIdle(); visible("2 feeds in your paper, 1 left out") }
-
-        assertEquals("a feed added later still lands above tt-rss", listOf("The Wire, on the phone", SourceRepository.TTRSS_TITLE), vm.rows.value!!.map { it.source.title })
-        assertTrue(visible("Also in your tt-rss"))
-        assertFalse("folded until opened", visible("Quarterly Review"))
-
-        compose.onNodeWithContentDescription("Show 2 feeds in your paper").performClick()
+        var settingsOpened = false
+        compose.setContent {
+            SourcesScreen(vm, onOpenFeed = { id, key -> feed = id to key }, onOpenLeftOut = { leftOut = it }, onOpenAccount = { settingsOpened = true })
+        }
         idleUntil { compose.waitForIdle(); visible("Quarterly Review") }
-        assertTrue(visible("Also on this phone · At most 2"))
-        assertFalse("a left-out feed isn't among them", visible("Press Office"))
-        assertTrue("and it stays open", runBlocking { settings.current().feedsShown })
+
+        assertEquals(
+            "A to Z, Uncategorized last, holding the feeds with no category too",
+            listOf("Essays" to listOf("Quarterly Review"), "News" to listOf("The Bay Dispatch", "Morning Wire"), null to listOf("A Friend's Journal", "Garden Log")),
+            vm.screen.value!!.server!!.categories.map { c -> c.name to c.feeds.map { it.title } },
+        )
+        compose.onNode(isHeading("News, 2 feeds")).assertExists()
+        compose.onNode(isHeading("Uncategorized, 2 feeds")).assertExists()
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and hasText("On this phone")).assertExists()
+        assertTrue("its own settings, and nothing about the phone feed with its address", visible("At most 2") && visible("Skips paid posts"))
+        assertFalse(visible("Also"))
+        assertFalse("a left-out feed is counted, not listed", visible("Press Office"))
+        assertEquals("the phone's sources stay apart from tt-rss", listOf("The Wire, on the phone"), vm.screen.value!!.rows.map { it.source.title })
 
         compose.onNodeWithText("Quarterly Review").performClick()
         assertEquals(account to "7", feed)
         compose.onNodeWithText("Left out · 1").performClick()
         assertEquals(account, leftOut)
+        compose.onNodeWithText("Your tt-rss · rss.example").performClick()
+        assertTrue(settingsOpened)
+        assertTrue(visible("5 feeds in your paper"))
+    }
 
-        compose.onNodeWithContentDescription("Hide the feeds").performClick()
-        idleUntil { compose.waitForIdle(); !visible("Quarterly Review") }
+    @Test
+    fun thePhoneSetupShowsNothingOfTtrss() {
+        account()
+        runBlocking { repo.addFeed("https://phone.example/feed", "A phone feed") }
+        val vm = sources(FeedsFrom.PHONE)
+        compose.setContent { SourcesScreen(vm) }
+        idleUntil { compose.waitForIdle(); visible("A phone feed") }
+        assertNull(vm.screen.value!!.server)
+        assertEquals(listOf("A phone feed"), vm.screen.value!!.rows.map { it.source.title })
+        assertFalse(visible("tt-rss"))
+        assertFalse(visible("On this phone"))
+    }
+
+    /**
+     * With one category chosen, the account's other feeds are counted in a row of their own,
+     * from the list drawn for that category only.
+     */
+    @Config(qualifiers = "w411dp-h1400dp")
+    @Test
+    fun feedsOutsideTheChosenCategoryAreNotInYourPaper() {
+        val account = account()
+        runBlocking {
+            db.sources().setTtrssCategory(account, 3, "News")
+            listOf(Triple("20", "Field Station", "Science"), Triple("21", "Deep Time", "Science"), Triple("22", "Someone's Blog", null)).forEach { (key, title, category) ->
+                db.sources().savePublication(PublicationEntity(account, key, title = title, category = category, outsideCategory = true))
+            }
+            db.sources().setFeedsListed(account, Instant.now())
+        }
+        val vm = sources(FeedsFrom.SERVER)
+        var notIn: Long? = null
+        compose.setContent { SourcesScreen(vm, onOpenNotInPaper = { notIn = it }) }
+        idleUntil { compose.waitForIdle(); visible("Not in your paper") }
+
+        assertTrue(visible("3 feeds outside News"))
+        assertTrue(visible("Articles from News"))
+        compose.onNodeWithText("Not in your paper").performClick()
+        assertEquals(account, notIn)
+
+        // Until the next list, the feeds known are the old category's: none are shown as in the paper.
+        runBlocking { db.sources().setTtrssCategory(account, 4, "Science") }
+        idleUntil { compose.waitForIdle(); visible("Your feeds in Science show here after the next check.") }
+        assertFalse(visible("Quarterly Review"))
+        assertFalse(visible("Not in your paper"))
+        assertTrue(visible("Checking… · Articles from Science"))
+        assertTrue("a left-out feed can still be brought back", visible("Left out · 1"))
+    }
+
+    @Test
+    fun notInYourPaperListsTheOtherCategoriesAndPointsToSettings() {
+        val account = account()
+        runBlocking {
+            db.sources().setTtrssCategory(account, 3, "News")
+            db.sources().savePublication(PublicationEntity(account, "20", title = "Field Station", category = "Science", outsideCategory = true))
+            db.sources().savePublication(PublicationEntity(account, "21", title = "Deep Time", category = "Science", outsideCategory = true, leftOut = true))
+            db.sources().setFeedsListed(account, Instant.now())
+        }
+        val vm = SourceDetailViewModel(repo, account, flowOf(1))
+        var opened = false
+        compose.setContent { NotInPaperScreen(vm, onBack = {}, onOpenAccount = { opened = true }) }
+        idleUntil { compose.waitForIdle(); visible("2 feeds: Deep Time (left out), Field Station") }
+        assertTrue(visible("Your paper takes articles from News only"))
+        compose.onNodeWithText("Change Articles from in Settings").performClick()
+        assertTrue(opened)
+    }
+
+    @Test
+    fun theAccountRowSaysWhatsWrongInWords() {
+        val now = Instant.parse("2026-10-03T09:00:00Z")
+        val account = SourceEntity(kind = SourceKind.TTRSS, url = "https://rss.example/api/", title = SourceRepository.TTRSS_TITLE, lastFetchedAt = now)
+        fun problem(source: SourceEntity) = accountProblem(source, Locale.US, is24Hour = false, now = now, zone = ZoneOffset.UTC)
+        assertNull(problem(account))
+        val down = problem(account.copy(lastError = "Couldn't reach tt-rss.", failingSince = Instant.parse("2026-10-03T06:10:00Z")))!!
+        assertTrue(down, down.startsWith("⚠ Couldn't reach tt-rss. Since 6:10") && down.endsWith("Showing what it last listed."))
+        assertTrue(problem(account.copy(lastError = "Couldn't reach tt-rss.", failingSince = Instant.parse("2026-09-30T06:10:00Z")))!!.contains("Since Sep 30."))
+        assertEquals("Paused", problem(account.copy(paused = true, lastError = "Couldn't reach tt-rss.")))
+        assertEquals("⚠ Couldn't mark articles read", problem(account.copy(serverNote = "Couldn't mark articles read")))
+
+        assertEquals("Checking…", accountLine(account.copy(lastFetchedAt = null), ServerSources(account)))
+        val waiting = account.copy(ttrssCategoryId = 4, ttrssCategoryTitle = "Science")
+        assertEquals("Checking… · Articles from Science", accountLine(waiting, ServerSources(waiting)))
+        val feeds = listOf(FeedCategory("News", listOf(FeedChoice("1", "A", inPaper = true), FeedChoice("2", "B", inPaper = true))))
+        assertEquals("2 feeds in your paper · Articles from News", accountLine(account.copy(ttrssCategoryTitle = "News"), ServerSources(account, feeds)))
     }
 
     @Test
@@ -112,7 +228,7 @@ class TtrssFeedsTest {
         val account = account()
         val vm = SourceDetailViewModel(repo, account, flowOf(1), key = "7")
         compose.setContent { SourceDetailScreen(vm, onBack = {}) }
-        idleUntil { compose.waitForIdle(); visible("From Tiny Tiny RSS · category Essays") }
+        idleUntil { compose.waitForIdle(); visible("In your tt-rss · category Essays") }
 
         assertTrue(visible("quarterly.example"))
         assertEquals("only this feed's articles", setOf("7"), vm.detail.value!!.articles.map { it.originId }.toSet())
@@ -152,16 +268,6 @@ class TtrssFeedsTest {
         assertFalse(runBlocking { db.sources().publication(account, "8")!!.skipPaidPosts })
     }
 
-    @Test
-    fun theAccountsPageHasNoPaidPostsSwitch() {
-        val account = account()
-        runBlocking { repo.markPaidOnly(db.articles().allForSource(account).first().id, skip = false) }
-        val vm = SourceDetailViewModel(repo, account, flowOf(1))
-        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
-        idleUntil { compose.waitForIdle(); visible("Your tt-rss account") }
-        assertFalse(visible("Skip paid posts"))
-    }
-
     /** A left-out feed's page shows none of the settings about its writing, its paid posts included. */
     @Test
     fun aLeftOutFeedHasNoPaidPostsSwitch() {
@@ -192,15 +298,14 @@ class TtrssFeedsTest {
 
     @Test
     fun aFeedsLineSaysOnlyWhatsWorthSaying() {
-        fun row(publication: PublicationEntity?, alsoOnPhone: Boolean = false) = FeedRow(FeedChoice("7", "Q", inPaper = true, publication), alsoOnPhone)
-        assertNull(feedNote(row(null)))
-        assertNull(feedNote(row(PublicationEntity(1, "7", title = "Q", listed = true))))
+        fun feed(publication: PublicationEntity?) = FeedChoice("7", "Q", inPaper = true, publication)
+        assertNull(feedNote(feed(null)))
+        assertNull(feedNote(feed(PublicationEntity(1, "7", title = "Q", listed = true))))
         assertEquals(
-            "Also on this phone · Feed's text · At most 1",
-            feedNote(row(PublicationEntity(1, "7", chosenMode = ContentMode.FEED, maxArticles = 1), alsoOnPhone = true)),
+            "Feed's text · At most 1 · Skips paid posts",
+            feedNote(feed(PublicationEntity(1, "7", chosenMode = ContentMode.FEED, maxArticles = 1, skipPaidPosts = true))),
         )
-        assertEquals("Full page", feedNote(row(PublicationEntity(1, "7", chosenMode = ContentMode.PAGE))))
-        assertEquals("1 feed in your paper", feedsLine(listOf(row(null))))
+        assertEquals("Full page", feedNote(feed(PublicationEntity(1, "7", chosenMode = ContentMode.PAGE))))
         assertTrue(sameFeed("https://www.Example.com/feed/", "http://example.com/feed"))
         assertFalse(sameFeed("https://example.com/feed", "https://example.com/rss"))
     }

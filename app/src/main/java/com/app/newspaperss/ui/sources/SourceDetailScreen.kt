@@ -122,10 +122,8 @@ import java.util.Locale
 /**
  * @param onGone leaves the screen once the source is removed, from here or elsewhere. It runs
  *   after the removal finishes, when the reader may already have left, so it mustn't just go up.
- * @param onOpenAccount opens Settings › Where your feeds come from, which has a tt-rss
- *   account's own settings.
  */
-fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onGone: () -> Unit = onBack, onOpenAccount: () -> Unit = {}) {
+fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onGone: () -> Unit = onBack) {
     val detail by viewModel.detail.collectAsState()
     val source = detail?.source
     val locale = LocalConfiguration.current.locales[0]
@@ -225,7 +223,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                         ArticleCap(publication?.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
                     }
                     if (viewModel.isFeed) {
-                        FeedHeader(source, publication)
+                        FeedHeader(publication)
                         val leftOut = publication?.leftOut == true
                         FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (leftOut) {
@@ -242,13 +240,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                             OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
                             if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(publication)}") }
                         }
-                        if (source.kind == SourceKind.TTRSS) {
-                            val feeds by viewModel.feeds.collectAsState()
-                            FeedsRow(feeds, viewModel::setFeedInPaper)
-                            AccountLink(onOpenAccount)
-                        } else {
-                            cap()
-                        }
+                        if (source.kind != SourceKind.TTRSS) cap()
                     }
                     val paidOnly = detail?.paidOnly
                     // Only once the publication has had one: most never do, and the page has enough on it.
@@ -326,10 +318,10 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
 
 /** A tt-rss feed's account and category, its address, and where its article text comes from. */
 @Composable
-private fun FeedHeader(source: SourceEntity, publication: PublicationEntity?) {
+private fun FeedHeader(publication: PublicationEntity?) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(listOfNotNull("From ${source.title}", publication?.category?.let { "category $it" }).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
+        Text(listOfNotNull("In your tt-rss", publication?.category?.let { "category $it" }).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
         publication?.feedUrl?.let { Text(SourceRepository.hostOf(it), style = MaterialTheme.typography.bodyMedium, color = muted) }
         if (publication?.leftOut == true) {
             Text("Left out of the paper. It stays in your tt-rss and isn't fetched. Starred articles from it still go in.")
@@ -364,25 +356,6 @@ private fun Health(source: SourceEntity, learned: PublicationEntity?, lastNew: I
     }
 }
 
-/** The account's own settings live with the setup choice; this page says where. */
-@Composable
-private fun AccountLink(onOpen: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onOpen).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text("Your tt-rss account")
-            Text(
-                "Articles from, read status, signing in: in Settings › Where your feeds come from",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
 @Composable
 private fun PaidPostsOption(skip: Boolean, skipped: Int, onChange: (Boolean) -> Unit) {
     Row(
@@ -404,52 +377,6 @@ private fun PaidPostsOption(skip: Boolean, skipped: Int, onChange: (Boolean) -> 
             )
         }
         Switch(checked = skip, onCheckedChange = null)
-    }
-}
-
-@Composable
-private fun FeedsRow(feeds: List<FeedChoice>, onChange: (FeedChoice, Boolean) -> Unit) {
-    if (feeds.isEmpty()) return
-    var choosing by rememberSaveable { mutableStateOf(false) }
-    val leftOut = feeds.count { !it.inPaper }
-    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Feeds in your paper")
-            Text(
-                if (leftOut == 0) "All ${feeds.size}" else "${feeds.size - leftOut} of ${feeds.size}: $leftOut left out",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        TextButton(onClick = { choosing = true }) { Text("Choose") }
-    }
-    if (choosing) {
-        AlertDialog(
-            onDismissRequest = { choosing = false },
-            title = { Text("Feeds in your paper") },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text(
-                        "A feed left out stays in tt-rss but stops coming to the paper. Its articles waiting here go too, except ones you starred.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    feeds.forEach { feed ->
-                        Row(
-                            Modifier.fillMaxWidth()
-                                .toggleable(value = feed.inPaper, role = Role.Checkbox) { onChange(feed, it) }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(checked = feed.inPaper, onCheckedChange = null)
-                            Text(feed.title, modifier = Modifier.padding(start = 12.dp))
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { choosing = false }) { Text("Done") } },
-        )
     }
 }
 

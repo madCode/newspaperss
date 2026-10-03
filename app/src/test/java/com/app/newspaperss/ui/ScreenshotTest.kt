@@ -63,6 +63,7 @@ import com.app.newspaperss.ui.settings.SettingsScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
+import com.app.newspaperss.ui.sources.NotInPaperScreen
 import com.app.newspaperss.ui.theme.NewspaperssTheme
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
@@ -269,8 +270,9 @@ class ScreenshotTest {
             val broken = repo.addFeed("https://broken.example/feed", "A blog that moved")
             db.sources().recordFailure(broken, Instant.now(), "We can't get new articles from this site any more. It may have moved; try adding it again.")
         }
-        val vm = SourcesViewModel(repo, FeedFinder(FakeHttp())) {}
-        shoot("06-sources", ready = { vm.rows.value?.isNotEmpty() == true }) { SourcesScreen(vm) }
+        runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.PHONE) } }
+        val vm = SourcesViewModel(repo, FeedFinder(FakeHttp()), settings = store) {}
+        shoot("06-sources", ready = { vm.screen.value?.rows?.isNotEmpty() == true }) { SourcesScreen(vm) }
     }
 
     /** A source with a row in each state the design shows: waiting, starred, marked read, in an unsent edition, delivered (two days ago), got old. */
@@ -395,24 +397,98 @@ class ScreenshotTest {
         account
     }
 
-    private fun sourcesWithTtrss(open: Boolean): SourcesViewModel {
+    /**
+     * The server setup: a curated list on the phone, and a tt-rss account with 21 well-known
+     * public feeds in four categories and Uncategorized, a few with settings of their own and two
+     * left out.
+     */
+    private fun serverSources(category: String? = null): SourcesViewModel {
         val repo = SourceRepository(db)
-        ttrssAccount(repo)
-        runBlocking { store.update { it.copy(feedsShown = open) } }
+        runBlocking {
+            repo.addList(com.app.newspaperss.core.lists.CuratedLists.all.first())
+            val account = repo.addTtrss("https://rss.example.com/tt-rss/api/")
+            fun feed(key: Int, title: String, url: String, category: String?) =
+                PublicationEntity(account, key.toString(), title = title, feedUrl = url, category = category)
+            val feeds = listOf(
+                feed(1, "BBC News", "https://feeds.bbci.co.uk/news/rss.xml", "News").copy(maxArticles = 2),
+                feed(2, "The Guardian: World", "https://www.theguardian.com/world/rss", "News"),
+                feed(3, "NPR News", "https://feeds.npr.org/1001/rss.xml", "News"),
+                feed(4, "Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", "News"),
+                feed(5, "ProPublica", "https://www.propublica.org/feeds/propublica/main", "News").copy(chosenMode = ContentMode.PAGE),
+                feed(6, "Quanta Magazine", "https://www.quantamagazine.org/feed/", "Science"),
+                feed(7, "New Scientist", "https://www.newscientist.com/feed/home/", "Science"),
+                feed(8, "Nature News", "https://www.nature.com/nature.rss", "Science"),
+                feed(9, "NASA Breaking News", "https://www.nasa.gov/news-release/feed/", "Science"),
+                feed(10, "Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", "Tech"),
+                feed(11, "The Verge", "https://www.theverge.com/rss/index.xml", "Tech"),
+                feed(12, "Wired", "https://www.wired.com/feed/rss", "Tech").copy(skipPaidPosts = true),
+                feed(13, "Hacker News", "https://news.ycombinator.com/rss", "Tech").copy(leftOut = true),
+                feed(14, "Slashdot", "https://rss.slashdot.org/Slashdot/slashdotMain", "Tech").copy(leftOut = true),
+                feed(15, "Aeon", "https://aeon.co/feed.rss", "Essays"),
+                feed(16, "The Marginalian", "https://www.themarginalian.org/feed/", "Essays"),
+                feed(17, "Longreads", "https://longreads.com/feed/", "Essays"),
+                feed(18, "Psyche", "https://psyche.co/feed", "Essays"),
+                feed(19, "xkcd", "https://xkcd.com/rss.xml", null),
+                feed(20, "Kottke.org", "https://feeds.kottke.org/main", null),
+                feed(21, "Atlas Obscura", "https://www.atlasobscura.com/feeds/latest", null),
+            )
+            feeds.forEach { f ->
+                // With a category chosen, the rest are outside it.
+                val inside = category == null || f.category == category
+                db.sources().savePublication(f.copy(listed = inside, outsideCategory = !inside))
+            }
+            if (category != null) db.sources().setTtrssCategory(account, 99, category)
+            db.sources().setFeedsListed(account, Instant.now())
+            db.sources().recordSuccess(account, Instant.now(), null, null, SourceRepository.TTRSS_TITLE)
+            store.update { it.copy(feedsFrom = FeedsFrom.SERVER) }
+        }
         return SourcesViewModel(repo, FeedFinder(FakeHttp()), settings = store) {}
     }
 
     @Test
-    fun sourcesWithTtrssFolded() {
-        val vm = sourcesWithTtrss(open = false)
-        shoot("08a-sources-ttrss-folded", ready = { vm.rows.value?.any { it.feeds.isNotEmpty() } == true }) { SourcesScreen(vm) }
+    fun sourcesWithAServer() {
+        val vm = serverSources()
+        shoot("08a-sources-server", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true }) { SourcesScreen(vm) }
+    }
+
+    /** The whole list, to its end: Uncategorized and Left out last. */
+    @Test
+    @Config(qualifiers = "w411dp-h2000dp-xxhdpi")
+    fun sourcesWithAServerWhole() {
+        val vm = serverSources()
+        shoot("08b-sources-server-whole", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true }) { SourcesScreen(vm) }
     }
 
     @Test
-    @Config(qualifiers = "w411dp-h1400dp-xxhdpi")
-    fun sourcesWithTtrssOpen() {
-        val vm = sourcesWithTtrss(open = true)
-        shoot("08b-sources-ttrss-open", ready = { vm.rows.value?.any { it.feeds.isNotEmpty() } == true && vm.feedsShown.value }) { SourcesScreen(vm) }
+    @Config(fontScale = 2f)
+    fun sourcesWithAServerAtTwiceTheFontSize() {
+        val vm = serverSources()
+        shoot("08f-sources-server-large-text", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true }) { SourcesScreen(vm) }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1100dp-xxhdpi")
+    fun sourcesWithAServerAndOneCategory() {
+        val vm = serverSources(category = "Essays")
+        shoot("08j-sources-server-one-category", ready = { vm.screen.value?.server?.outside?.isNotEmpty() == true }) { SourcesScreen(vm) }
+    }
+
+    @Test
+    fun notInYourPaper() {
+        serverSources(category = "Essays")
+        val account = runBlocking { db.sources().ofKind(com.app.newspaperss.data.SourceKind.TTRSS).single().id }
+        val vm = SourceDetailViewModel(SourceRepository(db), account, flowOf(1))
+        shoot("08k-not-in-your-paper", ready = { vm.outside.value.isNotEmpty() && vm.detail.value != null }) { NotInPaperScreen(vm, onBack = {}, onOpenAccount = {}) }
+    }
+
+    @Test
+    fun sourcesWithAServerDown() {
+        val vm = serverSources()
+        runBlocking {
+            val account = db.sources().ofKind(com.app.newspaperss.data.SourceKind.TTRSS).single().id
+            db.sources().recordFailure(account, Instant.now().minusSeconds(3_600), "Couldn't reach tt-rss.")
+        }
+        shoot("08l-sources-server-down", ready = { vm.screen.value?.server?.account?.lastError != null }) { SourcesScreen(vm) }
     }
 
     private fun feedPage(key: String): SourceDetailViewModel {
@@ -567,7 +643,7 @@ class ScreenshotTest {
     fun sourcesSignedOutOfTheServer() {
         runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.SERVER) } }
         val vm = SourcesViewModel(SourceRepository(db), FeedFinder(FakeHttp()), ttrss, settings = store) {}
-        shoot("06f-sources-sign-in", ready = { vm.needsSignIn.value && vm.rows.value != null }) { SourcesScreen(vm) }
+        shoot("06f-sources-sign-in", ready = { vm.screen.value?.needsSignIn == true }) { SourcesScreen(vm) }
     }
 
     @Test

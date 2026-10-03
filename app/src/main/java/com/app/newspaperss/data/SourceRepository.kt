@@ -80,6 +80,16 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
             }.sortedBy { sortTitle(it.title) }
         }
 
+    /**
+     * A tt-rss account's feeds outside the category its paper takes articles from. None when it
+     * takes from them all, or until the feeds are listed again after the category changed: the
+     * last list was drawn against the old one.
+     */
+    fun observeOutsideCategory(id: Long): Flow<List<PublicationEntity>> =
+        combine(sources.observe(id), sources.observePublicationsOf(id)) { source, publications ->
+            if (source?.ttrssCategoryId == null || source.feedsListedAt == null) emptyList() else publications.filter { it.outsideCategory }
+        }
+
     /** Leaving a feed out lets its waiting articles go too, except starred ones, so none shows as waiting in vain. */
     suspend fun setFeedInPaper(sourceId: Long, feed: FeedChoice, inPaper: Boolean) = db.withTransaction {
         val publication = sources.publication(sourceId, feed.originId) ?: PublicationEntity(sourceId, feed.originId)

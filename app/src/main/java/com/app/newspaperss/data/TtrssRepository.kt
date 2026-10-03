@@ -244,6 +244,9 @@ class TtrssRepository(
         return null
     }
 
+    /** Nothing in the app pauses a tt-rss account, but one can already be paused: this is the way back. */
+    suspend fun resume(sourceId: Long) = sources.setPaused(sourceId, false)
+
     suspend fun setMarkRead(sourceId: Long, markRead: Boolean) = db.sources().setMarkReadOnServer(sourceId, markRead)
 
     /**

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -102,12 +103,13 @@ class SourceDetailViewModel(
         viewModelScope.launch { repository.chooseContentMode(id, key, mode) }
     }
 
-    /** A tt-rss account's feeds, for leaving some out of the paper. */
+    /** A tt-rss account's feeds, for the left-out list. */
     val feeds: StateFlow<List<FeedChoice>> = repository.observeFeeds(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun setFeedInPaper(feed: FeedChoice, inPaper: Boolean) {
-        viewModelScope.launch { repository.setFeedInPaper(id, feed, inPaper) }
-    }
+    /** A tt-rss account's feeds in the categories its paper doesn't take articles from. */
+    val outside: StateFlow<List<FeedCategory>> = repository.observeOutsideCategory(id)
+        .map { publications -> byCategory(publications.map(::outsideFeed)) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setStarred(articleId: Long, starred: Boolean) {
         viewModelScope.launch { repository.setStarred(articleId, starred) }
