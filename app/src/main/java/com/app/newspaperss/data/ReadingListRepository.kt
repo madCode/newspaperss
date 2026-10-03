@@ -28,17 +28,21 @@ class ReadingListRepository(
 ) {
     suspend fun sourceId(): Long {
         db.sources().byUrl(URL)?.let { return it.id }
-        val id = db.sources().insert(
-            SourceEntity(
-                kind = SourceKind.READING_LIST, url = URL, title = "Your reading list",
-                // Saved links are pages; there's no feed text to fall back on.
-                contentMode = ContentMode.PAGE,
-                // First in line, so a saved link doesn't wait behind every feed.
-                position = -1,
-                section = SECTION,
-            ),
-        )
-        return if (id == -1L) db.sources().byUrl(URL)!!.id else id
+        return db.withTransaction {
+            db.sources().byUrl(URL)?.let { return@withTransaction it.id }
+            val id = db.sources().insert(
+                SourceEntity(
+                    kind = SourceKind.READING_LIST, url = URL, title = "Your reading list",
+                    // Saved links are pages; there's no feed text to fall back on.
+                    contentMode = ContentMode.PAGE,
+                    // First in line, so a saved link doesn't wait behind every feed.
+                    position = -1,
+                ),
+            )
+            // One publication, the reader's own choices, wherever each link is from.
+            db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, section = SECTION))
+            id
+        }
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

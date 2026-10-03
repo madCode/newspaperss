@@ -1,5 +1,7 @@
 package com.app.newspaperss
 
+import android.net.Uri
+
 import com.app.newspaperss.settings.offersOpen
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -38,6 +40,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.app.newspaperss.ui.sources.LeftOutScreen
 import com.app.newspaperss.ui.sources.SourceDetailScreen
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
@@ -68,6 +71,9 @@ private const val READING_LIST = "reading-list"
 private const val EDITION = "edition/{id}"
 private const val ARTICLE = "edition/{id}/article/{position}"
 private const val SOURCE = "source/{id}"
+/** One of a tt-rss account's feeds: the account's source id and the feed's id there. */
+private const val FEED = "source/{id}/feed/{key}"
+private const val LEFT_OUT = "source/{id}/left-out"
 
 class MainActivity : ComponentActivity() {
     @Volatile private var settingsLoaded = false
@@ -114,7 +120,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
             NavigationBar {
                 Tab.entries.forEach { tab ->
                     val route = current?.destination?.route
-                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE)) || (tab == Tab.TODAY && (route == EDITION || route == ARTICLE))
+                    val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE || route == FEED || route == LEFT_OUT)) || (tab == Tab.TODAY && (route == EDITION || route == ARTICLE))
                     NavigationBarItem(
                         selected = inTab,
                         onClick = {
@@ -177,7 +183,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel {
-                    SourcesViewModel(container.sources, container.feedFinder, container.ttrss, saveToReadingList = { container.readingList.save(it) }) {
+                    SourcesViewModel(container.sources, container.feedFinder, container.ttrss, saveToReadingList = { container.readingList.save(it) }, settings = container.settings) {
                         SyncWorker.syncNow(context)
                     }
                 }
@@ -185,7 +191,23 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                     vm,
                     onOpenReadingList = { nav.navigate(READING_LIST) },
                     onOpenSource = { nav.navigate("source/$it") { launchSingleTop = true } },
+                    onOpenFeed = { id, key -> nav.navigate("source/$id/feed/${Uri.encode(key)}") { launchSingleTop = true } },
+                    onOpenLeftOut = { nav.navigate("source/$it/left-out") { launchSingleTop = true } },
                 )
+            }
+            composable(FEED, arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("key") { type = NavType.StringType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                val key = entry.arguments?.getString("key").orEmpty()
+                val context = LocalContext.current.applicationContext
+                val vm = viewModel {
+                    SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, container.ttrss, key) { SyncWorker.syncNow(context) }
+                }
+                SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(FEED, inclusive = true) })
+            }
+            composable(LEFT_OUT, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                val id = entry.arguments?.getLong("id") ?: 0L
+                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, container.ttrss) }
+                LeftOutScreen(vm, onBack = { nav.navigateUp() }, onOpenFeed = { nav.navigate("source/$id/feed/${Uri.encode(it)}") { launchSingleTop = true } })
             }
             composable(SOURCE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L

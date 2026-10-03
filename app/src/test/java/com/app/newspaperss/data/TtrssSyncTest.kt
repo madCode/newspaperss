@@ -137,9 +137,67 @@ class TtrssSyncTest {
         assertTrue(db.articles().allForSource(source.id).none { it.title == "Another press release" })
         assertEquals("nothing left waiting in vain", ArticleState.EXPIRED, db.articles().allForSource(source.id).single { it.title == "A press release" }.state)
         assertEquals(
-            listOf(FeedChoice("42", "Press Office", inPaper = false), FeedChoice("7", "Quarterly Review", inPaper = true)),
-            sources.observeFeeds(source.id).first(),
+            listOf(Triple("42", "Press Office", false), Triple("7", "Quarterly Review", true)),
+            sources.observeFeeds(source.id).first().map { Triple(it.originId, it.title, it.inPaper) },
         )
+    }
+
+    /** tt-rss's own list names every feed, read ones too, with its address and category; once a day is enough. */
+    @Test
+    fun theAccountsFeedListNamesEveryFeedOnceADay() = runTest {
+        server.categories[2] = "Essays"
+        server.feeds[7] = FakeTtrss.Feed("Quarterly Review", "https://quarterly.example/feed", 2)
+        server.feeds[9] = FakeTtrss.Feed("Quiet Blog", "https://quiet.example/rss", 2)
+        server.add(1, "An essay", feedId = 7, feedTitle = "Quarterly Review", categoryId = 2)
+        val source = connect()
+
+        sync.syncAll()
+
+        val feeds = sources.observeFeeds(source.id).first()
+        assertEquals(listOf("Quarterly Review", "Quiet Blog"), feeds.map { it.title })
+        val quiet = feeds.single { it.title == "Quiet Blog" }.publication!!
+        assertEquals("https://quiet.example/rss" to "Essays", quiet.feedUrl to quiet.category)
+
+        server.feeds.remove(9)
+        sync.syncAll()
+        assertEquals("not asked again the same day", 2, sources.observeFeeds(source.id).first().size)
+
+        val nextDay = FeedSync(db, http, Clock.fixed(now.plus(Duration.ofDays(1)), ZoneOffset.UTC), Duration.ofDays(7), accounts)
+        nextDay.syncAll()
+        assertEquals("unsubscribed in tt-rss", listOf("Quarterly Review"), sources.observeFeeds(source.id).first().map { it.title })
+    }
+
+    @Test
+    fun anotherCategoryListsItsOwnFeedsAtTheNextSync() = runTest {
+        server.categories[2] = "Essays"
+        server.feeds[7] = FakeTtrss.Feed("Quarterly Review", "https://quarterly.example/feed", 2)
+        server.feeds[8] = FakeTtrss.Feed("Daily News", "https://news.example/feed", 0)
+        val source = connect()
+        sync.syncAll()
+        assertEquals(2, sources.observeFeeds(source.id).first().size)
+
+        db.sources().setTtrssCategory(source.id, 2, "Essays")
+        sync.syncAll()
+
+        assertEquals(listOf("Quarterly Review"), sources.observeFeeds(source.id).first().map { it.title })
+    }
+
+    /** The list is extra: a sync that got its articles has succeeded even if the list fails, and tries it again next time. */
+    @Test
+    fun aFeedListThatFailsDoesntFailTheSync() = runTest {
+        server.add(1, "An essay", feedId = 7, feedTitle = "Quarterly Review")
+        server.failFeedList = true
+        val source = connect()
+
+        sync.syncAll()
+
+        val synced = db.sources().byId(source.id)!!
+        assertNull(synced.lastError)
+        assertNull(synced.feedsListedAt)
+        assertEquals(1, db.articles().allForSource(source.id).size)
+        server.failFeedList = false
+        sync.syncAll()
+        assertNotNull(db.sources().byId(source.id)!!.feedsListedAt)
     }
 
     @Test

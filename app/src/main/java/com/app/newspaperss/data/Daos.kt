@@ -78,40 +78,36 @@ interface SourceDao {
     @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
     suspend fun setServerNote(id: Long, note: String?)
 
-    @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen WHERE id = :id")
-    suspend fun setContentMode(id: Long, mode: ContentMode, chosen: Boolean)
-
     @Query("SELECT * FROM publications WHERE sourceId = :sourceId AND `key` = :key")
     suspend fun publication(sourceId: Long, key: String): PublicationEntity?
 
     @Query("SELECT * FROM publications")
     suspend fun allPublications(): List<PublicationEntity>
 
-    /** Each source's own publication, for showing what the check found. */
-    @Query("SELECT * FROM publications WHERE `key` = ''")
-    fun observeOwnPublications(): Flow<List<PublicationEntity>>
+    @Query("SELECT * FROM publications")
+    fun observePublications(): Flow<List<PublicationEntity>>
+
+    @Query("SELECT * FROM publications WHERE sourceId = :sourceId AND `key` = :key")
+    fun observePublication(sourceId: Long, key: String): Flow<PublicationEntity?>
+
+    @Query("SELECT * FROM publications WHERE sourceId = :sourceId")
+    fun observePublicationsOf(sourceId: Long): Flow<List<PublicationEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun savePublication(publication: PublicationEntity)
 
-    @Query(
-        "UPDATE publications SET contentMode = 'AUTO', fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL, checkedDay = NULL " +
-            "WHERE sourceId = :sourceId AND `key` = :key",
-    )
-    suspend fun forgetFullText(sourceId: Long, key: String)
-
     @Query("DELETE FROM publications WHERE sourceId = :sourceId")
     suspend fun clearPublications(sourceId: Long)
 
-    @Query("UPDATE sources SET maxArticles = :max WHERE id = :id")
-    suspend fun setMaxArticles(id: Long, max: Int?)
-
-    /** Steps from the source's own cap, or from [default] if it has none, within 1..[limit]; in SQL so quick taps each count. */
-    @Query("UPDATE sources SET maxArticles = MAX(1, MIN(:limit, COALESCE(maxArticles, :default) + :delta)) WHERE id = :id")
-    suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int)
-
-    @Query("UPDATE sources SET ttrssCategoryId = :categoryId, ttrssCategoryTitle = :title WHERE id = :id")
+    /** A new category lists the account's feeds again at the next sync. */
+    @Query("UPDATE sources SET ttrssCategoryId = :categoryId, ttrssCategoryTitle = :title, feedsListedAt = NULL WHERE id = :id")
     suspend fun setTtrssCategory(id: Long, categoryId: Int?, title: String?)
+
+    @Query("UPDATE sources SET feedsListedAt = :at WHERE id = :id")
+    suspend fun setFeedsListed(id: Long, at: Instant)
+
+    @Query("UPDATE publications SET listed = 0 WHERE sourceId = :sourceId")
+    suspend fun unlistPublications(sourceId: Long)
 
     @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")
     suspend fun setMarkReadOnServer(id: Long, markRead: Boolean)
@@ -235,6 +231,14 @@ interface ArticleDao {
            LIMIT :limit""",
     )
     fun observeRecentForSource(sourceId: Long, limit: Int): Flow<List<ArticleEntity>>
+
+    /** [observeRecentForSource] for one of an aggregator's feeds. */
+    @Query(
+        """SELECT * FROM articles WHERE sourceId = :sourceId AND originId = :originId
+           ORDER BY CASE WHEN published IS NULL OR published > discoveredAt + 86400000 THEN discoveredAt ELSE published END DESC, id DESC
+           LIMIT :limit""",
+    )
+    fun observeRecentForFeed(sourceId: Long, originId: String, limit: Int): Flow<List<ArticleEntity>>
 
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt, id")
     suspend fun allForSource(sourceId: Long): List<ArticleEntity>

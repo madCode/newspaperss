@@ -32,8 +32,11 @@ data class MarkReadBatch(val marked: List<MarkedRead>, val heldBack: Int)
  */
 data class StarBatch(val starred: Boolean, val changed: List<MarkedRead>, val heldBack: Int)
 
-/** One of an aggregator's feeds, and whether its articles can go in the paper. */
-data class FeedChoice(val originId: String, val title: String, val inPaper: Boolean)
+/** One of an aggregator's feeds, whether its articles can go in the paper, and its settings if it has any. */
+data class FeedChoice(val originId: String, val title: String, val inPaper: Boolean, val publication: PublicationEntity? = null)
+
+/** For A to Z: a leading "The" or "A" doesn't count, as in a library. */
+fun sortTitle(title: String) = title.trim().lowercase().removePrefix("the ").removePrefix("a ")
 
 class SourceRepository(private val db: AppDatabase, private val clock: Clock = Clock.systemUTC()) {
     private val sources = db.sources()
@@ -47,17 +50,30 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     /** The source's newest articles, newest first, whatever their state. */
     fun observeRecentArticles(id: Long, limit: Int = 30): Flow<List<ArticleEntity>> = db.articles().observeRecentForSource(id, limit)
 
+    /** The newest articles from one of a tt-rss account's feeds, as [observeRecentArticles]. */
+    fun observeRecentArticles(id: Long, key: String, limit: Int = 30): Flow<List<ArticleEntity>> =
+        if (key == PublicationEntity.OWN) observeRecentArticles(id, limit) else db.articles().observeRecentForFeed(id, key, limit)
+
     /**
-     * An aggregator's feeds seen in the last month, by name, and every left-out one: a feed outside
-     * the chosen category or gone from the server drops off; a left-out one stays so it can come back.
+     * A tt-rss account's feeds, A to Z. Once tt-rss has listed them, the feeds it takes articles
+     * from (see [SourceEntity.feedsListedAt]); until then, those seen in the last month and every
+     * left-out one, which stays so it can come back.
      */
     fun observeFeeds(id: Long): Flow<List<FeedChoice>> =
-        combine(sources.observeFeeds(id, clock.instant().minus(FEEDS_LISTED_FOR)), sources.observeLeftOut(id)) { seen, leftOut ->
-        val out = leftOut.associateBy { it.key }
-        val names = seen.associate { it.originId to (it.title ?: out[it.originId]?.title ?: it.originId) } +
-            leftOut.filter { it.key !in seen.map { s -> s.originId } }.associate { it.key to (it.title ?: it.key) }
-        names.map { (originId, title) -> FeedChoice(originId, title, inPaper = originId !in out) }.sortedBy { it.title.lowercase() }
-    }
+        combine(sources.observe(id), sources.observeFeeds(id, clock.instant().minus(FEEDS_LISTED_FOR)), sources.observePublicationsOf(id)) { source, seen, publications ->
+            val byKey = publications.associateBy { it.key }
+            val keys = if (source?.feedsListedAt != null) {
+                publications.filter { it.listed }.map { it.key }
+            } else {
+                seen.map { it.originId } + publications.filter { it.leftOut }.map { it.key }
+            }
+            val seenTitles = seen.associate { it.originId to it.title }
+            keys.distinct().filter { it != PublicationEntity.OWN }.map { key ->
+                val publication = byKey[key]
+                val title = publication?.title ?: seenTitles[key] ?: key
+                FeedChoice(key, title, inPaper = publication?.leftOut != true, publication)
+            }.sortedBy { sortTitle(it.title) }
+        }
 
     /** Leaving a feed out lets its waiting articles go too, except starred ones, so none shows as waiting in vain. */
     suspend fun setFeedInPaper(sourceId: Long, feed: FeedChoice, inPaper: Boolean) = db.withTransaction {
@@ -66,13 +82,13 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
         if (!inPaper) db.articles().expireWaitingFromFeed(sourceId, feed.originId)
     }
 
-    /** Adds a feed unless one with this URL exists; returns its id either way. */
-    suspend fun addFeed(url: String, title: String?, section: String? = null): Long {
-        sources.byUrl(url)?.let { return it.id }
-        val id = sources.insert(
-            SourceEntity(url = url, title = title?.takeIf { it.isNotBlank() } ?: hostOf(url), section = section, position = sources.nextPosition()),
-        )
-        return if (id == -1L) sources.byUrl(url)!!.id else id
+    /** Adds a feed unless one with this URL exists; returns its id either way. [section] is only given to a new one. */
+    suspend fun addFeed(url: String, title: String?, section: String? = null): Long = db.withTransaction {
+        sources.byUrl(url)?.let { return@withTransaction it.id }
+        val id = sources.insert(SourceEntity(url = url, title = title?.takeIf { it.isNotBlank() } ?: hostOf(url), position = sources.nextPosition()))
+        if (id == -1L) return@withTransaction sources.byUrl(url)!!.id
+        if (section != null) sources.savePublication(PublicationEntity(id, PublicationEntity.OWN, section = section))
+        id
     }
 
     /**
@@ -103,9 +119,26 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
 
     suspend fun setPaused(id: Long, paused: Boolean) = sources.setPaused(id, paused)
 
-    suspend fun setMaxArticles(id: Long, max: Int?) = sources.setMaxArticles(id, max)
+    /** At most [max] articles per edition from the publication; null follows the edition setting. */
+    suspend fun setMaxArticles(sourceId: Long, key: String, max: Int?) = editPublication(sourceId, key) { it.copy(maxArticles = max) }
 
-    suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int) = sources.stepMaxArticles(id, delta, default, limit)
+    /** Steps from the publication's own cap, or from [default] if it has none, within 1..[limit]. */
+    suspend fun stepMaxArticles(sourceId: Long, key: String, delta: Int, default: Int, limit: Int) =
+        editPublication(sourceId, key) { it.copy(maxArticles = ((it.maxArticles ?: default) + delta).coerceIn(1, limit)) }
+
+    /** Null puts it under no heading. */
+    suspend fun setSection(sourceId: Long, key: String, section: String?) =
+        editPublication(sourceId, key) { it.copy(section = section?.trim()?.takeIf(String::isNotEmpty)) }
+
+    /**
+     * Reads and writes in one transaction, so two quick taps each count and a change made
+     * meanwhile elsewhere in the row (a check recording evidence) isn't written over.
+     */
+    private suspend fun editPublication(sourceId: Long, key: String, change: (PublicationEntity) -> PublicationEntity) = db.withTransaction {
+        val publication = sources.publication(sourceId, key) ?: PublicationEntity(sourceId, key)
+        val changed = change(publication)
+        if (changed != publication) sources.savePublication(changed)
+    }
 
     /** Removes the source with its articles, stars included. Past editions keep their contents. */
     suspend fun remove(source: SourceEntity) = sources.delete(source)
@@ -179,12 +212,14 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     }
 
     /**
-     * Sets how a source's articles get their text. [ContentMode.AUTO] hands the choice back to
-     * the automatic check, which starts over; any other mode is the reader's and stays.
+     * Sets how a publication's articles get their text. [ContentMode.AUTO] hands the choice back
+     * to the automatic check, which starts over; any other mode is the reader's and stays.
      */
-    suspend fun chooseContentMode(id: Long, mode: ContentMode) = db.withTransaction {
-        sources.setContentMode(id, mode, chosen = mode != ContentMode.AUTO)
-        sources.forgetFullText(id, PublicationEntity.OWN)
+    suspend fun chooseContentMode(sourceId: Long, key: String, mode: ContentMode) = editPublication(sourceId, key) {
+        it.copy(
+            chosenMode = mode.takeIf { m -> m != ContentMode.AUTO },
+            contentMode = ContentMode.AUTO, fullTextEvidence = null, fullTextStreak = 0, fullTextDay = null, checkedDay = null,
+        )
     }
 
     /**
@@ -203,8 +238,8 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
             SourceKind.TTRSS -> originId ?: return@withTransaction
             else -> return@withTransaction
         }
-        if (source.contentModeChosen) return@withTransaction
         val publication = sources.publication(sourceId, key) ?: PublicationEntity(sourceId, key)
+        if (publication.chosenMode != null) return@withTransaction
         val state = FullTextState(publication.contentMode, publication.fullTextEvidence, publication.fullTextStreak, publication.fullTextDay)
         val next = evidence?.let { FullTextCheck.next(state, it, day) } ?: state
         val updated = publication.copy(
@@ -215,7 +250,14 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     }
 
     /** Each source's own publication, by source id. */
-    fun observeOwnPublications(): Flow<Map<Long, PublicationEntity>> = sources.observeOwnPublications().map { list -> list.associateBy { it.sourceId } }
+    fun observeOwnPublications(): Flow<Map<Long, PublicationEntity>> =
+        sources.observePublications().map { list -> list.filter { it.key == PublicationEntity.OWN }.associateBy { it.sourceId } }
+
+    fun observePublication(sourceId: Long, key: String): Flow<PublicationEntity?> = sources.observePublication(sourceId, key)
+
+    /** The sections the reader's publications go under, A to Z, to choose from. */
+    fun observeSections(): Flow<List<String>> =
+        sources.observePublications().map { list -> list.mapNotNull { it.section }.distinct().sortedBy { it.lowercase() } }
 
     /** Returns how many feeds were new. */
     suspend fun importOpml(xml: String): Int {
@@ -229,10 +271,13 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
         return added
     }
 
-    suspend fun exportOpml(): String = Opml.write(
-        "newspapeRSS sources",
-        sources.all().filter { it.kind == SourceKind.FEED }.map { OpmlFeed(it.url, it.title, it.section) },
-    )
+    suspend fun exportOpml(): String {
+        val sections = sources.allPublications().filter { it.key == PublicationEntity.OWN }.associate { it.sourceId to it.section }
+        return Opml.write(
+            "newspapeRSS sources",
+            sources.all().filter { it.kind == SourceKind.FEED }.map { OpmlFeed(it.url, it.title, sections[it.id]) },
+        )
+    }
 
     companion object {
         private val FEEDS_LISTED_FOR: Duration = Duration.ofDays(30)

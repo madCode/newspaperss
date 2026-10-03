@@ -1,6 +1,10 @@
 package com.app.newspaperss.ui.sources
 
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import com.app.newspaperss.data.FeedChoice
 import android.content.Intent
 import android.net.Uri
@@ -132,6 +136,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
     var removing by remember { mutableStateOf(false) }
     var choosingMode by remember { mutableStateOf(false) }
+    var leavingOut by remember { mutableStateOf(false) }
     val gone = detail != null && source == null
     LaunchedEffect(gone) { if (gone) onGone() }
     val snackbar = remember { SnackbarHostState() }
@@ -173,6 +178,8 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         if (ids.isEmpty()) stopSelecting() else if (!ids.containsAll(selected)) selected = selected intersect ids
     }
     val articles = detail?.articles.orEmpty()
+    val publication = detail?.text
+    val feedTitle = publication?.title ?: articles.firstNotNullOfOrNull { it.originTitle } ?: "A feed"
     Scaffold(
         topBar = {
             if (selecting) {
@@ -184,12 +191,12 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 )
             } else {
                 TopAppBar(
-                    title = { Text(source?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    title = { Text(if (viewModel.isFeed) feedTitle else source?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                     // Removing is rare and destructive: in the menu, as on the Sources list and an
                     // edition's page, not beside Pause.
                     actions = {
-                        if (source != null) {
+                        if (source != null && !viewModel.isFeed) {
                             var menu by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
@@ -217,19 +224,38 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp + barRoom)) {
                 item {
-                    Health(source, detail?.text, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
-                    FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
-                        if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(source)}") }
+                    val sections by viewModel.sections.collectAsState()
+                    val writing: @Composable () -> Unit = {
+                        ArticleCap(publication?.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
+                        SectionRow(publication?.section, sections, viewModel::setSection)
                     }
-                    if (source.kind == SourceKind.TTRSS) {
-                        TtrssOptions(source, viewModel::openCategories, viewModel::setMarkReadOnServer)
-                        val feeds by viewModel.feeds.collectAsState()
-                        FeedsRow(feeds, viewModel::setFeedInPaper)
-                        val startingFresh by viewModel.startingFresh.collectAsState()
-                        StartFresh(source, startingFresh, viewModel::startFresh)
+                    if (viewModel.isFeed) {
+                        FeedHeader(source, publication)
+                        val leftOut = publication?.leftOut == true
+                        FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (leftOut) {
+                                OutlinedButton(onClick = { viewModel.setInPaper(feedTitle, true) }) { Text("Bring back") }
+                            } else {
+                                OutlinedButton(onClick = { leavingOut = true }) { Text("Leave out") }
+                                OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(publication)}") }
+                            }
+                        }
+                        if (!leftOut) writing()
                     } else {
-                        ArticleCap(source.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
+                        Health(source, publication, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
+                        FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
+                            if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(publication)}") }
+                        }
+                        if (source.kind == SourceKind.TTRSS) {
+                            TtrssOptions(source, viewModel::openCategories, viewModel::setMarkReadOnServer)
+                            val feeds by viewModel.feeds.collectAsState()
+                            FeedsRow(feeds, viewModel::setFeedInPaper)
+                            val startingFresh by viewModel.startingFresh.collectAsState()
+                            StartFresh(source, startingFresh, viewModel::startFresh)
+                        } else {
+                            writing()
+                        }
                     }
                     HorizontalDivider(Modifier.padding(top = 16.dp))
                     ArticlesHeading(articles, selecting, onSelect = { selecting = true })
@@ -273,13 +299,101 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
         }
     }
     if (choosingMode && source != null) {
-        ContentModeDialog(source, onChoose = { choosingMode = false; viewModel.chooseContentMode(it) }, onDismiss = { choosingMode = false })
+        ContentModeDialog(
+            detail?.text?.chosenMode ?: ContentMode.AUTO,
+            onChoose = { choosingMode = false; viewModel.chooseContentMode(it) },
+            onDismiss = { choosingMode = false },
+            automatic = if (viewModel.isFeed) "Automatic: learned for this feed" else "Automatic",
+        )
+    }
+    if (leavingOut) {
+        val waiting = articles.count { it.state == ArticleState.NEW && it.starredAt == null }
+        LeaveOutDialog(feedTitle, waiting, onConfirm = { leavingOut = false; viewModel.setInPaper(feedTitle, false) }, onDismiss = { leavingOut = false })
     }
     val categories by viewModel.categories.collectAsState()
     categories?.let { CategoryDialog(it, source?.ttrssCategoryId, viewModel::chooseCategory, viewModel::closeCategories) }
     if (removing && source != null) {
         RemoveSourceDialog(source, onConfirm = { removing = false; viewModel.remove() }, onDismiss = { removing = false })
     }
+}
+
+/** A tt-rss feed's account and category, its address, and where its article text comes from. */
+@Composable
+private fun FeedHeader(source: SourceEntity, publication: PublicationEntity?) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(listOfNotNull("From ${source.title}", publication?.category?.let { "category $it" }).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
+        publication?.feedUrl?.let { Text(SourceRepository.hostOf(it), style = MaterialTheme.typography.bodyMedium, color = muted) }
+        if (publication?.leftOut == true) {
+            Text("Left out of the paper. It stays in your tt-rss and isn't fetched. Starred articles from it still go in.")
+        } else {
+            Text(textLine(publication), style = MaterialTheme.typography.bodyMedium, color = muted)
+        }
+    }
+}
+
+@Composable
+private fun LeaveOutDialog(title: String, waiting: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Leave $title out?") },
+        text = {
+            Text(
+                "It stays in your tt-rss, so you can bring it back. It isn't fetched for the paper" +
+                    if (waiting > 0) ", and its ${plural(waiting, "waiting article")} go, except ones you starred." else ".",
+            )
+        },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Leave out") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** The heading the publication's articles go under in the edition's contents. */
+@Composable
+private fun SectionRow(section: String?, sections: List<String>, onChoose: (String?) -> Unit) {
+    var choosing by rememberSaveable { mutableStateOf(false) }
+    Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Section")
+            Text(section ?: "None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        TextButton(onClick = { choosing = true }) { Text("Change") }
+    }
+    if (choosing) SectionDialog(section, sections, onChoose = { choosing = false; onChoose(it) }, onDismiss = { choosing = false })
+}
+
+@Composable
+private fun SectionDialog(current: String?, sections: List<String>, onChoose: (String?) -> Unit, onDismiss: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Section") },
+        text = {
+            Column {
+                Text(
+                    "The heading its articles go under in the edition's contents.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                Column(Modifier.weight(1f, fill = false).selectableGroup().verticalScroll(rememberScrollState())) {
+                    CategoryChoice("None", current == null) { onChoose(null) }
+                    sections.forEach { section -> CategoryChoice(section, section == current) { onChoose(section) } }
+                }
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Or a new section") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onChoose(name) }),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onChoose(name) }, enabled = name.isNotBlank()) { Text("Add") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -290,7 +404,7 @@ private fun Health(source: SourceEntity, learned: PublicationEntity?, lastNew: I
         Text(statusLine(source, lastNew), color = if (hasProblem(source)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
         if (!source.paused) failingLine(source.failingSince, locale)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         lastCheckedLine(source.lastFetchedAt, locale, is24Hour)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
-        textLine(source, learned)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
+        if (source.kind == SourceKind.FEED) Text(textLine(learned), style = MaterialTheme.typography.bodyMedium, color = muted)
     }
 }
 
@@ -748,16 +862,15 @@ private fun statusMark(article: ArticleEntity) = when (article.state) {
 }
 
 /** The article-text setting in a word or two, for its button. */
-private fun modeName(source: SourceEntity) = when {
-    !source.contentModeChosen -> "Automatic"
-    source.contentMode == ContentMode.FEED -> "Feed's text"
-    source.contentMode == ContentMode.PAGE -> "Full page"
+private fun modeName(publication: PublicationEntity?) = when (publication?.chosenMode) {
+    ContentMode.FEED -> "Feed's text"
+    ContentMode.PAGE -> "Full page"
     else -> "Automatic"
 }
 
-/** Where the source's text comes from, including while the automatic check is still deciding. */
-private fun textLine(source: SourceEntity, learned: PublicationEntity?): String? = fullTextLine(source, learned)
-    ?: if (source.kind == SourceKind.FEED && !source.contentModeChosen) "Still working out whether this site sends full articles" else null
+/** Where a publication's text comes from, including while the automatic check is still deciding. */
+private fun textLine(publication: PublicationEntity?): String =
+    fullTextLine(publication) ?: "Still working out whether this site sends full articles"
 
 internal fun articleStatus(article: ArticleEntity): String = if (isStarred(article)) "Starred for your next edition" else when (article.state) {
     ArticleState.NEW -> "Waiting for an edition"

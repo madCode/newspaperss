@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionRepository
@@ -112,7 +113,7 @@ class LinkPostEditionTest {
     @Test
     fun aReaderWhoChoseTheFeedsTextGetsThePitch() = runTest {
         val id = addFeed("picks", pick())
-        sources.chooseContentMode(id, ContentMode.FEED)
+        sources.chooseContentMode(id, PublicationEntity.OWN, ContentMode.FEED)
         storyPage()
         sync.syncAll()
 

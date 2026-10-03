@@ -284,7 +284,7 @@ class EditionBuilderTest {
     fun aSourcesOwnCapIsAHardLimitWhereTheEditionsGivesWay() = runTest {
         val a = source("a", null, "a1", "a2", "a3")
         source("b", null, "b1", "b2")
-        sources.setMaxArticles(a, 2)
+        sources.setMaxArticles(a, PublicationEntity.OWN, 2)
 
         val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 1)) as BuildResult.Built
 
@@ -713,6 +713,31 @@ class EditionBuilderTest {
             assertTrue("the EPUB names the publication, not the account", text.contains("A Blog"))
             assertFalse(text.contains(SourceRepository.TTRSS_TITLE))
         }
+    }
+
+    /** A tt-rss feed's own cap and section are its own: the account's other feeds keep the edition's. */
+    @Test
+    fun aTtrssFeedsOwnCapAndSectionApplyToItAlone() = runTest {
+        source("a", "World", "a1")
+        val account = ttrss(
+            "n1" to ("1" to "Example News"), "n2" to ("1" to "Example News"), "n3" to ("1" to "Example News"),
+            "b1" to ("2" to "A Blog"), "b2" to ("2" to "A Blog"),
+        )
+        sources.setMaxArticles(account, "1", 1)
+        sources.setSection(account, "2", "Long reads")
+
+        val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 3)) as BuildResult.Built
+
+        val contents = editions.observeArticles(built.editionId).first()
+        assertEquals(1, contents.count { it.sourceTitle == "Example News" })
+        assertEquals(2, contents.count { it.sourceTitle == "A Blog" })
+        ZipFile(editions.fileOf(db.editions().byId(built.editionId)!!)!!).use { zip ->
+            val text = zip.entries().toList().filter { it.name.endsWith(".xhtml") }.joinToString { zip.getInputStream(it).reader().readText() }
+            assertTrue(text.contains("Long reads"))
+        }
+        val order = contents.map { it.sourceTitle }
+        assertEquals("World comes first, as its source does", "a", order.first())
+        assertEquals("the blog's section keeps its articles together", 1, order.lastIndexOf("A Blog") - order.indexOf("A Blog"))
     }
 
     @Test

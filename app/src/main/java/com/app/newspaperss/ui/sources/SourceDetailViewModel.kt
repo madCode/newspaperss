@@ -27,8 +27,9 @@ import kotlinx.coroutines.launch
 
 /**
  * [source] is null once the source is gone, e.g. removed from here.
- * [defaultMax] is the edition's own per-source cap, which [SourceEntity.maxArticles] replaces.
- * [text] is what the full-text check found about the source's own feed.
+ * [defaultMax] is the edition's own per-source cap, which [PublicationEntity.maxArticles] replaces.
+ * [text] is the publication shown: its settings and what the full-text check found; null until
+ * it has any.
  */
 data class SourceDetail(val source: SourceEntity?, val articles: List<ArticleEntity>, val defaultMax: Int, val text: PublicationEntity? = null)
 
@@ -40,6 +41,9 @@ sealed interface CategoryPicker {
 }
 
 /**
+ * A source's page, or with [key] one of a tt-rss account's feeds: the same settings about the
+ * writing, on its [PublicationEntity].
+ *
  * @param onSourceChanged asks for a sync, after a change to what the source fetches.
  */
 class SourceDetailViewModel(
@@ -47,27 +51,47 @@ class SourceDetailViewModel(
     private val id: Long,
     defaultMax: Flow<Int>,
     private val ttrss: TtrssRepository? = null,
+    val key: String = PublicationEntity.OWN,
     private val onSourceChanged: () -> Unit = {},
 ) : ViewModel() {
+    /** A tt-rss feed's page rather than a source's. */
+    val isFeed get() = key != PublicationEntity.OWN
+
     /** Null until loaded. */
     val detail: StateFlow<SourceDetail?> =
-        combine(repository.observe(id), repository.observeRecentArticles(id), defaultMax, repository.observeOwnPublications()) { source, articles, max, texts ->
-            SourceDetail(source, articles, max, texts[id])
+        combine(repository.observe(id), repository.observeRecentArticles(id, key), defaultMax, repository.observePublication(id, key)) { source, articles, max, publication ->
+            SourceDetail(source, articles, max, publication)
         }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The sections already in use, to choose from. */
+    val sections: StateFlow<List<String>> = repository.observeSections().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     /**
-     * Gives this source its own number of articles per edition, one more or fewer than it has now.
-     * Never below 1, so "fewer" at the edition's default of 1 makes that soft number a hard limit.
+     * Gives this publication its own number of articles per edition, one more or fewer than it has
+     * now. Never below 1, so "fewer" at the edition's default of 1 makes that soft number a hard limit.
      */
     fun stepMaxArticles(delta: Int) {
         val default = detail.value?.defaultMax ?: return
-        viewModelScope.launch { repository.stepMaxArticles(id, delta, default, SettingsViewModel.MAX_PER_SOURCE) }
+        viewModelScope.launch { repository.stepMaxArticles(id, key, delta, default, SettingsViewModel.MAX_PER_SOURCE) }
     }
 
     /** Back to the edition's own number, following it when it changes. */
     fun followEditionMax() {
-        viewModelScope.launch { repository.setMaxArticles(id, null) }
+        viewModelScope.launch { repository.setMaxArticles(id, key, null) }
+    }
+
+    fun setSection(section: String?) {
+        viewModelScope.launch { repository.setSection(id, key, section) }
+    }
+
+    /** A tt-rss feed's page: leaves the feed out of the paper, or brings it back. */
+    fun setInPaper(title: String, inPaper: Boolean) {
+        if (!isFeed) return
+        viewModelScope.launch {
+            repository.setFeedInPaper(id, FeedChoice(key, title, !inPaper), inPaper)
+            if (inPaper) onSourceChanged()
+        }
     }
 
     fun togglePaused() {
@@ -76,7 +100,7 @@ class SourceDetailViewModel(
     }
 
     fun chooseContentMode(mode: ContentMode) {
-        viewModelScope.launch { repository.chooseContentMode(id, mode) }
+        viewModelScope.launch { repository.chooseContentMode(id, key, mode) }
     }
 
     private val _categories = MutableStateFlow<CategoryPicker?>(null)

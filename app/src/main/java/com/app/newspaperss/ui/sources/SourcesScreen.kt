@@ -18,7 +18,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
+import com.app.newspaperss.core.plural
 import androidx.compose.material.icons.filled.Refresh
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -72,8 +75,15 @@ import androidx.compose.ui.semantics.Role
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {}, onOpenSource: (Long) -> Unit = {}) {
+fun SourcesScreen(
+    viewModel: SourcesViewModel,
+    onOpenReadingList: () -> Unit = {},
+    onOpenSource: (Long) -> Unit = {},
+    onOpenFeed: (sourceId: Long, key: String) -> Unit = { _, _ -> },
+    onOpenLeftOut: (sourceId: Long) -> Unit = {},
+) {
     val rows by viewModel.rows.collectAsState()
+    val feedsShown by viewModel.feedsShown.collectAsState()
     val add by viewModel.add.collectAsState()
     val message by viewModel.message.collectAsState()
     val snackbar = remember { SnackbarHostState() }
@@ -138,15 +148,32 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
             }
             else -> LazyColumn(contentPadding = PaddingValues(bottom = 96.dp), modifier = Modifier.padding(padding)) {
                 item { ReadingListRow(onOpenReadingList) }
-                items(list, key = { it.source.id }) { row ->
-                    SourceItem(
-                        row,
-                        onOpen = { onOpenSource(row.source.id) },
-                        onRemove = { viewModel.remove(row.source) },
-                        onTogglePause = { viewModel.togglePaused(row.source) },
-                        onChooseMode = { viewModel.chooseContentMode(row.source, it) },
-                    )
-                    HorizontalDivider()
+                list.forEach { row ->
+                    item(key = row.source.id) {
+                        SourceItem(
+                            row,
+                            onOpen = { onOpenSource(row.source.id) },
+                            onRemove = { viewModel.remove(row.source) },
+                            onTogglePause = { viewModel.togglePaused(row.source) },
+                            onChooseMode = { viewModel.chooseContentMode(row.source, it) },
+                            feedsShown = feedsShown.takeIf { row.feeds.isNotEmpty() },
+                            onShowFeeds = viewModel::showFeeds,
+                        )
+                        HorizontalDivider()
+                    }
+                    if (feedsShown && row.feeds.isNotEmpty()) {
+                        val inPaper = row.feeds.filter { it.feed.inPaper }
+                        items(inPaper, key = { "${row.source.id}/${it.feed.originId}" }) { feed ->
+                            InsetFeed(feed, onOpen = { onOpenFeed(row.source.id, feed.feed.originId) })
+                        }
+                        val leftOut = row.feeds.size - inPaper.size
+                        if (leftOut > 0) {
+                            item(key = "${row.source.id}/left-out") {
+                                InsetRow("Left out · $leftOut", null, "Open the feeds left out of your paper") { onOpenLeftOut(row.source.id) }
+                            }
+                        }
+                        item(key = "${row.source.id}/end") { HorizontalDivider() }
+                    }
                 }
             }
         }
@@ -283,13 +310,68 @@ private fun EmptySources(modifier: Modifier) {
     }
 }
 
+/** One of a tt-rss account's feeds, set in under its row. */
 @Composable
-private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit, onTogglePause: () -> Unit, onChooseMode: (ContentMode) -> Unit) {
+private fun InsetFeed(row: FeedRow, onOpen: () -> Unit) {
+    InsetRow(row.feed.title, feedNote(row), "Open ${row.feed.title}", onOpen)
+}
+
+@Composable
+private fun InsetRow(title: String, note: String?, openLabel: String, onOpen: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = note?.let { { Text(it, style = MaterialTheme.typography.bodySmall) } },
+        // Indented, so the feeds read as the account's and not as sources of their own.
+        modifier = Modifier.clickable(onClickLabel = openLabel, onClick = onOpen).padding(start = INSET),
+    )
+}
+
+private val INSET = 32.dp
+
+/**
+ * A line under a feed only when it has something to say: the same site added here, or its own
+ * settings. A line under all of them would be noise.
+ */
+internal fun feedNote(row: FeedRow): String? {
+    val p = row.feed.publication
+    return listOfNotNull(
+        "Also on this phone".takeIf { row.alsoOnPhone },
+        when (p?.chosenMode) {
+            ContentMode.FEED -> "Feed's text"
+            ContentMode.PAGE -> "Full page"
+            else -> null
+        },
+        p?.maxArticles?.let { "At most $it" },
+        p?.section?.let { "In $it" },
+    ).joinToString(" · ").ifEmpty { null }
+}
+
+/** How many of a tt-rss account's feeds go in the paper, for its row. */
+internal fun feedsLine(feeds: List<FeedRow>): String {
+    val leftOut = feeds.count { !it.feed.inPaper }
+    val inPaper = "${plural(feeds.size - leftOut, "feed")} in your paper"
+    return if (leftOut == 0) inPaper else "$inPaper, $leftOut left out"
+}
+
+/**
+ * @param feedsShown for a tt-rss row with feeds, whether they're shown under it; null for any
+ *   other row.
+ */
+@Composable
+private fun SourceItem(
+    row: SourceRow,
+    onOpen: () -> Unit,
+    onRemove: () -> Unit,
+    onTogglePause: () -> Unit,
+    onChooseMode: (ContentMode) -> Unit,
+    feedsShown: Boolean? = null,
+    onShowFeeds: (Boolean) -> Unit = {},
+) {
     var menu by remember { mutableStateOf(false) }
     var choosingMode by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf(false) }
     val s = row.source
-    val fullText = fullTextLine(s, row.text)
+    val fullText = if (s.kind == SourceKind.FEED) fullTextLine(row.text) else null
     val status = statusLine(s, row.lastNew)
     ListItem(
         modifier = Modifier.clickable(onClickLabel = "Open ${s.title}", onClick = onOpen),
@@ -305,23 +387,41 @@ private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit,
                 if (fullText != null) {
                     Text(fullText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                if (row.alsoInTtrss) {
+                    Text("Also in your tt-rss", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (row.feeds.isNotEmpty()) {
+                    Text(feedsLine(row.feeds), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
         trailingContent = {
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More for ${s.title}") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text(if (s.paused) "Resume" else "Pause") }, onClick = { menu = false; onTogglePause() })
-                    if (s.kind == SourceKind.FEED) {
-                        DropdownMenuItem(text = { Text("Article text") }, onClick = { menu = false; choosingMode = true })
+            Row {
+                if (feedsShown != null) {
+                    val count = row.feeds.count { it.feed.inPaper }
+                    // Its own button, not the row: the row opens the account's page, as every row opens its source.
+                    IconButton(onClick = { onShowFeeds(!feedsShown) }) {
+                        Icon(
+                            if (feedsShown) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (feedsShown) "Hide the feeds" else "Show ${plural(count, "feed")} in your paper",
+                        )
                     }
-                    DropdownMenuItem(text = { Text("Remove source") }, onClick = { menu = false; removing = true })
+                }
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More for ${s.title}") }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text(if (s.paused) "Resume" else "Pause") }, onClick = { menu = false; onTogglePause() })
+                        if (s.kind == SourceKind.FEED) {
+                            DropdownMenuItem(text = { Text("Article text") }, onClick = { menu = false; choosingMode = true })
+                        }
+                        DropdownMenuItem(text = { Text("Remove source") }, onClick = { menu = false; removing = true })
+                    }
                 }
             }
         },
     )
     if (choosingMode) {
-        ContentModeDialog(s, onChoose = { choosingMode = false; onChooseMode(it) }, onDismiss = { choosingMode = false })
+        ContentModeDialog(row.text?.chosenMode ?: ContentMode.AUTO, onChoose = { choosingMode = false; onChooseMode(it) }, onDismiss = { choosingMode = false })
     }
     if (removing) {
         RemoveSourceDialog(s, onConfirm = { removing = false; onRemove() }, onDismiss = { removing = false })
@@ -347,14 +447,14 @@ internal fun RemoveSourceDialog(source: SourceEntity, onConfirm: () -> Unit, onD
 }
 
 @Composable
-internal fun ContentModeDialog(source: SourceEntity, onChoose: (ContentMode) -> Unit, onDismiss: () -> Unit) {
-    val current = if (source.contentModeChosen) source.contentMode else ContentMode.AUTO
+internal fun ContentModeDialog(current: ContentMode, onChoose: (ContentMode) -> Unit, onDismiss: () -> Unit, automatic: String = "Automatic") {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Article text") },
         text = {
             Column(Modifier.selectableGroup()) {
-                CONTENT_MODE_CHOICES.forEach { (mode, label) ->
+                CONTENT_MODE_CHOICES.forEach { (mode, choice) ->
+                    val label = if (mode == ContentMode.AUTO) automatic else choice
                     Row(
                         Modifier.fillMaxWidth()
                             .selectable(selected = mode == current, role = Role.RadioButton, onClick = { onChoose(mode) })
@@ -390,17 +490,14 @@ internal fun statusLine(source: SourceEntity, lastNew: Instant?): String = when 
 internal fun hasProblem(source: SourceEntity) = (source.lastError != null || source.serverNote != null) && !source.paused
 
 /**
- * Where a site's article text comes from, once the app knows or the reader has chosen; null while
- * it's still checking. [learned] is the source's own publication, where the check keeps what it found.
+ * Where a publication's article text comes from, once the app knows or the reader has chosen;
+ * null while it's still checking.
  */
-internal fun fullTextLine(source: SourceEntity, learned: PublicationEntity?): String? {
-    if (source.kind != SourceKind.FEED) return null
-    if (source.contentModeChosen) {
-        return when (source.contentMode) {
-            ContentMode.FEED -> "Uses the text the site sends (your choice)"
-            ContentMode.PAGE -> "Always fetches the full page (your choice)"
-            ContentMode.AUTO -> null
-        }
+internal fun fullTextLine(learned: PublicationEntity?): String? {
+    when (learned?.chosenMode) {
+        ContentMode.FEED -> return "Uses the text the site sends (your choice)"
+        ContentMode.PAGE -> return "Always fetches the full page (your choice)"
+        else -> {}
     }
     return when (learned?.contentMode ?: ContentMode.AUTO) {
         ContentMode.AUTO -> null

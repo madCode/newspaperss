@@ -7,6 +7,7 @@ import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.TestApp
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -48,7 +49,7 @@ class SourceRepositoryTest {
             </body></opml>
         """.trimIndent()
         assertEquals(1, repo.importOpml(opml))
-        assertEquals("Science", db.sources().byUrl("https://b.example/rss")!!.section)
+        assertEquals("Science", db.sources().publication(db.sources().byUrl("https://b.example/rss")!!.id, PublicationEntity.OWN)?.section)
 
         val other = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
             .allowMainThreadQueries().build()
@@ -78,11 +79,11 @@ class SourceRepositoryTest {
     @Test
     fun aModeTheReaderChoseIsNeverChangedByTheCheck() = runTest {
         val id = repo.addFeed("https://a.example/feed", "A")
-        repo.chooseContentMode(id, ContentMode.FEED)
+        repo.chooseContentMode(id, PublicationEntity.OWN, ContentMode.FEED)
         record(id, FullTextEvidence.PAGE_LONGER, 5)
-        assertEquals(ContentMode.FEED, source(id).contentMode)
-        assertTrue(source(id).contentModeChosen)
-        assertEquals("nothing learned against the reader's choice", null, db.sources().publication(id, PublicationEntity.OWN))
+        val publication = db.sources().publication(id, PublicationEntity.OWN)!!
+        assertEquals(ContentMode.FEED, publication.chosenMode)
+        assertEquals("nothing learned against the reader's choice", null, publication.fullTextEvidence)
     }
 
     @Test
@@ -91,10 +92,10 @@ class SourceRepositoryTest {
         record(id, FullTextEvidence.BLOCKED, 3)
         assertEquals(ContentMode.FEED, learned(id))
 
-        repo.chooseContentMode(id, ContentMode.AUTO)
+        repo.chooseContentMode(id, PublicationEntity.OWN, ContentMode.AUTO)
 
         assertEquals(ContentMode.AUTO, learned(id))
-        assertFalse(source(id).contentModeChosen)
+        assertEquals(null, db.sources().publication(id, PublicationEntity.OWN)?.chosenMode)
         record(id, FullTextEvidence.PAGE_LONGER, 2)
         assertEquals("earlier evidence doesn't count towards the new run", ContentMode.AUTO, learned(id))
     }
@@ -155,6 +156,36 @@ class SourceRepositoryTest {
         repo.setFeedInPaper(ttrss, feed, inPaper = true)
         assertTrue(db.sources().allLeftOut().isEmpty())
         assertEquals(ContentMode.PAGE, learned(ttrss, "7"))
+    }
+
+    /** A tt-rss feed's settings are its own: another feed in the account, and the account itself, keep theirs. */
+    @Test
+    fun aTtrssFeedsCapAndSectionAreItsOwnAndKeepItLeftOut() = runTest {
+        val ttrss = repo.addTtrss("https://rss.example/api/")
+        repo.setFeedInPaper(ttrss, FeedChoice("7", "Teasers", inPaper = true), inPaper = false)
+
+        repo.stepMaxArticles(ttrss, "7", delta = 1, default = 1, limit = 3)
+        repo.stepMaxArticles(ttrss, "7", delta = 5, default = 1, limit = 3)
+        repo.setSection(ttrss, "7", "  Long reads ")
+        repo.setSection(ttrss, "8", "Front page")
+
+        val seven = db.sources().publication(ttrss, "7")!!
+        assertEquals(3, seven.maxArticles)
+        assertEquals("Long reads", seven.section)
+        assertTrue("still left out", seven.leftOut)
+        assertEquals(null, db.sources().publication(ttrss, "8")?.maxArticles)
+        assertEquals(listOf("Front page", "Long reads"), repo.observeSections().first())
+
+        repo.setSection(ttrss, "7", " ")
+        repo.setMaxArticles(ttrss, "7", null)
+        assertEquals(null to null, db.sources().publication(ttrss, "7")!!.let { it.section to it.maxArticles })
+    }
+
+    @Test
+    fun aSavedLinksSectionIsTheReadingListsOwn() = runTest {
+        val list = ReadingListRepository(db).sourceId()
+        assertEquals(ReadingListRepository.SECTION, db.sources().publication(list, PublicationEntity.OWN)?.section)
+        assertEquals("asked again, the same list", list, ReadingListRepository(db).sourceId())
     }
 
     /** Articles by guid, each inserted in [states]' state, with the star given. */

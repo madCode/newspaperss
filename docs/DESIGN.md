@@ -45,8 +45,8 @@ This document describes how the app works today. What's planned is in
 | Concept | What it is |
 |---|---|
 | **Source** | Where articles come from: an RSS, Atom or JSON feed; the **reading list** (links you shared or saved); a tt-rss account; or a **curated list**, a page that picks a few links a day (Arts & Letters Daily). |
-| **Publication** | Who wrote a source's articles, as against how they arrive: a feed added here is one, and each feed inside a tt-rss account is one. Takes turns in the paper, learns its own article text and can be left out. |
-| **Section** | A heading in the edition's contents. Sections come from OPML folders, and the reading list is "Saved for later". |
+| **Publication** | Who wrote a source's articles, as against how they arrive: a feed added here is one, each feed inside a tt-rss account is one, and the reading list is one (your picks). Takes turns in the paper and holds the settings about the writing: article text, cap, section, left out. |
+| **Section** | A heading in the edition's contents, set per publication. Sections come from OPML folders or a feed's page, and the reading list is "Saved for later". |
 | **Edition settings** | One recipe: size (minutes), per-source cap, order (take turns / in order / shuffle), and the time and days it should be ready. |
 | **Edition** | One built issue: a dated title ("Tuesday Morning Edition, Sep 29"), its articles, the EPUB and its status: building, ready, delivered, failed or deleted. |
 | **Article state** | `NEW`, then `IN_EDITION`, then `DELIVERED`; or `SKIPPED` (you marked it as read), or `EXPIRED` (older than the source keeps articles). |
@@ -131,8 +131,8 @@ module so it's all unit-tested without Android.
   - a feed of 300+ words whose page has no more, or a site that blocks
     fetching, means the feed is enough.
   Three days pointing the same way set the publication to that; the reader
-  can override a feed on its page ("Article text: Automatic / Feed's text /
-  Full page").
+  can override it on its page, a tt-rss feed's included ("Article text:
+  Automatic / Feed's text / Full page").
   - A short item always has its page read. A long one is taken from the feed,
     so it only counts once checked: each edition reads the pages of up to 5
     long items, one per publication, from publications still being worked
@@ -277,11 +277,20 @@ allowed to read that edition's file until the phone restarts.
       it's among that feed's newest five unread.
     - Changed on both sides between two syncs: the change made here wins.
     - Off, nothing flows either way: tt-rss and the app keep their own.
-  - **Feeds in your paper** (on the source's page) lists the account's feeds
-    seen in the last month, with a checkbox each. A feed left out isn't
-    fetched, and its waiting articles go too, except starred ones. It stays
-    in tt-rss, and stays listed so it can come back. Signing in as another
-    user clears the choices: feed ids belong to each tt-rss user.
+  - **The feed list.** Once a day a sync asks tt-rss for every feed the
+    account takes articles from (in its category, if it has one), read ones
+    too, with each feed's name, address and category. Until the first list,
+    the feeds seen in the last month stand in. A failed list waits for the
+    next sync; the sync itself has still succeeded. Changing the category
+    lists the feeds again.
+  - **Each feed is a publication** with its own page: leave it out or bring
+    it back, its article text, cap and section, and its own recent
+    articles. A feed left out isn't fetched, and its waiting articles go
+    too, except starred ones. It stays in tt-rss and on the Left out list,
+    so it can come back. **Feeds in your paper** on the account's page
+    is the same choice as a checklist. Signing in as another user clears
+    every feed's settings: feed ids belong to each tt-rss user. The same
+    user signing in again keeps them.
   - **Start fresh** ("Back after a break?" on the source's page), after a
     confirmation, marks everything that reached tt-rss more than two weeks
     ago read there (in the source's category, if it has one), starred ones
@@ -334,8 +343,18 @@ allowed to read that edition's file until the phone restarts.
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). A source's page
-  shows its recent articles, its cap, pause and the article-text setting;
-  **Remove source** is in its ⋮ menu, as on the list.
+  shows its recent articles, its cap, section, pause and the article-text
+  setting; **Remove source** is in its ⋮ menu, as on the list.
+  - **tt-rss** is one row, always last so a feed added later doesn't land
+    under it. It says how many feeds are in the paper and how many are left
+    out. A round **▾** button beside it shows its feeds just beneath it,
+    indented, A to Z, folded until you open them and then left as you
+    left them. A line under a feed only when it says something: "Also on
+    this phone", or its own settings. **Left out · N** at the end opens
+    the left-out feeds. Each feed opens its own page; the row itself opens
+    the account's page.
+  - A feed added here that's also in your tt-rss says "Also in your tt-rss",
+    matched by address.
   Each row is a status mark (`●` waiting, `✓` delivered, `○` read or not
   used), the title, a details line and a trailing **☆**; tapping the row
   opens the original. Two toggles, one per question:
@@ -411,13 +430,18 @@ erDiagram
     ARTICLE ||--o{ EDITION_ARTICLE : "goes in"
     SOURCE {
         string kind "feed, reading list, tt-rss, curated list"
-        string contentMode "the reader's choice, or fixed"
+        string contentMode "page for kinds with no feed text"
+        instant feedsListedAt "tt-rss: last full feed list"
     }
     PUBLICATION {
-        string key "empty for a feed, the tt-rss feed id"
+        string key "empty for its source's own, the tt-rss feed id"
+        string chosenMode "the reader's article text"
         string contentMode "what the check learned"
-        int checkedDay "last long item checked"
+        int maxArticles "its cap"
+        string section "its heading"
         bool leftOut "kept out of the paper"
+        string feedUrl "tt-rss: from the feed list"
+        bool listed "tt-rss: in the latest list"
     }
     ARTICLE {
         string originId "the tt-rss feed id"
@@ -425,13 +449,16 @@ erDiagram
     }
 ```
 
-- **A source is how articles arrive** (a feed address, a tt-rss account, the
-  reading list, a curated list): sync, read sync, sign-in and Pause are per
-  source.
-- **A publication is who wrote them:** the article text check and leaving
-  out are per publication, and the planner takes turns between
-  publications. A publication's row is written only once there's
-  something to keep; no row means the defaults.
+- **Sources carry, publications write.** A source is how articles arrive
+  (a feed address, a tt-rss account, the reading list, a curated list):
+  sync, read sync, sign-in and Pause are per source, and so is "always the
+  page" for the kinds with no feed text. A publication is who wrote them:
+  article text, cap, section and leaving out are per publication, and the
+  planner takes turns between publications. A feed added here and a feed
+  in tt-rss differ only in which source carries them.
+- A publication's row is written only once there's something to keep; no
+  row means the defaults. The reading list is one publication whatever
+  sites its links are from: one voice, one turn.
 - `delivered_urls` (links already sent) stands alone.
 
 ### Choosing an article's text

@@ -221,9 +221,7 @@ class SourcesScreenTest {
         compose.onNodeWithText("Always fetch the full page").performClick()
 
         waitFor("Always fetches the full page (your choice)")
-        val saved = runBlocking { db.sources().byId(id)!! }
-        assertEquals(ContentMode.PAGE, saved.contentMode)
-        assertTrue(saved.contentModeChosen)
+        assertEquals(ContentMode.PAGE, runBlocking { db.sources().publication(id, PublicationEntity.OWN)?.chosenMode })
     }
 
     @Test

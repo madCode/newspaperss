@@ -29,31 +29,34 @@ data class SourceEntity(
     val url: String,
     val title: String,
     val siteUrl: String? = null,
-    val section: String? = null,
     val position: Int = 0,
     /**
-     * The reader's choice ([contentModeChosen]), or a mode fixed by the kind of source (the reading
-     * list and curated lists fetch pages). What the automatic check learns is kept per
-     * [PublicationEntity] instead, so it's [ContentMode.AUTO] here for a feed the reader left to it.
+     * [ContentMode.PAGE] for the kinds of source that carry no feed text (the reading list and
+     * curated lists), otherwise [ContentMode.AUTO]: what the check learns, and what the reader
+     * chooses, are kept per [PublicationEntity].
      */
     val contentMode: ContentMode = ContentMode.AUTO,
-    /** The reader picked [contentMode] themselves, so the automatic full-text check leaves it alone. */
-    val contentModeChosen: Boolean = false,
+    val paused: Boolean = false,
     /**
-     * Unused: the check's state lives in [PublicationEntity]. Kept because dropping a column means
+     * Unused: these are kept per [PublicationEntity] now. Kept because dropping a column means
      * rebuilding this table, and dropping it with foreign keys on would delete every article.
      */
+    val section: String? = null,
+    val contentModeChosen: Boolean = false,
     val fullTextEvidence: FullTextEvidence? = null,
     val fullTextStreak: Int = 0,
     val fullTextDay: Long? = null,
-    val paused: Boolean = false,
-    /** At most this many articles per edition from this source; null follows the edition setting. Not used for tt-rss. */
     val maxArticles: Int? = null,
     /** tt-rss only: the category to take unread articles from, null for all of them. */
     val ttrssCategoryId: Int? = null,
     val ttrssCategoryTitle: String? = null,
     /** tt-rss only: mark delivered articles read on the server. */
     val markReadOnServer: Boolean = true,
+    /**
+     * tt-rss only: when the full list of the account's feeds last filled in its publications
+     * ([PublicationEntity.listed]); null before the first, and after the category changes.
+     */
+    val feedsListedAt: Instant? = null,
     val addedAt: Instant = Instant.now(),
     val lastFetchedAt: Instant? = null,
     /** The last sync error, cleared by the next successful sync. */
@@ -133,8 +136,9 @@ data class ArticleEntity(
 /**
  * Who wrote a source's articles, as against how they arrive: a feed's own publication has [key]
  * "", and each feed in a tt-rss account is one, keyed by its id there ([ArticleEntity.originId]).
- * Settings about the writing live here, settings about the connection on the source. A row is
- * written only once there's something to keep, so no row means the defaults.
+ * Settings about the writing live here (article text, cap, section, left out), settings about
+ * the connection on the source. A row is written only once there's something to keep, so no
+ * row means the defaults.
  */
 @Entity(
     tableName = "publications",
@@ -163,6 +167,22 @@ data class PublicationEntity(
      * articles still here, unless starred.
      */
     @ColumnInfo(defaultValue = "0") val leftOut: Boolean = false,
+    /** The article text the reader chose, which the check leaves alone; null leaves it to the check. */
+    val chosenMode: ContentMode? = null,
+    /** At most this many articles per edition; null follows the edition setting. */
+    val maxArticles: Int? = null,
+    /** The heading it goes under in the edition's contents; null for none. */
+    val section: String? = null,
+    /** tt-rss only: the feed's own address, from the account's feed list. */
+    val feedUrl: String? = null,
+    /** tt-rss only: the category it's in there. */
+    val category: String? = null,
+    /**
+     * tt-rss only: in the latest full list of the feeds the account takes articles from
+     * ([SourceEntity.feedsListedAt]). A feed unsubscribed there, or outside the chosen category,
+     * isn't.
+     */
+    @ColumnInfo(defaultValue = "0") val listed: Boolean = false,
 ) {
     companion object {
         /** The key of a source's own feed, and of an article with no [ArticleEntity.originId]. */

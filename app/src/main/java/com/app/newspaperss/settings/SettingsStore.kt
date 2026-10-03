@@ -57,6 +57,8 @@ data class Settings(
     /** A persisted SAF tree URI where each delivered edition's Markdown reading notes are saved, whatever [delivery] is. */
     val notesFolderUri: String? = null,
     val notesFolderName: String? = null,
+    /** A tt-rss account's feeds are shown under it on Sources; folded until the reader opens them. */
+    val feedsShown: Boolean = false,
 )
 
 // A corrupt settings file resets to defaults rather than crashing every launch.
@@ -83,6 +85,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val folderName = stringPreferencesKey("delivery_folder_name")
         val notesFolderUri = stringPreferencesKey("notes_folder_uri")
         val notesFolderName = stringPreferencesKey("notes_folder_name")
+        val feedsShown = booleanPreferencesKey("sources_feeds_shown")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
@@ -108,6 +111,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             if (s.folderName != null) prefs[Keys.folderName] = s.folderName else prefs.remove(Keys.folderName)
             if (s.notesFolderUri != null) prefs[Keys.notesFolderUri] = s.notesFolderUri else prefs.remove(Keys.notesFolderUri)
             if (s.notesFolderName != null) prefs[Keys.notesFolderName] = s.notesFolderName else prefs.remove(Keys.notesFolderName)
+            prefs[Keys.feedsShown] = s.feedsShown
             prefs.remove(Keys.legacyNotesWithEdition)
         }
     }
@@ -136,6 +140,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             folderName = p[Keys.folderName],
             notesFolderUri = p[Keys.notesFolderUri] ?: p[Keys.folderUri]?.takeIf { legacyNotes },
             notesFolderName = p[Keys.notesFolderName] ?: p[Keys.folderName]?.takeIf { legacyNotes },
+            feedsShown = p[Keys.feedsShown] ?: d.feedsShown,
         )
     }
 }

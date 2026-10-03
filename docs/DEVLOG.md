@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 73: your tt-rss feeds on Sources, each with a page
+- **From you:** build the rest of "sources carry, publications write", through to the inset feeds on Sources.
+- **Shipped:** the article text you choose, the cap and the section now belong to each publication, so a tt-rss feed can have its own ("at most 2 from Morning Wire", "Long reads"); the reading list's "Saved for later" is its own publication's section. Once a day tt-rss is asked for its whole feed list, read feeds included, with addresses and categories. On Sources, tt-rss is last, with a ▾ button that shows its feeds just beneath it, each opening a page like a feed's own, and a Left out list. The same site on the phone and in tt-rss says so on both rows. A feed's page can set its section too. Database version 8.
+- **Left for later:** "Nothing new in 3 weeks" for quiet feeds (tt-rss's feed list says when it last fetched a feed, not when it last posted); categories as sections; balance by section.
+
 ### Cycle 72: left out moves onto the publication
 - **From you:** go with "sources carry, publications write": settings about the writing belong to the publication, settings about the connection to the source.
 - **Shipped:** the first step. Leaving a tt-rss feed out is now a flag on its publication, beside what the text check learned, instead of a table of its own. Nothing changes on screen. Database version 7.

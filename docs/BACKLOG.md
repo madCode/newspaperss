@@ -38,9 +38,10 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
-- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): recommended keeping one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page; per-feed article text is done (cycle 71). Waiting on your answers to its "For you to decide" list
-- [ ] Sources carry, publications write: move each setting about the writing onto the publication, one step at a time, each with its own migration. Left out is done (cycle 72); next the cap and the section move off the source row (the reading list's fixed "Saved for later" and full page become its one publication's settings); then the daily full feed list from tt-rss fills in each publication's name, address and category, for the inset list in Sources
-- [ ] Per-feed cap on the tt-rss source page ("two from Current Affairs"); leaving a feed out is done
+- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page, is built (cycles 71–73). Still open on its "For you to decide" list: sections from categories, balance, adding feeds to tt-rss from here
+- [ ] A quiet tt-rss feed says so under its row ("Nothing new in 3 weeks"). tt-rss's feed list gives when it last fetched a feed, not when it last posted, so this needs the newest article's date from getHeadlines, once a day
+- [ ] tt-rss categories as sections, then balance by section (D in [research/ttrss-backend/](research/ttrss-backend/index.html))
+- [ ] Search on the account page's feed list (F4), if scrolling 50+ feeds on Sources gets slow
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] A heart for "loved this / keep it", synced to tt-rss *(you asked)*. The ☆ stays "put it in my next edition": two different wishes, and tt-rss's own star already means "keep" (which is why its stars aren't synced as ☆ today). Things to settle first:
   - Where: on a source's rows, on delivered editions, and maybe from the book (a link on each article's end that opens the app).
@@ -225,6 +226,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Your tt-rss feeds on Sources: inset under the tt-rss row, folded until you open them, each with its own page (leave out, article text, cap, section, its articles); a daily feed list from tt-rss names every feed; article text, cap and section are per publication, so a tt-rss feed has its own
 - [x] Article text is checked, not assumed: each edition reads the pages of up to 5 long items, one per publication (a feed here, or one feed in tt-rss), which each learn on their own; pictures the feed's copy lacks count for the page
 - [x] A tt-rss timeout says the server took too long, not that it couldn't be reached *(personas)*
 - [x] tt-rss: leave a feed out of the paper from the source's page; it isn't fetched, and its waiting articles go except starred ones *(personas)*

@@ -22,6 +22,13 @@ import com.app.newspaperss.core.ttrss.TtrssCategory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import com.app.newspaperss.data.FeedChoice
+import com.app.newspaperss.settings.SettingsStore
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,8 +38,27 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** A row in Sources: the source, its newest article, and what the full-text check found about its own feed. */
-data class SourceRow(val source: SourceEntity, val lastNew: Instant?, val text: PublicationEntity? = null)
+/**
+ * A row in Sources: the source, its newest article, and its own publication (its settings, and
+ * what the full-text check found). A tt-rss row carries its [feeds]. [alsoInTtrss] says a feed
+ * added here is one the tt-rss account also has.
+ */
+data class SourceRow(
+    val source: SourceEntity,
+    val lastNew: Instant?,
+    val text: PublicationEntity? = null,
+    val feeds: List<FeedRow> = emptyList(),
+    val alsoInTtrss: Boolean = false,
+)
+
+/** One of a tt-rss account's feeds under its row; [alsoOnPhone] when it's also a feed added here. */
+data class FeedRow(val feed: FeedChoice, val alsoOnPhone: Boolean = false)
+
+/** The same feed address, give or take its scheme, "www." and a trailing slash. */
+internal fun sameFeed(a: String, b: String): Boolean {
+    fun plain(url: String) = url.trim().lowercase().substringAfter("://").removePrefix("www.").trimEnd('/')
+    return plain(a) == plain(b)
+}
 
 sealed interface AddState {
     data object Closed : AddState
@@ -64,12 +90,43 @@ class SourcesViewModel(
     private val ttrss: TtrssRepository? = null,
     /** Saves a page to the reading list; null where that isn't offered. */
     private val saveToReadingList: (suspend (url: String) -> Boolean)? = null,
+    private val settings: SettingsStore? = null,
     private val onSourcesChanged: () -> Unit,
 ) : ViewModel() {
-    val rows: StateFlow<List<SourceRow>?> = combine(repository.observe(), repository.observeActivity(), repository.observeOwnPublications()) { sources, activity, texts ->
-        val bySource = activity.associate { it.sourceId to it.lastNew }
-        sources.filter { it.kind != SourceKind.READING_LIST }.map { SourceRow(it, bySource[it.id], texts[it.id]) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val ttrssFeeds: Flow<List<FeedChoice>> = repository.observe()
+        .map { sources -> sources.firstOrNull { it.kind == SourceKind.TTRSS }?.id }
+        .distinctUntilChanged()
+        .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repository.observeFeeds(id) }
+
+    /**
+     * The sources in the reader's order, with tt-rss last: its feeds go under it, and a feed added
+     * later shouldn't land beneath them all.
+     */
+    val rows: StateFlow<List<SourceRow>?> =
+        combine(repository.observe(), repository.observeActivity(), repository.observeOwnPublications(), ttrssFeeds) { sources, activity, texts, feeds ->
+            val bySource = activity.associate { it.sourceId to it.lastNew }
+            val phoneFeeds = sources.filter { it.kind == SourceKind.FEED }
+            val ttrssUrls = feeds.mapNotNull { it.publication?.feedUrl }
+            sources.filter { it.kind != SourceKind.READING_LIST }.sortedBy { it.kind == SourceKind.TTRSS }.map { s ->
+                SourceRow(
+                    s, bySource[s.id], texts[s.id],
+                    feeds = if (s.kind != SourceKind.TTRSS) emptyList() else feeds.map { f ->
+                        FeedRow(f, alsoOnPhone = f.publication?.feedUrl?.let { url -> phoneFeeds.any { sameFeed(it.url, url) } } == true)
+                    },
+                    alsoInTtrss = s.kind == SourceKind.FEED && ttrssUrls.any { sameFeed(it, s.url) },
+                )
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Whether the tt-rss feeds are shown under their row; folded until the reader opens them. */
+    val feedsShown: StateFlow<Boolean> = (settings?.settings?.map { it.feedsShown } ?: flowOf(false))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun showFeeds(shown: Boolean) {
+        val store = settings ?: return
+        viewModelScope.launch { store.update { it.copy(feedsShown = shown) } }
+    }
 
     /** The curated lists not added yet, offered in the add dialog. */
     val curatedLists: StateFlow<List<CuratedList>> = repository.observe().map { sources ->
@@ -197,7 +254,7 @@ class SourcesViewModel(
     }
 
     fun chooseContentMode(source: SourceEntity, mode: ContentMode) {
-        viewModelScope.launch { repository.chooseContentMode(source.id, mode) }
+        viewModelScope.launch { repository.chooseContentMode(source.id, PublicationEntity.OWN, mode) }
     }
 
     fun refresh() = onSourcesChanged()

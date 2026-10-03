@@ -17,7 +17,7 @@ class Converters {
 
 @Database(
     entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class, PublicationEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -135,8 +135,39 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * The writing settings move from a source to its own publication: the article text the
+         * reader chose, the cap and the section (the reading list's "Saved for later" too). tt-rss
+         * publications gain what the account's feed list says about them.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE publications ADD COLUMN `chosenMode` TEXT")
+                db.execSQL("ALTER TABLE publications ADD COLUMN `maxArticles` INTEGER")
+                db.execSQL("ALTER TABLE publications ADD COLUMN `section` TEXT")
+                db.execSQL("ALTER TABLE publications ADD COLUMN `feedUrl` TEXT")
+                db.execSQL("ALTER TABLE publications ADD COLUMN `category` TEXT")
+                db.execSQL("ALTER TABLE publications ADD COLUMN `listed` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE sources ADD COLUMN `feedsListedAt` INTEGER")
+                val chosen = "kind = 'FEED' AND contentModeChosen = 1 AND contentMode != 'AUTO'"
+                db.execSQL(
+                    "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +
+                        "SELECT id, '', 'AUTO', 0 FROM sources WHERE ($chosen) OR maxArticles IS NOT NULL OR section IS NOT NULL",
+                )
+                db.execSQL(
+                    "UPDATE publications SET " +
+                        "chosenMode = (SELECT s.contentMode FROM sources s WHERE s.id = publications.sourceId AND s.$chosen), " +
+                        "maxArticles = (SELECT s.maxArticles FROM sources s WHERE s.id = publications.sourceId), " +
+                        "section = (SELECT s.section FROM sources s WHERE s.id = publications.sourceId) " +
+                        "WHERE `key` = ''",
+                )
+                db.execSQL("UPDATE sources SET contentMode = 'AUTO' WHERE kind IN ('FEED', 'TTRSS')")
+                db.execSQL("UPDATE sources SET contentModeChosen = 0, maxArticles = NULL, section = NULL")
+            }
+        }
+
         fun open(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build()
     }
 }

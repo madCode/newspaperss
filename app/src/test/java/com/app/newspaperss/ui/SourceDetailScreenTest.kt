@@ -2,6 +2,7 @@ package com.app.newspaperss.ui
 
 import org.junit.Assert.assertFalse
 import com.app.newspaperss.ui.components.BUILDING_NOTE
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.MarkedRead
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
@@ -155,11 +156,11 @@ class SourceDetailScreenTest {
 
         defaultMax.value = 1
         idleUntil { compose.waitForIdle(); visible("Your edition setting: 1 article") }
-        assertEquals(4, runBlocking { db.sources().byId(id)!!.maxArticles })
+        assertEquals(4, runBlocking { db.sources().publication(id, PublicationEntity.OWN)?.maxArticles })
 
         compose.onNodeWithText("Use your edition setting").performClick()
         idleUntil { compose.waitForIdle(); visible("1 article from this site, then more if there's room") }
-        assertNull(runBlocking { db.sources().byId(id)!!.maxArticles })
+        assertNull(runBlocking { db.sources().publication(id, PublicationEntity.OWN)?.maxArticles })
     }
 
     /** The button says what it sets: the reader's choice, or Automatic when the check decides. */
@@ -170,7 +171,7 @@ class SourceDetailScreenTest {
         compose.setContent { SourceDetailScreen(vm, onBack = {}) }
         idleUntil { visible("Article text: Automatic") }
 
-        runBlocking { repo.chooseContentMode(id, ContentMode.PAGE) }
+        runBlocking { repo.chooseContentMode(id, PublicationEntity.OWN, ContentMode.PAGE) }
 
         idleUntil { compose.waitForIdle(); visible("Article text: Full page") }
     }
@@ -186,7 +187,7 @@ class SourceDetailScreenTest {
         compose.onNodeWithContentDescription("Fewer articles from this site").performClick()
 
         idleUntil { compose.waitForIdle(); visible("At most 1 article from this site") }
-        assertEquals(1, runBlocking { db.sources().byId(id)!!.maxArticles })
+        assertEquals(1, runBlocking { db.sources().publication(id, PublicationEntity.OWN)?.maxArticles })
     }
 
     @Test

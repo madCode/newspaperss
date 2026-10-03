@@ -46,7 +46,7 @@ class ExtractorContentProvider(
             feedTitle = article.title,
             feedHtml = article.feedHtml,
             feedAuthor = article.author,
-            mode = modeFor(article, source, text.learned),
+            mode = modeFor(article, source, text),
             feedUrl = article.viaUrl,
         )
         val checking = text.check && article.viaUrl == null && input.mode != ContentMode.PAGE
@@ -100,12 +100,10 @@ class ExtractorContentProvider(
          * sending teasers. A mode the reader chose is used as is. A link post's story is always
          * fetched unless the reader chose the feed's text: its pitch is never the article.
          */
-        fun modeFor(article: ArticleEntity, source: SourceEntity, learned: ContentMode?): ContentMode {
-            if (article.viaUrl != null) {
-                return if (source.contentModeChosen && source.contentMode == ContentMode.FEED) ContentMode.FEED else ContentMode.PAGE
-            }
-            if (source.contentModeChosen) return source.contentMode
-            val mode = learned ?: source.contentMode
+        fun modeFor(article: ArticleEntity, source: SourceEntity, text: TextChoice): ContentMode {
+            if (article.viaUrl != null) return if (text.chosen == ContentMode.FEED) ContentMode.FEED else ContentMode.PAGE
+            text.chosen?.let { return it }
+            val mode = text.learned ?: source.contentMode
             if (mode != ContentMode.FEED) return mode
             // Counted as the extractor counts, after cleaning, so the two agree on what's long.
             val words = article.feedHtml?.let { HtmlCleaner.clean(it, article.url, article.title).wordCount } ?: 0

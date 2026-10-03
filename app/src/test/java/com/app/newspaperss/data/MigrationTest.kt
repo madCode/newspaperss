@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
@@ -224,6 +224,46 @@ class MigrationTest {
                 val rows = generateSequence { if (c.moveToNext()) listOf(c.getString(0), c.getString(1), c.getString(2), c.getInt(3).toString()) else null }.toList()
                 assertEquals(
                     listOf(listOf("42", "PAGE", "Teasers", "1"), listOf("7", "AUTO", "Press releases", "1"), listOf("9", "FEED", null, "0")),
+                    rows,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun version7MovesTheReadersChoicesCapsAndSectionsToEachSourcesOwnPublication() {
+        helper.createDatabase(DB, 7).use { db ->
+            fun source(id: Int, kind: String, mode: String, chosen: Int, max: String, section: String) = db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt, maxArticles, section) " +
+                    "VALUES ($id, '$kind', 'https://s$id.example/feed', 'S$id', $id, '$mode', $chosen, 0, 0, 1, 0, $max, $section)",
+            )
+            source(1, "FEED", "PAGE", 1, "2", "'World'")
+            source(2, "FEED", "AUTO", 0, "NULL", "NULL")
+            source(3, "READING_LIST", "PAGE", 0, "NULL", "'Saved for later'")
+            source(4, "LIST", "PAGE", 0, "1", "NULL")
+            db.execSQL("INSERT INTO publications (sourceId, `key`, contentMode, fullTextStreak, leftOut) VALUES (1, '', 'AUTO', 0, 0), (2, '', 'FEED', 3, 0)")
+        }
+
+        helper.runMigrationsAndValidate(DB, 8, true, AppDatabase.MIGRATION_7_8).use { db ->
+            db.query("SELECT sourceId, contentMode, chosenMode, maxArticles, section FROM publications WHERE `key` = '' ORDER BY sourceId").use { c ->
+                val rows = generateSequence {
+                    if (c.moveToNext()) listOf(c.getLong(0).toString(), c.getString(1), c.getString(2), c.getString(3), c.getString(4)) else null
+                }.toList()
+                assertEquals(
+                    listOf(
+                        listOf("1", "AUTO", "PAGE", "2", "World"),
+                        listOf("2", "FEED", null, null, null),
+                        listOf("3", "AUTO", null, null, "Saved for later"),
+                        listOf("4", "AUTO", null, "1", null),
+                    ),
+                    rows,
+                )
+            }
+            db.query("SELECT contentMode, contentModeChosen, maxArticles, section FROM sources ORDER BY id").use { c ->
+                val rows = generateSequence { if (c.moveToNext()) listOf(c.getString(0), c.getString(1), c.getString(2), c.getString(3)) else null }.toList()
+                assertEquals(
+                    "the reading list and curated lists still fetch pages; nothing else is left on the source",
+                    listOf(listOf("AUTO", "0", null, null), listOf("AUTO", "0", null, null), listOf("PAGE", "0", null, null), listOf("PAGE", "0", null, null)),
                     rows,
                 )
             }

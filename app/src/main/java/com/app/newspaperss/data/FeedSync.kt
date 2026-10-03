@@ -205,6 +205,7 @@ class FeedSync(
                     CATEGORY_GONE
                 } else {
                     db.sources().recordSuccess(source.id, now, null, null, source.title)
+                    listFeeds(client, source, now)
                     return added
                 }
             } catch (e: CancellationException) {
@@ -224,6 +225,43 @@ class FeedSync(
         }
         db.sources().recordFailure(source.id, now, error)
         return null
+    }
+
+    /**
+     * Once a day, fills in the account's publications from its full list of feeds: their names,
+     * addresses and categories, and which are still there to show. Only unread feeds are fetched,
+     * so the articles alone would miss a feed read in tt-rss itself. A failure waits for the next
+     * sync: the sync it's part of has already succeeded.
+     */
+    private suspend fun listFeeds(client: TtrssClient, source: SourceEntity, now: Instant) {
+        if (source.feedsListedAt?.let { Duration.between(it, now) < LIST_FEEDS_EVERY } == true) return
+        val (feeds, categories) = try {
+            client.allFeeds(source.ttrssCategoryId) to client.categories().associate { it.id to it.title }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return
+        }
+        val sources = db.sources()
+        db.withTransaction {
+            // A list for a category the reader has since changed would show the wrong feeds.
+            val current = sources.byId(source.id) ?: return@withTransaction
+            if (current.ttrssCategoryId != source.ttrssCategoryId) return@withTransaction
+            sources.unlistPublications(source.id)
+            for (feed in feeds) {
+                val key = feed.id.toString()
+                val publication = sources.publication(source.id, key) ?: PublicationEntity(source.id, key)
+                sources.savePublication(
+                    publication.copy(
+                        title = feed.title.ifBlank { publication.title.orEmpty() }.ifBlank { null },
+                        feedUrl = feed.feedUrl ?: publication.feedUrl,
+                        category = feed.categoryId?.let(categories::get) ?: publication.category,
+                        listed = true,
+                    ),
+                )
+            }
+            sources.setFeedsListed(source.id, now)
+        }
     }
 
     private suspend fun syncList(source: SourceEntity): Int? {
@@ -275,6 +313,7 @@ class FeedSync(
 
     companion object {
         private val UNTITLED_LOOKUP_FOR: Duration = Duration.ofDays(2)
+        private val LIST_FEEDS_EVERY: Duration = Duration.ofDays(1)
 
         const val LIST_LAYOUT_CHANGED =
             "This page has changed its layout, so newspapeRSS can't tell which links are new and took none. An app update should fix it."

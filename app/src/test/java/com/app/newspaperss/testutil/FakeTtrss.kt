@@ -32,6 +32,11 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     var ignoreUpdates = false
     /** Run once a getHeadlines for unread articles has been answered: something else happening mid-sync. */
     var afterUnreadHeadlines: (() -> Unit)? = null
+    data class Feed(val title: String, val url: String, val categoryId: Int = 0)
+    /** getFeeds for every feed, read or not, answers with an HTTP 500. */
+    var failFeedList = false
+    /** Feeds subscribed to, by id: listed by getFeeds with their address, whether or not they have unread articles. */
+    val feeds = mutableMapOf<Int, Feed>()
     /** Subcategories, child id to parent id. */
     val subcategories = mutableMapOf<Int, Int>()
     /** A feed whose getHeadlines answers with an HTTP 500. */
@@ -83,11 +88,22 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
         }
         if (str("sid") !in live) return error("NOT_LOGGED_IN")
         return when (op) {
-            "getFeeds" -> ok(
+            "getFeeds" -> if (failFeedList && str("unread_only") == "false") 500 to "<html>Internal error</html>" else ok(
                 buildJsonArray {
                     val category = str("cat_id")!!.toInt().takeIf { it >= 0 }
-                    unread.filter { category == null || it.categoryId == category }.groupBy { it.feedId }.forEach { (id, items) ->
-                        add(buildJsonObject { put("id", id); put("title", items.first().feedTitle); put("unread", items.size); put("cat_id", items.first().categoryId) })
+                    val withUnread = unread.filter { category == null || it.categoryId == category }.groupBy { it.feedId }
+                    withUnread.forEach { (id, items) ->
+                        add(
+                            buildJsonObject {
+                                put("id", id); put("title", items.first().feedTitle); put("unread", items.size); put("cat_id", items.first().categoryId)
+                                feeds[id]?.let { put("feed_url", it.url) }
+                            },
+                        )
+                    }
+                    if (str("unread_only") == "false") {
+                        feeds.filter { (id, f) -> id !in withUnread && (category == null || f.categoryId == category) }.forEach { (id, f) ->
+                            add(buildJsonObject { put("id", id); put("title", f.title); put("unread", 0); put("cat_id", f.categoryId); put("feed_url", f.url) })
+                        }
                     }
                     // As tt-rss does with include_nested: direct subcategories as items of their own.
                     if (category != null && str("include_nested") == "true") {

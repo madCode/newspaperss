@@ -144,7 +144,7 @@ class ExtractorContentProviderTest {
         http.page("https://example.com/story", "<html><body><article><p>$words</p></article></body></html>")
 
         val settled = provider.contentFor(article("<p>A short teaser.</p>"), source, ImageAllowance(), TextChoice())
-        val chosen = provider.contentFor(article("<p>A short teaser.</p>"), source.copy(contentModeChosen = true), ImageAllowance(), TextChoice())
+        val chosen = provider.contentFor(article("<p>A short teaser.</p>"), source, ImageAllowance(), TextChoice(chosen = ContentMode.FEED))
 
         assertEquals(listOf(1L to FullTextEvidence.PAGE_LONGER), evidence)
         assertEquals(600, settled?.wordCount)

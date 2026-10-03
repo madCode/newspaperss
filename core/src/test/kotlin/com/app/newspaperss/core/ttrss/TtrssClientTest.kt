@@ -134,6 +134,19 @@ class TtrssClientTest {
     }
 
     @Test
+    fun allFeedsListReadOnesTooWithTheirAddressAndCategory() = runTest {
+        server.reply(loggedIn)
+        server.reply(
+            ok("""[{"id":7,"title":"A Blog","unread":0,"feed_url":"https://a.example/feed","cat_id":2},{"id":"12","title":"Old","unread":"0","feed_url":"","cat_id":"0"}]"""),
+        )
+        assertEquals(
+            listOf(TtrssFeed(7, "A Blog", 0, "https://a.example/feed", 2), TtrssFeed(12, "Old", 0, null, 0)),
+            client().allFeeds(),
+        )
+        assertEquals("false", server.sent[1].str("unread_only"))
+    }
+
+    @Test
     fun newestFirstAsksForDateOrderRatherThanScore() = runTest {
         server.reply(loggedIn)
         server.reply(ok("[]"))

@@ -27,8 +27,8 @@ data class TtrssHeadline(
     val feedId: String,
 )
 
-/** One of the reader's feeds with unread articles, as getFeeds reports it. */
-data class TtrssFeed(val id: Int, val title: String, val unread: Int)
+/** One of the reader's feeds, as getFeeds reports it. */
+data class TtrssFeed(val id: Int, val title: String, val unread: Int, val feedUrl: String? = null, val categoryId: Int? = null)
 
 /** A category of the reader's own feeds, as getCategories reports it. */
 data class TtrssCategory(val id: Int, val title: String)
@@ -114,16 +114,23 @@ class TtrssClient(
      *
      * @param categoryId a category, its subcategories included, or null for every feed.
      */
-    suspend fun unreadFeeds(categoryId: Int? = null): List<TtrssFeed> = unreadFeeds(categoryId, mutableSetOf())
+    suspend fun unreadFeeds(categoryId: Int? = null): List<TtrssFeed> = feeds(categoryId, unreadOnly = true, mutableSetOf())
 
-    private suspend fun unreadFeeds(categoryId: Int?, seen: MutableSet<Int>): List<TtrssFeed> {
+    /**
+     * Every one of the reader's feeds, read or not, with its address and category.
+     *
+     * @param categoryId a category, its subcategories included, or null for every feed.
+     */
+    suspend fun allFeeds(categoryId: Int? = null): List<TtrssFeed> = feeds(categoryId, unreadOnly = false, mutableSetOf())
+
+    private suspend fun feeds(categoryId: Int?, unreadOnly: Boolean, seen: MutableSet<Int>): List<TtrssFeed> {
         if (categoryId != null && !seen.add(categoryId)) return emptyList()
         val content = withSession { sid ->
             post(buildJsonObject {
                 put("sid", sid)
                 put("op", "getFeeds")
                 put("cat_id", categoryId ?: ALL_FEEDS)
-                put("unread_only", true)
+                put("unread_only", unreadOnly)
                 if (categoryId != null) put("include_nested", true)
             })
         }
@@ -135,10 +142,15 @@ class TtrssClient(
             // include_nested lists a subcategory as an item of its own, with an id from the
             // category sequence: fetched as a feed, it would be some unrelated feed.
             if ((o["is_cat"] as? JsonPrimitive)?.contentOrNull == "true") {
-                return@flatMap if (categoryId != null) unreadFeeds(id, seen) else emptyList()
+                return@flatMap if (categoryId != null) feeds(id, unreadOnly, seen) else emptyList()
             }
-            val unread = (o["unread"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
-            listOf(TtrssFeed(id, (o["title"] as? JsonPrimitive)?.contentOrNull ?: "", unread))
+            fun text(key: String) = (o[key] as? JsonPrimitive)?.contentOrNull
+            listOf(
+                TtrssFeed(
+                    id, text("title") ?: "", text("unread")?.toIntOrNull() ?: 0,
+                    feedUrl = text("feed_url")?.takeIf { it.isNotBlank() }, categoryId = text("cat_id")?.toIntOrNull(),
+                ),
+            )
         }
     }
 
