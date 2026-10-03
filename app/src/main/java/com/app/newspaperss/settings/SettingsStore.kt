@@ -65,12 +65,16 @@ val Device?.offersOpen: Boolean get() = this != Device.KINDLE && this != Device.
  */
 enum class FeedsFrom { PHONE, SERVER }
 
-/** How large the in-app article preview sets its text, as a percentage of the WebView's default. */
+/**
+ * How large the in-app article preview sets its text, as a percentage on top of Android's font
+ * size. Stored by name, so a new size goes anywhere in the list without changing anyone's choice.
+ */
 enum class PreviewTextSize(val label: String, val percent: Int) {
     SMALL("Small", 85),
     DEFAULT("Default", 100),
     LARGE("Large", 120),
     LARGER("Larger", 145),
+    LARGEST("Largest", 175),
 }
 
 data class Settings(

@@ -6,6 +6,7 @@ import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.data.TtrssStatus
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -47,9 +48,13 @@ class SettingsViewModel(
     fun useShare() = update { it.copy(delivery = DeliveryMethod.SHARE) }
     fun useKindleEmail() = update { it.copy(delivery = DeliveryMethod.KINDLE_EMAIL) }
 
-    // Saved as typed, without telling the timer: neither changes when editions are made.
+    // Saved without telling the timer: none of these change when editions are made.
     fun setKindleEmail(address: String) {
         viewModelScope.launch { store.update { it.copy(kindleEmail = address.trim().ifEmpty { null }) } }
+    }
+
+    fun setPreviewTextSize(size: PreviewTextSize) {
+        viewModelScope.launch { store.update { it.copy(previewTextSize = size) } }
     }
 
     fun setMailApp(packageName: String?) {

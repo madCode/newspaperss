@@ -37,6 +37,7 @@ import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.edition.EditionNotes
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.FakeHttp
 import com.app.newspaperss.testutil.TestApp
@@ -307,6 +308,20 @@ class ScreenshotTest {
         // The page itself is a WebView, which Robolectric doesn't draw; this shoots the top bar.
         shoot("05c-article-preview", ready = { compose.onAllNodes(hasText("Opening…")).fetchSemanticsNodes().isEmpty() }) {
             ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {})
+        }
+    }
+
+    /** The top bar at twice the font size: the title stays on one line beside Back and Share. */
+    @Test
+    @Config(fontScale = 2f)
+    fun articlePreviewAtTwiceTheFontSize() {
+        val file = tmp.newFile("p.epub")
+        val article = EditionArticle(title = "The quiet return of the night train", sourceTitle = "The Example Review", url = "https://example.com/night-train", bodyHtml = "<p>Sleeper services are coming back.</p>", minutes = 4.0)
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("Tuesday Morning Edition", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
+        }
+        shoot("05d-article-preview-200", ready = { compose.onAllNodes(hasText("Opening…")).fetchSemanticsNodes().isEmpty() }) {
+            ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {}, textSize = PreviewTextSize.LARGEST)
         }
     }
 
@@ -663,6 +678,21 @@ class ScreenshotTest {
         runBlocking { store.update { it.copy(device = Device.BOOX) } }
         val vm = SettingsViewModel(store) {}
         shoot("07g-settings-delivery-200", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.DELIVERY, onBack = {}) }
+    }
+
+    @Test
+    fun settingsTextSize() {
+        runBlocking { store.update { it.copy(previewTextSize = PreviewTextSize.LARGE) } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07m-settings-text-size", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.TEXT_SIZE, onBack = {}) }
+    }
+
+    @Test
+    @Config(fontScale = 2f)
+    fun settingsTextSizeLargestAtLargeText() {
+        runBlocking { store.update { it.copy(previewTextSize = PreviewTextSize.LARGEST) } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07n-settings-text-size-largest-200", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.TEXT_SIZE, onBack = {}) }
     }
 
     /** Settings › Where your feeds live, signed in to a tt-rss account. */

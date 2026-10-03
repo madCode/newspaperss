@@ -97,7 +97,7 @@ class ArticlePreviewScreenTest {
             // After the book's stylesheet, so it wins over the book's own body rule.
             assertTrue(opened.indexOf("stylesheet") in 0 until opened.indexOf(style))
             // The second article is reached by the first one's "Next" link, served page by page.
-            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, dark.first, dark.second).second.toString(Charsets.UTF_8)
+            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, dark.first, dark.second, justify = true).second.toString(Charsets.UTF_8)
             assertTrue(next.contains(style))
         }
     }
@@ -132,7 +132,7 @@ class ArticlePreviewScreenTest {
             val first = forPreview(pages.article(0)!!, 0, 0, imageSizes(pages))
             assertEquals("a headshot, a row of pictures and an inline one keep their size", listOf("images/strip.png"), filled(first))
             // A page reached by "Next": an article that is just the picture.
-            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, 0, 0).second.toString(Charsets.UTF_8)
+            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, 0, 0, justify = true).second.toString(Charsets.UTF_8)
             assertEquals(listOf("images/solo.png"), filled(next))
             assertTrue(next.contains("img.preview-fill { width: 100%; }"))
         }
@@ -147,35 +147,64 @@ class ArticlePreviewScreenTest {
         return file
     }
 
-    private fun webView(): WebView {
+    private fun findWebView(): WebView? {
         fun find(view: View): WebView? = view as? WebView ?: (view as? ViewGroup)?.let { group -> (0 until group.childCount).firstNotNullOfOrNull { find(group.getChildAt(it)) } }
+        return find(compose.activity.window.decorView)
+    }
+
+    private fun webView(): WebView {
         var found: WebView? = null
-        idleUntil { found = find(compose.activity.window.decorView); found != null }
+        idleUntil { found = findWebView(); found != null }
         return found!!
     }
 
+    private val leftAligned = ".article-body p { text-align: start; }"
+
     @Test
-    fun thePickedTextSizeIsAppliedAndKeptInPlace() {
+    fun theTextSizeFromSettingsIsAppliedInPlaceAndLeftAlignsFromLarger() {
         val file = oneArticleEdition()
         var size by mutableStateOf(PreviewTextSize.DEFAULT)
-        val picked = mutableListOf<PreviewTextSize>()
-        compose.setContent {
-            ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size, onTextSize = { picked += it; size = it })
-        }
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size) }
         val view = webView()
         assertEquals(100, view.settings.textZoom)
+        assertFalse(shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
 
-        compose.onNodeWithContentDescription("Text size").performClick()
-        compose.onNodeWithText("Larger").performClick()
+        size = PreviewTextSize.LARGE
         compose.waitForIdle()
-
-        assertEquals(listOf(PreviewTextSize.LARGER), picked)
-        assertEquals(145, view.settings.textZoom)
+        assertEquals(120, view.settings.textZoom)
         assertSame("the same page, so the reader keeps their place", view, webView())
-        // The menu marks the current size.
-        compose.onNodeWithContentDescription("Text size").performClick()
-        compose.onNode(hasText("Larger") and hasContentDescription("Current size")).assertExists()
-        compose.onNode(hasText("Default") and hasContentDescription("Current size")).assertDoesNotExist()
+
+        size = PreviewTextSize.LARGEST
+        compose.waitForIdle()
+        val large = webView()
+        assertEquals(175, large.settings.textZoom)
+        assertTrue("justified text opens wide gaps at this size", shadowOf(large).lastLoadDataWithBaseURL.data.contains(leftAligned))
+    }
+
+    @Test
+    fun aPageReachedByNextIsAlignedLikeTheFirst() {
+        val file = oneArticleEdition()
+        EpubPages(file).use { pages ->
+            fun page(justify: Boolean) = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(0), pages, 0, 0, justify).second.toString(Charsets.UTF_8)
+            assertTrue(page(justify = false).contains(leftAligned))
+            assertFalse(page(justify = true).contains(leftAligned))
+        }
+    }
+
+    @Test
+    fun thePageWaitsForTheStoredTextSizeRatherThanLayingOutTwice() {
+        val file = oneArticleEdition()
+        var size by mutableStateOf<PreviewTextSize?>(null)
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size) }
+        // Share shows once the article has been read: from then on only the size is missing.
+        idleUntil { compose.onAllNodes(hasContentDescription("Share link")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Opening…").assertExists()
+        assertEquals(null, findWebView())
+
+        size = PreviewTextSize.LARGEST
+        compose.waitForIdle()
+        assertEquals(175, webView().settings.textZoom)
+        compose.onNodeWithText("Opening…").assertDoesNotExist()
     }
 
     @Test
@@ -186,6 +215,7 @@ class ArticlePreviewScreenTest {
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size) }
         val view = webView()
         assertEquals(150, view.settings.textZoom)
+        assertTrue("as large as Larger, so left-aligned too", shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
 
         size = PreviewTextSize.LARGER
         compose.waitForIdle()
@@ -225,7 +255,7 @@ class ArticlePreviewScreenTest {
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}) }
         webView()
         compose.waitForIdle()
-        compose.onNodeWithContentDescription("Text size").assertExists()
+        compose.onNodeWithContentDescription("Back").assertExists()
         compose.onNodeWithContentDescription("Share link").assertDoesNotExist()
     }
 

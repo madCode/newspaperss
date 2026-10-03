@@ -10,6 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -71,6 +72,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.core.plural
@@ -81,6 +83,7 @@ import com.app.newspaperss.settings.Device
 import com.app.newspaperss.ui.onboarding.DeviceTips
 import com.app.newspaperss.ui.sources.LARGE_TEXT
 import com.app.newspaperss.settings.DeliveryMethod
+import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.settings.Settings as AppSettings
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -106,6 +109,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpen: (SettingsPage) -> Unit)
                 val summary = when (page) {
                     SettingsPage.EDITION -> SettingsSummary.edition(s)
                     SettingsPage.SCHEDULE -> SettingsSummary.schedule(s, notificationsOn, locale)
+                    SettingsPage.TEXT_SIZE -> SettingsSummary.textSize(s)
                     SettingsPage.DELIVERY -> SettingsSummary.delivery(s, folderReachable)
                     SettingsPage.FEEDS -> SettingsSummary.feedsFrom(s.feedsFrom(hasServer = ttrss.source != null), ttrss)
                     SettingsPage.NOTES -> SettingsSummary.notes(s, notesReachable)
@@ -182,6 +186,7 @@ fun SettingsPageScreen(viewModel: SettingsViewModel, page: SettingsPage, onBack:
             when (page) {
                 SettingsPage.EDITION -> EditionSection(s, viewModel)
                 SettingsPage.SCHEDULE -> ScheduleSection(s, viewModel)
+                SettingsPage.TEXT_SIZE -> TextSizeSection(s, viewModel)
                 SettingsPage.DELIVERY -> {
                     ReaderPicker(s, viewModel)
                     DeliverySection(s, viewModel)
@@ -305,6 +310,39 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
         Text("Pick at least one day.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
     }
 }
+
+/** The article preview's text size: a sample line drawn at the chosen size, then one row per size. */
+@Composable
+private fun TextSizeSection(s: AppSettings, vm: SettingsViewModel) {
+    Text(
+        "How big articles are when you open one in an edition, on top of Android's own font size. " +
+            "The rest of the app follows Android's font size, and your e-reader its own settings.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    // In sp, like the preview's zoom: the sample grows with Android's font size as the article does.
+    val body = MaterialTheme.typography.bodyLarge
+    Text(
+        SAMPLE_LINE,
+        style = body.copy(fontFamily = FontFamily.Serif, fontSize = body.fontSize * s.previewTextSize.percent / 100, lineHeight = body.lineHeight * s.previewTextSize.percent / 100),
+        modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium)
+            .padding(16.dp),
+    )
+    Column(Modifier.selectableGroup()) {
+        PreviewTextSize.entries.forEach { size ->
+            Row(
+                Modifier.fillMaxWidth().selectable(s.previewTextSize == size, role = Role.RadioButton) { vm.setPreviewTextSize(size) }.heightIn(min = 48.dp).padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = s.previewTextSize == size, onClick = null)
+                Text(size.label, Modifier.padding(start = 12.dp))
+            }
+        }
+    }
+}
+
+private const val SAMPLE_LINE = "The quiet return of the night train"
 
 /** The e-reader chosen in onboarding, changeable later: it decides Send or Open, the delivery choices and the tips shown. */
 @OptIn(ExperimentalMaterial3Api::class)
