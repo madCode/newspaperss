@@ -201,6 +201,11 @@ data class PublicationEntity(
      * same list as [listed]. Sources counts these as "Not in your paper".
      */
     @ColumnInfo(defaultValue = "0") val outsideCategory: Boolean = false,
+    /**
+     * tt-rss only: subscribed there but not fetched by it yet, as of the same list as [listed].
+     * A feed added from here has nothing to give until tt-rss's own schedule gets to it.
+     */
+    @ColumnInfo(defaultValue = "0") val awaitingFirstFetch: Boolean = false,
 ) {
     companion object {
         /** The key of a source's own feed, and of an article with no [ArticleEntity.originId]. */

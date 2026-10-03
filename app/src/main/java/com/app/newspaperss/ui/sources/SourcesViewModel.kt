@@ -17,6 +17,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import java.time.Instant
 import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.data.TtrssSubscriptions
+import com.app.newspaperss.core.ttrss.TtrssCategory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -88,22 +90,74 @@ internal fun byCategory(feeds: List<FeedChoice>): List<FeedCategory> =
         .map { (name, fs) -> FeedCategory(name, fs.sortedBy { sortTitle(it.title) }) }
         .sortedWith(compareBy<FeedCategory> { it.name == null }.thenBy { it.name?.lowercase() })
 
-/** The same feed address, give or take its scheme, "www." and a trailing slash. */
-internal fun sameFeed(a: String, b: String): Boolean {
-    fun plain(url: String) = url.trim().lowercase().substringAfter("://").removePrefix("www.").trimEnd('/')
-    return plain(a) == plain(b)
+/**
+ * The categories to subscribe a feed into: A to Z, then Uncategorized, always there and under
+ * the app's own name, as Sources shows it, whatever language the server speaks.
+ */
+internal fun pickerCategories(categories: List<TtrssCategory>): List<TtrssCategory> =
+    categories.filter { it.id != UNCATEGORIZED_ID && it.title.isNotBlank() }.sortedBy { it.title.lowercase() } +
+        TtrssCategory(UNCATEGORIZED_ID, UNCATEGORIZED)
+
+/** Why a feed already in tt-rss isn't in the paper, if it isn't. */
+internal fun alreadyNote(s: AddState.AlreadyIn): String? = when {
+    s.leftOut -> "You left it out of your paper. It's under Left out on Sources."
+    s.outsidePaper -> "It's outside the category your paper takes articles from."
+    else -> null
 }
 
+/** A feed already in tt-rss, said in one line. */
+internal fun alreadyLine(s: AddState.AlreadyIn): String =
+    listOfNotNull("${s.title} is already in your tt-rss, in ${s.category ?: UNCATEGORIZED}.", alreadyNote(s)).joinToString(" ")
+
+/**
+ * The Add dialog. Each state with a `page` can save that page to the reading list instead: an
+ * article the reader typed, not a site's front page.
+ */
 sealed interface AddState {
     data object Closed : AddState
     /** @property page a page with no feed, which can be saved to the reading list instead. */
     data class Editing(val input: String = "", val error: String? = null, val page: String? = null) : AddState
     data class Searching(val input: String) : AddState
-    data class Choosing(val input: String, val feeds: List<FoundFeed>) : AddState
+    data class Choosing(val input: String, val feeds: List<FoundFeed>, val page: String? = null) : AddState
+
+    /**
+     * The server setup: [feed] found, to subscribe to in tt-rss in the category [chosen].
+     * [categories] is null while loading; [error] says why only Uncategorized is offered.
+     */
+    data class Subscribing(
+        val feed: FoundFeed,
+        val page: String?,
+        val categories: List<TtrssCategory>? = null,
+        val chosen: Int = UNCATEGORIZED_ID,
+        val error: String? = null,
+    ) : AddState
+
+    /** Waiting for tt-rss's answer, which can take half a minute; closing the dialog doesn't stop it. */
+    data class Asking(val request: TtrssSubscriptions.Request) : AddState
+
+    /** Already in the account: [category] null is Uncategorized. */
+    data class AlreadyIn(val title: String, val category: String?, val leftOut: Boolean = false, val outsidePaper: Boolean = false) : AddState
+
+    /** The server setup, a site with no feed for tt-rss to follow: [list] a curated list the app can read from it instead. */
+    data class NoFeed(val site: String, val page: String?, val list: CuratedList?) : AddState
+
+    /** tt-rss didn't subscribe, [reason] in words. [couldntFetch]: it couldn't download or read the feed the phone found. */
+    data class Refused(val title: String, val reason: String, val couldntFetch: Boolean, val page: String?) : AddState
 }
 
 /**
+ * A line for the snackbar; with [undo], an Undo that unsubscribes the feed just added in tt-rss.
+ */
+data class Notice(val id: Long, val text: String, val undo: Undone? = null) {
+    data class Undone(val request: TtrssSubscriptions.Request, val feedId: Int)
+}
+
+/** tt-rss's category for feeds in none. */
+const val UNCATEGORIZED_ID = 0
+
+/**
  * @param ttrss with [settings], says when the server setup has no working account.
+ * @param subscriptions with [ttrss], adds sites to tt-rss in the server setup.
  */
 class SourcesViewModel(
     private val repository: SourceRepository,
@@ -112,6 +166,7 @@ class SourcesViewModel(
     /** Saves a page to the reading list; null where that isn't offered. */
     private val saveToReadingList: (suspend (url: String) -> Boolean)? = null,
     private val settings: SettingsStore? = null,
+    private val subscriptions: TtrssSubscriptions? = null,
     private val onSourcesChanged: () -> Unit,
 ) : ViewModel() {
     /**
@@ -166,6 +221,12 @@ class SourcesViewModel(
     private val _add = MutableStateFlow<AddState>(AddState.Closed)
     val add: StateFlow<AddState> = _add.asStateFlow()
 
+    /**
+     * Sites go to tt-rss rather than this phone: the server setup, as Sources shows it. Read
+     * from [screen], which the screen collects.
+     */
+    private val toServer get() = screen.value?.server != null && ttrss != null && subscriptions != null
+
     fun openAdd() { _add.value = AddState.Editing() }
     private var search: Job? = null
 
@@ -177,24 +238,133 @@ class SourcesViewModel(
 
     fun find() {
         val input = (add.value as? AddState.Editing)?.input ?: return
+        val server = toServer
         _add.value = AddState.Searching(input)
         search = viewModelScope.launch {
-            _add.value = when (val result = finder.find(input)) {
-                is FindResult.NotFound -> AddState.Editing(input, result.reason, result.page?.takeIf { saveToReadingList != null })
-                is FindResult.Found ->
-                    if (result.feeds.size == 1) {
-                        subscribe(result.feeds.single())
-                        AddState.Closed
-                    } else {
-                        AddState.Choosing(input, result.feeds)
+            when (val result = finder.find(input)) {
+                is FindResult.NotFound -> {
+                    val page = result.page?.takeIf { saveToReadingList != null }
+                    val list = if (server) curatedListAt(input) else null
+                    _add.value = if (server && (page != null || list != null)) AddState.NoFeed(SourceRepository.hostOf(input), page, list) else AddState.Editing(input, result.reason, page)
+                }
+                is FindResult.Found -> {
+                    val page = result.page?.takeIf { saveToReadingList != null }
+                    when {
+                        result.feeds.size > 1 -> _add.value = AddState.Choosing(input, result.feeds, page)
+                        server -> toSubscribe(result.feeds.single(), page)
+                        else -> {
+                            subscribe(result.feeds.single())
+                            _add.value = AddState.Closed
+                        }
                     }
+                }
             }
         }
     }
 
-    /** A site with no feed: its page goes to the reading list instead, so the reader isn't left at a dead end. */
+    /** A curated list the app can read whose site is [input], not added yet. */
+    private fun curatedListAt(input: String): CuratedList? {
+        val host = SourceRepository.hostOf(input).lowercase()
+        return curatedLists.value.firstOrNull { SourceRepository.hostOf(it.pageUrl).lowercase() == host }
+    }
+
+    /**
+     * Unless tt-rss already has it, offers to subscribe to [feed] there, in the category last
+     * used, else the one the paper takes articles from, else Uncategorized.
+     */
+    private suspend fun toSubscribe(feed: FoundFeed, page: String?) {
+        val ttrss = ttrss ?: return
+        ttrss.feedAt(feed.url)?.let { known ->
+            _add.value = AddState.AlreadyIn(known.title ?: feed.title ?: SourceRepository.hostOf(feed.url), known.category, known.leftOut, known.outsideCategory)
+            return
+        }
+        _add.value = AddState.Subscribing(feed, page)
+        val loaded = ttrss.categories(includeEmpty = true)
+        val categories = pickerCategories((loaded as? TtrssRepository.Categories.Loaded)?.categories.orEmpty())
+        val ids = categories.map { it.id }.toSet()
+        val chosen = listOfNotNull(settings?.current()?.lastCategoryId, screen.value?.server?.account?.ttrssCategoryId).firstOrNull { it in ids } ?: UNCATEGORIZED_ID
+        _add.value = AddState.Subscribing(feed, page, categories, chosen, (loaded as? TtrssRepository.Categories.Failed)?.message)
+    }
+
+    fun chooseCategory(id: Int) {
+        val s = add.value as? AddState.Subscribing ?: return
+        if (s.categories?.any { it.id == id } == true) _add.value = s.copy(chosen = id)
+    }
+
+    /** Asks tt-rss to subscribe, once: the dialog moves on to Asking, so a second tap finds nothing to do. */
+    fun subscribeInTtrss() {
+        val s = add.value as? AddState.Subscribing ?: return
+        val category = s.categories?.firstOrNull { it.id == s.chosen } ?: return
+        val subscriptions = subscriptions ?: return
+        val request = TtrssSubscriptions.Request(s.feed.url, s.feed.title, category, s.page)
+        _add.value = AddState.Asking(request)
+        // False when it's being asked already, from a dialog closed earlier: that answer comes here too.
+        subscriptions.subscribe(request)
+        viewModelScope.launch { settings?.update { it.copy(lastCategoryId = category.id) } }
+    }
+
+    /** Outcomes from tt-rss that haven't been shown; [take] shows one. */
+    val subscribeResults: StateFlow<List<TtrssSubscriptions.Result>> = subscriptions?.results ?: MutableStateFlow(emptyList())
+
+    private val _notices = MutableStateFlow<List<Notice>>(emptyList())
+    /** Snackbar lines waiting to be shown, oldest first; the screen calls [noticeShown] after each. */
+    val notices: StateFlow<List<Notice>> = _notices.asStateFlow()
+    private var nextNotice = 0L
+
+    fun noticeShown(notice: Notice) { _notices.value -= notice }
+
+    private fun notify(text: String, undo: Notice.Undone? = null) { _notices.value += Notice(nextNotice++, text, undo) }
+
+    /**
+     * Shows what tt-rss answered: in the dialog if it's still open on that feed, else as a
+     * snackbar line. A feed added says so in the snackbar either way, with Undo.
+     */
+    fun take(result: TtrssSubscriptions.Result) {
+        subscriptions?.shown(result.id)
+        when (val outcome = result.outcome) {
+            is TtrssSubscriptions.Outcome.Subscribed -> {
+                val request = outcome.request
+                val open = (add.value as? AddState.Asking)?.request?.feedUrl == request.feedUrl
+                val title = request.title ?: SourceRepository.hostOf(request.feedUrl)
+                when (val answer = outcome.answer) {
+                    is TtrssRepository.Subscribed.Added -> {
+                        if (open) _add.value = AddState.Closed
+                        val outside = screen.value?.server?.account?.ttrssCategoryTitle?.takeIf { answer.outsidePaper }
+                        notify(
+                            "Added to your tt-rss, in ${answer.category ?: UNCATEGORIZED}." + outside?.let { " Your paper takes articles from $it only." }.orEmpty(),
+                            answer.feedId?.let { Notice.Undone(request, it) },
+                        )
+                    }
+                    is TtrssRepository.Subscribed.Already -> {
+                        val feed = answer.feed
+                        val known = AddState.AlreadyIn(feed?.title ?: title, feed?.category, feed?.leftOut == true, feed?.outsideCategory == true)
+                        if (open) _add.value = known else notify(alreadyLine(known))
+                    }
+                    is TtrssRepository.Subscribed.Failed ->
+                        if (open) _add.value = AddState.Refused(title, answer.reason, answer.couldntFetch, request.page)
+                        else notify("tt-rss didn't add $title. ${answer.reason}")
+                }
+            }
+            is TtrssSubscriptions.Outcome.Unsubscribed -> {
+                val title = outcome.request.title ?: SourceRepository.hostOf(outcome.request.feedUrl)
+                notify(outcome.error?.let { "Couldn't take $title out of your tt-rss. $it" } ?: "Took $title out of your tt-rss.")
+            }
+        }
+    }
+
+    /** Undo for a feed just added: unsubscribes it in tt-rss. */
+    fun undo(undone: Notice.Undone) {
+        subscriptions?.unsubscribe(undone.request, undone.feedId)
+    }
+
+    /** A site with no feed, or one tt-rss can't follow: its page goes to the reading list instead, so the reader isn't left at a dead end. */
     fun saveInstead() {
-        val page = (add.value as? AddState.Editing)?.page ?: return
+        val page = when (val s = add.value) {
+            is AddState.Editing -> s.page
+            is AddState.NoFeed -> s.page
+            is AddState.Refused -> s.page
+            else -> null
+        } ?: return
         val save = saveToReadingList ?: return
         _add.value = AddState.Closed
         viewModelScope.launch {
@@ -203,9 +373,15 @@ class SourcesViewModel(
     }
 
     fun choose(feed: FoundFeed) {
-        viewModelScope.launch {
-            subscribe(feed)
-            _add.value = AddState.Closed
+        val choosing = add.value as? AddState.Choosing ?: return
+        val server = toServer
+        search = viewModelScope.launch {
+            if (server) {
+                toSubscribe(feed, choosing.page)
+            } else {
+                subscribe(feed)
+                _add.value = AddState.Closed
+            }
         }
     }
 

@@ -69,6 +69,14 @@ import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import com.app.newspaperss.data.TtrssSubscriptions
+import com.app.newspaperss.ui.sources.AddState
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import androidx.compose.ui.test.onNodeWithContentDescription
 import com.app.newspaperss.ui.sources.SourceDetailScreen
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.core.extract.ContentMode
@@ -80,6 +88,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import org.junit.Assert.assertNull
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -650,5 +659,124 @@ class ScreenshotTest {
     fun settingsNotes() {
         val vm = SettingsViewModel(store) {}
         shoot("07f-settings-notes", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.NOTES, onBack = {}) }
+    }
+
+    /**
+     * Adding a site in the server setup, at [state]: signed in to a tt-rss with four categories,
+     * Science used last. Quanta Magazine's page advertises its feed.
+     */
+    private fun shootServerAdd(name: String, state: (SourcesViewModel) -> Boolean, server: FakeTtrss.() -> Unit = {}, act: (SourcesViewModel) -> Unit) {
+        val fake = FakeTtrss(ttrssHttp).apply {
+            listOf("Essays", "News", "Science", "Tech").forEachIndexed { i, name -> categories[i + 1] = name }
+            titles["https://www.quantamagazine.org/feed/"] = "Quanta Magazine"
+            server()
+        }
+        ttrssHttp.page("https://quantamagazine.org", """<html><head><link rel="alternate" type="application/rss+xml" title="Quanta Magazine" href="https://www.quantamagazine.org/feed/"></head></html>""")
+        val repo = SourceRepository(db)
+        runBlocking {
+            assertNull(ttrss.connect("rss.example.com/tt-rss", fake.user, fake.password))
+            store.update { it.copy(feedsFrom = FeedsFrom.SERVER, lastCategoryId = 3) }
+        }
+        val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+        val vm = SourcesViewModel(repo, FeedFinder(ttrssHttp), ttrss, saveToReadingList = { true }, settings = store, subscriptions = TtrssSubscriptions(ttrss, scope)) {}
+        try {
+            shoot(
+                name, ready = { vm.screen.value?.server != null }, dialog = true,
+                act = {
+                    act(vm)
+                    idleUntil { compose.waitForIdle(); state(vm) }
+                },
+            ) { SourcesScreen(vm) }
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    private fun SourcesViewModel.typeAndFind(address: String) {
+        openAdd()
+        editInput(address)
+        find()
+    }
+
+    private val categoriesLoaded: (SourcesViewModel) -> Boolean = { (it.add.value as? AddState.Subscribing)?.categories != null }
+
+    @Test
+    fun addingASiteWithAServer() =
+        shootServerAdd("09a-add-server-subscribe", categoriesLoaded) { it.typeAndFind("quantamagazine.org") }
+
+    @Test
+    fun addingASiteWithAServerPickingACategory() =
+        shootServerAdd("09b-add-server-category", categoriesLoaded) {
+            it.typeAndFind("quantamagazine.org")
+            idleUntil { compose.waitForIdle(); categoriesLoaded(it) }
+            compose.onNodeWithContentDescription("Category, Science").performClick()
+        }
+
+    @Test
+    fun addingASiteWithAServerAsking() =
+        shootServerAdd("09c-add-server-asking", { it.add.value is AddState.Asking }, server = { subscribeGate = CompletableDeferred() }) {
+            it.typeAndFind("quantamagazine.org")
+            idleUntil { compose.waitForIdle(); categoriesLoaded(it) }
+            it.subscribeInTtrss()
+        }
+
+    @Test
+    fun addingASiteAlreadyInTtrss() =
+        shootServerAdd("09d-add-server-already", { it.add.value is AddState.AlreadyIn }, server = { feeds[6] = FakeTtrss.Feed("Quanta Magazine", "https://www.quantamagazine.org/feed/", categoryId = 3) }) {
+            it.typeAndFind("quantamagazine.org")
+            idleUntil { compose.waitForIdle(); categoriesLoaded(it) }
+            it.subscribeInTtrss()
+        }
+
+    @Test
+    fun addingASiteTtrssCantFetch() =
+        shootServerAdd("09e-add-server-cant-fetch", { it.add.value is AddState.Refused }, server = { subscribeCode = 5 }) {
+            ttrssHttp.page(
+                "https://www.quantamagazine.org/a-new-proof-20261001/",
+                """<html><head><link rel="alternate" type="application/rss+xml" title="Quanta Magazine" href="https://www.quantamagazine.org/feed/"></head></html>""",
+            )
+            it.typeAndFind("https://www.quantamagazine.org/a-new-proof-20261001/")
+            idleUntil { compose.waitForIdle(); categoriesLoaded(it) }
+            it.subscribeInTtrss()
+        }
+
+    @Test
+    fun addingASiteWithNoFeed() =
+        shootServerAdd("09f-add-server-no-feed", { it.add.value is AddState.NoFeed }) {
+            ttrssHttp.page("https://quietpaper.example/2026/10/on-slowness", "<html><body><p>An essay.</p></body></html>")
+            it.typeAndFind("quietpaper.example/2026/10/on-slowness")
+        }
+
+    /** Sources with the feed just added, its first fetch to come, and Undo. */
+    @Test
+    fun aSiteAddedToTtrss() {
+        val fake = FakeTtrss(ttrssHttp).apply {
+            listOf("Essays", "News", "Science", "Tech").forEachIndexed { i, name -> categories[i + 1] = name }
+            feeds[1] = FakeTtrss.Feed("Aeon", "https://aeon.co/feed.rss", categoryId = 1)
+            feeds[2] = FakeTtrss.Feed("New Scientist", "https://www.newscientist.com/feed/home/", categoryId = 3)
+            titles["https://www.quantamagazine.org/feed/"] = "Quanta Magazine"
+        }
+        ttrssHttp.page("https://quantamagazine.org", """<html><head><link rel="alternate" type="application/rss+xml" title="Quanta Magazine" href="https://www.quantamagazine.org/feed/"></head></html>""")
+        runBlocking {
+            assertNull(ttrss.connect("rss.example.com/tt-rss", fake.user, fake.password))
+            store.update { it.copy(feedsFrom = FeedsFrom.SERVER, lastCategoryId = 3) }
+            val account = db.sources().ofKind(com.app.newspaperss.data.SourceKind.TTRSS).single().id
+            db.sources().recordSuccess(account, Instant.now(), null, null, SourceRepository.TTRSS_TITLE)
+        }
+        val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(ttrssHttp), ttrss, settings = store, subscriptions = TtrssSubscriptions(ttrss, scope)) {}
+        try {
+            shoot(
+                "09g-add-server-added", ready = { vm.screen.value?.server != null },
+                act = {
+                    vm.typeAndFind("quantamagazine.org")
+                    idleUntil { compose.waitForIdle(); categoriesLoaded(vm) }
+                    vm.subscribeInTtrss()
+                    idleUntil { compose.waitForIdle(); compose.onAllNodes(hasText("Undo")).fetchSemanticsNodes().isNotEmpty() }
+                },
+            ) { SourcesScreen(vm) }
+        } finally {
+            scope.cancel()
+        }
     }
 }

@@ -119,6 +119,7 @@ abstract class AppDatabase : RoomDatabase() {
                         "`fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, " +
                         "`leftOut` INTEGER NOT NULL DEFAULT 0, `chosenMode` TEXT, `maxArticles` INTEGER, `feedUrl` TEXT, `category` TEXT, " +
                         "`listed` INTEGER NOT NULL DEFAULT 0, `skipPaidPosts` INTEGER NOT NULL DEFAULT 0, `outsideCategory` INTEGER NOT NULL DEFAULT 0, " +
+                        "`awaitingFirstFetch` INTEGER NOT NULL DEFAULT 0, " +
                         "PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
                 )
                 // What the check learned about a feed the reader left to it. With no checkedDay, a

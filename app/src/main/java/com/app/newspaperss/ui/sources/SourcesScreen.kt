@@ -33,6 +33,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalConfiguration
@@ -112,6 +118,19 @@ fun SourcesScreen(
             viewModel.dismissMessage()
         }
     }
+    // tt-rss's answers, which can arrive after the dialog that asked has closed.
+    val results by viewModel.subscribeResults.collectAsState()
+    LaunchedEffect(results) { results.firstOrNull()?.let(viewModel::take) }
+    LaunchedEffect(Unit) {
+        viewModel.notices.collect { waiting ->
+            val notice = waiting.firstOrNull() ?: return@collect
+            val undo = notice.undo
+            val answer = snackbar.showSnackbar(notice.text, actionLabel = undo?.let { "Undo" }, duration = SnackbarDuration.Long)
+            if (answer == SnackbarResult.ActionPerformed && undo != null) viewModel.undo(undo)
+            viewModel.noticeShown(notice)
+        }
+    }
+    val server = screen?.server != null
     Scaffold(
         topBar = {
             TopAppBar(
@@ -121,14 +140,19 @@ fun SourcesScreen(
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Import from another reader (OPML)") },
-                                onClick = { menu = false; importFile.launch(arrayOf("*/*")) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Export your sites (OPML)") },
-                                onClick = { menu = false; exportFile.launch("newspapeRSS-sources.opml") },
-                            )
+                            // With a server, its feeds are tt-rss's to import and export (Preferences › Feeds there).
+                            if (server) {
+                                DropdownMenuItem(text = { Text("Where your feeds come from") }, onClick = { menu = false; onOpenAccount() })
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Import from another reader (OPML)") },
+                                    onClick = { menu = false; importFile.launch(arrayOf("*/*")) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Export your sites (OPML)") },
+                                    onClick = { menu = false; exportFile.launch("newspapeRSS-sources.opml") },
+                                )
+                            }
                         }
                     }
                 },
@@ -138,7 +162,7 @@ fun SourcesScreen(
             ExtendedFloatingActionButton(
                 onClick = viewModel::openAdd,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Add a source") },
+                text = { Text(if (server) "Add a site" else "Add a source") },
                 // Filled like the app's other main buttons: the default pale container turns
                 // almost white on e-ink.
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -175,7 +199,7 @@ fun SourcesScreen(
         }
     }
     val curatedLists by viewModel.curatedLists.collectAsState()
-    AddSourceDialog(add, curatedLists, viewModel)
+    AddSourceDialog(add, curatedLists, viewModel, server)
 }
 
 /** The server setup with no working account: nothing comes from tt-rss until the reader signs in. */
@@ -364,13 +388,17 @@ private fun failingSinceLine(since: Instant, locale: Locale, is24Hour: Boolean, 
     return "Since ${DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)}."
 }
 
+/** A feed just subscribed to in tt-rss, which has nothing to give until tt-rss's own schedule fetches it. */
+internal const val WAITING_FOR_FIRST_FETCH = "Waiting for tt-rss's first fetch"
+
 /**
- * A line under a feed only when it has something to say: its own settings. A line under all of
- * them would be noise.
+ * A line under a feed only when it has something to say: a first fetch still to come, or its own
+ * settings. A line under all of them would be noise.
  */
 internal fun feedNote(feed: FeedChoice): String? {
     val p = feed.publication
     return listOfNotNull(
+        WAITING_FOR_FIRST_FETCH.takeIf { p?.awaitingFirstFetch == true },
         when (p?.chosenMode) {
             ContentMode.FEED -> "Feed's text"
             ContentMode.PAGE -> "Full page"
@@ -489,11 +517,25 @@ internal fun fullTextLine(learned: PublicationEntity?): String? {
 }
 
 @Composable
-private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, viewModel: SourcesViewModel) {
+private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, viewModel: SourcesViewModel, server: Boolean) {
     if (state == AddState.Closed) return
+    // The category list replaces the Subscribe step's content, then Done brings it back.
+    var picking by remember(state is AddState.Subscribing) { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = viewModel::closeAdd,
-        title = { Text(if (state is AddState.Choosing) "Which part of this site?" else "Add a source") },
+        title = {
+            Text(
+                when (state) {
+                    is AddState.Choosing -> "Which part of this site?"
+                    is AddState.Subscribing -> if (picking) "Category" else "Subscribe in your tt-rss"
+                    is AddState.Asking -> "Subscribe in your tt-rss"
+                    is AddState.AlreadyIn -> "Already in your tt-rss"
+                    is AddState.NoFeed -> if (state.list != null) "A curated list" else "No feed on this site"
+                    is AddState.Refused -> if (state.couldntFetch) "tt-rss couldn't fetch it" else "tt-rss didn't add it"
+                    else -> if (server) "Add a site" else "Add a source"
+                },
+            )
+        },
         text = {
             when (state) {
                 // Scrolls: at large text an error plus the curated lists can outgrow the dialog.
@@ -510,12 +552,13 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
                         keyboardActions = KeyboardActions(onGo = { viewModel.find() }),
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (server) Muted("It goes into your tt-rss, so your other reader apps get it too.")
                     if (state.page != null) {
                         TextButton(onClick = viewModel::saveInstead) { Text("Save this page to your reading list instead") }
                     }
                     if (curatedLists.isNotEmpty()) CuratedListChoices(curatedLists, viewModel::addList)
                 }
-                is AddState.Searching -> Text("Checking ${state.input}…")
+                is AddState.Searching -> Text("Checking ${state.input}…", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 is AddState.Choosing -> Column {
                     Text("This site offers more than one set of articles.", modifier = Modifier.padding(bottom = 8.dp))
                     state.feeds.forEach { feed ->
@@ -525,16 +568,94 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
                         )
                     }
                 }
+                is AddState.Subscribing -> if (picking) CategoryChoices(state, viewModel::chooseCategory) else SubscribeStep(state, onPick = { picking = true })
+                is AddState.Asking -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Stepped text rather than a spinner: e-ink redraws the whole screen for an animation.
+                    Text("Asking tt-rss to subscribe…", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                    Muted("A slow server can take half a minute. You can close this; it carries on.")
+                }
+                is AddState.AlreadyIn -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${state.title} is in ${state.category ?: UNCATEGORIZED}.")
+                    alreadyNote(state)?.let { Muted(it) }
+                }
+                is AddState.NoFeed -> Column {
+                    Text(
+                        if (state.list != null) "${state.site} has no feed, but newspapeRSS can read its picks each day, on this phone."
+                        else "${state.site} doesn't offer a feed, so tt-rss can't follow it.",
+                    )
+                    state.list?.let { list -> TextButton(onClick = { viewModel.addList(list) }) { Text("Add ${list.title}") } }
+                    if (state.page != null) TextButton(onClick = viewModel::saveInstead) { Text("Save this page to your reading list") }
+                }
+                is AddState.Refused -> Column {
+                    Text(state.reason)
+                    if (state.couldntFetch) Muted("Some sites block servers, or your server can't reach them.")
+                    if (state.page != null) TextButton(onClick = viewModel::saveInstead) { Text("Save this page to your reading list") }
+                }
                 AddState.Closed -> {}
             }
         },
         confirmButton = {
-            if (state is AddState.Editing) {
-                TextButton(onClick = viewModel::find, enabled = state.input.isNotBlank()) { Text("Add") }
+            when {
+                state is AddState.Editing -> TextButton(onClick = viewModel::find, enabled = state.input.isNotBlank()) { Text("Add") }
+                state is AddState.Subscribing && picking -> TextButton(onClick = { picking = false }) { Text("Done") }
+                state is AddState.Subscribing -> TextButton(onClick = viewModel::subscribeInTtrss, enabled = state.categories != null) { Text("Subscribe") }
+                state is AddState.AlreadyIn -> TextButton(onClick = viewModel::closeAdd) { Text("OK") }
             }
         },
-        dismissButton = { TextButton(onClick = viewModel::closeAdd) { Text("Cancel") } },
+        dismissButton = {
+            when (state) {
+                is AddState.AlreadyIn -> {}
+                is AddState.Asking -> TextButton(onClick = viewModel::closeAdd) { Text("Close") }
+                else -> if (!(state is AddState.Subscribing && picking)) TextButton(onClick = viewModel::closeAdd) { Text("Cancel") }
+            }
+        },
     )
+}
+
+@Composable
+private fun Muted(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+}
+
+/** The feed found, and the tt-rss category it goes into. */
+@Composable
+private fun SubscribeStep(state: AddState.Subscribing, onPick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(state.feed.title ?: SourceRepository.hostOf(state.feed.url), style = MaterialTheme.typography.titleSmall)
+        Muted(state.feed.url.substringAfter("://").removePrefix("www."))
+        Text("Category", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp))
+        val categories = state.categories
+        if (categories == null) {
+            Text("Loading your categories…", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        } else {
+            val name = categories.firstOrNull { it.id == state.chosen }?.title ?: UNCATEGORIZED
+            OutlinedButton(onClick = onPick, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Category, $name" }) {
+                Text(name, modifier = Modifier.weight(1f))
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+        }
+        state.error?.let { Text("Couldn't load your categories. $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        // tt-rss's API can't make a category.
+        Muted("To add a category, make it in tt-rss first.")
+    }
+}
+
+@Composable
+private fun CategoryChoices(state: AddState.Subscribing, onChoose: (Int) -> Unit) {
+    Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
+        state.categories.orEmpty().forEach { category ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .selectable(selected = category.id == state.chosen, role = Role.RadioButton, onClick = { onChoose(category.id) })
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = category.id == state.chosen, onClick = null)
+                Text(category.title, modifier = Modifier.padding(start = 12.dp))
+            }
+        }
+        Muted("To add a category, make it in tt-rss first.")
+    }
 }
 
 /** Sites that aren't feeds but pick a few links a day; one tap adds one. */

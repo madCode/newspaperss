@@ -1,6 +1,7 @@
 package com.app.newspaperss.testutil
 
 import com.app.newspaperss.data.AesGcmCipher
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -32,7 +33,8 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     var ignoreUpdates = false
     /** Run once a getHeadlines for unread articles has been answered: something else happening mid-sync. */
     var afterUnreadHeadlines: (() -> Unit)? = null
-    data class Feed(val title: String, val url: String, val categoryId: Int = 0)
+    /** [fetched]: tt-rss has fetched it at least once; a feed just subscribed to hasn't. */
+    data class Feed(val title: String, val url: String, val categoryId: Int = 0, val fetched: Boolean = true)
     /** getFeeds for every feed, read or not, answers with an HTTP 500. */
     var failFeedList = false
     /** Feeds subscribed to, by id: listed by getFeeds with their address, whether or not they have unread articles. */
@@ -53,6 +55,19 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     var apiLevel = 18
     /** catchupFeed calls: feed or category id, whether it's a category, and the mode. */
     val caughtUp = mutableListOf<Triple<Int, Boolean, String>>()
+    /** subscribeToFeed answers with this status code instead of subscribing. */
+    var subscribeCode: Int? = null
+    /** Answer subscribeToFeed as tt-rss before 2021 did, without the feed's id. */
+    var subscribeWithoutId = false
+    /** subscribeToFeed waits for this before answering, as tt-rss does while it fetches the feed. */
+    var subscribeGate: CompletableDeferred<Unit>? = null
+    /** Names tt-rss gives feeds subscribed to, by address; otherwise their host. */
+    val titles = mutableMapOf<String, String>()
+    /** subscribeToFeed calls: address and category id. */
+    val subscribed = mutableListOf<Pair<String, Int>>()
+    /** unsubscribeFeed calls, by feed id. */
+    val unsubscribed = mutableListOf<Int>()
+    private var nextFeedId = 1000
     private var sessions = 0
     private val live = mutableSetOf<String>()
 
@@ -74,7 +89,12 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
         http.onPost = { url, body -> if (url == apiUrl) handle(Json.parseToJsonElement(body).jsonObject) else 404 to "" }
     }
 
-    private fun handle(request: JsonObject): Pair<Int, String> {
+    /** tt-rss fetches its feeds on its own schedule; this is that happening. */
+    fun fetch(id: Int) {
+        feeds[id] = feeds.getValue(id).copy(fetched = true)
+    }
+
+    private suspend fun handle(request: JsonObject): Pair<Int, String> {
         failWith?.let { return it to "<html>Bad gateway</html>" }
         fun str(key: String) = (request[key] as? JsonPrimitive)?.contentOrNull
         val op = str("op") ?: ""
@@ -102,7 +122,12 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                     }
                     if (str("unread_only") == "false") {
                         feeds.filter { (id, f) -> id !in withUnread && (category == null || f.categoryId == category) }.forEach { (id, f) ->
-                            add(buildJsonObject { put("id", id); put("title", f.title); put("unread", 0); put("cat_id", f.categoryId); put("feed_url", f.url) })
+                            add(
+                                buildJsonObject {
+                                    put("id", id); put("title", f.title); put("unread", 0); put("cat_id", f.categoryId); put("feed_url", f.url)
+                                    put("last_updated", if (f.fetched) 1_759_125_600L else 0L)
+                                },
+                            )
                         }
                     }
                     // As tt-rss does with include_nested: direct subcategories as items of their own.
@@ -171,6 +196,31 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
             "catchupFeed" -> {
                 caughtUp += Triple(str("feed_id")!!.toInt(), str("is_cat") == "true", str("mode") ?: "all")
                 ok(buildJsonObject { put("status", "OK") })
+            }
+            "subscribeToFeed" -> {
+                val url = str("feed_url")!!
+                val category = str("category_id")!!.toInt()
+                subscribed += url to category
+                subscribeGate?.await()
+                val existing = feeds.entries.firstOrNull { it.value.url == url }?.key
+                val (code, id) = when {
+                    subscribeCode != null -> subscribeCode!! to null
+                    existing != null -> 0 to existing
+                    else -> {
+                        val id = nextFeedId++
+                        feeds[id] = Feed(titles[url] ?: java.net.URI(url).host, url, category, fetched = false)
+                        1 to id
+                    }
+                }
+                ok(buildJsonObject { put("status", buildJsonObject { put("code", code); if (id != null && !subscribeWithoutId) put("feed_id", id) }) })
+            }
+            "unsubscribeFeed" -> {
+                val id = str("feed_id")!!.toInt()
+                unsubscribed += id
+                // tt-rss deletes the feed's articles with it.
+                unread.removeAll { it.feedId == id }
+                read.removeAll { it.feedId == id }
+                if (feeds.remove(id) == null) error("E_OPERATION_FAILED") else ok(buildJsonObject { put("status", "OK") })
             }
             "logout" -> {
                 live -= str("sid")!!

@@ -109,6 +109,10 @@ interface SourceDao {
     @Query("UPDATE publications SET listed = 0, outsideCategory = 0 WHERE sourceId = :sourceId")
     suspend fun unlistPublications(sourceId: Long)
 
+    /** tt-rss has fetched these feeds: they have unread articles there. */
+    @Query("UPDATE publications SET awaitingFirstFetch = 0 WHERE sourceId = :sourceId AND `key` IN (:keys) AND awaitingFirstFetch = 1")
+    suspend fun fetchedByServer(sourceId: Long, keys: List<String>)
+
     @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")
     suspend fun setMarkReadOnServer(id: Long, markRead: Boolean)
 

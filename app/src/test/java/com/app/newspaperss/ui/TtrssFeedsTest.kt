@@ -39,7 +39,7 @@ import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import com.app.newspaperss.ui.sources.feedNote
-import com.app.newspaperss.ui.sources.sameFeed
+import com.app.newspaperss.data.sameFeed
 import com.app.newspaperss.core.extract.ContentMode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 7,
-    "identityHash": "faf300a097ee67029cd8ad0f1fd8e7f4",
+    "identityHash": "6bab5a9f9f3c6ff02a342fcfcbd6de7a",
     "entities": [
       {
         "tableName": "sources",
@@ -516,7 +516,7 @@
       },
       {
         "tableName": "publications",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, `leftOut` INTEGER NOT NULL DEFAULT 0, `chosenMode` TEXT, `maxArticles` INTEGER, `skipPaidPosts` INTEGER NOT NULL DEFAULT 0, `feedUrl` TEXT, `category` TEXT, `listed` INTEGER NOT NULL DEFAULT 0, `outsideCategory` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, `fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, `leftOut` INTEGER NOT NULL DEFAULT 0, `chosenMode` TEXT, `maxArticles` INTEGER, `skipPaidPosts` INTEGER NOT NULL DEFAULT 0, `feedUrl` TEXT, `category` TEXT, `listed` INTEGER NOT NULL DEFAULT 0, `outsideCategory` INTEGER NOT NULL DEFAULT 0, `awaitingFirstFetch` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "sourceId",
@@ -609,6 +609,13 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
+          },
+          {
+            "fieldPath": "awaitingFirstFetch",
+            "columnName": "awaitingFirstFetch",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -635,7 +642,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'faf300a097ee67029cd8ad0f1fd8e7f4')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6bab5a9f9f3c6ff02a342fcfcbd6de7a')"
     ]
   }
 }

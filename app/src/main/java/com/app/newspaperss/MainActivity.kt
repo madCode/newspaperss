@@ -197,7 +197,10 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel {
-                    SourcesViewModel(container.sources, container.feedFinder, container.ttrss, saveToReadingList = { container.readingList.save(it) }, settings = container.settings) {
+                    SourcesViewModel(
+                        container.sources, container.feedFinder, container.ttrss, saveToReadingList = { container.readingList.save(it) },
+                        settings = container.settings, subscriptions = container.ttrssSubscriptions,
+                    ) {
                         SyncWorker.syncNow(context)
                     }
                 }

@@ -323,6 +323,7 @@ private fun FeedHeader(publication: PublicationEntity?) {
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(listOfNotNull("In your tt-rss", publication?.category?.let { "category $it" }).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
         publication?.feedUrl?.let { Text(SourceRepository.hostOf(it), style = MaterialTheme.typography.bodyMedium, color = muted) }
+        if (publication?.awaitingFirstFetch == true) Text("$WAITING_FOR_FIRST_FETCH. Its first articles come once tt-rss has fetched it, usually within the hour.")
         if (publication?.leftOut == true) {
             Text("Left out of the paper. It stays in your tt-rss and isn't fetched. Starred articles from it still go in.")
         } else {

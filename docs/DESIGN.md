@@ -442,9 +442,10 @@ phone restarts.
     - **From your tt-rss:** each category a heading, "News · 9 feeds"
       ("News, 9 feeds" to TalkBack), its feeds A to Z under it. Feeds with
       no category go under **Uncategorized**, last. A line under a feed only
-      when it says something: its own settings ("Feed's text", "Full page",
-      "At most 2", "Skips paid posts"). Each opens its own page, which says
-      "In your tt-rss · category News". Right after Articles from changes,
+      when it says something: "Waiting for tt-rss's first fetch" for a feed
+      just added, or its own settings ("Feed's text", "Full page", "At most
+      2", "Skips paid posts"). Each opens its own page, which says "In your
+      tt-rss · category News". Right after Articles from changes,
       until the next check lists the new category, it says "Your feeds in
       Science show here after the next check" instead.
     - **Not in your paper**, when the paper takes from one category: "43
@@ -486,8 +487,37 @@ phone restarts.
   - Nothing moves: a marked-read row stays in place with `○`, and
     entering or leaving selection doesn't shift the list, so e-ink
     doesn't redraw it.
-  Add a source, or import or export OPML. Getting or leaving a server is
-  in Settings.
+  - **Without a server**, **Add a source** finds a site's feed and adds it
+    to the phone, offers the curated lists, or saves a page with no feed to
+    the reading list. The ⋮ menu imports or exports OPML.
+  - **With a server**, **Add a site** puts the site into tt-rss, so other
+    reader apps get it too:
+    - The phone finds the feed first, with the same finder (and "Which
+      part of this site?").
+    - Already in tt-rss (matched by address): "Already in your tt-rss",
+      "Quanta Magazine is in Science.", and nothing else.
+    - Otherwise **Subscribe in your tt-rss**, with a **Category** picker:
+      the category used last, else the one the paper takes articles from,
+      else Uncategorized. "To add a category, make it in tt-rss first":
+      tt-rss's API can't make one.
+    - **Asking tt-rss to subscribe…**, in plain text with no spinner. It
+      can take half a minute, as tt-rss downloads the feed first. Closing
+      the dialog doesn't stop it.
+    - Then a snackbar, "Added to your tt-rss, in Science.", with **Undo**,
+      which unsubscribes it. The feed's row appears at once, waiting for
+      tt-rss's first fetch.
+    - tt-rss refusing (it couldn't download or read the feed, an old
+      server, a read-only account) says why in plain words, and offers
+      **Save this page to your reading list** when the address typed was an
+      article. Fetching it from the phone instead is an open question.
+    - A site with no feed: "No feed on this site", with **Save this page to
+      your reading list**, or **Add Arts & Letters Daily** when the site is
+      one of the curated lists, which stay on the phone.
+    - If the dialog was closed, the answer comes as a snackbar when Sources
+      is open.
+    - The ⋮ menu has **Where your feeds come from** instead of OPML: tt-rss
+      imports and exports OPML itself. No starter packs are offered.
+  Getting or leaving a server is in Settings.
 - **Reading list:** links you shared into the app, each with its title,
   site and reading time (looked up in the background). They go first in
   the next edition. Import and export as a Markdown

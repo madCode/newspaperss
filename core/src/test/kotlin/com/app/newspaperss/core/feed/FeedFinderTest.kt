@@ -42,6 +42,7 @@ class FeedFinderTest {
             listOf(FoundFeed("https://example.com/feed.xml", "Posts"), FoundFeed("https://cdn.example.com/atom", null)),
             result.feeds,
         )
+        assertNull("a front page isn't one to save to read later", result.page)
     }
 
     @Test
@@ -49,6 +50,15 @@ class FeedFinderTest {
         val http = FakeHttp(mapOf("https://example.com/rss" to feedXml))
         val result = FeedFinder(http).find("https://example.com/rss") as FindResult.Found
         assertEquals(listOf(FoundFeed("https://example.com/rss", "Site feed")), result.feeds)
+        assertNull("the feed itself isn't a page to read", result.page)
+    }
+
+    @Test
+    fun anArticleWithAFeedKeepsTheArticleToSaveInstead() = runTest {
+        val article = "<html><head><link rel=\"alternate\" type=\"application/rss+xml\" href=\"/feed\"></head></html>"
+        val http = FakeHttp(mapOf("https://example.com/2026/10/a-story" to article))
+        val result = FeedFinder(http).find("example.com/2026/10/a-story") as FindResult.Found
+        assertEquals("https://example.com/2026/10/a-story", result.page)
     }
 
     @Test

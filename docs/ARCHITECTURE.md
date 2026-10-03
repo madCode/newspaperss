@@ -126,7 +126,7 @@ The steps, with where they live:
    unpaused source except the reading list, four at a time. Feeds go
    through `FeedParser`, tt-rss through `TtrssClient`, curated lists
    through `CuratedLists`; once a day a tt-rss sync also asks for the
-   account's whole feed list (`FeedSync.listFeeds`) to name its
+   account's whole feed list (`listTtrssFeeds`) to name its
    publications. It then
    expires old waiting articles, forgets delivered links after a year and
    drops old feed text.
@@ -280,6 +280,7 @@ erDiagram
         string category "tt-rss"
         bool listed "tt-rss: in the latest list"
         bool outsideCategory "tt-rss: in the account, outside Articles from"
+        bool awaitingFirstFetch "tt-rss: not fetched there yet"
     }
     articles {
         long id PK
@@ -324,7 +325,7 @@ erDiagram
 - **A publication's row** is written only once there's something to keep;
   no row means the defaults. Every read-modify-write of one runs in a
   transaction (`SourceRepository.editPublication`, `recordFullText`,
-  `setFeedInPaper`, `FeedSync.listFeeds`), so none drops another's fields.
+  `setFeedInPaper`, `listTtrssFeeds`), so none drops another's fields.
 - **`sources` keeps some unused columns** (`section`, `maxArticles`,
   `contentModeChosen`, the old check state): dropping a column means
   rebuilding the table, and with foreign keys on that would delete every
@@ -388,13 +389,32 @@ setup too: with `SERVER` it shows the account, then what's on the phone,
 then the account's feeds by `publications.category`; with `PHONE` nothing
 of tt-rss. Its rows, the tt-rss part and the sign-in state load as one
 value (`SourcesViewModel.screen`), so nothing lands above rows already
-shown. The once-a-day feed list (`FeedSync.listFeeds`) marks feeds in the
+shown. The once-a-day feed list (`listTtrssFeeds`, in `FeedSync.kt`) marks feeds in the
 chosen category `listed` and, with a category chosen, asks for the rest
 and marks them `outsideCategory`: that's "Not in your paper". Both flags
 are cleared and redrawn together, and ignored while `feedsListedAt` is
 null after the category changes. Leaving the server
 is `TtrssRepository.signOut`: the login and the tt-rss source go, and with
 it, by cascade, its articles.
+
+**Adding a site with a server** subscribes in tt-rss rather than adding a
+phone feed. The phone finds the feed (`FeedFinder`), `TtrssRepository.feedAt`
+checks the account's listed feeds with `sameFeed`, and
+`TtrssRepository.subscribe` calls `TtrssClient.subscribeToFeed`, then lists
+the feeds at once (`listTtrssFeeds`, outside the daily gate, which keeps
+`feedsListedAt` set), so the row shows and Undo has the feed id even from
+a tt-rss too old to return it. tt-rss downloads the feed before it answers,
+so `TtrssSubscriptions` runs the request in the container's `appScope`:
+closing the dialog or leaving Sources doesn't cancel it, and the outcome
+waits in its `results` until Sources shows it, in the dialog if it's still
+open on that feed, else as a snackbar. A worker would survive the process
+dying, but an answer it got couldn't reach an open dialog or offer Undo;
+a subscribe cut off that way is in tt-rss anyway, and the next daily list
+shows it. Undo (`TtrssRepository.unsubscribe`) unsubscribes, expires the
+feed's waiting articles (a sync may have brought some in the meantime)
+and lists again. A feed tt-rss hasn't fetched yet (`last_updated` 0) is
+`awaitingFirstFetch` until a sync sees unread articles from it or the
+next list. The last category used is the setting `lastCategoryId`.
 
 ## Doing things safely at the same time
 
@@ -410,7 +430,11 @@ it, by cascade, its articles.
   `NonCancellable` before rethrowing.
 - **Short-lived callers hand off:** receivers use `goAsync()` and the
   container's `appScope`, and work that may be slow (notes to a cloud
-  folder, tt-rss) goes to a worker.
+  folder, tt-rss) goes to a worker. Subscribing in tt-rss is the
+  exception, in `appScope`, since its answer goes back to the screen.
+- **One subscribe per feed at a time:** `TtrssSubscriptions` won't ask
+  tt-rss about a feed it's already asking about, so a double tap sends one
+  request.
 
 ## Tests and CI
 

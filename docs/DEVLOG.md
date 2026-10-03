@@ -14,6 +14,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 85: adding a site to your tt-rss
+- **From you:** build step (c) of the server-or-phone design: with a server, Add puts the site into tt-rss, with fallbacks when it can't.
+- **Shipped:** with a server, **Add a site** finds the feed on the phone as before, then asks **Subscribe in your tt-rss** with a category picker (the one used last, else the paper's, else Uncategorized; "To add a category, make it in tt-rss first"). "Asking tt-rss to subscribe…" can be closed: the request carries on in the app, and the answer comes as a snackbar, "Added to your tt-rss, in Science.", with **Undo**, which unsubscribes it and lets go of anything it brought meanwhile. The feed list is read again straight away, so the new row shows at once, "Waiting for tt-rss's first fetch", on Sources and its page. A feed already there says "Already in your tt-rss" and its category, matched by address or by tt-rss's own answer. tt-rss refusing says why in words (it couldn't download or read the feed, an old server, a read-only account) and offers the reading list for an article; a site with no feed offers the reading list, or Arts & Letters Daily when that's the site. With a server, the Sources ⋮ menu has Where your feeds come from instead of OPML. On the phone, nothing changes. tt-rss's subscribe status codes are checked against its source.
+- **Review caught:** pending.
+- **Decided for you:**
+  - The subscribe runs in the app, not as background work: its answer goes back to the dialog or a snackbar with Undo. If the app is closed mid-way, tt-rss still adds it, and the next daily list shows it.
+  - No "fetch it from this phone instead" when tt-rss can't: that's your open question.
+  - The reading-list fallback is offered only for an article's address, not a site's front page, as on the phone setup.
+  - The curated lists stay offered in the Add dialog with a server, as on the phone: they're on the phone in both setups.
+  - The starter packs weren't offered anywhere after onboarding, and onboarding already hid them with a server, so nothing else changed there.
+  - New categories come from tt-rss: the picker lists empty ones too, so one just made there shows.
+
 ### Cycle 84: Sources for a server
 - **From you:** build step (b) of the server-or-phone design: Sources for the server setup, P1 v3 of the mockups.
 - **Shipped:** with a server, Sources starts with **Your tt-rss · host** ("54 feeds in your paper", or what's wrong in words with a ⚠, such as "Couldn't reach tt-rss. Since 6:10 AM. Showing what it last listed."), which opens Settings › Where your feeds come from. Then **On this phone** (the reading list, curated lists, any phone feeds), then **From your tt-rss**: each category a TalkBack heading ("News, 9 feeds") with its feeds A to Z, Uncategorized last, each feed opening its page ("In your tt-rss · category News"). A line under a feed only for its own settings. **Not in your paper** counts the feeds outside a chosen category and opens a page listing them by category; **Left out · N** opens the left-out feeds. Without a server, Sources is today's list with nothing of tt-rss. The inset feeds, the fold button and its saved setting, the "Also on this phone" and "Also in your tt-rss" lines and the tt-rss-last sort on Sources are gone. The daily feed list now also lists the account's other feeds when a category is chosen (a new `outsideCategory` flag, folded into this branch's unreleased database step). A paused tt-rss account gets **Resume** in Settings.

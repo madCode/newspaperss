@@ -16,6 +16,7 @@ import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssAccountStore
 import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.data.TtrssSubscriptions
 import com.app.newspaperss.edition.AndroidImageEncoder
 import com.app.newspaperss.edition.ArticleContentProvider
 import com.app.newspaperss.edition.CoverRenderer
@@ -64,6 +65,7 @@ class AppContainer(
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)
+    val ttrssSubscriptions = TtrssSubscriptions(ttrss, appScope)
     val feedSync = FeedSync(db, http, ttrssAccounts = ttrssAccounts, onUntitled = fetchReadingListTitles)
     val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render)
     val settings = SettingsStore(context)

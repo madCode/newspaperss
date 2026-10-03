@@ -360,4 +360,118 @@ class TtrssClientTest {
             assertEquals(listOf("login", "catchupFeed", "login"), server.sent.map { it["op"]!!.toString().trim('"') })
         }
     }
+
+    private fun ops() = server.sent.map { it["op"]!!.toString().trim('"') }
+
+    @Test
+    fun subscribingSendsTheFeedAndCategoryAndReadsTheNewFeedsId() = runTest {
+        server.reply(loggedIn)
+        // As tt-rss 21+ answers: the status is an object with the new feed's id.
+        server.reply(ok("""{"status":{"code":1,"feed_id":321}}"""))
+        assertEquals(TtrssSubscription.Added(321), client().subscribeToFeed("https://science.example/feed", 4))
+        assertEquals(
+            Json.parseToJsonElement("""{"sid":"sid-1","op":"subscribeToFeed","feed_url":"https://science.example/feed","category_id":4}"""),
+            server.sent.last(),
+        )
+    }
+
+    @Test
+    fun anOlderServerSaysAddedWithoutAnId() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""{"status":{"code":"1"}}"""))
+        assertEquals(TtrssSubscription.Added(null), client().subscribeToFeed("https://science.example/feed", 0))
+    }
+
+    @Test
+    fun alreadySubscribedGivesTheFeedItIsAlready() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""{"status":{"code":0,"feed_id":17}}"""))
+        assertEquals(TtrssSubscription.AlreadySubscribed(17), client().subscribeToFeed("https://science.example/feed", 0))
+    }
+
+    @Test
+    fun eachRefusalIsSaidInWordsAndTheFetchFailuresAreToldApart() = runTest {
+        val answers = (2..9).map { code ->
+            server.reply(loggedIn)
+            server.reply(ok("""{"status":{"code":$code,"message":"secret detail from the server"}}"""))
+            client().subscribeToFeed("https://science.example/feed", 0) as TtrssSubscription.Refused
+        }
+        assertEquals((2..9).toList(), answers.map { it.code })
+        assertEquals("couldn't download, couldn't parse, or a page instead of a feed", listOf(3, 5, 6), answers.filter { it.couldntFetch }.map { it.code })
+        assertEquals("tt-rss couldn't download it.", answers.single { it.code == 5 }.reason)
+        assertEquals("tt-rss didn't subscribe to it (code 9).", answers.last().reason)
+        assertTrue("the server's own message isn't shown", answers.none { "secret" in it.reason })
+    }
+
+    @Test
+    fun aSubscribeAnswerWithNoCodeIsNotTtrss() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""{"status":"OK"}"""))
+        try {
+            client().subscribeToFeed("https://science.example/feed", 0)
+            fail("expected NotTtrss")
+        } catch (e: TtrssException.NotTtrss) {
+        }
+    }
+
+    @Test
+    fun unsubscribingSendsTheFeedsId() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""{"status":"OK"}"""))
+        client().unsubscribeFeed(321)
+        assertEquals(Json.parseToJsonElement("""{"sid":"sid-1","op":"unsubscribeFeed","feed_id":321}"""), server.sent.last())
+    }
+
+    @Test
+    fun unsubscribingAFeedThatIsntThereIsAnError() = runTest {
+        server.reply(loggedIn)
+        server.reply(error("E_OPERATION_FAILED"))
+        try {
+            client().unsubscribeFeed(321)
+            fail("expected ApiError")
+        } catch (e: TtrssException.ApiError) {
+            assertEquals("E_OPERATION_FAILED", e.code)
+        }
+    }
+
+    @Test
+    fun aServerBeforeLevelFiveIsNeverAskedToSubscribeOrUnsubscribe() = runTest {
+        server.reply(ok("""{"session_id":"sid-1","api_level":4}"""))
+        val client = client()
+        try {
+            client.subscribeToFeed("https://science.example/feed", 0)
+            fail("expected TooOld")
+        } catch (e: TtrssException.TooOld) {
+            assertEquals(TtrssClient.TOO_OLD_TO_SUBSCRIBE, e.message)
+        }
+        try {
+            client.unsubscribeFeed(321)
+            fail("expected TooOld")
+        } catch (e: TtrssException.TooOld) {
+        }
+        assertEquals(listOf("login"), ops())
+    }
+
+    @Test
+    fun levelFiveIsEnough() = runTest {
+        server.reply(ok("""{"session_id":"sid-1","api_level":5}"""))
+        server.reply(ok("""{"status":{"code":1}}"""))
+        assertEquals(TtrssSubscription.Added(null), client().subscribeToFeed("https://science.example/feed", 0))
+    }
+
+    @Test
+    fun categoriesCanIncludeEmptyOnes() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""[{"id":0,"title":"Uncategorized"},{"id":"4","title":"Science"}]"""))
+        assertEquals(listOf(TtrssCategory(0, "Uncategorized"), TtrssCategory(4, "Science")), client().categories(includeEmpty = true))
+        assertEquals("true", server.sent.last()["include_empty"].toString())
+    }
+
+    @Test
+    fun aFeedsLastFetchIsRead() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""[{"id":5,"title":"New","unread":0,"cat_id":0,"feed_url":"https://new.example/feed","last_updated":0},
+            {"id":6,"title":"Old","unread":2,"cat_id":0,"last_updated":1759125600},{"id":7,"title":"Older version","unread":0}]"""))
+        assertEquals(listOf(0L, 1_759_125_600L, null), client().allFeeds().map { it.lastUpdated })
+    }
 }

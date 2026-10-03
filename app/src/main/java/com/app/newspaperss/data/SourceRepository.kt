@@ -38,6 +38,12 @@ data class FeedChoice(val originId: String, val title: String, val inPaper: Bool
 /** For A to Z: a leading "The" or "A" doesn't count, as in a library. */
 fun sortTitle(title: String) = title.trim().lowercase().removePrefix("the ").removePrefix("a ")
 
+/** The same feed address, give or take its scheme, "www." and a trailing slash. */
+fun sameFeed(a: String, b: String): Boolean {
+    fun plain(url: String) = url.trim().lowercase().substringAfter("://").removePrefix("www.").trimEnd('/')
+    return plain(a) == plain(b)
+}
+
 class SourceRepository(private val db: AppDatabase, private val clock: Clock = Clock.systemUTC()) {
     private val sources = db.sources()
 
