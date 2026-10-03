@@ -6,6 +6,8 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isDialog
+import com.app.newspaperss.ui.sources.LeftOutScreen
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
@@ -82,14 +84,18 @@ class ScreenshotTest {
     private val store by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
     private val out = File("build/screenshots").apply { mkdirs() }
 
-    /** [act] runs once [ready], before the capture, e.g. to enter a mode through the UI. */
-    private fun shoot(name: String, ready: () -> Boolean = { true }, act: () -> Unit = {}, content: @Composable () -> Unit) {
+    /**
+     * [act] runs once [ready], before the capture, e.g. to enter a mode through the UI. With
+     * [dialog], the open dialog is captured: it's a window of its own, not part of the root.
+     */
+    private fun shoot(name: String, ready: () -> Boolean = { true }, act: () -> Unit = {}, dialog: Boolean = false, content: @Composable () -> Unit) {
         compose.setContent { NewspaperssTheme(content) }
         idleUntil(condition = ready)
         compose.waitForIdle()
         act()
         compose.waitForIdle()
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val node = if (dialog) compose.onNode(isDialog()) else compose.onRoot()
+        val bitmap = node.captureToImage().asAndroidBitmap()
         File(out, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
@@ -253,6 +259,129 @@ class ScreenshotTest {
                 compose.onNode(second).performClick()
             },
         ) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    /**
+     * A tt-rss account listed by tt-rss: feeds with settings of their own, one also added on the
+     * phone, two left out, and articles from one of them.
+     */
+    private fun ttrssAccount(repo: SourceRepository): Long = runBlocking {
+        repo.addFeed("https://www.theguardian.com/world/rss", "The Guardian: World")
+        repo.addFeed("https://aeon.co/feed.rss", "Aeon")
+        val account = repo.addTtrss("https://rss.example.com/tt-rss/api/")
+        db.sources().recordSuccess(account, Instant.now(), null, null, SourceRepository.TTRSS_TITLE)
+        fun feed(key: String, title: String, url: String, category: String) =
+            PublicationEntity(account, key, title = title, feedUrl = url, category = category, listed = true)
+        listOf(
+            feed("1", "Ars Technica", "https://feeds.arstechnica.com/arstechnica/index", "Tech"),
+            feed("2", "BBC News", "https://feeds.bbci.co.uk/news/rss.xml", "News").copy(maxArticles = 1),
+            feed("3", "Aeon", "https://aeon.co/feed.rss", "Essays"),
+            feed("4", "Longreads", "https://longreads.com/feed/", "Essays").copy(section = "Long reads", chosenMode = ContentMode.PAGE),
+            feed("5", "Quanta Magazine", "https://www.quantamagazine.org/feed/", "Science"),
+            feed("6", "The Marginalian", "https://www.themarginalian.org/feed/", "Essays"),
+            feed("7", "Hacker News", "https://news.ycombinator.com/rss", "Tech").copy(leftOut = true),
+            feed("8", "Slashdot", "https://rss.slashdot.org/Slashdot/slashdotMain", "Tech").copy(leftOut = true),
+        ).forEach { db.sources().savePublication(it) }
+        db.sources().setFeedsListed(account, Instant.now())
+        val stories = listOf(
+            "How a quiet lab rebuilt the atomic clock",
+            "The mathematicians who count the uncountable",
+            "Why some ice is older than it should be",
+            "A new map of the brain's wiring",
+        )
+        db.articles().insertNew(
+            stories.mapIndexed { i, t ->
+                ArticleEntity(
+                    sourceId = account, guid = "ttrss:5$i", url = "https://www.quantamagazine.org/$i", title = t,
+                    originId = "5", originTitle = "Quanta Magazine", discoveredAt = Instant.now().minusSeconds(3_600L * (i + 1)),
+                )
+            },
+        )
+        account
+    }
+
+    private fun sourcesWithTtrss(open: Boolean): SourcesViewModel {
+        val repo = SourceRepository(db)
+        ttrssAccount(repo)
+        runBlocking { store.update { it.copy(feedsShown = open) } }
+        return SourcesViewModel(repo, FeedFinder(FakeHttp()), settings = store) {}
+    }
+
+    @Test
+    fun sourcesWithTtrssFolded() {
+        val vm = sourcesWithTtrss(open = false)
+        shoot("08a-sources-ttrss-folded", ready = { vm.rows.value?.any { it.feeds.isNotEmpty() } == true }) { SourcesScreen(vm) }
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1400dp-xxhdpi")
+    fun sourcesWithTtrssOpen() {
+        val vm = sourcesWithTtrss(open = true)
+        shoot("08b-sources-ttrss-open", ready = { vm.rows.value?.any { it.feeds.isNotEmpty() } == true && vm.feedsShown.value }) { SourcesScreen(vm) }
+    }
+
+    private fun feedPage(key: String): SourceDetailViewModel {
+        val repo = SourceRepository(db)
+        val account = ttrssAccount(repo)
+        return SourceDetailViewModel(repo, account, flowOf(1), key = key)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h1100dp-xxhdpi")
+    fun ttrssFeedPage() {
+        val vm = feedPage("5")
+        shoot("08c-ttrss-feed-page", ready = { vm.detail.value?.articles?.isNotEmpty() == true }) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    fun ttrssFeedPageLeftOut() {
+        val vm = feedPage("7")
+        shoot("08d-ttrss-feed-left-out", ready = { vm.detail.value?.text?.leftOut == true }) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    fun ttrssFeedLeaveOutDialog() {
+        val vm = feedPage("5")
+        shoot(
+            "08e-leave-out-dialog", ready = { vm.detail.value?.articles?.isNotEmpty() == true }, dialog = true,
+            act = { compose.onNodeWithText("Leave out").performClick() },
+        ) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    fun ttrssFeedSectionDialog() {
+        val vm = feedPage("5")
+        shoot(
+            "08f-section-dialog", ready = { vm.detail.value?.articles?.isNotEmpty() == true }, dialog = true,
+            act = {
+                compose.onNodeWithText("Change").performScrollTo().performClick()
+                idleUntil { compose.onAllNodes(hasText("Long reads")).fetchSemanticsNodes().isNotEmpty() }
+            },
+        ) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    fun ttrssFeedArticleTextDialog() {
+        val vm = feedPage("5")
+        shoot(
+            "08g-article-text-dialog", ready = { vm.detail.value?.articles?.isNotEmpty() == true }, dialog = true,
+            act = { compose.onNodeWithText("Article text: Automatic").performClick() },
+        ) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    @Test
+    fun leftOutList() {
+        val repo = SourceRepository(db)
+        val account = ttrssAccount(repo)
+        val vm = SourceDetailViewModel(repo, account, flowOf(1))
+        shoot("08h-left-out-list", ready = { vm.feeds.value.any { !it.inPaper } }) { LeftOutScreen(vm, onBack = {}, onOpenFeed = {}) }
+    }
+
+    /** A phone feed's page from the top: its settings, now with a section. */
+    @Test
+    fun phoneFeedSettings() {
+        val vm = sourceWithArticles()
+        shoot("08i-phone-feed-settings", ready = { vm.detail.value?.articles?.isNotEmpty() == true }) { SourceDetailScreen(vm, onBack = {}) }
     }
 
     @Test
