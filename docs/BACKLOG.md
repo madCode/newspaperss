@@ -82,8 +82,9 @@ pitch, so it has to be the reader's own.
 
 ### Smart order: rare posts first *(you asked)*
 Taking turns treats every source alike, so a source that posts once a month waits its turn behind
-daily ones, and its one post can expire unread. A fourth order, "Smart", would let sources that post
-rarely go first.
+daily ones, and its one post can expire unread. A "Smart" order would let sources that post rarely go
+first. It replaces "Source by source", which only differs from Take turns with the per-source cap off;
+a reader who chose it moves to Smart. The orders become Take turns, Smart and Shuffle.
 
 - **How often a source posts** comes from what the app has already seen: the typical gap between its
   articles' dates over the last few months (the median, so one burst doesn't count as a habit). A new
@@ -93,9 +94,10 @@ rarely go first.
 - **Still finite and fair:** the per-source cap and the budget hold, and stars still come first. Smart
   changes only who goes first, so frequent sources still get their turns once the rare ones are in.
 - **Visible:** a source's page could say "posts about once a month", which also explains the order.
-- **Open questions:** whether this should simply replace Take turns (it behaves the same when sources
+- **Open questions:** whether Smart should also replace Take turns (it behaves the same when sources
   post equally often); and whether rare sources need a longer keep window too, which would also catch a
-  monthly post that lands the day after an edition is full.
+  monthly post that lands the day after an edition is full. Count how many rare sources' articles
+  expire once Smart is in: if it stays near zero, the longer window isn't needed.
 
 ### Sharing an article
 Share an article with someone. The link is easy; the full extracted text raises copyright questions and
