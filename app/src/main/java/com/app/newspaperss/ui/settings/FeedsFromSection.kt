@@ -92,6 +92,10 @@ internal fun FeedsFromSection(vm: FeedsFromViewModel) {
         return
     }
     Account(source, s.ttrss)
+    if (source.paused) {
+        Text("Paused: nothing comes from your tt-rss until you resume it.", modifier = Modifier.padding(bottom = 4.dp))
+        OutlinedButton(onClick = vm::resume, modifier = Modifier.padding(vertical = 4.dp)) { Text("Resume") }
+    }
     OutlinedButton(onClick = vm::openSignIn, modifier = Modifier.padding(vertical = 4.dp)) { Text("Sign in again") }
     TtrssOptions(source, vm::openCategories, vm::setMarkRead)
     val startingFresh by vm.startingFresh.collectAsState()

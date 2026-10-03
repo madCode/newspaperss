@@ -188,48 +188,6 @@ class SourceDetailScreenTest {
         assertEquals(1, runBlocking { db.sources().publication(id, PublicationEntity.OWN)?.maxArticles })
     }
 
-    @Test
-    fun aTtrssAccountsPageLeavesItsAccountSettingsToSettings() {
-        val id = runBlocking { repo.addTtrss("https://rss.example/api/") }
-        var opened = false
-        val vm = SourceDetailViewModel(repo, id, flowOf(1))
-        compose.setContent { SourceDetailScreen(vm, onBack = {}, onOpenAccount = { opened = true }) }
-        idleUntil { visible("Your tt-rss account") }
-        // Removing it here would leave the server setup with no account and no warning.
-        compose.onNodeWithContentDescription("More options").assertDoesNotExist()
-        compose.onNodeWithText("Pause").assertExists()
-
-        compose.onNodeWithText("Your tt-rss account").performClick()
-        assertTrue(opened)
-    }
-
-    @Test
-    fun aTtrssFeedCanBeLeftOutAndBroughtBack() {
-        val id = runBlocking {
-            val account = repo.addTtrss("https://rss.example/api/")
-            db.articles().insertNew(
-                listOf("Quarterly Review" to "7", "Press Office" to "42").map { (title, feed) ->
-                    ArticleEntity(sourceId = account, guid = "ttrss:$feed", url = "https://news.example/$feed", title = "From $title", originId = feed, originTitle = title)
-                },
-            )
-            account
-        }
-        val vm = SourceDetailViewModel(repo, id, flowOf(1))
-        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
-        idleUntil { visible("Feeds in your paper") && visible("All 2") }
-
-        compose.onNodeWithText("Choose").performClick()
-        idleUntil { compose.waitForIdle(); visible("Press Office") }
-        compose.onNodeWithText("Press Office").performClick()
-        idleUntil { compose.waitForIdle(); visible("1 of 2: 1 left out") }
-        assertEquals(listOf("42"), runBlocking { db.sources().allLeftOut().map { it.key } })
-
-        compose.onNodeWithText("Press Office").performClick()
-        idleUntil { compose.waitForIdle(); visible("All 2") }
-        compose.onNodeWithText("Done").performClick()
-        assertTrue(runBlocking { db.sources().allLeftOut().isEmpty() })
-    }
-
     /**
      * Waiting, delivered and in an unsent edition, plus [moreWaiting] more waiting ones ("Article
      * more1"…), newest first. Returns the source and article ids by guid.

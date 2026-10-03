@@ -425,30 +425,36 @@ phone restarts.
   to the articles (an unsent edition's go back for the next one). An article that went in because it was starred says
   "You starred it". On delivered editions each article has a trailing **☆** to
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
-- **Sources:** each source with its health ("Full articles", "Summaries
-  only", "Site blocks fetching", "Failing for N days"). Tapping a row
-  opens the source's page; a row has nothing else to tap, so a long list
-  stays plain. The page shows its recent articles, pause, its cap and,
-  for a feed, the article-text setting (a tt-rss account's are on each of
-  its feeds' pages); **Remove source** is in its ⋮ menu.
-  - **tt-rss** is one row, always last so a feed added later doesn't land
-    under it; the paper follows the same order. It says how many feeds
-    are in the paper and how many are left out. A round **▾** button beside it shows its feeds just beneath it,
-    indented, A to Z, folded until you open them and then left as you
-    left them, with a rule between each. A line under a feed only when it
-    says something: "Also on this phone", or its own settings. **Left
-    out · N** at the end opens the left-out feeds. Each feed opens its own page; the row itself opens
-    the account's page.
-  - A feed added here that's also in your tt-rss says "Also in your tt-rss",
-    matched by address.
-  - The tt-rss account's page has its articles, **Feeds in your paper** and
-    **Pause**, and a row that opens Settings › Where your feeds come from,
-    which has the account's own settings. It has no **Remove source**:
-    leaving tt-rss is done there.
-  - In the server setup with no working account (never signed in, or a
-    password the phone can no longer read), the top of Sources says **Sign
-    in to your tt-rss**, with a button to that Settings page.
-  Each row is a status mark (`●` waiting, `✓` delivered, `○` read or not
+- **Sources:** one plain list, ruled between rows. Nothing on it folds or
+  moves, so e-ink doesn't redraw it, and TalkBack can jump by heading.
+  Tapping a row opens its page; a row has nothing else to tap.
+  - **Without a server:** the reading list, then each source in your order
+    with its health ("Full articles", "Summaries only", "Site blocks
+    fetching", "Failing for N days"). No headings, and nothing about servers.
+  - **With a server**, top to bottom:
+    - **Your tt-rss · host**, with "54 feeds in your paper" (and "Articles
+      from News" when a category is chosen), "Paused", or what's wrong, in
+      words with a ⚠ ("Couldn't reach tt-rss. Since 6:10 AM. Showing what it
+      last listed."). It opens Settings › Where your feeds come from. With no
+      working account, **Sign in to your tt-rss** takes its place.
+    - **On this phone:** the reading list, curated lists, and any feeds
+      still fetched by the phone.
+    - **From your tt-rss:** each category a heading, "News · 9 feeds"
+      ("News, 9 feeds" to TalkBack), its feeds A to Z under it. Feeds with
+      no category go under **Uncategorized**, last. A line under a feed only
+      when it says something: its own settings ("Feed's text", "Full page",
+      "At most 2", "Skips paid posts"). Each opens its own page, which says
+      "In your tt-rss · category News".
+    - **Not in your paper**, when the paper takes from one category: "43
+      feeds in 6 other categories". Its page lists those categories with
+      their feeds, and points to Articles from in Settings.
+    - **Left out · N**, when some are, opens the left-out feeds, each
+      opening its page to bring it back.
+  - A source's page shows its recent articles, pause, its cap and, for a
+    feed, the article-text setting; **Remove source** is in its ⋮ menu. A
+    tt-rss account has no page of its own: its settings, and leaving it,
+    are in Settings, and each of its feeds has a page.
+  On a source's or feed's page, each article row is a status mark (`●` waiting, `✓` delivered, `○` read or not
   used), the title, a details line and a trailing **☆**; tapping the row
   opens the original. Two toggles, one per question:
   - The status mark marks the article read (`●` → `○`) or unread (`○` or
@@ -521,7 +527,7 @@ phone restarts.
     signed in or why the login fails, when it was last checked, **Sign in
     again** (the address and username filled in; the same user keeps their
     category), **Articles from**, **Sync read status with tt-rss** and
-    **Start fresh**.
+    **Start fresh**, and **Resume** if the account was paused.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
     delivered, by share, folder or Open, in the background so a slow cloud folder

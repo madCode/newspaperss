@@ -279,6 +279,7 @@ erDiagram
         string feedUrl "tt-rss"
         string category "tt-rss"
         bool listed "tt-rss: in the latest list"
+        bool outsideCategory "tt-rss: in the account, outside Articles from"
     }
     articles {
         long id PK
@@ -382,7 +383,16 @@ sets it to `SERVER` if a tt-rss source exists, else `PHONE`; until then
 screens read it the same way (`Settings.feedsFrom(hasServer)`). `SERVER`
 with no working account (no tt-rss source, or a password the phone can't
 read, e.g. after a restore) is a state of its own, `TtrssStatus`, which
-Sources and Settings show as "Sign in to your tt-rss". Leaving the server
+Sources and Settings show as "Sign in to your tt-rss". Sources reads the
+setup too: with `SERVER` it shows the account, then what's on the phone,
+then the account's feeds by `publications.category`; with `PHONE` nothing
+of tt-rss. Its rows, the tt-rss part and the sign-in state load as one
+value (`SourcesViewModel.screen`), so nothing lands above rows already
+shown. The once-a-day feed list (`FeedSync.listFeeds`) marks feeds in the
+chosen category `listed` and, with a category chosen, asks for the rest
+and marks them `outsideCategory`: that's "Not in your paper". Both flags
+are cleared and redrawn together, and ignored while `feedsListedAt` is
+null after the category changes. Leaving the server
 is `TtrssRepository.signOut`: the login and the tt-rss source go, and with
 it, by cascade, its articles.
 

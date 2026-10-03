@@ -187,6 +187,38 @@ class TtrssSyncTest {
         assertEquals(listOf("Quarterly Review"), sources.observeFeeds(source.id).first().map { it.title })
     }
 
+    /**
+     * With a category chosen, the rest of the account's feeds are listed as outside it, for
+     * "Not in your paper"; a subcategory's feeds are in the chosen one, not outside it.
+     */
+    @Test
+    fun feedsOutsideTheChosenCategoryAreListedApart() = runTest {
+        server.categories[2] = "Essays"
+        server.categories[3] = "News"
+        server.categories[5] = "Long reads"
+        server.subcategories[5] = 2
+        server.feeds[7] = FakeTtrss.Feed("Quarterly Review", "https://quarterly.example/feed", 2)
+        server.feeds[10] = FakeTtrss.Feed("Slow Essays", "https://slow.example/feed", 5)
+        server.feeds[8] = FakeTtrss.Feed("Daily News", "https://news.example/feed", 3)
+        server.feeds[9] = FakeTtrss.Feed("Someone's Blog", "https://blog.example/rss", 0)
+        val source = connect()
+        db.sources().setTtrssCategory(source.id, 2, "Essays")
+
+        sync.syncAll()
+
+        assertEquals(listOf("Quarterly Review", "Slow Essays"), sources.observeFeeds(source.id).first().map { it.title })
+        assertEquals(
+            setOf("Daily News" to "News", "Someone's Blog" to "Uncategorized"),
+            sources.observeOutsideCategory(source.id).first().map { it.title to it.category }.toSet(),
+        )
+
+        db.sources().setTtrssCategory(source.id, null, null)
+        assertEquals("the old list isn't read against the new choice", emptyList<PublicationEntity>(), sources.observeOutsideCategory(source.id).first())
+        sync.syncAll()
+        assertEquals(4, sources.observeFeeds(source.id).first().size)
+        assertTrue(db.sources().allPublications().none { it.outsideCategory })
+    }
+
     /** The list is extra: a sync that got its articles has succeeded even if the list fails, and tries it again next time. */
     @Test
     fun aFeedListThatFailsDoesntFailTheSync() = runTest {

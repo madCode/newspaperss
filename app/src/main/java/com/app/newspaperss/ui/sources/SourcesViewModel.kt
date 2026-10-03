@@ -2,7 +2,6 @@ package com.app.newspaperss.ui.sources
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.feed.FeedFinder
 import com.app.newspaperss.core.feed.FindResult
 import com.app.newspaperss.core.feed.FoundFeed
@@ -22,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import com.app.newspaperss.data.FeedChoice
+import com.app.newspaperss.data.sortTitle
 import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,21 +38,48 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/**
- * A row in Sources: the source, its newest article, and its own publication (its settings, and
- * what the full-text check found). A tt-rss row carries its [feeds]. [alsoInTtrss] says a feed
- * added here is one the tt-rss account also has.
- */
+/** A row in Sources: the source, its newest article, and its own publication (its settings, and what the full-text check found). */
 data class SourceRow(
     val source: SourceEntity,
     val lastNew: Instant?,
     val text: PublicationEntity? = null,
-    val feeds: List<FeedRow> = emptyList(),
-    val alsoInTtrss: Boolean = false,
 )
 
-/** One of a tt-rss account's feeds under its row; [alsoOnPhone] when it's also a feed added here. */
-data class FeedRow(val feed: FeedChoice, val alsoOnPhone: Boolean = false)
+/**
+ * Sources in the server setup, below what's on this phone.
+ *
+ * @property account the tt-rss account's source; null while there's none to show (signed out).
+ * @property categories the feeds in the paper, under the server's categories.
+ * @property leftOut how many of them the reader left out.
+ * @property outside the account's feeds in categories the paper doesn't take from, by category.
+ */
+data class ServerSources(
+    val account: SourceEntity?,
+    val categories: List<FeedCategory> = emptyList(),
+    val leftOut: Int = 0,
+    val outside: List<FeedCategory> = emptyList(),
+) {
+    val inPaper get() = categories.sumOf { it.feeds.size }
+}
+
+/** Sources as shown: [rows] on this phone, and [server] in the server setup (null in the phone setup). */
+data class SourcesList(val rows: List<SourceRow>, val server: ServerSources?, val needsSignIn: Boolean)
+
+/** A server category and its feeds, A to Z; [name] null is Uncategorized. */
+data class FeedCategory(val name: String?, val feeds: List<FeedChoice>)
+
+const val UNCATEGORIZED = "Uncategorized"
+
+internal fun outsideFeed(p: PublicationEntity) = FeedChoice(p.key, p.title ?: p.key, inPaper = false, p)
+
+/**
+ * Feeds under their categories, A to Z with Uncategorized last. A feed with no category, or
+ * tt-rss's own "Uncategorized" (category 0), goes there: Google Reader servers can give none at all.
+ */
+internal fun byCategory(feeds: List<FeedChoice>): List<FeedCategory> =
+    feeds.groupBy { f -> f.publication?.category?.trim()?.takeIf { it.isNotEmpty() && it != UNCATEGORIZED } }
+        .map { (name, fs) -> FeedCategory(name, fs.sortedBy { sortTitle(it.title) }) }
+        .sortedWith(compareBy<FeedCategory> { it.name == null }.thenBy { it.name?.lowercase() })
 
 /** The same feed address, give or take its scheme, "www." and a trailing slash. */
 internal fun sameFeed(a: String, b: String): Boolean {
@@ -80,41 +107,46 @@ class SourcesViewModel(
     private val settings: SettingsStore? = null,
     private val onSourcesChanged: () -> Unit,
 ) : ViewModel() {
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val ttrssFeeds: Flow<List<FeedChoice>> = repository.observe()
-        .map { sources -> sources.firstOrNull { it.kind == SourceKind.TTRSS }?.id }
-        .distinctUntilChanged()
-        .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repository.observeFeeds(id) }
+    /**
+     * The sources on this phone, in the reader's order, as the edition takes them. A tt-rss
+     * account is never among them: in the server setup it has its own part of the screen.
+     */
+    private val phoneRows: Flow<List<SourceRow>> =
+        combine(repository.observe(), repository.observeActivity(), repository.observeOwnPublications()) { sources, activity, texts ->
+            val bySource = activity.associate { it.sourceId to it.lastNew }
+            sources.filter { it.kind != SourceKind.READING_LIST && it.kind != SourceKind.TTRSS }.map { s -> SourceRow(s, bySource[s.id], texts[s.id]) }
+        }
+
+    /** The phone's sources alone, for onboarding's count; Sources itself shows [screen]. */
+    val rows: StateFlow<List<SourceRow>?> = phoneRows.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The server setup, with its account's id if there is one. */
+    private data class ServerSetup(val accountId: Long?)
 
     /**
-     * The sources in the reader's order, with tt-rss last: its feeds go under it, and a feed added
-     * later shouldn't land beneath them all.
+     * The tt-rss part of Sources in the server setup; null in the phone setup, where nothing of
+     * tt-rss shows even if an account was somehow left behind.
      */
-    val rows: StateFlow<List<SourceRow>?> =
-        combine(repository.observe(), repository.observeActivity(), repository.observeOwnPublications(), ttrssFeeds) { sources, activity, texts, feeds ->
-            val bySource = activity.associate { it.sourceId to it.lastNew }
-            val phoneFeeds = sources.filter { it.kind == SourceKind.FEED }
-            val ttrssUrls = feeds.mapNotNull { it.publication?.feedUrl }
-            // The edition follows the same order (see EditionBuilder).
-            sources.filter { it.kind != SourceKind.READING_LIST }.sortedBy { it.kind == SourceKind.TTRSS }.map { s ->
-                SourceRow(
-                    s, bySource[s.id], texts[s.id],
-                    feeds = if (s.kind != SourceKind.TTRSS) emptyList() else feeds.map { f ->
-                        FeedRow(f, alsoOnPhone = f.publication?.feedUrl?.let { url -> phoneFeeds.any { sameFeed(it.url, url) } } == true)
-                    },
-                    alsoInTtrss = s.kind == SourceKind.FEED && ttrssUrls.any { sameFeed(it, s.url) },
-                )
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val serverPart: Flow<ServerSources?> =
+        (if (settings == null) flowOf(null) else combine(settings.settings, repository.observe()) { s, sources ->
+            val account = sources.firstOrNull { it.kind == SourceKind.TTRSS }
+            if (s.feedsFrom(hasServer = account != null) == FeedsFrom.SERVER) ServerSetup(account?.id) else null
+        }).distinctUntilChanged().flatMapLatest { setup ->
+            val id = setup?.accountId
+            when {
+                setup == null -> flowOf(null)
+                id == null -> flowOf(ServerSources(null))
+                else -> combine(repository.observe(id), repository.observeFeeds(id), repository.observeOutsideCategory(id)) { source, feeds, outside ->
+                    ServerSources(
+                        source,
+                        byCategory(feeds.filter { it.inPaper }),
+                        leftOut = feeds.count { !it.inPaper },
+                        outside = byCategory(outside.map(::outsideFeed)),
+                    )
+                }
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    /** Whether the tt-rss feeds are shown under their row; folded until the reader opens them. */
-    val feedsShown: StateFlow<Boolean> = (settings?.settings?.map { it.feedsShown } ?: flowOf(false))
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
-    fun showFeeds(shown: Boolean) {
-        val store = settings ?: return
-        viewModelScope.launch { store.update { it.copy(feedsShown = shown) } }
-    }
+        }
 
     /** The curated lists not added yet, offered in the add dialog. */
     val curatedLists: StateFlow<List<CuratedList>> = repository.observe().map { sources ->
@@ -180,10 +212,18 @@ class SourcesViewModel(
      * The server setup without a working account to take articles from: never signed in,
      * signed out, or its password unreadable. Sources says so at the top.
      */
-    val needsSignIn: StateFlow<Boolean> =
+    private val signInNeeded: Flow<Boolean> =
         (if (settings == null || ttrss == null) flowOf(false) else combine(settings.settings, ttrss.observeStatus()) { s, status ->
             s.feedsFrom(hasServer = status.source != null) == FeedsFrom.SERVER && !status.signedIn
-        }).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+        })
+
+    /**
+     * Everything the list shows, null until all of it has loaded. One value rather than three:
+     * a part arriving late (the account row, the sign-in banner) would land above rows already
+     * shown, and the list keeps its first visible row in place, so it would open scrolled past it.
+     */
+    val screen: StateFlow<SourcesList?> = combine(phoneRows, serverPart, signInNeeded, ::SourcesList)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun refresh() = onSourcesChanged()
 

@@ -269,13 +269,26 @@ class FeedsFromTest {
         runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.SERVER) } }
         var opened = false
         val vm = SourcesViewModel(sources, FeedFinder(http), ttrss, settings = store) {}
-        compose.setContent { SourcesScreen(vm, onSignIn = { opened = true }) }
+        compose.setContent { SourcesScreen(vm, onOpenAccount = { opened = true }) }
         waitFor("Sign in to your tt-rss")
         compose.onNodeWithText("Sign in").performClick()
         assertTrue(opened)
 
         signedIn()
         waitGone("Sign in to your tt-rss")
+    }
+
+    /** Nothing in the app pauses an account, so one paused already needs a way back. */
+    @Test
+    fun aPausedAccountCanBeResumed() {
+        val id = signedIn()
+        runBlocking { sources.setPaused(id, true) }
+        showSettings(SettingsPage.FEEDS)
+        waitFor("Paused: nothing comes from your tt-rss")
+        compose.onNodeWithText("Resume").performScrollTo().performClick()
+        idleUntil { runBlocking { db.sources().byId(id)!!.paused } == false }
+        waitGone("Paused: nothing comes from your tt-rss")
+        assertEquals(1, syncs)
     }
 
     @Test

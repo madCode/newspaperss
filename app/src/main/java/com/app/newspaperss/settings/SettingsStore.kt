@@ -91,8 +91,6 @@ data class Settings(
     val kindleEmail: String? = null,
     /** The package of the mail app Send opens for [DeliveryMethod.KINDLE_EMAIL]; null asks each time. */
     val mailApp: String? = null,
-    /** A tt-rss account's feeds are shown under it on Sources; folded until the reader opens them. */
-    val feedsShown: Boolean = false,
     /** Null only until [SettingsStore.settleFeedsFrom] has run once; see [feedsFrom]. */
     val feedsFrom: FeedsFrom? = null,
 ) {
@@ -137,7 +135,6 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val previewTextSize = stringPreferencesKey("preview_text_size")
         val kindleEmail = stringPreferencesKey("kindle_email")
         val mailApp = stringPreferencesKey("kindle_email_mail_app")
-        val feedsShown = booleanPreferencesKey("sources_feeds_shown")
         val feedsFrom = stringPreferencesKey("feeds_from")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
@@ -167,7 +164,6 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             prefs[Keys.previewTextSize] = s.previewTextSize.name
             if (s.kindleEmail != null) prefs[Keys.kindleEmail] = s.kindleEmail else prefs.remove(Keys.kindleEmail)
             if (s.mailApp != null) prefs[Keys.mailApp] = s.mailApp else prefs.remove(Keys.mailApp)
-            prefs[Keys.feedsShown] = s.feedsShown
             if (s.feedsFrom != null) prefs[Keys.feedsFrom] = s.feedsFrom.name else prefs.remove(Keys.feedsFrom)
             prefs.remove(Keys.legacyNotesWithEdition)
         }
@@ -214,7 +210,6 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             previewTextSize = p[Keys.previewTextSize]?.let { runCatching { PreviewTextSize.valueOf(it) }.getOrNull() } ?: d.previewTextSize,
             kindleEmail = p[Keys.kindleEmail],
             mailApp = p[Keys.mailApp],
-            feedsShown = p[Keys.feedsShown] ?: d.feedsShown,
             feedsFrom = p[Keys.feedsFrom]?.let { runCatching { FeedsFrom.valueOf(it) }.getOrNull() },
         )
     }
