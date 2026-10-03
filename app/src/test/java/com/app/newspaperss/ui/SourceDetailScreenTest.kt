@@ -132,6 +132,11 @@ class SourceDetailScreenTest {
 
         compose.onNodeWithContentDescription("More options").performClick()
         compose.onNodeWithText("Remove source").performClick()
+        compose.onNodeWithText("Keep").performClick()
+        assertEquals(1, runBlocking { db.sources().all().size })
+
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Remove source").performClick()
         compose.onNodeWithText("Remove Example?").assertExists()
         compose.onNode(hasText("Remove source") and hasAnyAncestor(isDialog())).performClick()
         // Compose only recomposes for the removal when its test clock runs.

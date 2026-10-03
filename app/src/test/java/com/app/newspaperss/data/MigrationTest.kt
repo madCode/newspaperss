@@ -192,6 +192,7 @@ class MigrationTest {
             source(3, "FEED", "AUTO", 0, null, null, "World")
             source(4, "READING_LIST", "PAGE", 0, null, null, "Saved for later")
             source(5, "LIST", "PAGE", 0, null, 1, null)
+            source(6, "TTRSS", "AUTO", 0, null, 3, null)
         }
 
         helper.runMigrationsAndValidate(DB, 7, true, AppDatabase.MIGRATION_6_7).use { db ->
@@ -202,13 +203,14 @@ class MigrationTest {
                         listOf("2", "", "AUTO", null, "0", null, "PAGE", "2"),
                         listOf("5", "", "AUTO", null, "0", null, null, "1"),
                     ),
+                    // No row for tt-rss: its feeds are capped one by one, so a cap on the account never applied.
                     rows(c),
                 )
             }
             db.query("SELECT contentMode, contentModeChosen, fullTextEvidence, maxArticles, section, feedsListedAt FROM sources ORDER BY id").use { c ->
                 assertEquals(
                     "the reading list and curated lists still fetch pages; nothing else is left on the source",
-                    listOf("AUTO", "AUTO", "AUTO", "PAGE", "PAGE").map { listOf(it, "0", null, null, null, null) },
+                    listOf("AUTO", "AUTO", "AUTO", "PAGE", "PAGE", "AUTO").map { listOf(it, "0", null, null, null, null) },
                     rows(c),
                 )
             }

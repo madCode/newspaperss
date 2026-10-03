@@ -355,8 +355,8 @@ private class TextChoices(publications: List<PublicationEntity>, private val tod
         return TextChoice(publication?.contentMode, check, today)
     }
 
-    // A short item has its page fetched anyway; only a long one needs a check to find a teaser.
-    // Counted as the extractor counts, after cleaning, so the two agree on what's long.
+    // A short item, or one ending in "Read more", has its page fetched anyway; only a long one
+    // needs a check to find a teaser. Cleaned as the extractor cleans, so the two agree.
     private fun isLong(article: ArticleEntity) =
-        (article.feedHtml?.let { HtmlCleaner.clean(it, article.url, article.title).wordCount } ?: 0) >= ArticleExtractor.FULL_TEXT_WORDS
+        article.feedHtml?.let { HtmlCleaner.clean(it, article.url, article.title) }?.let { it.wordCount >= ArticleExtractor.FULL_TEXT_WORDS && !it.teaser } == true
 }

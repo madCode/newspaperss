@@ -28,6 +28,7 @@ class FullTextCheckTest {
 
     @Test
     fun outcomesThatDontTellAreIgnored() {
+        assertNull("a paywall shows the free part whatever the feed sends", FullTextCheck.evidence(extracted(800, 820, usedFeed = false).copy(paidPost = true)))
         assertNull("page about as long as the feed", FullTextCheck.evidence(extracted(200, 300, usedFeed = false)))
         assertNull(
             "a long feed item taken without fetching its page: it could still be a teaser",

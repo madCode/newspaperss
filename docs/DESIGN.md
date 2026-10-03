@@ -405,8 +405,9 @@ phone restarts.
 - **Sources:** each source with its health ("Full articles", "Summaries
   only", "Site blocks fetching", "Failing for N days"). Tapping a row
   opens the source's page; a row has nothing else to tap, so a long list
-  stays plain. The page shows its recent articles, its cap, pause and the
-  article-text setting; **Remove source** is in its ⋮ menu.
+  stays plain. The page shows its recent articles, pause, its cap and,
+  for a feed, the article-text setting (a tt-rss account's are on each of
+  its feeds' pages); **Remove source** is in its ⋮ menu.
   - **tt-rss** is one row, always last so a feed added later doesn't land
     under it; the paper follows the same order. It says how many feeds
     are in the paper and how many are left out. A round **▾** button beside it shows its feeds just beneath it,

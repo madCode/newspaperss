@@ -134,12 +134,11 @@ The steps, with where they live:
    marks any edition left `BUILDING` by a dead process as failed, and
    releases editions still `READY` (never sent) so their articles go back.
    It then inserts the new edition as `BUILDING` and reads the candidates
-   (`ArticleDao.candidates`).
+   (`ArticleDao.candidates`), dropping left-out publications' unless starred.
 3. **Order.** `EditionPlanner.order` (`core/edition/EditionPlanner.kt`)
    sorts candidates: stars first, then by turns across publications: a
-   feed added here is one, and each of a tt-rss account's feeds is one.
-   Left-out publications are skipped unless starred, and a publication's
-   own cap replaces the edition's.
+   feed added here is one, and each of a tt-rss account's feeds is one. A
+   publication's own cap replaces the edition's.
 4. **Fill.** `EditionPlanner.fill` walks that order, fetching one article
    at a time through a callback, and stops when the time budget is met.
    Fetching inside the loop is what keeps a big pool cheap: articles
@@ -315,7 +314,7 @@ erDiagram
 
 - **Sources carry, publications write.** A source is how articles arrive
   (a feed address, a tt-rss account, the reading list, a curated list):
-  sync, read sync, sign-in and Pause are per source. A publication is who
+  sync, read sync, sign-in, Pause and Skip paid posts are per source. A publication is who
   wrote them, and holds the settings about the writing: article text, cap,
   left out. A feed added here and a feed in tt-rss differ only in which
   source carries them. An article's publication is

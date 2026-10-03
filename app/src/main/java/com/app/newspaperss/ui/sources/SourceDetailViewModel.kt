@@ -96,7 +96,7 @@ class SourceDetailViewModel(
     fun setInPaper(title: String?, inPaper: Boolean) {
         if (!isFeed) return
         viewModelScope.launch {
-            repository.setFeedInPaper(id, FeedChoice(key, title ?: key, !inPaper), inPaper)
+            repository.setFeedInPaper(id, FeedChoice(key, title ?: key, inPaper = !inPaper), inPaper)
             if (inPaper) onSourceChanged()
         }
     }

@@ -193,6 +193,22 @@ class ExtractorContentProviderTest {
         assertEquals(listOf(FullTextEvidence.FEED_FULL, null), checks)
     }
 
+    /** A paywall shows the free part whatever the feed sends, so a check that meets one learns nothing. */
+    @Test
+    fun aCheckThatMeetsAPaywallSaysNothing() = runTest {
+        val auto = source.copy(contentMode = ContentMode.AUTO)
+        val opening = words(400, "free")
+        http.page(
+            "https://example.com/story",
+            "<html><body><article><p>$opening</p></article><div data-testid=\"paywall\"><h2>Keep reading with a 7-day free trial</h2></div></body></html>",
+        )
+
+        val content = provider.contentFor(article("<p>$opening</p>"), auto, ImageAllowance(), TextChoice(check = true))!!
+
+        assertEquals("counted as the day's check, with no evidence", listOf(null), checks)
+        assertTrue(content.bodyHtml.contains("free1 "))
+    }
+
     @Test
     fun aShorterPageWithAPictureDoesntReplaceAWholeArticle() = runTest {
         val auto = source.copy(contentMode = ContentMode.AUTO)

@@ -51,6 +51,8 @@ object FullTextCheck {
             // Unread for its own reasons (too large, gone, no connection): the feed's text standing
             // in says nothing about whether the page has more.
             article.pageFailure != null -> null
+            // A paywall shows only the free part, whatever the feed sends: it says nothing either way.
+            article.paidPost -> null
             suggested == ContentMode.PAGE -> FullTextEvidence.PAGE_LONGER
             // Only a page with all of the feed's text: a paywall page with a hero image isn't the better copy.
             compared && (article.pageImageCount ?: 0) > 0 && article.feedImageCount == 0 &&

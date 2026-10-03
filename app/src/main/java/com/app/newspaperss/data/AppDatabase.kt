@@ -128,7 +128,9 @@ abstract class AppDatabase : RoomDatabase() {
                         "SELECT id, '', contentMode, fullTextEvidence, fullTextStreak, fullTextDay FROM sources " +
                         "WHERE kind = 'FEED' AND contentModeChosen = 0 AND (contentMode != 'AUTO' OR fullTextEvidence IS NOT NULL)",
                 )
-                // The reader's chosen article text and cap.
+                // The reader's chosen article text and cap. tt-rss never took a cap of its own: its
+                // feeds were capped one by one by the edition's number.
+                db.execSQL("UPDATE sources SET maxArticles = NULL WHERE kind = 'TTRSS'")
                 val chosen = "kind = 'FEED' AND contentModeChosen = 1 AND contentMode != 'AUTO'"
                 db.execSQL(
                     "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +

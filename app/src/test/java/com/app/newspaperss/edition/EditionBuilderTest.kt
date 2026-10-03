@@ -1028,6 +1028,28 @@ class EditionBuilderTest {
         assertEquals(setOf("7", "8"), db.sources().allPublications().map { it.key }.toSet())
     }
 
+    /** A long item ending in "Read more" has its page read anyway, so it doesn't take a feed's check. */
+    @Test
+    fun aReadMoreTeaserIsntUsedAsACheck() = runTest {
+        val http = FakeHttp()
+        val checked = mutableListOf<String>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { _, originId, e, text ->
+            if (text.check) checked += originId.orEmpty()
+        }
+        val ttrss = sources.addTtrss("https://rss.example/api/")
+        val teaser = longArticle(ttrss, "t1", "news.example", http, originId = "7")
+        db.articles().insertNew(
+            listOf(
+                teaser.copy(feedHtml = teaser.feedHtml + "<p><a href=\"${teaser.url}\">Read more</a></p>"),
+                longArticle(ttrss, "t2", "news.example", http, originId = "8"),
+            ),
+        )
+
+        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals(listOf("8"), checked)
+    }
+
     /** A feed wrongly settled on its own text needs three teasers in a row to switch: daily checks, not one a fortnight. */
     @Test
     fun aFeedWhoseLastCheckFoundATeaserIsCheckedTheNextDay() = runTest {
