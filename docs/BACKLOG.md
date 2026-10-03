@@ -80,6 +80,23 @@ the e-reader), and let the planner lean towards similar ones from their own feed
 is visible and adjustable, and mustn't narrow the paper into an echo chamber: "nobody's algorithm" is the
 pitch, so it has to be the reader's own.
 
+### Smart order: rare posts first *(you asked)*
+Taking turns treats every source alike, so a source that posts once a month waits its turn behind
+daily ones, and its one post can expire unread. A fourth order, "Smart", would let sources that post
+rarely go first.
+
+- **How often a source posts** comes from what the app has already seen: the typical gap between its
+  articles' dates over the last few months (the median, so one burst doesn't count as a habit). A new
+  source has no history and is treated as average.
+- **Who goes first:** sources with the longest gap. A daily feed will have another article tomorrow; a
+  monthly one won't. Within that, an article close to its keep window ending goes ahead of a fresh one.
+- **Still finite and fair:** the per-source cap and the budget hold, and stars still come first. Smart
+  changes only who goes first, so frequent sources still get their turns once the rare ones are in.
+- **Visible:** a source's page could say "posts about once a month", which also explains the order.
+- **Open questions:** whether this should simply replace Take turns (it behaves the same when sources
+  post equally often); and whether rare sources need a longer keep window too, which would also catch a
+  monthly post that lands the day after an edition is full.
+
 ### Sharing an article
 Share an article with someone. The link is easy; the full extracted text raises copyright questions and
 shouldn't become a way around paywalls. A likely middle: the link plus a short excerpt.
