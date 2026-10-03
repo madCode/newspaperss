@@ -205,6 +205,15 @@ class SourceDetailScreenTest {
         assertTrue("below the words", more.top >= words.bottom)
     }
 
+    /** The page lists only a source's newest articles, so its heading mustn't read as everything waiting. */
+    @Test
+    @Config(qualifiers = "w411dp-h1600dp")
+    fun theHeadingSaysTheListIsTheNewest() {
+        val (busy, _) = sourceWithArticles(moreWaiting = 37)
+        show(busy)
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Newest articles · 30"))
+    }
+
     private fun sourceWithArticles(moreWaiting: Int = 0): Pair<Long, Map<String, Long>> = runBlocking {
         val id = repo.addFeed("https://example.com/feed", "Example")
         val guids = listOf("waiting", "delivered", "unsent") + (1..moreWaiting).map { "more$it" }

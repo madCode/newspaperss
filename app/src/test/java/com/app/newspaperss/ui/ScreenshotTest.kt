@@ -11,6 +11,7 @@ import com.app.newspaperss.ui.sources.LeftOutScreen
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -355,13 +356,29 @@ class ScreenshotTest {
 
     /** Scrolled to the articles, which sit below the source's settings. */
     private fun scrollToArticles() {
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Recent articles", substring = true))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("articles", substring = true) and isHeading())
     }
 
     @Test
     fun sourceDetail() {
         val vm = sourceWithArticles()
         shoot("06b-source-detail", ready = { vm.detail.value?.articles?.isNotEmpty() == true }, act = ::scrollToArticles) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
+    /** A busy source lists only its newest articles, and the heading says so rather than looking like a total. */
+    @Test
+    fun sourceDetailNewest() {
+        val repo = SourceRepository(db)
+        val id = runBlocking {
+            val id = repo.addFeed("https://www.theguardian.com/world/rss", "The Guardian: World")
+            db.articles().insertNew((1..40).map { i ->
+                ArticleEntity(sourceId = id, guid = "$i", url = "https://www.theguardian.com/$i", title = "Morning briefing, part $i", discoveredAt = Instant.now().minusSeconds(600L * i))
+            })
+            db.sources().recordSuccess(id, Instant.now(), null, "https://www.theguardian.com", "")
+            id
+        }
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        shoot("06f-source-detail-newest", ready = { vm.detail.value?.articles?.isNotEmpty() == true }, act = ::scrollToArticles) { SourceDetailScreen(vm, onBack = {}) }
     }
 
     @Test
