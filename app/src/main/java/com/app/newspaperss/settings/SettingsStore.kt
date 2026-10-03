@@ -59,6 +59,12 @@ enum class Device(val label: String) {
  */
 val Device?.offersOpen: Boolean get() = this != Device.KINDLE && this != Device.KOBO
 
+/**
+ * Where the reader's sites come from: fetched by this phone, or from their own RSS server (tt-rss).
+ * Never both: the reading list and curated lists stay on the phone either way.
+ */
+enum class FeedsFrom { PHONE, SERVER }
+
 /** How large the in-app article preview sets its text, as a percentage of the WebView's default. */
 enum class PreviewTextSize(val label: String, val percent: Int) {
     SMALL("Small", 85),
@@ -85,7 +91,19 @@ data class Settings(
     val kindleEmail: String? = null,
     /** The package of the mail app Send opens for [DeliveryMethod.KINDLE_EMAIL]; null asks each time. */
     val mailApp: String? = null,
+    /** Null only until [SettingsStore.settleFeedsFrom] has run once; see [feedsFrom]. */
+    val feedsFrom: FeedsFrom? = null,
+    /** The tt-rss category a site was last added to, offered first next time; 0 is Uncategorized. */
+    val lastCategoryId: Int? = null,
+    /** The tt-rss categories folded on Sources, by name; "" is Uncategorized. */
+    val foldedCategories: Set<String> = emptySet(),
 ) {
+    /**
+     * The setup chosen, or before it's settled, the one [SettingsStore.settleFeedsFrom] will
+     * choose: the server if a tt-rss account is there.
+     */
+    fun feedsFrom(hasServer: Boolean): FeedsFrom = feedsFrom ?: if (hasServer) FeedsFrom.SERVER else FeedsFrom.PHONE
+
     /**
      * Where Send emails editions, or null to share them as usual: email delivery is chosen and has
      * a usable address. Without one (cleared in Settings), Send falls back to the share sheet.
@@ -121,6 +139,9 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val previewTextSize = stringPreferencesKey("preview_text_size")
         val kindleEmail = stringPreferencesKey("kindle_email")
         val mailApp = stringPreferencesKey("kindle_email_mail_app")
+        val feedsFrom = stringPreferencesKey("feeds_from")
+        val lastCategoryId = intPreferencesKey("ttrss_last_category_id")
+        val foldedCategories = stringSetPreferencesKey("sources_folded_categories")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
@@ -149,8 +170,25 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             prefs[Keys.previewTextSize] = s.previewTextSize.name
             if (s.kindleEmail != null) prefs[Keys.kindleEmail] = s.kindleEmail else prefs.remove(Keys.kindleEmail)
             if (s.mailApp != null) prefs[Keys.mailApp] = s.mailApp else prefs.remove(Keys.mailApp)
+            if (s.feedsFrom != null) prefs[Keys.feedsFrom] = s.feedsFrom.name else prefs.remove(Keys.feedsFrom)
+            if (s.lastCategoryId != null) prefs[Keys.lastCategoryId] = s.lastCategoryId else prefs.remove(Keys.lastCategoryId)
+            prefs[Keys.foldedCategories] = s.foldedCategories
             prefs.remove(Keys.legacyNotesWithEdition)
         }
+    }
+
+    /**
+     * Makes the setup explicit the first time it's read after an upgrade: the server if
+     * [hasServer] (a tt-rss account was added before there was a choice), else this phone.
+     * Once set, it only changes when the reader changes it.
+     */
+    suspend fun settleFeedsFrom(hasServer: suspend () -> Boolean): FeedsFrom {
+        var settled: FeedsFrom? = null
+        store.edit { prefs ->
+            val current = prefs[Keys.feedsFrom]?.let { runCatching { FeedsFrom.valueOf(it) }.getOrNull() }
+            settled = current ?: (if (hasServer()) FeedsFrom.SERVER else FeedsFrom.PHONE).also { prefs[Keys.feedsFrom] = it.name }
+        }
+        return settled!!
     }
 
     private fun read(p: Preferences): Settings {
@@ -180,6 +218,9 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             previewTextSize = p[Keys.previewTextSize]?.let { runCatching { PreviewTextSize.valueOf(it) }.getOrNull() } ?: d.previewTextSize,
             kindleEmail = p[Keys.kindleEmail],
             mailApp = p[Keys.mailApp],
+            feedsFrom = p[Keys.feedsFrom]?.let { runCatching { FeedsFrom.valueOf(it) }.getOrNull() },
+            lastCategoryId = p[Keys.lastCategoryId],
+            foldedCategories = p[Keys.foldedCategories] ?: emptySet(),
         )
     }
 }

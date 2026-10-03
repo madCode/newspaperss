@@ -29,24 +29,35 @@ data class SourceEntity(
     val url: String,
     val title: String,
     val siteUrl: String? = null,
-    val section: String? = null,
     val position: Int = 0,
+    /**
+     * [ContentMode.PAGE] for the kinds of source that carry no feed text (the reading list and
+     * curated lists), otherwise [ContentMode.AUTO]: what the check learns, and what the reader
+     * chooses, are kept per [PublicationEntity].
+     */
     val contentMode: ContentMode = ContentMode.AUTO,
-    /** The reader picked [contentMode] themselves, so the automatic full-text check leaves it alone. */
+    val paused: Boolean = false,
+    /**
+     * Unused, and always null: what these held is kept per [PublicationEntity], or not at all
+     * (sections). Kept because dropping a column means rebuilding this table, and dropping it
+     * with foreign keys on would delete every article.
+     */
+    val section: String? = null,
     val contentModeChosen: Boolean = false,
-    /** The latest article's [FullTextEvidence] and the run behind it; see [com.app.newspaperss.core.extract.FullTextCheck]. */
     val fullTextEvidence: FullTextEvidence? = null,
     val fullTextStreak: Int = 0,
-    /** The epoch day the last piece of full-text evidence was counted. */
     val fullTextDay: Long? = null,
-    val paused: Boolean = false,
-    /** At most this many articles per edition from this source; null follows the edition setting. Not used for tt-rss. */
     val maxArticles: Int? = null,
     /** tt-rss only: the category to take unread articles from, null for all of them. */
     val ttrssCategoryId: Int? = null,
     val ttrssCategoryTitle: String? = null,
     /** tt-rss only: mark delivered articles read on the server. */
     val markReadOnServer: Boolean = true,
+    /**
+     * tt-rss only: when the full list of the account's feeds last filled in its publications
+     * ([PublicationEntity.listed]); null before the first, and after the category changes.
+     */
+    val feedsListedAt: Instant? = null,
     val addedAt: Instant = Instant.now(),
     val lastFetchedAt: Instant? = null,
     /** The last sync error, cleared by the next successful sync. */
@@ -59,10 +70,7 @@ data class SourceEntity(
      * back succeeds.
      */
     val serverNote: String? = null,
-    /**
-     * Leave out paid posts with next to nothing free (see
-     * [com.app.newspaperss.core.extract.ExtractedArticle.nothingFree]) instead of giving them a place.
-     */
+    /** Unused, and always false: the switch is kept per [PublicationEntity.skipPaidPosts]. Kept as [section] is. */
     @ColumnInfo(defaultValue = "0") val skipPaidPosts: Boolean = false,
 )
 
@@ -123,7 +131,7 @@ data class ArticleEntity(
     /** A paid post that turned out, when an edition tried it, to have next to nothing free. */
     @ColumnInfo(defaultValue = "0") val paidOnly: Boolean = false,
     /**
-     * Left out, as EXPIRED, for its source's [SourceEntity.skipPaidPosts] the first time it was found
+     * Left out, as EXPIRED, for its publication's [PublicationEntity.skipPaidPosts] the first time it was found
      * [paidOnly]. Cleared when the reader marks it unread: then they want it, and it isn't skipped again.
      */
     @ColumnInfo(defaultValue = "0") val paidSkipped: Boolean = false,
@@ -136,24 +144,85 @@ data class ArticleEntity(
 }
 
 /**
- * A tt-rss feed the reader left out of the paper: sync stops fetching it and the planner skips
- * any of its articles still here, unless starred. [originId] is tt-rss's feed id; [title] keeps
- * it listed, so it can come back, after its articles are gone.
+ * Who wrote a source's articles, as against how they arrive: a feed's own publication has [key]
+ * "", and each feed in a tt-rss account is one, keyed by its id there ([ArticleEntity.originId]).
+ * Settings about the writing live here (article text, cap, left out, paid posts), settings about
+ * the connection on the source. A row is written only once there's something to keep, so no
+ * row means the defaults.
  */
 @Entity(
-    tableName = "left_out_feeds",
-    primaryKeys = ["sourceId", "originId"],
+    tableName = "publications",
+    primaryKeys = ["sourceId", "key"],
     foreignKeys = [ForeignKey(entity = SourceEntity::class, parentColumns = ["id"], childColumns = ["sourceId"], onDelete = ForeignKey.CASCADE)],
 )
-data class LeftOutFeedEntity(val sourceId: Long, val originId: String, val title: String)
+data class PublicationEntity(
+    val sourceId: Long,
+    val key: String,
+    /**
+     * What the automatic full-text check has learned (see
+     * [com.app.newspaperss.core.extract.FullTextCheck]); a mode the reader chose stays on the source.
+     */
+    val contentMode: ContentMode = ContentMode.AUTO,
+    /** The latest article's [FullTextEvidence] and the run of days behind it. */
+    val fullTextEvidence: FullTextEvidence? = null,
+    val fullTextStreak: Int = 0,
+    /** The epoch day the last piece of evidence was counted. */
+    val fullTextDay: Long? = null,
+    /** The epoch day a long item was last checked against its page. */
+    val checkedDay: Long? = null,
+    /** The name it was last listed under, so a left-out feed stays listed after its articles are gone. */
+    val title: String? = null,
+    /**
+     * The reader left it out of the paper: sync stops fetching it and the planner skips any of its
+     * articles still here, unless starred.
+     */
+    @ColumnInfo(defaultValue = "0") val leftOut: Boolean = false,
+    /** The article text the reader chose, which the check leaves alone; null leaves it to the check. */
+    val chosenMode: ContentMode? = null,
+    /** At most this many articles per edition; null follows the edition setting. */
+    val maxArticles: Int? = null,
+    /**
+     * Leave out paid posts with next to nothing free (see
+     * [com.app.newspaperss.core.extract.ExtractedArticle.nothingFree]) instead of giving them a place.
+     */
+    @ColumnInfo(defaultValue = "0") val skipPaidPosts: Boolean = false,
+    /** tt-rss only: the feed's own address, from the account's feed list. */
+    val feedUrl: String? = null,
+    /** tt-rss only: the category it's in there. */
+    val category: String? = null,
+    /**
+     * tt-rss only: in the latest full list of the feeds the account takes articles from
+     * ([SourceEntity.feedsListedAt]). A feed unsubscribed there, or outside the chosen category,
+     * isn't.
+     */
+    @ColumnInfo(defaultValue = "0") val listed: Boolean = false,
+    /**
+     * tt-rss only: in the account but outside the category the paper takes articles from, in the
+     * same list as [listed]. Sources counts these as "Not in your paper".
+     */
+    @ColumnInfo(defaultValue = "0") val outsideCategory: Boolean = false,
+    /**
+     * tt-rss only: subscribed there but not fetched by it yet, as of the same list as [listed].
+     * A feed added from here has nothing to give until tt-rss's own schedule gets to it.
+     */
+    @ColumnInfo(defaultValue = "0") val awaitingFirstFetch: Boolean = false,
+) {
+    companion object {
+        /** The key of a source's own feed, and of an article with no [ArticleEntity.originId]. */
+        const val OWN = ""
+
+        fun keyOf(article: ArticleEntity) = article.originId ?: OWN
+    }
+}
 
 /** A feed an aggregator's articles came from, as the source page lists it. */
 data class FeedName(val originId: String, val title: String?, val lastSeen: Instant)
 
 /**
- * A link that went out in a delivered edition. Kept apart from articles, which go when their
- * source is removed, so a source removed and added again, or a story that turns up later in
- * another source, doesn't deliver it a second time.
+ * A link that went out in a delivered edition, or that the reader marked read in a feed since
+ * moved to tt-rss. Kept apart from articles, which go when their source is removed, so a source
+ * removed and added again, or a story that turns up later in another source, doesn't deliver it
+ * a second time.
  */
 @Entity(tableName = "delivered_urls")
 data class DeliveredUrlEntity(

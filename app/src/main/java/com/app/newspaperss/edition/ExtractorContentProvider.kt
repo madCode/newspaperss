@@ -5,6 +5,7 @@ import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.ExtractInput
 import com.app.newspaperss.core.extract.FullTextCheck
 import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.core.extract.HtmlCleaner
 import com.app.newspaperss.core.images.ArticleImages
 import com.app.newspaperss.core.images.EncodedImage
 import com.app.newspaperss.core.images.ImageAllowance
@@ -27,40 +28,45 @@ import java.io.IOException
  * later by [EditionBuilder], in reading order.
  *
  * @param onPaidOnly told of each paid post with next to nothing free, and whether it was left out
- *   for its source's [SourceEntity.skipPaidPosts], for [com.app.newspaperss.data.SourceRepository.markPaidOnly].
- * @param onEvidence receives what each article showed about where its source's full text is,
- *   for [com.app.newspaperss.data.SourceRepository.recordFullText].
+ *   for its publication's [TextChoice.skipPaid], for [com.app.newspaperss.data.SourceRepository.markPaidOnly].
+ * @param onEvidence receives what each article showed about where its publication's full text is
+ *   (null if nothing, which is still passed on for a check, so the check counts as done), with the
+ *   article's [TextChoice], for [com.app.newspaperss.data.SourceRepository.recordFullText].
  */
 class ExtractorContentProvider(
     private val extractor: ArticleExtractor,
     private val http: HttpClient,
     private val encoder: ImageEncoder,
     private val onPaidOnly: suspend (articleId: Long, skipped: Boolean) -> Unit = { _, _ -> },
-    private val onEvidence: suspend (sourceId: Long, FullTextEvidence) -> Unit,
+    private val onEvidence: suspend (sourceId: Long, originId: String?, FullTextEvidence?, TextChoice) -> Unit,
 ) : ArticleContentProvider {
     // Downloads overlap but decoding doesn't: a decoded photo can take tens of MB of heap.
     private val encoding = Mutex()
 
-    override suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance): ArticleContent? {
-        val extracted = extractor.extract(
-            ExtractInput(
-                url = article.url,
-                feedTitle = article.title,
-                feedHtml = article.feedHtml,
-                feedAuthor = article.author,
-                mode = modeFor(article, source),
-                feedUrl = article.viaUrl,
-            ),
+    override suspend fun contentFor(article: ArticleEntity, source: SourceEntity, images: ImageAllowance, text: TextChoice): ArticleContent? {
+        val input = ExtractInput(
+            url = article.url,
+            feedTitle = article.title,
+            feedHtml = article.feedHtml,
+            feedAuthor = article.author,
+            mode = modeFor(article, source, text),
+            feedUrl = article.viaUrl,
         )
+        val checking = text.check && article.viaUrl == null && input.mode != ContentMode.PAGE
+        val fetched = extractor.extract(if (checking) input.copy(mode = ContentMode.PAGE) else input)
         // A link post's story page against its pitch says nothing about the source's own feed.
-        if (article.viaUrl == null) FullTextCheck.evidence(extracted)?.let { onEvidence(source.id, it) }
+        val evidence = if (article.viaUrl == null) FullTextCheck.evidence(fetched) else null
+        if (evidence != null || checking) onEvidence(source.id, article.originId, evidence, text.copy(check = checking))
+        // Unless the check found the page the better copy, the article is what it would have been
+        // without one: the feed's text, with no note about a page that failed.
+        val extracted = if (checking && evidence?.mode != ContentMode.PAGE) extractor.extract(input) else fetched
         // A feed article that can't be read still goes in, so a broken feed gets noticed. A link the
         // reader saved on purpose waits for the next edition instead of being used up as a stub.
         if (source.kind == SourceKind.READING_LIST && extracted.wordCount == 0) return null
         if (extracted.nothingFree) {
             // A star asks for this article whatever it turns out to be, and one found before and
             // still here was let in or brought back by the reader: only a first find is skipped.
-            val skip = source.skipPaidPosts && article.starredAt == null && !article.paidOnly
+            val skip = text.skipPaid && article.starredAt == null && !article.paidOnly
             onPaidOnly(article.id, skip)
             if (skip) return null
         }
@@ -99,18 +105,18 @@ class ExtractorContentProvider(
 
     private companion object {
         /**
-         * A source the check settled on the feed's text still has its short items, and ones ending
-         * in "Read more", checked against the page: otherwise it could never find out that the site
-         * stopped blocking or started sending teasers, or tell a paid post's opening. AUTO does
-         * that and takes a long feed text as it is. A mode the reader chose is used as is. A link
-         * post's story is always fetched unless the reader chose the feed's text: its pitch is
-         * never the article.
+         * A publication the check settled on the feed's text still has its short items, and ones
+         * ending in "Read more", checked against the page: otherwise it could never find out that
+         * the site stopped blocking or started sending teasers, or tell a paid post's opening. AUTO
+         * does that and takes a long feed text as it is. A mode the reader chose is used as is. A
+         * link post's story is always fetched unless the reader chose the feed's text: its pitch
+         * is never the article.
          */
-        fun modeFor(article: ArticleEntity, source: SourceEntity): ContentMode {
-            if (article.viaUrl != null) {
-                return if (source.contentModeChosen && source.contentMode == ContentMode.FEED) ContentMode.FEED else ContentMode.PAGE
-            }
-            return if (source.contentModeChosen || source.contentMode != ContentMode.FEED) source.contentMode else ContentMode.AUTO
+        fun modeFor(article: ArticleEntity, source: SourceEntity, text: TextChoice): ContentMode {
+            if (article.viaUrl != null) return if (text.chosen == ContentMode.FEED) ContentMode.FEED else ContentMode.PAGE
+            text.chosen?.let { return it }
+            val mode = text.learned ?: source.contentMode
+            return if (mode == ContentMode.FEED) ContentMode.AUTO else mode
         }
 
         /**

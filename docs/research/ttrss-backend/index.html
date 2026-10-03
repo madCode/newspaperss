@@ -1,0 +1,1302 @@
+<title>tt-rss in newspapeRSS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,700&family=Noto+Serif:wght@400;600;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap">
+<style>
+/* Layout: a newsprint review folder. Tabs across the top; each proposal pairs its notes with a live phone. */
+:root {
+  /* The app's own palette (ui/theme/Theme.kt), light */
+  --bg: #F7F4EC; --fg: #1C1B1A; --muted: #4A4740; --accent: #8C2F1B; --on-accent: #ffffff;
+  --accent-soft: #F3D9CF; --on-accent-soft: #3B0D02;
+  --card: #EFEADD; --card-hi: #E4DDCC; --line: #948D80; --line-soft: #D8D1C1;
+  --good: #2F5D3A; --warn: #8A5A00;
+  --serif: "Noto Serif", Georgia, "Times New Roman", serif;
+  --sans: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Roboto Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161514; --fg: #E9E4D8; --muted: #CBC5B8; --accent: #E8A594; --on-accent: #3B0D02;
+  --accent-soft: #5C2112; --on-accent-soft: #F3D9CF;
+  --card: #211F1D; --card-hi: #363330; --line: #7A746A; --line-soft: #3A3733;
+  --good: #9CCB9F; --warn: #E3B860; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #161514; --fg: #E9E4D8; --muted: #CBC5B8; --accent: #E8A594; --on-accent: #3B0D02;
+  --accent-soft: #5C2112; --on-accent-soft: #F3D9CF;
+  --card: #211F1D; --card-hi: #363330; --line: #7A746A; --line-soft: #3A3733;
+  --good: #9CCB9F; --warn: #E3B860; color-scheme: dark;
+}
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); padding-inline: 16px; padding-block: 0 48px; margin: 0 }
+.wrap { max-width: 1120px; margin: 0 auto }
+h1, h2, h3 { font-family: var(--serif); text-wrap: balance; line-height: 1.2; margin: 0 }
+h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 700 }
+h2 { font-size: 1.5rem; font-weight: 700 }
+h3 { font-size: 1.1rem; font-weight: 600 }
+p, li { max-width: 68ch }
+a { color: var(--accent) }
+code { font: 0.86em var(--mono); background: var(--card); padding: 0 4px; border-radius: 3px }
+.masthead { padding-block: 28px 12px; border-bottom: 3px double var(--line); display: grid; gap: 6px }
+.kicker { font: 500 0.72rem var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted) }
+.dek { color: var(--muted); max-width: 70ch; margin: 0 }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); display: flex; gap: 4px; overflow-x: auto; padding-block: 10px; border-bottom: 1px solid var(--line-soft) }
+.tabs button { font: 500 0.9rem var(--sans); color: var(--muted); background: none; border: 1px solid transparent; border-radius: 999px; padding: 6px 14px; cursor: pointer; white-space: nowrap }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--on-accent-soft); }
+.tabs button:focus-visible, .phone :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.tab { padding-block: 24px; display: grid; gap: 20px }
+.lede { display: grid; gap: 10px }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 32px; align-items: start }
+@media (max-width: 860px) { .split { grid-template-columns: minmax(0, 1fr) } .split .stage { justify-self: center } }
+.notes { display: grid; gap: 14px; min-width: 0 }
+.notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px }
+.pill { display: inline-block; font: 500 0.72rem var(--sans); letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; background: var(--card-hi); color: var(--fg) }
+.pill.v { background: var(--accent-soft); color: var(--on-accent-soft) }
+.pros-cons { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px }
+.pros-cons > div { border-top: 2px solid var(--line); padding-top: 8px }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 6px }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line-soft) }
+th { font-weight: 500; background: var(--card); position: sticky; top: 0 }
+td.y { color: var(--good) } td.n { color: var(--muted) }
+.log { display: grid; gap: 14px }
+.log article { border-left: 3px solid var(--line-soft); padding-left: 14px; display: grid; gap: 4px }
+.log h3 { font-size: 1rem }
+.log .when { font: 0.78rem var(--mono); color: var(--muted) }
+.critique { background: var(--card); border-radius: 8px; padding: 14px 16px; display: grid; gap: 8px }
+.critique h3 { font-size: 1rem }
+.critique ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px }
+.who { font-weight: 500 }
+details summary { cursor: pointer; font-weight: 500 }
+
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px }
+.shot { margin: 0; display: grid; gap: 8px; align-content: start; min-width: 0 }
+.shot.wide { grid-column: span 2 }
+@media (max-width: 520px) { .shot.wide { grid-column: auto } }
+.shot img { width: 100%; max-height: 440px; object-fit: contain; object-position: top; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--card) }
+.shot figcaption { font-size: 13px; color: var(--muted); display: grid; gap: 3px }
+.shot figcaption b { color: var(--fg) }
+.shot .map { color: var(--fg) }
+.shot .nopic { display: none; font-size: 13px; padding: 24px 12px; border: 1px dashed var(--line); border-radius: 6px; color: var(--muted) }
+.shot.missing img { display: none } .shot.missing .nopic { display: block }
+
+/* ---------- The phone: newspapeRSS's own screens, in its own theme ---------- */
+.stage { display: grid; gap: 10px; justify-items: center; width: min(360px, 100%) }
+.phone { width: 100%; max-width: 360px; height: 720px; border-radius: 28px; border: 8px solid #0d0c0b; background: var(--bg); color: var(--fg); position: relative; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,.18); font-size: 14px; line-height: 1.4 }
+.phone .status { height: 22px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; font: 500 11px var(--sans); color: var(--muted) }
+.phone .screen { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative }
+.phone .bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 4px; min-height: 52px }
+.phone .bar .t { font: 700 20px var(--serif); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.phone .bar.big .t { font-size: 25px; padding-left: 12px }
+.phone .ib { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: none; border: 0; color: var(--fg); cursor: pointer; flex: none }
+.phone .ib svg { width: 22px; height: 22px }
+.phone .body { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 80px }
+.phone .nav { flex: none; height: 62px; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--card); align-items: center; text-align: center; font: 500 11px var(--sans) }
+.phone .nav span { display: grid; justify-items: center; gap: 2px; color: var(--muted) }
+.phone .nav span.on b { background: var(--card-hi) }
+.phone .nav b { display: grid; place-items: center; width: 52px; height: 26px; border-radius: 999px }
+.phone .nav svg { width: 18px; height: 18px }
+.phone .fab { position: absolute; right: 14px; bottom: 76px; background: var(--accent); color: var(--on-accent); border: 0; border-radius: 16px; padding: 14px 18px; font: 500 14px var(--sans); display: flex; gap: 8px; align-items: center; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,.25) }
+.phone .fab svg { width: 18px; height: 18px }
+.phone .row { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); cursor: default; text-align: left; width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; color: inherit; font: inherit }
+.phone [data-go], .phone [data-dlg], .phone [data-act] { cursor: pointer }
+.phone .row:hover[data-go] { background: var(--card) }
+.phone .row .main { flex: 1; min-width: 0; display: grid; gap: 1px }
+.phone .row .ti { font-size: 15px }
+.phone .row .su { font-size: 12.5px; color: var(--muted) }
+.phone .row .ic { width: 24px; height: 24px; color: var(--muted); flex: none }
+.phone .chev { width: 18px; height: 18px; color: var(--muted); flex: none }
+.phone .pad { padding: 4px 16px 12px; display: grid; gap: 2px }
+.phone .host { color: var(--muted); font-size: 13px }
+.phone .btns { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 16px 10px }
+.phone .ob { border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; background: none; color: var(--fg); font: 500 13px var(--sans); cursor: pointer }
+.phone .set { display: flex; gap: 10px; align-items: center; padding: 9px 16px }
+.phone .set .main { flex: 1; min-width: 0 }
+.phone .set .su { font-size: 12.5px; color: var(--muted) }
+.phone .tb { background: none; border: 0; color: var(--accent); font: 500 14px var(--sans); padding: 8px 6px; cursor: pointer; flex: none }
+.phone .sw { width: 46px; height: 26px; border-radius: 999px; border: 2px solid var(--line); position: relative; flex: none; cursor: pointer; background: none; padding: 0 }
+.phone .sw::after { content: ""; position: absolute; top: 4px; left: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--line); transition: all .15s }
+.phone .sw.on { background: var(--accent); border-color: var(--accent) }
+.phone .sw.on::after { left: 22px; top: 2px; width: 18px; height: 18px; background: var(--on-accent) }
+.phone .h2 { font: 700 21px var(--serif); padding: 16px 16px 4px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px }
+.phone .h3 { font: 600 13px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 14px 16px 6px }
+.phone .hint { font-size: 12.5px; color: var(--muted); padding: 0 16px 8px }
+.phone hr { border: 0; border-top: 1px solid var(--line-soft); margin: 10px 0 0 }
+.phone .art { display: flex; gap: 12px; padding: 10px 12px 10px 14px; border-bottom: 1px solid var(--line-soft); margin-left: 0 }
+.phone .art .mk { width: 22px; text-align: center; flex: none; font-size: 15px }
+.phone .art .main { flex: 1; min-width: 0 }
+.phone .art .ti { font-weight: 500; font-size: 14.5px }
+.phone .art .su { font-size: 12px; color: var(--muted) }
+.phone .art.read .ti { font-weight: 400; color: var(--muted) }
+.phone .star { width: 22px; height: 22px; color: var(--muted); flex: none }
+.phone .tag { font: 500 10.5px var(--sans); padding: 1px 6px; border-radius: 4px; background: var(--card-hi); color: var(--muted); letter-spacing: .02em; margin-left: 4px; vertical-align: 1px }
+.phone .mark { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 2px }
+.phone .stepper { display: flex; align-items: center; gap: 8px; padding: 0 16px 8px }
+.phone .stepper .ob { padding: 4px 14px; font-size: 16px }
+.phone .crumb { font-size: 12.5px; color: var(--muted); padding: 0 16px }
+.phone .crumb b { font-weight: 500; color: var(--accent); cursor: pointer }
+.phone .cb { width: 20px; height: 20px; border: 2px solid var(--line); border-radius: 3px; flex: none; display: grid; place-items: center; cursor: pointer; background: none; padding: 0; color: var(--on-accent) }
+.phone .cb.on { background: var(--accent); border-color: var(--accent) }
+.phone .cb.on::after { content: "✓"; font-size: 13px; line-height: 1 }
+.phone .rad { width: 20px; height: 20px; border: 2px solid var(--line); border-radius: 50%; flex: none; position: relative }
+.phone .rad.on { border-color: var(--accent) }
+.phone .rad.on::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent) }
+.phone .field { margin: 4px 0 6px; border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; font-size: 14px }
+.phone .field small { display: block; font-size: 11px; color: var(--muted) }
+.phone .select { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; font-size: 13.5px; cursor: pointer }
+.phone .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 18px; z-index: 3 }
+.phone .dlg { background: var(--card-hi); color: var(--fg); border-radius: 24px; padding: 22px 20px 12px; width: 100%; max-height: 92%; display: flex; flex-direction: column; gap: 10px }
+.phone .dlg .dt { font: 600 19px var(--serif) }
+.phone .dlg .db { overflow-y: auto; min-height: 0; display: grid; gap: 6px; font-size: 14px }
+.phone .dlg .db .su { font-size: 12.5px; color: var(--muted) }
+.phone .dlg .acts { display: flex; justify-content: flex-end; gap: 4px }
+.phone .opt { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; cursor: pointer }
+.phone .opt .main { flex: 1; min-width: 0 }
+.phone .snack { position: absolute; left: 10px; right: 10px; bottom: 74px; background: var(--fg); color: var(--bg); border-radius: 6px; padding: 12px 14px; font-size: 13px; z-index: 2; display: flex; gap: 10px; justify-content: space-between; align-items: center }
+.phone .snack b { color: var(--accent-soft); font-weight: 500 }
+.phone .menu { position: absolute; right: 8px; top: 46px; background: var(--card-hi); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.3); z-index: 3; padding: 6px 0; min-width: 220px }
+.phone .menu div { padding: 11px 16px; font-size: 14px; cursor: pointer }
+.phone .menu div:hover { background: var(--card) }
+.phone .menuscrim { position: absolute; inset: 0; z-index: 2 }
+.phone .note { margin: 8px 16px; padding: 10px 12px; border-radius: 8px; background: var(--card); font-size: 12.5px; color: var(--muted) }
+.phone .warn { color: var(--warn) }
+.phone .sec { display: flex; align-items: center; gap: 8px; padding: 14px 16px 6px; font: 600 13px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer; border: 0; background: none; width: 100%; text-align: left }
+.phone .sec .n { font-weight: 400; letter-spacing: 0; text-transform: none; margin-left: auto }
+.phone .seg { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; flex: none }
+.phone .seg button { border: 0; background: none; color: var(--fg); font: 500 12px var(--sans); padding: 6px 10px; cursor: pointer }
+.phone .seg button + button { border-left: 1px solid var(--line) }
+.phone .seg button.on, .phone .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--on-accent-soft) }
+.phone .insetgroup { border-left: 2px solid var(--line-soft); margin-left: 28px }
+.phone .foldbtn { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 50%; background: none; color: var(--fg); font-size: 16px; cursor: pointer; flex: none }
+.phone .row.inset { padding: 9px 12px 9px 14px }
+.phone .row.inset .ti { font-size: 14px }
+.phone .row.inset .su { font-size: 12px }
+.hot .phone [data-go], .hot .phone [data-dlg], .hot .phone [data-act] { outline: 2px dashed var(--accent); outline-offset: -2px }
+.stagebar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center }
+.stagebar button { font: 500 12px var(--sans); border: 1px solid var(--line-soft); background: var(--bg); color: var(--fg); padding: 4px 10px; border-radius: 999px; cursor: pointer }
+.stagebar button.on { background: var(--accent-soft); color: var(--on-accent-soft); border-color: transparent }
+.caption { font-size: 13px; color: var(--muted); text-align: center; max-width: 340px; min-height: 2.6em }
+
+/* ---------- the e-reader: grey e-ink page, the EPUB's own conventions ---------- */
+.phone.ereader { --ink: #1a1a1a; --paper: #efede7; --grey: #555; background: var(--paper); color: var(--ink); border-color: #3a3a3a; border-width: 14px 14px 30px; border-radius: 10px; height: 640px; font-family: "Literata", "Noto Serif", Georgia, serif }
+.ereader .screen { padding: 18px 20px 8px; overflow: hidden }
+.ereader .page { flex: 1; overflow-y: auto; min-height: 0; font-size: 14px; line-height: 1.45 }
+.ereader .foot { display: flex; justify-content: space-between; font: 11px var(--sans); color: var(--grey); padding-top: 6px; border-top: 1px solid #c9c6bd }
+.ereader .foot span { cursor: pointer }
+.ereader h1 { font: 700 21px/1.2 "Literata", "Noto Serif", serif; margin: 4px 0 6px }
+.ereader h2 { font: 600 11px var(--sans); letter-spacing: .12em; border-bottom: 1px solid var(--ink); padding-bottom: 2px; margin: 14px 0 6px }
+.ereader h2 span { letter-spacing: 0; font-weight: 400 }
+.ereader ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px }
+.ereader ol.secs { list-style: none; padding: 0; gap: 10px }
+.ereader li { cursor: pointer }
+.ereader li span, .ereader .tot, .ereader .by, .ereader .sitem span, .ereader .lead span { font: 12px var(--sans); color: var(--grey) }
+.ereader .dl, .ereader .kick { font: 600 10.5px var(--sans); letter-spacing: .12em; color: var(--grey); margin: 0 }
+.ereader hr { border: 0; border-top: 1px solid var(--ink); margin: 8px 0 }
+.ereader p { margin: 0 0 8px }
+.ereader .ph { height: 9px; background: #cfccc3; border-radius: 2px; margin: 0 0 9px }
+.ereader .ph.short { width: 60% }
+.ereader .end { text-align: center; font-size: 10px }
+.ereader .cover { height: 100%; display: grid; align-content: center; justify-items: center; text-align: center; gap: 6px; cursor: pointer }
+.ereader .mast { font: 600 11px var(--sans); letter-spacing: .3em; text-transform: uppercase; border-bottom: 2px solid var(--ink); padding-bottom: 4px }
+.ereader .etitle { font: 700 26px/1.15 "Literata", "Noto Serif", serif; max-width: 14ch }
+.ereader .edate { font-size: 40px; font-weight: 700 }
+.ereader .leads { font-size: 12.5px; display: grid; gap: 4px; border-top: 1px solid var(--ink); padding-top: 8px; margin-top: 6px }
+.ereader .tap { font: 11px var(--sans); color: var(--grey); margin-top: 10px }
+.ereader .sfront { padding-top: 20% }
+.ereader .sname { font: 700 34px/1.1 "Literata", "Noto Serif", serif }
+.ereader .sitem { margin: 12px 0; cursor: pointer } .ereader .sitem b { font-size: 15px } .ereader .sitem p { margin: 2px 0 }
+.ereader .lead { border-top: 1px solid #b9b6ad; padding: 8px 0 } .ereader .lead.first b { font-size: 18px } .ereader .lead b { cursor: pointer; display: block; font-size: 14.5px; line-height: 1.25 } .ereader .lead p { font-size: 12.5px; margin: 3px 0 } .ereader .lead span { cursor: pointer }
+@media (prefers-reduced-motion: reduce) { .phone .sw::after { transition: none } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <span class="kicker">newspapeRSS · design exploration · Oct 2026</span>
+    <h1>tt-rss in newspapeRSS</h1>
+    <p class="dek">Should a tt-rss account stay one source, open up into its feeds, or take back what you subscribe to here? Competitors, today's screens, and clickable proposals, each critiqued by the app's personas.</p>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <main id="tabsBody">
+
+<section class="tab" id="plan" data-label="Plan &amp; log">
+  <div class="lede">
+    <h2>Plan and log</h2>
+    <p>Cycles run the way the DEVLOG's do: one question each, and each one ends with something to look at. No app code changes; this page and <code>docs/research/</code> are the output.</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>#</th><th>Cycle</th><th>Output</th><th>State</th></tr></thead>
+    <tbody id="planRows"></tbody>
+  </table></div>
+  <h2>Log</h2>
+  <div class="log" id="log"></div>
+</section>
+
+<section class="tab" id="competitors" data-label="Competitors">
+  <div class="lede">
+    <h2>How others handle a reader account</h2>
+    <p class="dek">Cycle 1, with screenshots added in cycle 17. Three questions for each product: are a synced account's feeds sources of their own, where do per-feed settings live, and where does a feed you add go? Claims link to sources; "?" means not confirmed.</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Product</th><th>Account's feeds as sources</th><th>Per-feed settings</th><th>Folders</th><th>A feed you add goes to</th><th>Makes folders on the server</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://netnewswire.com/help/mac/5.0/en/adding-feeds.html">NetNewsWire</a></td><td class="y">Yes, one sidebar section per account</td><td>?</td><td>Server folders</td><td><b>You pick the account and folder</b> in Add</td><td>Yes; feeds drag between accounts (<a href="https://netnewswire.blog/2019/05/31/netnewswire-a.html">blog</a>)</td></tr>
+      <tr><td><a href="https://www.macstories.net/reviews/reeder-a-new-approach-to-following-feeds/">Reeder. (2024)</a></td><td>iCloud only</td><td>In the app: name, <b>"show in Home"</b>, style</td><td>None; tags and filters</td><td>iCloud</td><td>n/a</td></tr>
+      <tr><td><a href="https://voidstern.net/fiery-feeds-user-guide">Fiery Feeds</a></td><td class="y">Yes, tt-rss included</td><td>In the app, remembered per feed</td><td>Made in the app</td><td>The account (?)</td><td>Yes, where the API allows</td></tr>
+      <tr><td><a href="https://github.com/yang991178/fluent-reader/wiki/Support">Fluent Reader</a></td><td class="y">Yes</td><td>In the app, <b>keyed by feed URL</b>, kept when a service is connected</td><td>Local groups</td><td>?</td><td>?</td></tr>
+      <tr><td><a href="https://f-droid.org/packages/com.readrops.app/">Readrops</a></td><td class="y">Yes: local, FreshRSS, Nextcloud</td><td>?</td><td>Yes</td><td>The account</td><td>"If supported by the service API"</td></tr>
+      <tr><td><a href="https://github.com/jocmp/capyreader">Capy Reader</a></td><td class="y">Yes: local, Feedbin, FreshRSS, Miniflux</td><td>?</td><td>Edits Miniflux categories</td><td>The server</td><td>Yes (Miniflux)</td></tr>
+      <tr><td><a href="https://gigazine.net/gsc_news/en/20260510-read-you/">Read You</a></td><td class="y">Yes, switching between accounts</td><td>?</td><td>Server tags become groups</td><td>The current account</td><td>Via Google Reader tags</td></tr>
+      <tr><td><a href="https://f-droid.org/en/packages/org.ttrssreader/">TTRSS-Reader</a></td><td class="y">Categories, feeds, labels</td><td>?</td><td>tt-rss categories</td><td>tt-rss (share to subscribe)</td><td class="n">No: tt-rss's API can't</td></tr>
+      <tr><td><a href="https://github.com/omer-faruq/rssreader.koplugin">KOReader rssreader</a></td><td>Local and account feeds side by side</td><td>Global only</td><td>Server folders</td><td>Local config file only</td><td class="n">No</td></tr>
+      <tr><td><a href="https://reabble.com/">Reabble</a> (Inoreader)</td><td>Shows Inoreader's feeds</td><td>In Inoreader</td><td>?</td><td>Inoreader</td><td>n/a</td></tr>
+      <tr><td><a href="https://ktool.io/blog/december-update-rss-is-here">KTool</a></td><td>Each feed a subscription</td><td><b>Per feed: daily, weekly, or straight to Kindle</b></td><td>"Custom magazines" planned</td><td>KTool</td><td>n/a</td></tr>
+      <tr><td><a href="https://www.inoreader.com/blog/2020/02/send-daily-email-digests-to-friends-colleagues-or-even-to-yourself.html">Inoreader digest</a></td><td>n/a</td><td>n/a</td><td><b>A digest is one folder or tag</b></td><td>n/a</td><td>n/a</td></tr>
+      <tr><td><a href="https://docs.readwise.io/reader/docs/faqs/filtered-views">Readwise Reader</a></td><td>Feeds in a Feed tab</td><td>On the server, as Views</td><td>Filtered views</td><td>?</td><td>n/a</td></tr>
+    </tbody>
+  </table></div>
+  <div class="lede">
+    <h3>How they show an account's feeds</h3>
+    <p class="dek">Screenshots from each product's own store or project page. Three are tt-rss (TTRSS-Reader and tt-rss itself); the rest are other synced accounts. Every one shows unread counts on every feed, the thing newspapeRSS leaves out.</p>
+  </div>
+  <div class="gallery"><figure class="shot"><a href="https://f-droid.org/en/packages/org.ttrssreader/"><img src="shots/01-ttrssreader-categories.png" alt="TTRSS-Reader · tt-rss: Top level of a tt-rss account: tt-rss's special feeds first (All, Fresh, Published, Starred), then its categories as a flat list, each with an unread count." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://f-droid.org/en/packages/org.ttrssreader/">See it at the source</a>.</div><figcaption><b>TTRSS-Reader · tt-rss</b> Top level of a tt-rss account: tt-rss's special feeds first (All, Fresh, Published, Starred), then its categories as a flat list, each with an unread count. <span class="map">Here: Categories first, feeds one level down: like A's account page, or F4.</span> <a href="https://f-droid.org/en/packages/org.ttrssreader/">Source</a></figcaption></figure><figure class="shot"><a href="https://f-droid.org/en/packages/org.ttrssreader/"><img src="shots/02-ttrssreader-feeds-in-category.png" alt="TTRSS-Reader · tt-rss: Inside a category: its feeds, each with an unread count. One level at a time." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://f-droid.org/en/packages/org.ttrssreader/">See it at the source</a>.</div><figcaption><b>TTRSS-Reader · tt-rss</b> Inside a category: its feeds, each with an unread count. One level at a time. <span class="map">Here: A drill-down: two taps to a feed.</span> <a href="https://f-droid.org/en/packages/org.ttrssreader/">Source</a></figcaption></figure><figure class="shot"><a href="https://tt-rss.org/"><img src="shots/03-ttrss-web-feed-tree-sidebar.png" alt="tt-rss web · tt-rss itself: Sidebar tree: Special and Labels at the top, then categories that fold open into feeds, unread badges everywhere." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://tt-rss.org/">See it at the source</a>.</div><figcaption><b>tt-rss web · tt-rss itself</b> Sidebar tree: Special and Labels at the top, then categories that fold open into feeds, unread badges everywhere. <span class="map">Here: Folding categories: what F1 copies.</span> <a href="https://tt-rss.org/">Source</a></figcaption></figure><figure class="shot"><a href="https://apps.apple.com/us/app/netnewswire-rss-reader/id1480640210"><img src="shots/07-netnewswire-feeds-by-account.webp" alt="NetNewsWire · iOS: One folding section per account (On My iPhone, iCloud), its feeds inside, unread counts on the right." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://apps.apple.com/us/app/netnewswire-rss-reader/id1480640210">See it at the source</a>.</div><figcaption><b>NetNewsWire · iOS</b> One folding section per account (On My iPhone, iCloud), its feeds inside, unread counts on the right. <span class="map">Here: Accounts as sections: F1's "On this phone" / "Tiny Tiny RSS".</span> <a href="https://apps.apple.com/us/app/netnewswire-rss-reader/id1480640210">Source</a></figcaption></figure><figure class="shot"><a href="https://apps.apple.com/us/app/fiery-feeds-news-reader/id1158763303"><img src="shots/08-fieryfeeds-feeds-sidebar.webp" alt="Fiery Feeds · iOS (supports tt-rss): Smart views, then folder headings in capitals, each holding feeds with counts and chevrons. The account isn't named in the shot." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://apps.apple.com/us/app/fiery-feeds-news-reader/id1158763303">See it at the source</a>.</div><figcaption><b>Fiery Feeds · iOS (supports tt-rss)</b> Smart views, then folder headings in capitals, each holding feeds with counts and chevrons. The account isn't named in the shot. <span class="map">Here: Folders as headings over feeds: F1 again.</span> <a href="https://apps.apple.com/us/app/fiery-feeds-news-reader/id1158763303">Source</a></figcaption></figure><figure class="shot"><a href="https://f-droid.org/en/packages/com.readrops.app/"><img src="shots/04-readrops-feeds-folders.jpg" alt="Readrops · Android (FreshRSS, probably): A Feeds tab with folders as headers showing a count, feeds under them; a sheet for one feed is open." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://f-droid.org/en/packages/com.readrops.app/">See it at the source</a>.</div><figcaption><b>Readrops · Android (FreshRSS, probably)</b> A Feeds tab with folders as headers showing a count, feeds under them; a sheet for one feed is open. <span class="map">Here: Folder headers with feeds: F1; the sheet is a feed's own settings.</span> <a href="https://f-droid.org/en/packages/com.readrops.app/">Source</a></figcaption></figure><figure class="shot"><a href="https://f-droid.org/en/packages/com.readrops.app/"><img src="shots/05-readrops-freshrss-account.jpg" alt="Readrops · FreshRSS account: The account screen: a FreshRSS account, with Nextcloud News and a local account listed below. Accounts kept apart." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://f-droid.org/en/packages/com.readrops.app/">See it at the source</a>.</div><figcaption><b>Readrops · FreshRSS account</b> The account screen: a FreshRSS account, with Nextcloud News and a local account listed below. Accounts kept apart. <span class="map">Here: An account's own settings page, like ours.</span> <a href="https://f-droid.org/en/packages/com.readrops.app/">Source</a></figcaption></figure><figure class="shot"><a href="https://f-droid.org/en/packages/me.ash.reader/"><img src="shots/06-readyou-feeds-groups.png" alt="Read You · Android: An All card, then groups (Default, News, Blogs) that fold; Blogs is open, its feeds indented with counts." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://f-droid.org/en/packages/me.ash.reader/">See it at the source</a>.</div><figcaption><b>Read You · Android</b> An All card, then groups (Default, News, Blogs) that fold; Blogs is open, its feeds indented with counts. <span class="map">Here: Feeds indented under a folding heading: the closest to F5.</span> <a href="https://f-droid.org/en/packages/me.ash.reader/">Source</a></figcaption></figure><figure class="shot wide"><a href="https://flathub.org/apps/io.gitlab.news_flash.NewsFlash"><img src="shots/09-newsflash-sidebar.png" alt="NewsFlash · desktop: All Articles and Today, then a folding Subscriptions tree with nested categories and feeds, unread badges." loading="lazy" onerror="this.closest('figure').classList.add('missing')"></a><div class="nopic">Screenshot kept out of the public copy. <a href="https://flathub.org/apps/io.gitlab.news_flash.NewsFlash">See it at the source</a>.</div><figcaption><b>NewsFlash · desktop</b> All Articles and Today, then a folding Subscriptions tree with nested categories and feeds, unread badges. <span class="map">Here: A tree, nested: deeper than anything proposed here.</span> <a href="https://flathub.org/apps/io.gitlab.news_flash.NewsFlash">Source</a></figcaption></figure></div>
+  <div class="notes"><h3>What the screenshots say</h3><ul>
+    <li><b>Folding categories, feeds inside</b> is what nearly everyone does (tt-rss, NetNewsWire, Fiery Feeds, Readrops, NewsFlash). That's F1.</li>
+    <li><b>Feeds indented under one heading</b> (Read You) is F5, your idea: no category level between the account and its feeds.</li>
+    <li><b>Drilling in a level at a time</b> (TTRSS-Reader) is A's account page and F4: tidy, one more tap.</li>
+    <li><b>None of them has to stay calm</b>: they're readers, built around counts. The paper's Sources list doesn't need counts, so it can be shorter than any of these.</li>
+  </ul></div>
+  <div class="split" style="grid-template-columns: 1fr 1fr">
+    <div class="notes">
+      <h3>What the sync APIs allow</h3>
+      <ul>
+        <li><b>tt-rss:</b> subscribe into an existing category, unsubscribe, read the tree. Nothing to make, rename or move categories (<a href="https://tt-rss.org/docs/API-Reference.html">API</a>).</li>
+        <li><b>Google Reader API</b> (FreshRSS, Inoreader): add, and folders are tags, so it can make them (<a href="https://www.inoreader.com/developers/edit-subscription">Inoreader</a>).</li>
+        <li><b>Miniflux:</b> creates categories; feeds and categories carry server settings, including <code>hide_globally</code> (<a href="https://miniflux.app/docs/api.html">API</a>).</li>
+        <li><b>Fever:</b> read-only; can't add or edit anything (<a href="https://freshrss.github.io/FreshRSS/en/developers/06_Fever_API.html">FreshRSS</a>).</li>
+      </ul>
+    </div>
+    <div class="notes">
+      <h3>What it means here</h3>
+      <ul>
+        <li><b>Among full feed readers, grouping an account's feeds under it is the norm</b> (NetNewsWire, Readrops, Capy). The closest finite-edition peers (ttrss2calibre, Reabble) don't group at all: they send everything unread.</li>
+        <li><b>Paper settings belong in the app, keyed by the feed's address</b> (Fluent Reader). tt-rss can't hold them, and an address survives signing in again or moving a feed.</li>
+        <li><b>Clutter is handled with show/hide, not more structure:</b> Reeder's "show in Home", Miniflux's hide. That's today's "leave out".</li>
+        <li><b>Write-back is explicit:</b> NetNewsWire asks which account and folder. Nobody found sends feeds to a server silently.</li>
+        <li><b>Digests get scoped:</b> Inoreader by folder, KTool by daily or weekly per feed. "Too long" is the usual complaint about all-subscriptions digests (<a href="https://news.ycombinator.com/item?id=40773125">HN</a>).</li>
+        <li><b>No one found builds a finite edition from a reader account</b>; ttrss2calibre and Reabble send everything unread.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="tab" id="today" data-label="Today">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycle 2 · baseline</span>
+      <h2>tt-rss today</h2>
+      <p>One source for the whole account. Its feeds are already there underneath: each article remembers its feed, and the planner gives each feed its own turn and applies the per-source cap per feed. What the reader can set per feed stops at a checkbox.</p>
+      <h3>What a tt-rss feed can't do that a feed added here can</h3>
+      <ul>
+        <li><b>Article text</b> (Automatic / Feed's text / Full page), and learning it from three days of evidence.</li>
+        <li><b>Its own cap</b> ("at most 1 from this site"): tt-rss follows the edition setting.</li>
+        <li><b>A section</b>: every tt-rss article lands in one section of the contents.</li>
+        <li><b>A page of its own</b>: Recent articles mixes all 58, so one busy local-news feed fills the top of the list (the paper itself already gives each feed its turn).</li>
+      </ul>
+      <h3>What works and stays at the account</h3>
+      <ul>
+        <li>Sign-in, "Articles from" one category, read sync with tt-rss, Start fresh.</li>
+        <li>Sync asks each feed for up to five unread, so per-feed sources cost no extra requests.</li>
+      </ul>
+      <p class="kicker">Built from the code on main and your screenshots. Feed names are made up.</p>
+    </div>
+    <div class="stage" data-flow="today"></div>
+  </div>
+</section>
+
+<section class="tab" id="a" data-label="A · Feeds open up">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">v3</span></span>
+      <h2>A. Each feed opens up, folded under the account</h2>
+      <p><i>Cycle 16: the list of feeds now sits on Sources, inset under the tt-rss row (F5); see All feeds in Sources.</i> Sources doesn't change: tt-rss is still one row. On the account page, "Feeds in your paper" becomes the list of feeds, folded by tt-rss category, each opening a page of its own.</p>
+      <h3>What the reader gets</h3>
+      <ul>
+        <li><b>Article text learned per feed, with no new screen.</b> This alone fixes tt-rss's teaser and stripped feeds.</li>
+        <li><b>A page per feed:</b> Leave out or Bring back, an Article text override, a cap, a section, its own recent (or starred) articles.</li>
+        <li><b>Categories folded</b>, saying what's inside in words. With one category under "Articles from", the rest fold into "Not in your paper", and only their waiting articles expire.</li>
+        <li><b>A feed unsubscribed in tt-rss</b> says so ("No longer in your tt-rss") and offers Forget; its stars still go in.</li>
+        <li><b>Changes made while an edition is being made</b> apply from the next one, and the dialog says so.</li>
+      </ul>
+      <h3>How it's kept (round 2 changed this)</h3>
+      <ul>
+        <li><b>A feed is a settings row, not a source.</b> One row per tt-rss feed (account, feed id, address, category, article text, cap, section, left out), replacing today's left-out table. Articles stay on the account.</li>
+        <li><b>Why:</b> the planner already keys turns by account + feed. Sync, read sync and mark-read are all keyed on the account and stay untouched. Making feeds into sources would rewrite exactly those.</li>
+        <li><b>Content, caps and sections</b> look up the article's feed row before the account's.</li>
+        <li><b>The full feed list</b> (quiet feeds included, with address and category) is read once a day.</li>
+        <li><b>Signing in again:</b> the same user at a new address (http to https) keeps the rows; another user clears them, as today.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Sources stays four rows for everyone.</li><li>Leaves sync and delivery alone.</li><li>Every later per-feed idea (a heart, how often) has a home.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Two levels to learn: the account, and a feed.</li><li>A lookup in three places (text, caps, sections).</li><li>A per-feed cap rarely bites in a 30-minute paper; balance needs D.</li></ul></div>
+      </div>
+      <div id="a-crit" class="log">
+        <div class="critique"><h3>Round 2 · cycle 5 · the code and the edges</h3><ul>
+          <li><span class="who">Code:</span> child sources would break every account-keyed path: read sync, mark-read, the <code>kind = 'TTRSS'</code> joins, and Sources and OPML export would gain 58 rows. <b>Reduced:</b> per-feed settings table keyed like the planner's <code>publicationOf</code>; articles stay on the account.</li>
+          <li><span class="who">Code:</span> text learning, caps and sections all read the account today (<code>recordFullText</code> returns early, caps skip tt-rss). <b>Fixed:</b> one lookup by the article's feed.</li>
+          <li><span class="who">Self-hoster:</span> there's no address to carry settings by: the app asks only for feeds with unread, without their URL or category, and an http→https change deletes the account. <b>Fixed:</b> a daily full feed list; the rows are re-keyed rather than deleted.</li>
+          <li><span class="who">Owner:</span> choosing a category still expires every waiting article. <b>Fixed:</b> only those outside it.</li>
+          <li><span class="who">Owner:</span> a feed unsubscribed on the server looks merely quiet. <b>New:</b> "No longer in your tt-rss", with Forget.</li>
+          <li><span class="who">Owner:</span> a left-out feed's page hid its starred articles. <b>Fixed:</b> they're listed.</li>
+          <li><span class="who">Owner:</span> Leave out mid-build still lands in today's paper. <b>Fixed:</b> "from the next edition".</li>
+          <li><span class="who">TalkBack:</span> a heading role on a button hid the button. <b>Fixed:</b> a button inside a heading, with a live expanded state.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">Owner:</span> the section row said "News, its tt-rss category" while the categories switch was off. Which is in charge? <b>Fixed:</b> the row says what applies now.</li>
+          <li><span class="who">Owner:</span> with "Articles from: Essays", 46 feeds still looked live. <b>Fixed:</b> they fold into "Not in your paper".</li>
+          <li><span class="who">Owner:</span> a per-feed cap of 1 changes nothing when 54 feeds share 7 slots; what's missing is "less news, more essays". <b>New:</b> proposal D.</li>
+          <li><span class="who">Everyone:</span> per-feed article text needs no screen. <b>Reduced:</b> learned automatically; the page only overrides.</li>
+          <li><span class="who">Self-hoster:</span> keying settings by address loses them when a feed moves to https or is quiet for a month. <b>Fixed:</b> settings live on the feed's source; the address only carries them.</li>
+          <li><span class="who">Boox, TalkBack:</span> 58 open rows and a 7px dot. <b>Fixed:</b> folded categories, settings in words, real headings and switch labels.</li>
+          <li><span class="who">Owner:</span> what does a left-out feed's page look like? <b>Fixed:</b> a "Left out" line and Bring back.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="a"></div>
+  </div>
+</section>
+
+<section class="tab" id="b" data-label="B · dropped">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 6–8 · <span class="pill">dropped in round 2</span></span>
+      <h2>B. Sources by section</h2>
+      <p><b>Folded into D.</b> v1 spread all 58 tt-rss feeds through Sources; round 1 cut it to an optional by-section view; round 2 found that view duplicated D's section pages and tripped too easily. What survives lives in D: a section's page lists its phone feeds and its tt-rss feeds as one row. The phone below is v2, kept for the record.</p>
+      <div class="pros-cons">
+        <div><h3>What it taught</h3><ul><li>"Sources reads like the contents" is a real wish, met by D's section page.</li><li>Every row needs its freshness line, tt-rss feeds included.</li><li>Left-out feeds belong out of the way, not among live ones.</li></ul></div>
+        <div><h3>Why it went</h3><ul><li>Sections exist for almost everyone (the reading list is always "Saved for later"; one OPML folder adds more), so the view would switch on by surprise.</li><li>A second place to browse sections, with its own toggle.</li><li>The filtered account page hid every account setting.</li></ul></div>
+      </div>
+      <div id="b-crit" class="log">
+        <div class="critique"><h3>Round 2 · cycle 8 · verdict: fold into D</h3><ul>
+          <li><span class="who">Kindle reader in their sixties:</span> the reading list always has a section and an OPML import adds folders, so "two sections" trips by surprise: Sources reorganises overnight under a friend's folder names.</li>
+          <li><span class="who">Owner:</span> with categories-as-sections off, Sources showed a heading "Tiny Tiny RSS" over one row "Tiny Tiny RSS · 54 feeds".</li>
+          <li><span class="who">Owner:</span> the filtered account page had no way to the account's settings, and its menu offered "Remove tt-rss" from inside a section.</li>
+          <li><span class="who">Owner:</span> two Uncategorized feeds had no group at all and couldn't be found.</li>
+          <li><span class="who">TalkBack:</span> five rows all named "Tiny Tiny RSS · N feeds".</li>
+          <li><span class="who">Everyone:</span> D's section page already does this job. <b>Dropped;</b> the useful part moved to D.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 7 · personas</h3><ul>
+          <li><span class="who">Kindle reader, no tt-rss:</span> B forces sections on five starter feeds that have none. <b>Reduced:</b> headings only with two or more sections.</li>
+          <li><span class="who">Owner:</span> with "Articles from: News", Sources still listed 49 feeds that never reach the paper, and left-out feeds sat among live ones. <b>Fixed:</b> only feeds in the paper are listed; left out folds at the bottom.</li>
+          <li><span class="who">Owner:</span> tt-rss rows lost the freshness line that's there to catch dead feeds. <b>Fixed.</b></li>
+          <li><span class="who">TalkBack, Boox:</span> about 67 swipe stops; "News 10" heard as an unread count; full refresh on every fold. <b>Fixed:</b> tt-rss folded per section, headings read "News, 3 sources and 9 tt-rss feeds, folded".</li>
+          <li><span class="who">Verdict:</span> drop B as the structure; keep "Sources reads like the contents" as a view on top of A, and the time-per-section idea as its own proposal. <b>Done:</b> B v2 is that view; the idea is D.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="b"></div>
+  </div>
+</section>
+
+<section class="tab" id="c" data-label="C · Add to tt-rss">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 9–11 · <span class="pill v">v3</span></span>
+      <h2>C. Add to tt-rss instead</h2>
+      <p>Built on A. When a feed is found, the usual <b>Add</b> keeps it on the phone, one tap as today. With an account connected, a second button, <b>Add to tt-rss instead</b>, subscribes it there. Move to tt-rss waits.</p>
+      <h3>What happens</h3>
+      <ul>
+        <li><b>Already in your tt-rss?</b> Checked against every tt-rss feed by address (quiet ones too). If it's there, the app opens it instead.</li>
+        <li><b>Category</b> starts on the paper's own; others warn if the paper takes one category.</li>
+        <li><b>"Keep only its newest 2 unread"</b>, ticked. Done at the first sync that sees the feed, by article, because tt-rss fetches on its own schedule: marking right away would mark nothing, and "everything" would starve the paper.</li>
+        <li><b>Undo</b> only for a feed this app just created (tt-rss's "subscribed" answer, never "already subscribed"). It unsubscribes, drops anything it brought here, and offers the phone.</li>
+        <li><b>Timeout or Cancel after asking</b> is "waiting for tt-rss", kept on the account page across restarts, settled at the next sync.</li>
+        <li><b>Several feeds on one site:</b> the same chooser as the phone add. <b>Substack and similar:</b> says what tt-rss loses, on this path only.</li>
+        <li><b>Untouched:</b> onboarding, starter packs and OPML stay phone-only, skipping feeds already in tt-rss.</li>
+      </ul>
+      <h3>Cost</h3>
+      <ul><li>A stored "waiting for tt-rss" state: a database change with a migration test.</li><li>The feed's id comes from tt-rss's answer where newer servers give it, otherwise from the full feed list by address.</li></ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>One subscription list across your tt-rss apps, when you want it.</li><li>No extra step for the common add.</li><li>Undo, so a wrong tap isn't a laptop chore.</li></ul></div>
+        <div><h3>Against</h3><ul><li>tt-rss strips some content: a phone feed can be better.</li><li>A site may block the server but not the phone.</li><li>More reliance on a project now living on a fork.</li></ul></div>
+      </div>
+      <div id="c-crit" class="log">
+        <div class="critique"><h3>Round 2 · cycle 11 · the API and the code</h3><ul>
+          <li><span class="who">API:</span> subscribing doesn't fetch; tt-rss's updater does, later. Marking back issues read at once marks nothing, and "sync now" brings nothing. <b>Fixed:</b> trimmed at the first sync that sees the feed; the message says "usually within the hour".</li>
+          <li><span class="who">Code:</span> the paper takes only unread, five per feed. Marking all read would starve it. <b>Fixed:</b> keep the newest 2, mark the rest by id.</li>
+          <li><span class="who">API:</span> subscribe returns a status, not reliably an id; "already subscribed" must never offer Undo. <b>Fixed.</b></li>
+          <li><span class="who">Code:</span> today's feed list asks only for feeds with unread, without addresses, so "already in tt-rss" would miss quiet feeds. <b>Fixed:</b> the full list, matched by cleaned-up address.</li>
+          <li><span class="who">Code:</span> Cancel after the request is sent can leave a subscription the app forgets. <b>Fixed:</b> treated as a timeout, stored.</li>
+          <li><span class="who">Code:</span> Undo left waiting articles that read sync can't resolve. <b>Fixed:</b> they're dropped.</li>
+          <li><span class="who">Owner:</span> a dialog on every add slows the common case. <b>Reduced:</b> a second button instead.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 10 · personas</h3><ul>
+          <li><span class="who">Owner on one category:</span> a feed added to another category never reaches the paper. <b>Fixed:</b> category starts on the paper's, with a warning.</li>
+          <li><span class="who">Owner:</span> subscribing dumps the feed's backlog unread into the laptop counts. <b>Fixed:</b> "Mark its older posts read in tt-rss", on by default.</li>
+          <li><span class="who">Owner, self-hoster:</span> a remembered "tt-rss too" plus no way to unsubscribe makes a wrong tap a laptop chore. <b>Fixed:</b> phone is the default; Undo unsubscribes.</li>
+          <li><span class="who">OPML, starter packs:</span> importing your own tt-rss OPML makes 58 duplicates. <b>Fixed:</b> imports skip feeds already in tt-rss; they never ask.</li>
+          <li><span class="who">Slow server:</span> a timeout then "Add to this phone" makes a duplicate once the server finishes. <b>Fixed:</b> a timeout is "not sure yet", checked at the next sync.</li>
+          <li><span class="who">Owner:</span> Move to tt-rss can orphan settings if tt-rss stores a different address, or drop stars before tt-rss has fetched anything. <b>Reduced:</b> Move is deferred.</li>
+          <li><span class="who">Self-hoster:</span> Substack through tt-rss loses Notes and footnotes. <b>Fixed:</b> the dialog says so for known hosts and keeps the phone preselected.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="c"></div>
+  </div>
+</section>
+
+<section class="tab" id="d" data-label="D · Balance">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Rounds D1–D2 · <span class="pill v">v3</span></span>
+      <h2>D. Balance the paper by section</h2>
+      <p>With 54 feeds and seven slots, per-feed controls don't shape the paper. What the owner wants is "thoughtful, varied, some fun": <b>every section represented, and more of some</b>. One rule the reader can predict:</p>
+      <p style="border-left:3px solid var(--accent);padding-left:12px"><b>Each section gets one article. Then More sections take the next turns, then Normal. Less gets a second only if there's room. Starred articles always go in, and count as their section's one.</b></p>
+      <h3>What changes</h3>
+      <ul>
+        <li><b>Settings › Sections</b>, shown only with two or more real sections. <b>Off by default</b>: importing a friend's OPML never changes the paper by itself.</li>
+        <li><b>Less / Normal / More</b> per section, applied <b>per section</b>, not per source: a 21-feed section doesn't win just by being big.</li>
+        <li><b>Only with Take turns.</b> With In order or Shuffle, the screen says balance steps aside.</li>
+        <li><b>Within a section</b>, sources still take turns, featured-longest-ago first; so does the order sections get their one article, so a section cut today leads tomorrow.</li>
+        <li><b>"What would go in now"</b> on request, each heading saying its share and count ("Long reads · More · 2") and why.</li>
+        <li><b>When only one section has news</b>, the contents say so ("Only Front page had new articles today") rather than padding or holding back.</li>
+        <li><b>Saved for later</b> is a section: with balance on, a saved link goes in most days. The screen says so.</li>
+        <li><b>Sections come from</b> OPML folders today; for tt-rss, A's "categories as sections".</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>"Varied" by construction: every section, when the budget allows.</li><li>A rule you can say out loud and check against the paper.</li><li>Works for OPML folders now, tt-rss after A.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Long articles in the first round can still fill the budget.</li><li>One more screen in Settings.</li><li>Changes how often saved links appear.</li></ul></div>
+      </div>
+      
+<div id="d-crit" class="log">
+        <div class="critique"><h3>Round 2 · D2 · does it deliver?</h3><ul>
+          <li><span class="who">Owner, worked numbers:</span> today's turns already give Long reads about 3 of 7 articles (21 of the 47 sources in the worked example). Weighting per section, More gave about 2.5: fewer essays than with balance off. Per source, Science and Saved vanished. <b>Fixed:</b> a guaranteed one per section, then More.</li>
+          <li><span class="who">Owner:</span> two 20-minute essays taking the first turns fill the paper; "More" meant less variety. <b>Fixed:</b> everyone gets one before anyone gets two.</li>
+          <li><span class="who">Everyone:</span> "weights whose turn comes next" can't be predicted. <b>Reduced:</b> one rule, said on the screen, in the preview and in the contents.</li>
+          <li><span class="who">Kindle reader:</span> a friend's OPML with 12 folders switched balance on, giving a 1-feed folder as many turns as a 40-feed one. <b>Fixed:</b> off by default.</li>
+          <li><span class="who">Shuffle and In order:</span> weights are unpredictable or do nothing there. <b>Fixed:</b> Take turns only, and said.</li>
+          <li><span class="who">Owner:</span> only Front page (Less) had news, and the paper was all news with no word why. <b>New:</b> a line in the contents.</li>
+          <li><span class="who">Stars, Saved for later:</span> does a starred essay use Long reads' turn? <b>Fixed:</b> yes, it's the section's one. Saved links become near-daily. <b>Said on the screen.</b></li>
+        </ul></div>
+
+        <div class="critique"><h3>Round 1 · D1 · the planner and the personas</h3><ul>
+          <li><span class="who">Pocket refugee:</span> stars go first across every source; a section's minutes would hold back starred saved links. <b>Fixed:</b> stars ignore shares <i>(refined in D2: a star counts as its section's one)</i>.</li>
+          <li><span class="who">Owner:</span> length is only known after fetching, so a budget per section means going over once per section, and a 25-minute essay alone breaks "Long reads 12". <b>Fixed:</b> one budget; shares only weight the turns.</li>
+          <li><span class="who">Everyone:</span> minutes that must add up to "30 of 30" break when the size changes, and 0 clashes with Leave out. <b>Reduced:</b> Less / Normal / More.</li>
+          <li><span class="who">Owner:</span> leftover time went to whichever section was held back first. <b>Fixed:</b> the second pass follows the shares too.</li>
+          <li><span class="who">Code:</span> the contents order comes from Sources' order; dragging would make a second owner. <b>Reduced:</b> no dragging; no "Make a section".</li>
+          <li><span class="who">Boox:</span> an honest preview means fetching pages. <b>Fixed:</b> on request, lengths "about".</li>
+          <li><span class="who">Kindle reader, TalkBack:</span> steppers and a drag handle with no names; a screen she'd never need. <b>Fixed:</b> hidden under two sections; labelled choices.</li>
+        </ul></div></div>
+    </div>
+    <div class="stage" data-flow="d"></div>
+  </div>
+</section>
+<section class="tab" id="paper" data-label="Sections in the paper">
+  <div class="lede">
+    <span class="kicker">Your question · what would sections of a newspaper look like?</span>
+    <h2>Sections in the paper</h2>
+    <p class="dek">A section is a heading the paper's articles are grouped under: Front page, Long reads, Science. Today they come from OPML folders, and the reading list is always "Saved for later". tt-rss has none yet: all of it lands in one section. Below, three ways the book itself could show them, on an e-reader page. Tap the contents entries and the page edges to turn pages.</p>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">S1 · today</span>
+      <h3>Headings in the contents, the section in each kicker</h3>
+      <ul>
+        <li><b>Contents</b> ("In this edition") lists articles under small uppercase headings, each with its minutes.</li>
+        <li><b>Each article</b> starts with a kicker: "Long reads · A Working Library".</li>
+        <li><b>No section pages:</b> turning from the last Science article lands straight on the first Arts one; the kicker is the only sign.</li>
+        <li>Kindle's Go To menu lists sections and their articles.</li>
+      </ul>
+      <p class="dek">Cheapest, already built. Works well when sections are few and short.</p>
+    </div>
+    <div class="stage" data-flow="s1"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">S4 · recommended · S1, plus two signposts</span>
+      <h3>Today's book, with the section said where it changes</h3>
+      <ul>
+        <li><b>A section flag</b> on the first article of each section: the section's name, large, above the kicker. No extra page, so no extra page turn or e-ink refresh.</li>
+        <li><b>"Next, in Science: Tagging shorebirds at dawn · 4 min"</b> when the next article starts a new section, on the "Next" line that already follows long reads.</li>
+        <li><b>Contents, kicker and Go To</b> stay as today: Kindle opens at the contents, and each section's entry already points at its first article.</li>
+      </ul>
+      <p class="dek">The cheapest way to make sections felt while reading. Try the section's first article, then the end of a long read.</p>
+    </div>
+    <div class="stage" data-flow="s4"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">S2 · section fronts · only for big sections</span>
+      <h3>A short page opens each section</h3>
+      <ul>
+        <li><b>The section's name, large</b>, its article count and minutes, and its headlines with one line each: a pause and a menu, as a print section's front does.</li>
+        <li><b>Contents</b> gets shorter: sections with their minutes; tap one for its front.</li>
+        <li><b>Kicker</b> keeps only the source, since the front says where you are.</li>
+        <li>Costs one page per section: five page turns in a 30-minute paper. On e-ink, each is a full refresh.</li>
+      </ul>
+      <p class="dek">Feels most like a newspaper, but in a 7-article paper most fronts would open a one-article section and repeat its headline a page later. If kept: a front only for a section with 3 or more articles, and the section stays in the kicker for readers who jump in from Go To.</p>
+    </div>
+    <div class="stage" data-flow="s2"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">S3 · a front page · not recommended</span>
+      <h3>One page with the lead of every section</h3>
+      <ul>
+        <li><b>The first page after the cover</b> is a front page: each section's lead headline, its first two lines, and "Long reads · 2 articles · 19 min →".</li>
+        <li><b>Then the articles</b>, with section headings in the contents as today (S1).</li>
+        <li>The cover image already shows first headlines, so this is a richer version of something that exists.</li>
+        <li>Fitting five leads on a small e-reader screen means short teasers; on a 6" Kindle at large type, it scrolls to a second page.</li>
+      </ul>
+      <p class="dek">Kindle opens the book at the contents, after this page, so it would be skipped; KOReader and Boox open at the cover, which already lists six headlines. A third list of the same leads.</p>
+    </div>
+    <div class="stage" data-flow="s3"></div>
+  </div>
+  <div class="critique"><h3>Critique · personas on a Kindle, a Boox and KOReader</h3><ul>
+    <li><span class="who">Owner, Kindle:</span> S3's front page sits before the contents, where Kindle opens the book, so it's skipped; the cover already lists six headlines. <b>Not recommended.</b></li>
+    <li><span class="who">Boox:</span> S2 adds five page turns, each a full refresh, and three of its fronts open one-article sections. <b>Reduced:</b> fronts only for sections of 3+, section kept in the kicker.</li>
+    <li><span class="who">Owner:</span> S1's real gap is the silent change between sections. <b>New:</b> S4, a section flag and a section-aware "Next", at no page cost.</li>
+  </ul></div>
+  <div class="notes">
+    <h3>Where the sections themselves would come from</h3>
+    <ul>
+      <li><b>OPML folders</b> (today): a folder's name becomes the section.</li>
+      <li><b>tt-rss categories</b> (the "categories as sections" switch from A): Essays &amp; ideas, News, Tech… as they're named in tt-rss.</li>
+      <li><b>The reading list</b> is always "Saved for later".</li>
+      <li><b>Renamed or merged here</b> for a newspaper's voice: News → "Front page", Essays and Newsletters → "Long reads". That's a small extra: a name per section, kept in the app.</li>
+      <li><b>No section</b> (starter feeds): no heading, as today. A paper with one section shows no headings at all.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="tab" id="allfeeds" data-label="All feeds in Sources">
+  <div class="lede">
+    <span class="kicker">Your question · what if every tt-rss feed showed on the Sources page?</span>
+    <h2>All feeds in Sources</h2>
+    <p class="dek">Three layouts that put all 58 tt-rss feeds on Sources, built with what B's critiques taught: every row keeps its freshness line, left-out feeds go out of the way, the account's settings keep a home, and a reader without tt-rss sees exactly today's list. None needs feeds to become sources in the database: the per-feed table from A1 can supply the rows.</p>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F1 · by account</span>
+      <h3>"On this phone" and "Tiny Tiny RSS", as NetNewsWire does it</h3>
+      <ul>
+        <li><b>Two groups:</b> your phone's sources, then tt-rss with its feeds under their tt-rss categories.</li>
+        <li><b>The tt-rss heading is a row</b>: tap it for the account (sign-in, Articles from, read sync, Start fresh).</li>
+        <li><b>Categories fold</b>; all open here, so every feed shows. On TalkBack that's about 70 stops, and on e-ink every fold redraws the list.</li>
+        <li><b>Freshness from tt-rss itself</b> ("newest in tt-rss: today"): the app only fetches unread, so its own "last new article" would call a feed you read on the laptop dead.</li>
+        <li><b>Left out</b> folds at the end of the tt-rss group.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Matches how tt-rss itself and most readers show an account.</li><li>Clear where a feed lives and where its settings are.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Your three phone sources sit above 58 rows; the reading list is easy to scroll past.</li><li>Says nothing about the paper's sections.</li></ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="f1"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F2 · by the paper's sections · not recommended</span>
+      <h3>Sources laid out like the paper's contents</h3>
+      <ul>
+        <li><b>Grouped by section</b>, in the paper's order: Front page, Long reads, Science… Each lists its phone feeds and its tt-rss feeds together; tt-rss ones carry a small "tt-rss" label.</li>
+        <li><b>The account</b> is one row at the top, "Tiny Tiny RSS · connected".</li>
+        <li><b>No section</b> gets its own group; <b>Left out</b> folds at the bottom.</li>
+        <li><b>Only when you have tt-rss or two real sections</b>; otherwise today's list.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>What you see is how the paper is put together.</li><li>Pairs with D: each group could show its share (More, Normal, Less).</li></ul></div>
+        <div><h3>Against</h3><ul><li>This is B again: an OPML import with folders rearranges Sources by surprise.</li><li>Changing a feed's section moves its row; with sections off, it's one long group.</li><li>A second place deciding the paper's order, which D avoids.</li></ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="f2"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F3 · one list, with filters</span>
+      <h3>Everything A to Z, with a search box and filter chips</h3>
+      <ul>
+        <li><b>One alphabetical list</b> of every source; tt-rss feeds say "From your tt-rss" under the name. A–Z puts "The Morning Wire" on the phone right next to "Morning Wire" in tt-rss: the only layout that shows duplicates.</li>
+        <li><b>Chips:</b> All · On this phone · tt-rss · Left out. <b>Search</b> finds a feed by name.</li>
+        <li><b>The account</b> is a row pinned at the top.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Fastest way to find one feed you remember by name.</li><li>No structure to keep in sync with tt-rss.</li></ul></div>
+        <div><h3>Against</h3><ul><li>A list of 61 says nothing about the paper; it reads like a feed reader's sidebar.</li><li>Search and chips are more to learn for a non-coder (hidden without tt-rss).</li></ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="f3"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F4 · optional · the full list, one tap down</span>
+      <h3>Sources keeps one tt-rss row; the account page lists all 58</h3>
+      <ul>
+        <li><b>Sources is today's</b>, for everyone. The reader with five starter feeds never sees any of this.</li>
+        <li><b>The account page</b>: its settings, then every feed A to Z, a search box, and chips for In your paper and Left out. Settings and feeds on one page.</li>
+        <li><b>Each row</b> says its tt-rss category and how fresh it is in tt-rss, and opens the feed's own page.</li>
+        <li><b>A–Z</b> shows a feed you have both here and in tt-rss, and says so.</li>
+      </ul>
+      <p class="dek">This answers "can I see all my tt-rss feeds?" without making Sources a feed reader's sidebar. It's A's account page with a flat, searchable list instead of folded categories.</p>
+    </div>
+    <div class="stage" data-flow="f4"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">F5 · your idea · inset under the tt-rss row · <span class="pill v">v2</span></span>
+      <h3>tt-rss is a source, and its feeds sit just beneath it</h3>
+      <ul>
+        <li><b>Sources looks as it does today</b> down to the tt-rss row. Under it, indented a little and joined by a thin line, are its 54 feeds in the paper, A to Z.</li>
+        <li><b>The tt-rss group is always last</b>: a feed you add later lands above it, not under 54 rows and the Add button.</li>
+        <li><b>Two clear controls on the tt-rss row</b>: "Settings" opens the account; a round ▾ / ▴ button shows or hides the feeds.</li>
+        <li><b>Starts folded</b> (today's Sources) until you open it; then it stays as you left it.</li>
+        <li><b>A line under a feed only when it says something</b>: "Nothing new in 3 weeks", "Also on this phone", or its own settings. 54 rows of "newest today" would be noise.</li>
+        <li><b>Left out</b> is one row at the end, opening a plain list of the four. <b>Without tt-rss</b>, nothing changes.</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Every feed on Sources, no extra tap, and still plainly part of tt-rss.</li><li>One level: no categories to open (unlike F1).</li><li>Folded, it's today's screen.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Open, Sources is ~60 rows: closer to a feed reader's sidebar than to the paper.</li><li>No search or categories (F4 has search; F1 has categories).</li><li>On TalkBack ~60 stops open; on e-ink, folding redraws the list.</li></ul></div>
+      </div>
+      <div class="critique"><h3>Critique · F5</h3><ul>
+        <li><span class="who">Owner:</span> a feed added after tt-rss landed under all 54 rows, behind the Add button. <b>Fixed:</b> tt-rss group always last.</li>
+        <li><span class="who">Everyone:</span> the fold arrow was the same chevron that means "opens a page", and the account had no visible way in. <b>Fixed:</b> a round ▾ button and a "Settings" link.</li>
+        <li><span class="who">TalkBack, Boox:</span> label said 58 but showed 54 + one; open every visit. <b>Fixed:</b> "Show 54 feeds in your paper", starts folded.</li>
+        <li><span class="who">Boox, TalkBack:</span> 54 identical "newest today" lines. <b>Reduced:</b> a line only for quiet feeds, duplicates and own settings.</li>
+        <li><span class="who">Owner:</span> the same site on the phone and in tt-rss sat 30 rows apart, unlinked. <b>Fixed:</b> "also on this phone" / "also in your tt-rss".</li>
+        <li><span class="who">Owner:</span> the Left out screen repeated the account page. <b>Fixed:</b> a plain list.</li>
+      </ul></div>
+    </div>
+    <div class="stage" data-flow="f5"></div>
+  </div>
+  <div class="notes">
+    <h3>The five side by side</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th></th><th>Feeds on Sources?</th><th>Taps to a feed</th><th>Rows on Sources (open)</th><th>Find a feed</th><th>Categories</th><th>Duplicates shown</th><th>Without tt-rss</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><b>F1</b> by account</td><td>Yes, under categories</td><td>1</td><td>~70</td><td>Scroll</td><td>Yes</td><td>No</td><td>Unchanged</td><td>Works; heavy</td></tr>
+        <tr><td><b>F2</b> by section</td><td>Yes, mixed with phone</td><td>1</td><td>~70</td><td>Scroll</td><td>As sections</td><td>No</td><td>Can change after an OPML import</td><td class="n">Not recommended</td></tr>
+        <tr><td><b>F3</b> A–Z, filters</td><td>Yes, mixed with phone</td><td>1</td><td>~60</td><td>Search, chips</td><td>No</td><td>Side by side</td><td>Unchanged</td><td>Works; reads like a sidebar</td></tr>
+        <tr><td><b>F4</b> account page</td><td>No: one row</td><td>2</td><td>5</td><td>Search, chips</td><td>Per row</td><td>Said</td><td>Unchanged</td><td>Optional, if scrolling gets slow</td></tr>
+        <tr><td><b>F5</b> inset</td><td>Yes, under the tt-rss row</td><td>1</td><td>~60, or 5 folded</td><td>Scroll</td><td>No</td><td>Said</td><td>Unchanged</td><td class="y">Recommended</td></tr>
+      </tbody>
+    </table></div>
+    <p class="dek">F5 is the pick: every feed on Sources, folded until you open it, and a five-feed reader sees no change. F4's searchable list can be added to the account page later if scrolling 54 rows gets slow; it doesn't compete with F5.</p>
+  </div>
+  <div class="critique"><h3>Critique · personas with 58 feeds and with 5</h3><ul>
+    <li><span class="who">Owner:</span> freshness lines would be false: the app only fetches unread, so a feed read on the laptop looks dead. <b>Fixed:</b> taken from tt-rss's own feed list.</li>
+    <li><span class="who">Kindle reader:</span> F2 is B again, rearranging Sources after an OPML import. <b>Not recommended.</b></li>
+    <li><span class="who">TalkBack, Boox:</span> F1 open is about 70 swipe stops and a long e-ink scroll; folds redraw the screen. <b>Said;</b> F4 keeps it off Sources.</li>
+    <li><span class="who">TalkBack:</span> a "tt-rss" tag glued to the title reads as part of the name, and the counts disagreed across options. <b>Fixed:</b> "From your tt-rss" as a subtitle; counts agree.</li>
+    <li><span class="who">Owner:</span> the same site on the phone and in tt-rss sat 60 rows apart in F1. <b>Kept in F4:</b> A–Z puts them side by side.</li>
+    <li><span class="who">Everyone:</span> <b>New:</b> F4, the full list on the account page.</li>
+  </ul></div>
+</section>
+
+<section class="tab" id="compare" data-label="Compare &amp; recommend">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 12–13, redone in 16 after F and S · <span class="pill v">v3</span></span>
+      <h2>Compare and recommend</h2>
+      <p style="border-left:3px solid var(--accent);padding-left:12px"><b>Keep tt-rss as one row in Sources, with its feeds listed just beneath it, folded until you open them (F5).</b> Cycle 13 held feed pages back "until missed"; you then asked to see every feed on Sources and proposed F5, which is that signal, so feed pages move up to Next. Build the invisible part first: tt-rss feeds learning their article text.</p>
+      <h3>Your questions</h3>
+      <ul>
+        <li><b>Each tt-rss feed as its own source?</b> Shown as its own source, yes: inset under the tt-rss row on Sources (F5), each opening its own page. Stored as its own source, no: a per-feed record under the account, so sync, read sync and delivery stay as they are. Spreading feeds among the others by section (B, F2) was dropped twice: it rearranges Sources for readers who never asked.</li>
+        <li><b>Add what you subscribe to here back to tt-rss?</b> You can already: Sources › ⋮ › Export your sites (OPML), then import in tt-rss, or subscribe in tt-rss itself. C, a second button when adding, is designed if that becomes a chore.</li>
+        <li><b>Cluttered or not?</b> It depends on the feed. A blog you'd read on the laptop anyway belongs in tt-rss; a feed that exists for the paper becomes an unread count there. So never by default, never on import.</li>
+        <li><b>What would sections look like?</b> Today's contents headings, plus two signposts in the book (S4): the section's name on its first article, and "Next, in Science: …". No extra pages.</li>
+      </ul>
+      <h3>In order</h3>
+      <ol style="margin:0;padding-left:1.3em;display:grid;gap:6px">
+        <li><b>Done (cycle 71) · A1, as it turned out.</b> Building it showed per-feed learning alone changed little: Automatic already read the page of short items, and took any long item as proof of full text without looking. So long items are now checked against their page (up to 5 an edition, one per publication), pictures count as well as words, and what's learned lives in a <code>publications</code> table for every feed, phone or tt-rss. Every later step adds to that table. <b>Any time · S4:</b> the two signposts in the book; it only touches the EPUB writer and already helps OPML-folder users.</li>
+        <li><b>Next · your feeds on Sources (F5 + feed pages).</b> The inset list under the tt-rss row, folded until opened, each row opening the feed's page (Leave out, article text, its own articles). It's the biggest step: a daily full feed list from tt-rss (addresses, categories, quiet feeds, "No longer in your tt-rss"), the left-out list moving into the per-feed table (a migration), duplicate matching and re-keying on sign-in. This is what A2 was, now with a place on Sources.</li>
+        <li><b>When you want a more varied paper · sections, then D.</b> "Use tt-rss categories as sections" on the account page, a section per feed on its page, then D's balance (one from each section, then More).</li>
+        <li><b>Only if needed:</b> F4's searchable A–Z list on the account page, if scrolling 54 rows on Sources gets slow; C, if OPML is a chore.</li>
+      </ol>
+      <div class="tablewrap"><table>
+        <thead><tr><th></th><th>What it fixes</th><th>Who sees it</th><th>Touches</th><th>Cost</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td><b>A1</b></td><td>Long teasers taken as full articles, for every feed; tt-rss feeds never learning</td><td>No one: automatic</td><td>Full-text check, a publications table</td><td>Medium; migration</td><td class="y">Done</td></tr>
+          <tr><td><b>F5 + feed pages</b></td><td>You can't see or set anything per feed; one busy feed fills Recent articles</td><td>tt-rss users; folded until opened</td><td>Sources list, a feed page, sync (a daily full feed list), category choice</td><td>Medium–large; migration</td><td class="y">Next</td></tr>
+          <tr><td><b>Sections for tt-rss</b></td><td>All of tt-rss is one section</td><td>tt-rss users who switch it on</td><td>How sections are chosen: text, caps and sections look up the feed</td><td>Small–medium, after F5's feed list</td><td>For variety</td></tr>
+          <tr><td><b>S4</b></td><td>Sections are silent while reading</td><td>Everyone with two or more sections</td><td>The EPUB writer only</td><td>Small</td><td class="y">Any time</td></tr>
+          <tr><td><b>D</b></td><td>No way to say "less news, more essays"</td><td>Anyone with two or more sections who turns it on</td><td>The planner's core (pure JVM, testable)</td><td>Medium</td><td>After sections</td></tr>
+          <tr><td><b>F4</b></td><td>Finding one feed among 54</td><td>tt-rss users, on the account page</td><td>The account page</td><td>Small, once F5 exists</td><td class="n">If needed</td></tr>
+          <tr><td><b>C</b></td><td>Adding to tt-rss from the phone</td><td>tt-rss users adding one feed</td><td>Add flow, a stored pending state</td><td>Medium; migration</td><td class="n">If OPML is a chore</td></tr>
+        </tbody>
+      </table></div>
+      <p class="dek">Dropped along the way: B and F2 (feeds spread through Sources by section), S3 (a front page Kindle opens past), and the per-feed cap from the backlog (in a 30-minute paper from 54 feeds it rarely bites).</p>
+      <h3>For you to decide</h3>
+      <ol style="margin:0;padding-left:1.3em;display:grid;gap:4px">
+        <li>Is A1 enough for a while, before F5?</li>
+        <li>Feeds on Sources: F5 inset (the recommendation), or only on the account page (F4)?</li>
+        <li>A feed's section: always its tt-rss category, or settable per feed?</li>
+        <li>Do you add feeds in your other tt-rss apps at all? That's C's premise; if not, C can go.</li>
+        <li>D's rule, "one from each section, then More": does it match how you'd edit the paper by hand? And should Saved for later count as a section?</li>
+      </ol>
+      <div id="compare-crit" class="log">
+        <div class="critique"><h3>Critique · cycle 16 · the redone recommendation</h3><ul>
+          <li><span class="who">Engineer:</span> A1's table held addresses and categories, which only the full feed list in step 2 provides. <b>Fixed:</b> A1 keys on feed id; step 2 adds the rest.</li>
+          <li><span class="who">Owner:</span> F4 was "recommended" on one tab and "only if needed" here. <b>Fixed:</b> optional everywhere.</li>
+          <li><span class="who">Owner:</span> the reversal from "only if missed" wasn't explained. <b>Fixed:</b> you asking is that signal; old lines marked superseded.</li>
+          <li><span class="who">Engineer:</span> step 2 was costed "Medium" but is the biggest: sync, a migration, matching, re-keying. <b>Fixed:</b> Medium–large; per-feed sections moved to step 3.</li>
+          <li><span class="who">Engineer:</span> S4 only touches the book and helps OPML users now. <b>Fixed:</b> any time.</li>
+          <li><span class="who">Both:</span> the click-through showed the dropped cap and numbered steps wrong; the decide list lost "is A1 enough?". <b>Fixed.</b></li>
+        </ul></div>
+
+        <div class="critique"><h3>Critique · cycle 13 · the recommendation itself</h3><ul>
+          <li><span class="who">Owner:</span> v1 never mentioned your gut or the week you wanted to sit with it, then recommended four builds. <b>Fixed:</b> opens with where it agrees, and builds one thing now.</li>
+          <li><span class="who">Engineer:</span> A1 was rated "low, small", but learning lives on the source row and skips tt-rss: it needs a table and a migration. A2 was said to leave sync alone; it doesn't. <b>Fixed:</b> re-rated.</li>
+          <li><span class="who">Engineer:</span> too much for one persona. <b>Reduced:</b> A1 now; categories as sections and D after living with it; feed pages only if missed. <i>(Superseded in cycle 16: you asked for feeds on Sources, so feed pages moved up.)</i></li>
+          <li><span class="who">Owner:</span> OPML export and tt-rss's own subscribe already add feeds to tt-rss. <b>Reduced:</b> stated as the zero-code answer; C waits.</li>
+          <li><span class="who">Engineer:</span> "every section, every day" overclaimed; the preview's 33 minutes was unexplained. <b>Fixed:</b> "when the budget allows", and the preview says it went over by one article.</li>
+          <li><span class="who">Engineer:</span> stale lines across tabs (D's shares, a switch drawn on with "Off" text, unqualified claims). <b>Fixed</b> and marked superseded where kept for the record.</li>
+          <li><span class="who">Owner:</span> the decide list missed "is A1 enough?" and "do you add feeds in other tt-rss apps?". <b>Fixed.</b></li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="rec"></div>
+  </div>
+</section>
+  </main>
+</div>
+
+<script>
+/* ---------- icons ---------- */
+const I = {
+  back: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg>',
+  bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4 6.5 20.3l1-6.2L3 9.7l6.2-.9z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>',
+  today: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v16H4zm2 4v10h12V8zm2 2h4v3H8zm6 0h2v6h-2zm-6 4h4v2H8z"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h2v2H4zm4 0h12v2H8zM4 11h2v2H4zm4 0h12v2H8zm-4 5h2v2H4zm4 0h12v2H8z"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.6 4.6l1.9 1.5-2 3.4-2.3-.9a7 7 0 0 1-2 1.2l-.3 2.4h-4l-.3-2.4a7 7 0 0 1-2-1.2l-2.3.9-2-3.4 1.9-1.5a7 7 0 0 1 0-2.2L1.5 9.4l2-3.4 2.3.9a7 7 0 0 1 2-1.2L8.1 3.3h4l.3 2.4a7 7 0 0 1 2 1.2l2.3-.9 2 3.4-1.9 1.5a7 7 0 0 1 0 2.2z"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" fill="currentColor"><path d="M9 6l6 6-6 6-1.4-1.4L12.2 12 7.6 7.4z"/></svg>',
+  rss: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="18" r="2"/><path d="M4 10a10 10 0 0 1 10 10h-2.5A7.5 7.5 0 0 0 4 12.5zm0-6a16 16 0 0 1 16 16h-2.5A13.5 13.5 0 0 0 4 6.5z"/></svg>',
+};
+
+/* ---------- made-up data (no one's real subscriptions) ---------- */
+const CATS = {
+  "News": ["Harbour Ledger · Local News", "The Bay Dispatch", "City Hall Notes", "Morning Wire", "Transit Watch", "The Courthouse Beat", "Weather & Tides", "Statehouse Report", "Neighbourhood Bulletin"],
+  "Essays & ideas": ["A Working Library", "The Long Field", "Slow Thoughts", "Marginalia Weekly", "The Honest Ledger", "Second Drafts", "Footnotes & Asides", "The Quiet Reader", "Commonplace", "Open Questions", "The Patient Essay", "Notes from the Stacks"],
+  "Tech": ["Distributed Notes", "The Pragmatic Builder", "Small Tools", "Kernel Diaries", "Garbage Collection", "The Ops Log", "Plain Text Weekly", "Release Notes", "Data at Rest", "The Compiler"],
+  "Science": ["Field Station", "The Tidepool", "Deep Time", "Lab Bench", "Night Sky Notes", "The Seed Bank"],
+  "Arts & music": ["Colour & Form", "The Listening Room", "Gallery Walk", "Liner Notes", "The Ink Well", "Studio Visit", "Small Press Review", "The Score"],
+  "Newsletters": ["Writer Fuel", "Serial Field Notes", "Ask the Agent", "The Margins Letter", "Sunday Long Read", "Weekly Craft", "The Publishing Desk", "Five Good Things", "Letters from the Coast"],
+  "Uncategorized": ["Someone's Blog", "Old Friend's Journal", "Recipes I Keep", "Garden Log"],
+};
+const ALL = Object.entries(CATS).flatMap(([c, fs]) => fs.map(t => ({ t, c })));
+const ARTS = [
+  ["●", "Council delays vote on the waterfront plan", "Harbour Ledger · Local News · Sep 30 · Waiting for an edition"],
+  ["●", "Why the night bus keeps getting cut", "Harbour Ledger · Local News · Sep 30 · Waiting for an edition"],
+  ["●", "The ferry schedule, explained", "Harbour Ledger · Local News · Sep 30 · Waiting for an edition"],
+  ["●", "A school board weighs a new lottery", "Harbour Ledger · Local News · Sep 30 · Waiting for an edition"],
+  ["●", "On rereading old notebooks", "A Working Library · Sep 30 · Waiting for an edition"],
+  ["●", "17 small observations on patience", "Slow Thoughts · Sep 30 · Waiting for an edition"],
+  ["●", "The 1% of readers, part II", "Serial Field Notes · Sep 30 · Waiting for an edition"],
+  ["○", "Couple charged after harbour fire", "Harbour Ledger · Local News · Sep 30 · Marked as read", true],
+  ["✓", "Listen: a new record from the coast", "The Listening Room · Sep 30 · Delivered", true],
+  ["●", "A designer opens her first shop", "Harbour Ledger · Local News · Sep 30 · Waiting for an edition"],
+  ["●", "Distributed databases, an interview", "The Pragmatic Builder · Sep 30 · Waiting for an edition"],
+];
+
+/* ---------- building blocks ---------- */
+const H = {
+  bar: (t, o = {}) => `<div class="bar ${o.big ? "big" : ""}">${o.big ? "" : `<button class="ib" data-back aria-label="Back">${I.back}</button>`}<div class="t">${t}</div>${o.refresh ? `<button class="ib" aria-label="Refresh">${I.refresh}</button>` : ""}<button class="ib" ${o.menu ? `data-act="menu:${o.menu}"` : ""} aria-label="More options">${I.more}</button></div>`,
+  nav: (on = "src") => `<div class="nav"><span><b>${I.today}</b>Today</span><span class="${on === "src" ? "on" : ""}"><b>${I.list}</b>Sources</span><span class="${on === "set" ? "on" : ""}"><b>${I.gear}</b>Settings</span></div>`,
+  fab: (go = "") => `<button class="fab" ${go}>${I.plus} Add a source</button>`,
+  row: (ti, su, o = {}) => `<${o.go || o.dlg ? "button" : "div"} class="row" ${o.go ? `data-go="${o.go}"` : ""} ${o.dlg ? `data-dlg="${o.dlg}"` : ""}>${o.icon ? `<span class="ic">${o.icon}</span>` : ""}<span class="main"><span class="ti">${ti}${o.mark ? '<span class="mark" title="Has its own settings"></span>' : ""}</span>${su ? `<span class="su">${su}</span>` : ""}</span>${o.right ?? (o.go ? I.chev : `<span class="ic">${I.more}</span>`)}</${o.go || o.dlg ? "button" : "div"}>`,
+  set: (ti, su, act) => `<div class="set" aria-label="${ti}"><div class="main"><div>${ti}</div>${su ? `<div class="su">${su}</div>` : ""}</div>${act}</div>`,
+  tb: (label, attrs = "") => `<button class="tb" ${attrs}>${label}</button>`,
+  sw: (on) => `<button class="sw ${on ? "on" : ""}" data-act="toggle" role="switch" aria-checked="${on}" aria-label="Switch"></button>`,
+  art: ([mk, ti, su, read]) => `<div class="art ${read ? "read" : ""}"><span class="mk">${mk}</span><div class="main"><div class="ti">${ti}</div><div class="su">${su}</div></div><span class="star">${I.star}</span></div>`,
+  dlg: (t, body, acts) => `<div class="scrim" data-close><div class="dlg" role="dialog" aria-label="${t}"><div class="dt">${t}</div><div class="db">${body}</div><div class="acts">${acts}</div></div></div>`,
+  opt: (label, sub, on, kind = "rad") => `<div class="opt" data-act="pick"><span class="${kind} ${on ? "on" : ""}"></span><span class="main">${label}${sub ? `<div class="su">${sub}</div>` : ""}</span></div>`,
+  cb: (label, on) => `<div class="opt" data-act="check"><span class="cb ${on ? "on" : ""}" role="checkbox" aria-checked="${on}"></span><span class="main">${label}</span></div>`,
+  close: (l = "Done") => `<button class="tb" data-close>${l}</button>`,
+};
+const sourcesTop = () => H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" }) +
+  H.row("Field Station", "fieldstation.example · New articles today") +
+  H.row("Arts &amp; Letters Daily", "aldaily.com · New articles today");
+
+/* ---------- flows: screens per proposal ---------- */
+const FLOWS = {};
+FLOWS.today = {
+  start: "sources",
+  screens: {
+    sources: { label: "Sources", note: "One tt-rss row among the others. Tap it.", html: () =>
+      H.bar("Sources", { big: true, refresh: true, menu: "srcmenu" }) +
+      `<div class="body">${sourcesTop()}${H.row("Tiny Tiny RSS", "rss.example.org · New articles today", { go: "acct" })}</div>` + H.fab() + H.nav() },
+    acct: { label: "Account page", note: "Account settings, a checkbox list of feeds, and every feed's articles mixed in one list.", html: () =>
+      H.bar("Tiny Tiny RSS", { menu: "acctmenu" }) +
+      `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>New articles today</span><span class="host">Last checked today at 10:21 PM</span></div>
+      <div class="btns"><button class="ob">Pause</button></div>
+      ${H.set("Articles from", "All your unread articles", H.tb("Change", 'data-dlg="cats"'))}
+      ${H.set("Sync read status with tt-rss", "What you read or mark unread here or in tt-rss shows in both. Delivered articles count as read.", H.sw(true))}
+      ${H.set("Feeds in your paper", "All 58", H.tb("Choose", 'data-dlg="feeds"'))}
+      ${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss, and start from what's recent.", H.tb("Start fresh"))}
+      <hr><div class="h2">Recent articles · 30 <button class="tb">Select</button></div>
+      <div class="hint">Tap ☆ to put one in your next edition. Tap Select to mark some as read.</div>
+      ${ARTS.map(H.art).join("")}</div>` + H.nav() },
+    feeds: { dialog: true, over: ["sources", "acct"], label: "Feeds in your paper", note: "The only per-feed control: in or out.", html: () =>
+      H.dlg("Feeds in your paper", `<div class="su">A feed left out stays in tt-rss but stops coming to the paper. Its articles waiting here go too, except ones you starred.</div>${ALL.map(f => H.cb(f.t, true)).join("")}`, H.close()) },
+    cats: { dialog: true, over: ["sources", "acct"], label: "Articles from", note: "One category, or all unread.", html: () =>
+      H.dlg("Articles from", H.opt("All your unread articles", "", true) + Object.keys(CATS).map(c => H.opt(c, "", false)).join(""), H.close("Cancel")) },
+    feed: { label: "A feed added here", note: "For contrast: a feed added directly gets Article text and its own cap.", html: () =>
+      H.bar("Field Station") +
+      `<div class="body"><div class="pad"><span class="host">fieldstation.example</span><span>New articles today</span><span class="host">Sends full articles: no need to visit the site</span></div>
+      <div class="btns"><button class="ob">Pause</button><button class="ob" data-dlg="text">Article text: Automatic</button></div>
+      ${H.set("1 article from this site, then more if there's room", "Your edition setting. Choose fewer or more to give this site a firm limit.", "")}
+      <div class="stepper"><button class="ob">−</button><button class="ob">+</button></div>
+      <hr><div class="h2">Recent articles · 12 <button class="tb">Select</button></div>
+      ${H.art(["●", "Tagging shorebirds at dawn", "Sep 30 · Waiting for an edition"])}${H.art(["✓", "What the tidepools told us", "Sep 29 · Delivered", true])}</div>` + H.nav() },
+    text: { dialog: true, over: ["sources", "feed"], label: "Article text", note: "Not offered for tt-rss feeds today.", html: () =>
+      H.dlg("Article text", H.opt("Automatic", "newspapeRSS checks each article and settles after three days", true) + H.opt("Feed's text", "Use what the site sends", false) + H.opt("Full page", "Always fetch the article's page", false), H.close("Cancel")) },
+  },
+  menus: {
+    srcmenu: [["Import from another reader (OPML)"], ["Export your sites (OPML)"], ["Add tt-rss account"]],
+    acctmenu: [["Remove source"]],
+  },
+  chips: ["sources", "acct", "feeds", "cats", "feed"],
+};
+
+/* ---------- A v2: feeds open up, folded under the account ---------- */
+const OWN = { "Harbour Ledger · Local News": "Feed's text · section Front page", "Garbage Collection": "Left out", "Recipes I Keep": "Left out", "Release Notes": "Left out", "Garden Log": "Left out", "A Working Library": "Full page", "Five Good Things": "New from tt-rss" };
+const LEFT = t => OWN[t] === "Left out";
+const catHead = (c, fs, open = false) => { const lo = fs.filter(LEFT).length; return `<h3 style="margin:0"><button class="sec" data-act="fold" aria-expanded="${open}">${c}<span class="n">${fs.length} feeds${lo ? `, ${lo} left out` : ""}</span></button></h3>`; };
+const feedRow = (t, go = "afeed") => H.row(t, OWN[t] || "Last new article today", { go });
+const acctPage = (o = {}) => {
+  const cats = o.only ? { [o.only]: CATS[o.only] } : CATS;
+  return H.bar(o.title || "Tiny Tiny RSS", { menu: "acctmenu" }) +
+  `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>New articles today</span></div>
+  ${o.only ? "" : `<div class="btns"><button class="ob">Pause tt-rss</button></div>
+  ${H.set("Articles from", o.from || "All your unread articles", H.tb("Change", 'data-dlg="from"'))}
+  ${H.set("Sync read status with tt-rss", "Read and unread show in both. Delivered articles count as read.", H.sw(true))}
+  ${H.set("Use tt-rss categories as sections", "Off: all of tt-rss is one section, \"Tiny Tiny RSS\"", H.sw(false))}
+  ${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss.", H.tb("Start fresh"))}
+  <hr>`}<div class="h2">${o.only ? o.only : "Feeds · 54 in your paper"}</div><div class="hint">Tap a category, then a feed for its own settings.</div>
+  ${o.only ? "" : H.row("All recent articles", "30 waiting, from every feed", { go: "recent" })}
+  ${Object.entries(cats).map(([c, fs]) => catHead(c, fs, c === "News" || !!o.only) + `<div class="secbody" ${c === "News" || o.only ? "" : "hidden"}>${fs.filter(t => !LEFT(t)).map(t => feedRow(t)).join("")}${fs.filter(LEFT).map(t => feedRow(t, "lfeed")).join("")}</div>`).join("")}
+  ${o.from ? `<button class="sec" data-act="fold">Not in your paper<span class="n">46 feeds outside Essays &amp; ideas</span></button><div class="secbody" hidden>${ALL.filter(f => f.c !== "Essays & ideas").slice(0, 8).map(f => H.row(f.t, f.c)).join("")}</div>` : ""}
+  </div>` + H.nav();
+};
+const capBlock = H.set("1 article from this feed, then more if there's room", "Your edition setting. Choose fewer or more to give it a firm limit.", "") + `<div class="stepper"><button class="ob" aria-label="Fewer articles from this feed">−</button><button class="ob" aria-label="More articles from this feed">+</button></div>`;
+const feedPage = (o = {}) => o.noCap ? feedPageFull(o).replace(capBlock, "") : feedPageFull(o);
+const feedPageFull = (o = {}) =>
+  H.bar(o.name || "Harbour Ledger · Local News") +
+  `<div class="body">${o.crumb ?? `<div class="crumb">In <b data-back>Tiny Tiny RSS</b> · category News</div>`}
+  ${o.left ? `<div class="note"><b>Left out of the paper.</b> It stays in your tt-rss and isn't fetched. Starred articles from it still go in.</div><div class="btns"><button class="ob">Bring back</button></div><div class="h2">Starred · 1</div>${H.art(["★", "How we rebuilt the build farm", "Sep 22 · Starred for your next edition"])}` :
+  `<div class="pad"><span class="host">harbourledger.example</span><span>New articles today · about 6 a day</span><span class="host">Uses the text tt-rss sends (your choice)</span></div>
+  <div class="btns"><button class="ob" data-dlg="leave">Leave out</button><button class="ob" data-dlg="atext">Article text: Feed's text</button></div>
+  ${capBlock}
+  ${H.set("Section", o.sectionSub || "Front page (your choice)", H.tb("Change", 'data-dlg="section"'))}`}
+  ${o.left ? "" : `<hr><div class="h2">Recent articles · 14</div>`}
+  ${o.left ? "" : ARTS.filter(a => a[2].startsWith("Harbour")).map(a => H.art([a[0], a[1], a[2].replace("Harbour Ledger · Local News · ", ""), a[3]])).join("")}</div>` + H.nav();
+const textDlg = H.dlg("Article text", H.opt("Automatic", "Learned for this feed: settles after three days", false) + H.opt("Feed's text", "Use what tt-rss sends", true) + H.opt("Full page", "Always fetch the article's page", false), H.close("Cancel"));
+const sectionDlg = H.dlg("Section", `<div class="su">Where this feed's articles go in the contents.</div>` + H.opt("Same as tt-rss", "Tiny Tiny RSS, until categories become sections", false) + H.opt("Front page", "", true) + H.opt("Long reads", "", false) + H.opt("Saved for later", "", false), H.close("Cancel"));
+FLOWS.a = {
+  start: "sources",
+  screens: {
+    sources: { label: "Sources", note: "Unchanged: tt-rss is one row, saying how many feeds and how many are left out.", html: () =>
+      H.bar("Sources", { big: true, refresh: true }) +
+      `<div class="body">${sourcesTop()}${H.row("Tiny Tiny RSS", "54 feeds in your paper, 4 left out · New articles today", { go: "acct" })}</div>` + H.fab() + H.nav() },
+    acct: { label: "Account page", note: "Account settings, then feeds folded by category (News is open). Settings are written on the row. Tap Harbour Ledger, or a left-out feed under Tech.", html: () => acctPage() },
+    one: { label: "One category", note: "With Articles from: Essays & ideas, only its feeds are listed; the rest fold away.", path: ["sources", "one"], html: () => acctPage({ from: "Essays &amp; ideas" }).replace(/<button class="sec"[^>]*>News[\s\S]*?(?=<button class="sec"[^>]*>Not in)/, () => catHead("Essays & ideas", CATS["Essays & ideas"]) + `<div class="secbody">${CATS["Essays & ideas"].map(t => feedRow(t)).join("")}</div>`) },
+    afeed: { label: "A feed's page", note: "Leave out, an Article text override, the cap, a section, its own articles.", path: ["sources", "acct", "afeed"], html: () => feedPage() },
+    lfeed: { label: "A left-out feed", note: "Says what left out means and offers Bring back.", path: ["sources", "acct", "lfeed"], html: () => feedPage({ name: "Garbage Collection", left: true, crumb: `<div class="crumb">In <b data-back>Tiny Tiny RSS</b> · category Tech</div>` }) },
+    gone: { label: "Gone from tt-rss", note: "Unsubscribed on the server: found by the daily full feed list. Its waiting articles go; stars stay until delivered.", path: ["sources", "acct", "gone"], html: () =>
+      H.bar("The Ops Log") + `<div class="body"><div class="crumb">Was in <b data-back>Tiny Tiny RSS</b> · category Tech</div><div class="note"><b>No longer in your tt-rss.</b> It was unsubscribed there. Nothing new comes from it; its 1 starred article still goes in your next edition.</div><div class="btns"><button class="ob" data-back>Forget it</button></div><div class="h2">Starred · 1</div>${H.art(["★", "Pager duty, without the pager", "Sep 25 · Starred for your next edition"])}</div>` + H.nav() },
+    leave: { dialog: true, over: ["sources", "acct", "afeed"], label: "Leave out", note: "Today's checkbox, with its consequences said where you choose it.", html: () =>
+      H.dlg("Leave Harbour Ledger out?", `<div>It stays in your tt-rss and in this list, so you can bring it back. It isn't fetched for the paper, and its 14 waiting articles go, except ones you starred.</div><div class="su">From the next edition: one being made now keeps what it has.</div>`, H.close("Cancel") + H.close("Leave out")) },
+    atext: { dialog: true, over: ["sources", "acct", "afeed"], label: "Article text", note: "Automatic is now learned per feed; this only overrides it.", html: () => textDlg },
+    section: { dialog: true, over: ["sources", "acct", "afeed"], label: "Section", note: "Follow tt-rss, or pick a section the paper already has.", html: () => sectionDlg },
+    from: { dialog: true, over: ["sources", "acct"], label: "Articles from", note: "Pick Essays & ideas to see the one-category page.", html: () =>
+      H.dlg("Articles from", H.opt("All your unread articles", "", true) + Object.keys(CATS).map(c => `<div class="opt" ${c === "Essays & ideas" ? 'data-go="one"' : 'data-act="pick"'}><span class="rad"></span><span class="main">${c}</span></div>`).join(""), H.close("Cancel")) },
+    recent: { label: "All recent articles", note: "Today's mixed list, one tap down.", path: ["sources", "acct", "recent"], html: () =>
+      H.bar("Tiny Tiny RSS · recent") + `<div class="body"><div class="hint" style="padding-top:8px">Tap ☆ to put one in your next edition. Tap Select to mark some as read.</div>${ARTS.map(H.art).join("")}</div>` + H.nav() },
+  },
+  menus: { acctmenu: [["Sign in again"], ["Remove tt-rss"]] },
+  chips: ["sources", "acct", "afeed", "lfeed", "gone", "atext", "section", "one", "recent"],
+};
+
+/* ---------- B v2: Sources by section, tt-rss folded per section ---------- */
+const BSEC = [["Front page", [["Arts &amp; Letters Daily", "aldaily.com · New articles today"]], ["News", 9, 0]], ["Long reads", [], ["Essays & ideas", 12, 0], ["Newsletters", 9, 0]], ["Science", [["Field Station", "fieldstation.example · New articles today"]], ["Science", 6, 0]], ["Tech", [], ["Tech", 7, 3]], ["Arts & music", [], ["Arts & music", 8, 0]]];
+FLOWS.b = {
+  start: "sources",
+  screens: {
+    sources: { label: "Sources by section", note: "Two or more sections, so Sources is grouped. tt-rss is one folded row per section. Tap one.", html: () =>
+      H.bar("Sources", { big: true, refresh: true, menu: "view" }) +
+      `<div class="body">${H.row("Your reading list", "Saved for later", { icon: I.bookmark, right: "" })}
+      ${BSEC.map(([name, local, ...tt]) => { const n = tt.reduce((a, x) => a + x[1], 0); return `<div class="h3" role="heading" aria-level="3" aria-label="${name}, ${local.length} sources and ${n} tt-rss feeds">${name}</div>` +
+        local.map(([t, su]) => H.row(t, su)).join("") + H.row(`Tiny Tiny RSS · ${n} feeds`, tt.map(x => x[0]).join(" and ") + " · New articles today", { go: "tsec", icon: I.rss }); }).join("")}
+      <button class="sec" data-act="fold">Left out<span class="n">4</span></button><div class="secbody" hidden>${["Garbage Collection", "Release Notes", "Recipes I Keep", "Garden Log"].map(t => H.row(t, "tt-rss · left out")).join("")}</div>
+      </div>` + H.fab() + H.nav() },
+    flat: { label: "One section", note: "The Kindle reader with five starter feeds: no headings, today's list.", path: ["flat"], html: () =>
+      H.bar("Sources", { big: true, refresh: true }) +
+      `<div class="body">${H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" })}${["The Morning Wire", "Field Station", "Arts &amp; Letters Daily", "City Hall Notes", "The Listening Room"].map(t => H.row(t, "New articles today")).join("")}</div>` + H.fab() + H.nav() },
+    tsec: { label: "tt-rss in a section", note: "A's account page, showing only the tt-rss feeds in this section.", path: ["sources", "tsec"], html: () => acctPage({ only: "News", title: "Tiny Tiny RSS · Front page" }) },
+    afeed: { label: "A feed's page", note: "As in A.", path: ["sources", "tsec", "afeed"], html: () => feedPage() },
+    leave: { dialog: true, over: ["sources", "tsec", "afeed"], label: "Leave out", note: "", html: () => FLOWS.a.screens.leave.html() },
+    atext: { dialog: true, over: ["sources", "tsec", "afeed"], label: "Article text", note: "", html: () => textDlg },
+    section: { dialog: true, over: ["sources", "tsec", "afeed"], label: "Section", note: "Changing it moves the feed to that section's tt-rss row; a message says where.", html: () => sectionDlg },
+  },
+  menus: { view: [["Show as one list"], ["Import from another reader (OPML)"], ["Add tt-rss account"]] },
+  chips: ["sources", "tsec", "afeed", "flat"],
+};
+
+/* ---------- C v3: "Add to tt-rss instead" ---------- */
+FLOWS.c = {
+  start: "sources",
+  screens: {
+    sources: { label: "Sources", note: "As in A. Tap Add a source.", html: () =>
+      H.bar("Sources", { big: true, refresh: true }) +
+      `<div class="body">${sourcesTop()}${H.row("Tiny Tiny RSS", "54 feeds in your paper, 4 left out · New articles today", { go: "acct" })}</div>` + H.fab('data-dlg="add"') + H.nav() },
+    add: { dialog: true, over: ["sources"], label: "Add a source", note: "Unchanged. Tap Add, or the address of a feed already in your tt-rss.", html: () =>
+      H.dlg("Add a source", `<div>Paste a website or feed address.</div><div class="field"><small>Address</small>longessay.example</div><div class="su">Or try <b data-go="dupe" style="color:var(--accent);cursor:pointer">harbourledger.example</b>, already in your tt-rss.</div>`, H.close("Cancel") + `<button class="tb" data-go="found">Add</button>`) },
+    found: { dialog: true, over: ["sources"], label: "Found it", note: "The usual Add keeps it on the phone, one tap as today. tt-rss is the second button, only with an account.", html: () =>
+      H.dlg("The Long Essay", `<div class="su">longessay.example · about 3 articles a week</div><div>Add it to your paper?</div>`,
+        H.close("Cancel") + `<button class="tb" data-dlg="where">Add to tt-rss instead</button><button class="tb" data-close>Add</button>`) },
+    dupe: { dialog: true, over: ["sources"], label: "Already in tt-rss", note: "Checked against every tt-rss feed, quiet ones too, by address. No duplicate.", html: () =>
+      H.dlg("Already in your tt-rss", `<div>Harbour Ledger · Local News is one of your tt-rss feeds, in News. It's in your paper.</div>`, H.close("Cancel") + `<button class="tb" data-go="afeed">Open it</button>`) },
+    where: { dialog: true, over: ["sources"], label: "Add to tt-rss", note: "Category starts on the paper's. Back issues are trimmed when they arrive, not now: tt-rss hasn't fetched them yet.", html: () =>
+      H.dlg("Add to your tt-rss", `<div>The Long Essay will be in your tt-rss apps too, and come to the paper through tt-rss.</div>
+        <div class="select" data-dlg="cat">Category: Essays &amp; ideas <span>▾</span></div>
+        <div class="opt" data-act="check"><span class="cb on"></span><span class="main">Keep only its newest 2 unread<div class="su">A new subscription brings its back issues in as unread. newspapeRSS marks the older ones read in tt-rss when they arrive.</div></span></div>`,
+        `<button class="tb" data-dlg="found">Back</button><button class="tb" data-go="adding">Add to tt-rss</button>`) },
+    cat: { dialog: true, over: ["sources"], then: "where", label: "Category", note: "tt-rss's own categories. With a one-category paper, the others say they won't reach it.", html: () =>
+      H.dlg("Category in tt-rss", Object.keys(CATS).map(c => H.opt(c, "", c === "Essays & ideas")).join("") + `<div class="su">New categories are made in tt-rss itself.</div>`, H.close("Done")) },
+    adding: { label: "Asking tt-rss…", note: "Stepped text, no spinner. Cancel after the request has gone out is treated like a timeout. Tap the text to go on.", path: ["adding"], html: () =>
+      FLOWS.c.screens.sources.html() + H.dlg("Add to your tt-rss", `<div data-go="added" style="cursor:pointer">Asking tt-rss to subscribe…</div><div class="su">On a slow server this can take half a minute.</div>`, H.close("Cancel")) },
+    added: { label: "Subscribed, with Undo", note: "Honest about timing: tt-rss fetches on its own schedule. Undo only for a feed this app just created.", path: ["added"], html: () =>
+      FLOWS.c.screens.sources.html().replace('<div class="nav">', `<div class="snack"><span>Subscribed in tt-rss. Its articles arrive once tt-rss fetches it, usually within the hour.</span><b data-go="undo">Undo</b></div><div class="nav">`) },
+    waiting: { label: "Waiting for tt-rss", note: "On the account page, until the first sync that sees the feed (or after a timeout or Cancel).", path: ["sources", "acct", "waiting"], html: () =>
+      acctPage().replace('<div class="h2">Feeds', `<div class="note"><b>The Long Essay</b> · waiting for tt-rss to fetch it. Checked at each sync.</div><div class="h2">Feeds`) },
+    undo: { dialog: true, over: ["added"], label: "Undo", note: "Unsubscribes in tt-rss, drops anything it brought here, and offers the phone instead.", html: () =>
+      H.dlg("Removed from tt-rss", `<div>The Long Essay is unsubscribed. Nothing from it is waiting here.</div>`, H.close("Done") + `<button class="tb" data-close>Add to this phone</button>`) },
+    several: { dialog: true, over: ["sources"], label: "Several feeds", note: "tt-rss's code 4: let the reader pick, as the phone add already does.", html: () =>
+      H.dlg("Which part of this site?", H.opt("All posts", "longessay.example/feed", true) + H.opt("Essays only", "longessay.example/essays/feed", false), H.close("Cancel") + H.close("Add to tt-rss")) },
+    fail: { dialog: true, over: ["sources"], label: "tt-rss couldn't", note: "A definite no from the server: offer the phone.", html: () =>
+      H.dlg("tt-rss couldn't add it", `<div>Your tt-rss server couldn't download longessay.example. Some sites turn servers away but let phones in.</div>`, H.close("Cancel") + `<button class="tb" data-close>Add to this phone</button>`) },
+    substack: { dialog: true, over: ["sources"], label: "A Substack", note: "Only on the tt-rss path: what tt-rss loses for this host.", html: () =>
+      H.dlg("Add to your tt-rss", `<div>Slow Thoughts is a Substack. Through tt-rss, its footnote links and embedded Notes are lost; added to this phone they work.</div>`, `<button class="tb" data-close>Add to this phone</button><button class="tb" data-close>Add to tt-rss anyway</button>`) },
+    afeed: { label: "Existing feed", note: "", path: ["sources", "acct", "afeed"], html: () => feedPage() },
+    acct: { label: "Account page", note: "", path: ["sources", "acct"], html: () => acctPage() },
+  },
+  menus: { acctmenu: [["Sign in again"], ["Remove tt-rss"]] },
+  chips: ["sources", "found", "where", "adding", "added", "undo", "waiting", "dupe", "several", "fail", "substack"],
+};
+
+/* ---------- D v2: balance by section, as shares ---------- */
+const SHARES = [["Front page", "News · tt-rss, 9 feeds · and Arts &amp; Letters Daily", "Less"], ["Long reads", "Essays &amp; ideas, Newsletters · tt-rss, 21 feeds", "More"], ["Science", "Field Station · and tt-rss, 6 feeds", "Normal"], ["Arts &amp; music", "tt-rss, 8 feeds", "Normal"], ["Saved for later", "Your reading list", "Normal"]];
+const share = (s, v) => `<div class="seg" role="radiogroup" aria-label="Share for ${s}">${["Less", "Normal", "More"].map(x => `<button role="radio" aria-checked="${x === v}" class="${x === v ? "on" : ""}" data-act="seg">${x}</button>`).join("")}</div>`;
+FLOWS.d = {
+  start: "settings",
+  screens: {
+    settings: { label: "Settings", note: "One new row, shown only with two or more sections (the reading list and empty ones don't count).", html: () =>
+      H.bar("Settings", { big: true }) +
+      `<div class="body"><div class="h3">Your edition</div>
+      ${H.row("Size", "About 30 minutes", { right: "" })}${H.row("When", "Ready by 6:30, every day", { right: "" })}${H.row("Order", "Take turns between sources", { right: "" })}
+      ${H.row("Sections", "Balanced: more Long reads, less Front page", { go: "balance" })}
+      <div class="h3">Delivery</div>${H.row("Kindle", "Send to Kindle", { right: "" })}</div>` + H.nav("set") },
+    balance: { label: "Sections", note: "One rule, said on the screen. Off by default; only with Take turns.", path: ["settings", "balance"], html: () =>
+      H.bar("Sections") +
+      `<div class="body">${H.set("Balance by section", "On. Off, the paper takes turns between all sources, as now.", H.sw(true))}
+      <div class="note" style="color:var(--fg)"><b>How it works:</b> each section gets one article. Then More sections take the next turns, then Normal. Less gets a second only if there's room. Starred articles always go in, and count as their section's one.</div>
+      ${SHARES.map(([s, su, v]) => `<div class="set" style="flex-wrap:wrap"><div class="main" data-go="sec" style="cursor:pointer;min-width:150px"><div>${s}</div><div class="su">${su}</div></div>${share(s, v)}</div>`).join("")}
+      <div class="hint">Saved for later is a section too: with Balance on, one saved link goes in most days.</div>
+      ${H.row("What would go in now", "Tomorrow's contents, from what's waiting", { go: "preview" })}</div>` + H.nav("set") },
+    order: { label: "Another order", note: "With In order or Shuffle, the shares step aside and say why.", path: ["settings", "order"], html: () =>
+      H.bar("Sections") + `<div class="body">${H.set("Balance by section", "", H.sw(true))}<div class="note">Balance works with "Take turns between sources". Your edition is set to Shuffle, so sections aren't balanced. <b style="color:var(--accent)">Change order</b></div></div>` + H.nav("set") },
+    sec: { label: "A section", note: "Where B's \"Sources by section\" ended up: its phone feeds, and its tt-rss feeds as one row.", path: ["settings", "balance", "sec"], html: () =>
+      H.bar("Long reads") + `<div class="body"><div class="pad"><span>More · first in the contents</span><span class="host">From tt-rss categories Essays &amp; ideas and Newsletters</span></div>
+      <div class="h3">Sources</div>${H.row("Tiny Tiny RSS · 21 feeds", "Essays &amp; ideas and Newsletters · New articles today", { icon: I.rss, right: I.chev })}
+      <div class="hint">No phone feeds here yet. A source's section is set on its own page.</div></div>` + H.nav("set") },
+    preview: { label: "What would go in", note: "On request, from feed text: lengths are \"about\". Order and sections are exact.", path: ["settings", "balance", "preview"], html: () =>
+      H.bar("If made now") + `<div class="body"><div class="pad"><span class="host">About 33 minutes · 6 articles · lengths from feed text · went over by one article, as editions do</span><span class="host">One from each section, then Long reads (More) took the next turn. The star counts as Front page’s one.</span></div>
+      ${[["Front page · Less · 1", ["★ A school board weighs a new lottery · ~3 min"]], ["Long reads · More · 2", ["On rereading old notebooks · ~12 min", "17 small observations on patience · ~6 min"]], ["Science · Normal · 1", ["Tagging shorebirds at dawn · ~4 min"]], ["Arts &amp; music · Normal · 1", ["A gallery walk in the rain · ~3 min"]], ["Saved for later · Normal · 1", ["Distributed databases, an interview · ~5 min"]]].map(([h, items]) => `<div class="h3" role="heading" aria-level="3">${h}</div>` + items.map(t => `<div class="art"><span class="mk">·</span><div class="main"><div class="ti">${t}</div></div></div>`).join("")).join("")}</div>` + H.nav("set") },
+  },
+  chips: ["settings", "balance", "preview", "sec", "order"],
+};
+
+/* ---------- e-reader pages: sections in the paper ---------- */
+const PAPER = [
+  ["Front page", [["Council delays vote on the waterfront plan", "Harbour Ledger", 3, "The vote, expected Tuesday, now waits for a traffic study the council asked for in June."], ["A school board weighs a new lottery", "The Bay Dispatch", 4, "Families would rank schools once, and siblings would no longer be guaranteed a place."]]],
+  ["Long reads", [["On rereading old notebooks", "A Working Library", 12, "What I wrote at twenty-five reads like a letter from someone I'd like to meet again."], ["17 small observations on patience", "Slow Thoughts", 7, "Patience isn't waiting. It's what you do while you wait."]]],
+  ["Science", [["Tagging shorebirds at dawn", "Field Station", 4, "The birds arrive before the light does, and so must we."]]],
+  ["Arts & music", [["A gallery walk in the rain", "Colour & Form", 3, "Six rooms, two umbrellas and one painting I can't stop thinking about."]]],
+  ["Saved for later", [["Distributed databases, an interview", "The Pragmatic Builder", 5, "Why consensus is the easy part, and naming things is still hard."]]],
+];
+const pmin = a => a.reduce((n, x) => n + x[2], 0);
+const ALLART = PAPER.flatMap(([s, as]) => as.map(a => [s, ...a]));
+const ep = (inner, foot = "") => `<div class="page">${inner}</div><div class="foot">${foot}</div>`;
+const cover = () => ep(`<div class="cover" data-go="contents"><div class="mast">newspapeRSS</div><div class="etitle">Thursday Morning Edition</div><div class="edate">October 1</div><div class="tot">7 articles · 38 min</div><div class="leads">${PAPER.slice(0, 3).map(([, as]) => `<div>${as[0][0]}</div>`).join("")}</div><div class="tap">Tap to open ›</div></div>`, "Cover");
+const articlePage = (i, kickerSection = true) => { const [s, t, src, m, dek] = ALLART[i]; return ep(`<p class="kick">${kickerSection ? `${s.toUpperCase()} · ` : ""}${src.toUpperCase()}</p><h1>${t}</h1><p class="by">By A. Writer · Sep 30 · ${m} min read</p><hr><p>${dek}</p><p class="ph"></p><p class="ph short"></p><p class="ph"></p><p class="end">■</p>`, `<span data-back>‹ Back</span><span data-go="end">Skip to the end ›</span>`); };
+const endPage = () => ep(`<h1 style="margin-top:40%">That's all for today</h1><p>7 articles, about 38 minutes. The next edition is ready by 6:30 tomorrow.</p>`, `<span data-back>‹ Back</span>`);
+FLOWS.s1 = { device: "ereader", start: "cover", screens: {
+  cover: { label: "Cover", note: "Tap the cover.", html: cover },
+  contents: { label: "Contents", note: "Today: headings with minutes; articles numbered right through. Tap a headline.", path: ["cover", "contents"], html: () => ep(`<p class="dl">THURSDAY, OCTOBER 1</p><h1>In this edition</h1><p class="tot">7 articles · 38 min</p>${PAPER.map(([s, as]) => `<h2>${s.toUpperCase()} <span>· ${pmin(as)} min</span></h2><ol>${as.map(a => `<li data-go="art"><b>${a[0]}</b><br><span>${a[1]} · ${a[2]} min</span></li>`).join("")}</ol>`).join("")}`, `<span data-back>‹ Cover</span>`) },
+  art: { label: "An article", note: "The section is in the kicker, the only sign of where you are.", path: ["cover", "contents", "art"], html: () => articlePage(2) },
+  end: { label: "The end", note: "", path: ["cover", "contents", "end"], html: endPage },
+}, chips: ["cover", "contents", "art"] };
+FLOWS.s2 = { device: "ereader", start: "cover", screens: {
+  cover: { label: "Cover", note: "Tap the cover.", html: cover },
+  contents: { label: "Contents", note: "Sections only, with their size. Tap Long reads.", path: ["cover", "contents"], html: () => ep(`<p class="dl">THURSDAY, OCTOBER 1</p><h1>In this edition</h1><p class="tot">7 articles · 38 min</p><ol class="secs">${PAPER.map(([s, as]) => `<li ${s === "Long reads" ? 'data-go="front"' : ""}><b>${s}</b><br><span>${as.length} article${as.length > 1 ? "s" : ""} · ${pmin(as)} min</span></li>`).join("")}</ol>`, `<span data-back>‹ Cover</span>`) },
+  front: { label: "Section front", note: "A page that opens the section: what's in it, at a glance. Tap the first headline.", path: ["cover", "contents", "front"], html: () => ep(`<div class="sfront"><p class="kick">SECTION 2 OF 5</p><div class="sname">Long reads</div><p class="tot">2 articles · 19 min</p><hr>${PAPER[1][1].map(a => `<div class="sitem" data-go="art"><b>${a[0]}</b><p>${a[3]}</p><span>${a[1]} · ${a[2]} min</span></div>`).join("")}</div>`, `<span data-back>‹ Contents</span><span data-go="art">Begin ›</span>`) },
+  art: { label: "An article", note: "The kicker keeps only the source: the front already said which section.", path: ["cover", "contents", "front", "art"], html: () => articlePage(2, false) },
+  end: { label: "The end", note: "", path: ["cover", "contents", "end"], html: endPage },
+}, chips: ["cover", "contents", "front", "art"] };
+FLOWS.s3 = { device: "ereader", start: "cover", screens: {
+  cover: { label: "Cover", note: "Tap the cover.", html: () => cover().replace('data-go="contents"', 'data-go="fp"') },
+  fp: { label: "Front page", note: "Each section's lead, with its first lines. Tap a lead or a section's arrow.", path: ["cover", "fp"], html: () => ep(`<p class="dl">THURSDAY, OCTOBER 1 · 7 ARTICLES · 38 MIN</p>${PAPER.map(([s, as], i) => `<div class="lead ${i === 0 ? "first" : ""}"><p class="kick">${s.toUpperCase()}</p><b data-go="art">${as[0][0]}</b><p>${as[0][3]}</p><span data-go="contents">${as.length > 1 ? `${as.length} articles · ${pmin(as)} min →` : `${pmin(as)} min →`}</span></div>`).join("")}`, `<span data-back>‹ Cover</span><span data-go="contents">Contents ›</span>`) },
+  contents: { label: "Contents", note: "As today, after the front page.", path: ["cover", "fp", "contents"], html: () => FLOWS.s1.screens.contents.html() },
+  art: { label: "An article", note: "", path: ["cover", "fp", "art"], html: () => articlePage(0) },
+  end: { label: "The end", note: "", path: ["cover", "fp", "end"], html: endPage },
+}, chips: ["cover", "fp", "contents"] };
+
+/* ---------- every tt-rss feed on Sources ---------- */
+const FRESH = ["Newest in tt-rss: today", "Newest in tt-rss: yesterday", "Newest in tt-rss: 3 days ago", "Newest in tt-rss: today", "Newest in tt-rss: 2 weeks ago"];
+const fresh = t => OWN[t] && OWN[t] !== "New from tt-rss" && !LEFT(t) ? `${OWN[t]} · ${FRESH[t.length % 5]}` : (OWN[t] === "New from tt-rss" ? "New from tt-rss · today" : FRESH[t.length % 5]);
+const fold = (label, n, body, open = true, lvl = 3) => `<h${lvl} style="margin:0"><button class="sec" data-act="fold" aria-expanded="${open}">${label}<span class="n">${n}</span></button></h${lvl}><div class="secbody" ${open ? "" : "hidden"}>${body}</div>`;
+const ttRow = t => H.row(t, fresh(t), { go: "feed" });
+const ttLabel = t => t;
+const LOCALS = [["Field Station", "Science"], ["Arts &amp; Letters Daily", "Front page"], ["The Morning Wire", null]];
+const feedScreen = { label: "A feed", note: "Every row opens a feed's page (A's).", html: () => feedPage({ crumb: `<div class="crumb">From <b data-go="acct">Tiny Tiny RSS</b> · category News</div>` }) };
+const acctScreen = { label: "Account", note: "The account's own settings, one tap from Sources.", html: () =>
+  H.bar("Tiny Tiny RSS") + `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>Signed in · last checked 10:21 PM</span></div>
+  <div class="btns"><button class="ob">Pause tt-rss</button></div>
+  ${H.set("Articles from", "All your unread articles", H.tb("Change"))}${H.set("Sync read status with tt-rss", "Read and unread show in both.", H.sw(true))}
+  ${H.set("Use tt-rss categories as sections", "Each feed's category is its section in the paper", H.sw(true))}${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss.", H.tb("Start fresh"))}
+  ${H.row("All recent articles", "30 waiting, from every feed", { right: I.chev })}</div>` + H.nav() };
+const leftBody = () => ALL.filter(f => LEFT(f.t)).map(f => H.row(ttLabel(f.t), `Left out · ${f.c}`, { go: "feed" })).join("");
+FLOWS.f1 = { start: "sources", screens: {
+  sources: { label: "Sources", note: "Phone sources first, then tt-rss by its categories, all open. Fold any heading.", html: () =>
+    H.bar("Sources", { big: true, refresh: true }) + `<div class="body">
+    ${fold("On this phone", "4", H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" }) + LOCALS.map(([t]) => H.row(t, "New articles today")).join(""))}
+    <button class="row" data-go="acct" style="border-top:2px solid var(--line)"><span class="ic">${I.rss}</span><span class="main"><span class="ti" style="font-weight:600">Tiny Tiny RSS</span><span class="su">54 feeds in your paper, 4 left out · Account settings ›</span></span>${I.chev}</button>
+    ${Object.entries(CATS).map(([c, fs]) => fold(c, `${fs.filter(t => !LEFT(t)).length}`, fs.filter(t => !LEFT(t)).map(ttRow).join(""), true, 4)).join("")}
+    ${fold("Left out", "4", leftBody(), false, 4)}</div>` + H.fab() + H.nav() },
+  feed: { ...feedScreen, path: ["sources", "feed"] },
+  acct: { ...acctScreen, path: ["sources", "acct"] },
+  leave: { dialog: true, over: ["sources", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "feed", "acct"] };
+const SEC_OF = { "News": "Front page", "Essays & ideas": "Long reads", "Newsletters": "Long reads", "Science": "Science", "Tech": "Tech", "Arts & music": "Arts & music", "Uncategorized": null };
+FLOWS.f2 = { start: "sources", screens: {
+  sources: { label: "Sources", note: "The paper's sections, in the paper's order; phone and tt-rss feeds together.", html: () => {
+    const groups = {}; ALL.filter(f => !LEFT(f.t)).forEach(f => { const s = SEC_OF[f.c] ?? "No section"; (groups[s] ||= []).push(ttRow(ttLabel(f.t)).replace(fresh(ttLabel(f.t)), fresh(f.t))); });
+    LOCALS.forEach(([t, s]) => (groups[s ?? "No section"] ||= []).unshift(H.row(t, "On this phone · New articles today")));
+    const order = ["Front page", "Long reads", "Science", "Tech", "Arts & music", "No section"];
+    return H.bar("Sources", { big: true, refresh: true }) + `<div class="body">
+    ${H.row("Tiny Tiny RSS", "Connected · 54 feeds in your paper · Account settings", { go: "acct", icon: I.rss })}
+    ${fold("Saved for later", "1", H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" }))}
+    ${order.map(s => fold(s, `${groups[s].length}`, groups[s].join(""))).join("")}
+    ${fold("Left out", "4", leftBody(), false)}</div>` + H.fab() + H.nav(); } },
+  feed: { ...feedScreen, path: ["sources", "feed"] },
+  acct: { ...acctScreen, path: ["sources", "acct"] },
+  leave: { dialog: true, over: ["sources", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "feed", "acct"] };
+const f3list = (filter) => {
+  const rows = [...LOCALS.map(([t]) => ({ t, local: true })), ...ALL].filter(f => filter === "left" ? LEFT(f.t) : filter === "tt" ? !f.local && !LEFT(f.t) : filter === "phone" ? f.local : !LEFT(f.t));
+  rows.sort((a, b) => a.t.replace(/^(The|A) /, "").localeCompare(b.t.replace(/^(The|A) /, "")));
+  const chip = (k, l) => `<button class="${filter === k ? "on" : ""}" data-go="${k === "all" ? "sources" : "f_" + k}" aria-pressed="${filter === k}">${l}</button>`;
+  return H.bar("Sources", { big: true, refresh: true }) + `<div class="body">
+  <div style="padding:0 16px 8px;display:grid;gap:8px"><div class="field" style="margin:0;color:var(--muted)">⌕ Find a source</div><div class="seg" style="align-self:start;flex-wrap:wrap">${chip("all", "All 58")}${chip("phone", "Phone 4")}${chip("tt", "tt-rss 54")}${chip("left", "Left out 4")}</div></div>
+  ${filter === "all" || filter === "phone" ? H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" }) : ""}
+  ${filter !== "phone" ? H.row("Tiny Tiny RSS account", "Connected · settings", { go: "acct", icon: I.rss }) : ""}
+  ${rows.map(f => H.row(f.t, f.local ? "On this phone · New articles today" : (LEFT(f.t) ? "From your tt-rss · left out" : "From your tt-rss · " + fresh(f.t).replace("Newest in tt-rss: ", "newest ")), { go: f.local ? undefined : "feed" })).join("")}</div>` + H.fab() + H.nav();
+};
+FLOWS.f3 = { start: "sources", screens: {
+  sources: { label: "All", note: "Everything A to Z. Try the chips.", html: () => f3list("all") },
+  f_phone: { label: "Phone", note: "Only what's on the phone: today's list.", path: ["f_phone"], html: () => f3list("phone") },
+  f_tt: { label: "tt-rss", note: "Only tt-rss feeds in the paper.", path: ["f_tt"], html: () => f3list("tt") },
+  f_left: { label: "Left out", note: "The four left out, to bring back.", path: ["f_left"], html: () => f3list("left") },
+  feed: { ...feedScreen, path: ["sources", "feed"] },
+  acct: { ...acctScreen, path: ["sources", "acct"] },
+  leave: { dialog: true, over: ["sources", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "f_phone", "f_tt", "f_left", "feed"] };
+
+/* ---------- S4: today's book with two signposts ---------- */
+FLOWS.s4 = { device: "ereader", start: "cover", screens: {
+  cover: { label: "Cover", note: "Tap the cover.", html: cover },
+  contents: { label: "Contents", note: "As today. Tap the first Science article.", path: ["cover", "contents"], html: () => FLOWS.s1.screens.contents.html().replace('<li data-go="art"><b>Tagging', '<li data-go="flag"><b>Tagging').replace(/<li data-go="art"><b>On rereading/, '<li data-go="long"><b>On rereading') },
+  flag: { label: "First in a section", note: "The section's name, large, on its first article. No extra page.", path: ["cover", "contents", "flag"], html: () => { const [s, t, src, m, dek] = ALLART[4]; return ep(`<div style="border-top:3px solid var(--ink);border-bottom:1px solid var(--ink);padding:6px 0;margin:6% 0 14px"><div class="sname" style="font-size:28px">Science</div><span style="font:12px var(--sans);color:var(--grey)">1 article · 4 min</span></div><p class="kick">${src.toUpperCase()}</p><h1>${t}</h1><p class="by">By A. Writer · Sep 30 · ${m} min read</p><hr><p>${dek}</p><p class="ph"></p><p class="ph short"></p>`, `<span data-back>‹ Back</span>`); } },
+  long: { label: "End of a long read", note: "The Next line already follows long reads; now it names the section it leads into.", path: ["cover", "contents", "long"], html: () => ep(`<p class="kick">LONG READS · A WORKING LIBRARY</p><p class="ph"></p><p class="ph"></p><p class="ph short"></p><p>…and that, I think, is why I keep them.</p><p class="end">■</p><p style="font:12px var(--sans);color:var(--grey)">Read the original at aworkinglibrary.example</p><hr><p data-go="flag" style="cursor:pointer"><span style="font:600 10.5px var(--sans);letter-spacing:.12em;color:var(--grey)">NEXT, IN SCIENCE</span><br><b>Tagging shorebirds at dawn</b><br><span style="font:12px var(--sans);color:var(--grey)">Field Station · 4 min</span></p>`, `<span data-back>‹ Back</span>`) },
+}, chips: ["cover", "contents", "long", "flag"] };
+
+/* ---------- F4: Sources unchanged; the full list on the account page ---------- */
+const f4acct = (filter) => {
+  const rows = ALL.filter(f => filter === "left" ? LEFT(f.t) : !LEFT(f.t)).sort((a, b) => a.t.replace(/^(The|A) /, "").localeCompare(b.t.replace(/^(The|A) /, "")));
+  const chip = (k, l) => `<button class="${filter === k ? "on" : ""}" aria-pressed="${filter === k}" data-go="${k === "in" ? "acct" : "acct_left"}">${l}</button>`;
+  return H.bar("Tiny Tiny RSS") + `<div class="body"><div class="pad"><span class="host">rss.example.org</span><span>Signed in · last checked 10:21 PM</span></div>
+  <div class="btns"><button class="ob">Pause tt-rss</button></div>
+  ${H.set("Articles from", "All your unread articles", H.tb("Change"))}${H.set("Sync read status with tt-rss", "Read and unread show in both.", H.sw(true))}
+  ${H.set("Use tt-rss categories as sections", "Each feed's category is its section in the paper", H.sw(false))}${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss.", H.tb("Start fresh"))}
+  <hr><div class="h2">Your 58 feeds</div>
+  <div style="padding:0 16px 8px;display:grid;gap:8px"><div class="field" style="margin:0;color:var(--muted)">⌕ Find a feed</div><div class="seg" style="align-self:start">${chip("in", "In your paper 54")}${chip("left", "Left out 4")}</div></div>
+  ${rows.map(f => H.row(f.t, `${f.c} · ${LEFT(f.t) ? "left out" : fresh(f.t).replace("Newest in tt-rss: ", "newest ")}${f.t === "Morning Wire" ? " · also on this phone" : ""}`, { go: "feed" })).join("")}</div>` + H.nav();
+};
+FLOWS.f4 = { start: "sources", screens: {
+  sources: { label: "Sources", note: "Unchanged. Tap Tiny Tiny RSS.", html: () => H.bar("Sources", { big: true, refresh: true }) + `<div class="body">${H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" })}${LOCALS.map(([t]) => H.row(t, "New articles today")).join("")}${H.row("Tiny Tiny RSS", "54 feeds in your paper, 4 left out · New articles today", { go: "acct", icon: I.rss })}</div>` + H.fab() + H.nav() },
+  acct: { label: "All 58, A to Z", note: "Settings, then every feed: search, two chips, A–Z. \"Morning Wire\" says it's also on the phone.", path: ["sources", "acct"], html: () => f4acct("in") },
+  acct_left: { label: "Left out", note: "The four left out, to bring back.", path: ["sources", "acct_left"], html: () => f4acct("left") },
+  feed: { ...feedScreen, path: ["sources", "acct", "feed"] },
+  leave: { dialog: true, over: ["sources", "acct", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "acct", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "acct", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "acct", "acct_left", "feed"] };
+
+/* ---------- F5 v2: tt-rss row with its feeds inset beneath it, on Sources ---------- */
+const QUIET = { "Garbage Collection": 1, "Night Sky Notes": "Nothing new in 3 weeks", "Old Friend's Journal": "Nothing new in 2 months", "The Patient Essay": "Nothing new in 5 weeks" };
+const insetRow = f => { const notes = [typeof QUIET[f.t] === "string" ? QUIET[f.t] : "", f.t === "Morning Wire" ? "Also on this phone" : "", OWN[f.t] && !LEFT(f.t) && OWN[f.t] !== "New from tt-rss" ? OWN[f.t] : ""].filter(Boolean).join(" · ");
+  return `<button class="row inset" data-go="feed"><span class="main"><span class="ti">${f.t}</span>${notes ? `<span class="su">${notes}</span>` : ""}</span>${I.chev}</button>`; };
+const f5sources = (open) => {
+  const live = ALL.filter(f => !LEFT(f.t)).sort((a, b) => a.t.replace(/^(The|A) /, "").localeCompare(b.t.replace(/^(The|A) /, "")));
+  return H.bar("Sources", { big: true, refresh: true }) + `<div class="body">
+  ${H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark, right: "" })}
+  ${LOCALS.map(([t]) => H.row(t, t === "The Morning Wire" ? "New articles today · also in your tt-rss" : "New articles today")).join("")}
+  ${H.row("The Long Essay", "Added just now · checking…")}
+  <div class="row" style="border-bottom:0;padding-right:4px"><span class="ic">${I.rss}</span><span class="main"><span class="ti" style="font-weight:600">Tiny Tiny RSS</span><span class="su">54 feeds in your paper, 4 left out</span></span>
+    <button class="tb" data-go="acct" style="padding:8px">Settings</button>
+    <button class="foldbtn" data-go="${open ? "closed" : "sources"}" aria-expanded="${open}" aria-label="${open ? "Hide" : "Show"} 54 feeds in your paper">${open ? "▴" : "▾"}</button></div>
+  ${open ? `<div class="insetgroup" role="group" aria-label="Feeds in Tiny Tiny RSS">${live.map(insetRow).join("")}
+    <button class="row inset" data-go="left"><span class="main"><span class="ti" style="color:var(--muted)">Left out · 4</span></span>${I.chev}</button></div>` : ""}
+  </div>` + H.fab() + H.nav();
+};
+FLOWS.f5 = { start: "sources", screens: {
+  sources: { label: "Open", note: "Phone sources (a new one included) stay above tt-rss. Under it, all 54 feeds, A–Z; a line only where there's something to say.", html: () => f5sources(true) },
+  closed: { label: "Folded", note: "Folded is today's Sources, and how it starts until you open it; then it stays as you left it.", path: ["closed"], html: () => f5sources(false) },
+  left: { label: "Left out", note: "A plain list of the four, to bring one back.", path: ["sources", "left"], html: () => H.bar("Left out of the paper") + `<div class="body"><div class="hint" style="padding-top:8px">These stay in your tt-rss. Open one to bring it back.</div>${ALL.filter(f => LEFT(f.t)).map(f => H.row(f.t, f.c, { go: "feed" })).join("")}</div>` + H.nav() },
+  feed: { ...feedScreen, path: ["sources", "feed"] },
+  acct: { ...acctScreen, path: ["sources", "acct"] },
+  leave: { dialog: true, over: ["sources", "feed"], label: "", html: () => FLOWS.a.screens.leave.html() },
+  atext: { dialog: true, over: ["sources", "feed"], label: "", html: () => textDlg },
+  section: { dialog: true, over: ["sources", "feed"], label: "", html: () => sectionDlg },
+}, chips: ["sources", "closed", "feed", "acct", "left"] };
+
+/* ---------- the recommended path, end to end ---------- */
+FLOWS.rec = {
+  start: "sources",
+  screens: {
+    sources: { label: "2 · Sources", note: "Step 2: tt-rss is one row; its feeds sit inset beneath it (shown open). Tap a feed, or Settings.", html: () => FLOWS.f5.screens.sources.html() },
+    closed: { label: "Folded", note: "Folded is today's Sources.", path: ["closed"], html: () => FLOWS.f5.screens.closed.html() },
+    feed: { label: "2 · A feed", note: "Step 2: a feed's page. Article text is already learned per feed by step 1; this only overrides. No cap: dropped.", path: ["sources", "feed"], html: () => feedPage({ noCap: true, crumb: `<div class="crumb">From <b data-go="acct">Tiny Tiny RSS</b> · category News</div>` }) },
+    acct: { label: "3 · Sections", note: "Step 3 adds \"Use tt-rss categories as sections\" here.", path: ["sources", "acct"], html: () => acctScreen.html() },
+    balance: { label: "3 · Balance", note: "Step 3: D, one from each section, then More.", path: ["settings", "balance"], html: () => FLOWS.d.screens.balance.html() },
+    preview: { label: "3 · What would go in", note: "D's rule, visible in tomorrow's contents. For the book's signposts (S4), see Sections in the paper.", path: ["settings", "balance", "preview"], html: () => FLOWS.d.screens.preview.html() },
+    found: { dialog: true, over: ["sources"], label: "If needed · C", note: "C, only if OPML export and tt-rss's own subscribe feel like a chore.", html: () => FLOWS.c.screens.found.html() },
+    left: { label: "Left out", note: "", path: ["sources", "left"], html: () => FLOWS.f5.screens.left.html() },
+    settings: { label: "Settings", note: "", path: ["settings"], html: () => FLOWS.d.screens.settings.html() },
+    leave: { dialog: true, over: ["sources", "feed"], label: "Leave out", note: "", html: () => FLOWS.a.screens.leave.html() },
+    atext: { dialog: true, over: ["sources", "feed"], label: "Article text", note: "", html: () => textDlg },
+    section: { dialog: true, over: ["sources", "feed"], label: "Section", note: "", html: () => sectionDlg },
+    sec: { label: "Section", note: "", path: ["settings", "balance", "sec"], html: () => FLOWS.d.screens.sec.html() },
+    where: { dialog: true, over: ["sources"], label: "Add to tt-rss", note: "", html: () => FLOWS.c.screens.where.html() },
+    cat: { dialog: true, over: ["sources"], then: "where", label: "Category", note: "", html: () => FLOWS.c.screens.cat.html() },
+    adding: { label: "Adding", note: "", path: ["adding"], html: () => FLOWS.c.screens.adding.html() },
+    added: { label: "Added", note: "", path: ["added"], html: () => FLOWS.c.screens.added.html() },
+    undo: { dialog: true, over: ["added"], label: "Undo", note: "", html: () => FLOWS.c.screens.undo.html() },
+  },
+  menus: { acctmenu: [["Sign in again"], ["Remove tt-rss"]] },
+  chips: ["sources", "closed", "feed", "acct", "balance", "preview", "found"],
+};
+
+/* ---------- engine ---------- */
+function mountPhone(stage) {
+  const flow = FLOWS[stage.dataset.flow];
+  stage.innerHTML = `<div class="phone${flow.device === "ereader" ? " ereader" : ""}">${flow.device === "ereader" ? "" : '<div class="status"><span>10:21</span><span>▾ ▴ ▮</span></div>'}<div class="screen"></div></div><div class="caption"></div><div class="stagebar"></div><label class="caption" style="min-height:0"><input type="checkbox" class="hl"> Show what's clickable</label>`;
+  const scr = stage.querySelector(".screen"), cap = stage.querySelectorAll(".caption")[0], bar = stage.querySelector(".stagebar");
+  let stack = [flow.start], overlay = null, menu = null;
+  function render() {
+    const base = flow.screens[stack[stack.length - 1]];
+    let html = base.html();
+    if (overlay) html += flow.screens[overlay].html();
+    if (menu) html += `<div class="menuscrim" data-act="closemenu"></div><div class="menu">${flow.menus[menu].map(([l, go]) => `<div ${go ? `data-go="${go}"` : 'data-act="closemenu"'}>${l}</div>`).join("")}</div>`;
+    scr.innerHTML = html;
+    const cur = overlay || stack[stack.length - 1];
+    cap.textContent = flow.screens[cur].note || "";
+    bar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.s === cur));
+  }
+  bar.innerHTML = flow.chips.map(id => `<button data-s="${id}">${flow.screens[id].label}</button>`).join("");
+  bar.addEventListener("click", e => {
+    const id = e.target.dataset.s; if (!id) return;
+    const s = flow.screens[id];
+    if (s.dialog) { overlay = id; if (s.over) stack = s.over.slice(); } else { overlay = null; stack = s.path ? s.path.slice() : [flow.start, id].filter((v, i, a) => a.indexOf(v) === i); }
+    menu = null; render();
+  });
+  stage.querySelector(".hl").addEventListener("change", e => stage.classList.toggle("hot", e.target.checked));
+  scr.addEventListener("click", e => {
+    const t = e.target.closest("[data-go],[data-dlg],[data-back],[data-close],[data-act]");
+    if (!t) return;
+    if (t.matches(".scrim") && e.target !== t) return; // clicks inside a dialog don't close it
+    if (t.dataset.go) { const s = flow.screens[t.dataset.go]; if (s.dialog) overlay = t.dataset.go; else { overlay = null; stack.push(t.dataset.go); } menu = null; }
+    else if (t.dataset.dlg) overlay = t.dataset.dlg;
+    else if (t.hasAttribute("data-back")) { overlay = null; if (stack.length > 1) stack.pop(); }
+    else if (t.hasAttribute("data-close")) { const s = overlay && flow.screens[overlay]; overlay = s && s.then ? s.then : null; if (s && s.thenGo) stack.push(s.thenGo); }
+    else {
+      const a = t.dataset.act;
+      if (a === "toggle") { t.classList.toggle("on"); t.setAttribute("aria-checked", t.classList.contains("on")); return; }
+      if (a === "check") { const c = t.querySelector(".cb"); c.classList.toggle("on"); return; }
+      if (a === "pick") { t.parentElement.querySelectorAll(".rad").forEach(r => r.classList.remove("on")); t.querySelector(".rad").classList.add("on"); return; }
+      if (a.startsWith("menu:")) menu = a.slice(5);
+      if (a === "closemenu") menu = null;
+      if (a === "seg") { t.parentElement.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b === t); b.setAttribute("aria-checked", b === t); }); return; }
+      if (a === "fold") { const b = t.nextElementSibling; b.hidden = !b.hidden; t.setAttribute("aria-expanded", !b.hidden); return; }
+      if (a === "where1" || a === "where2") { const d = t.closest(".db"); d.querySelectorAll(".rad").forEach(r => r.classList.remove("on")); t.querySelector(".rad").classList.add("on"); d.querySelector(".more").hidden = a === "where1"; return; }
+    }
+    render();
+  });
+  render();
+}
+
+/* ---------- plan and log ---------- */
+const PLAN = [
+  ["1", "Competitor analysis", "Competitors tab", "done"],
+  ["2", "tt-rss today", "Today tab: clickable baseline", "done"],
+  ["3", "Proposal A: feeds as sources, folded under the account", "A v1", "done"],
+  ["6", "Proposal B: feeds spread through Sources by category", "B v1", "done"],
+  ["9", "Proposal C: adding feeds back to tt-rss", "C v1", "done"],
+  ["4 · 7 · 10", "Critique round 1 for A, B and C, run side by side", "A v2, B v2 (cut down), C v2 (cut down), new D v1", "done"],
+  ["5 · 8 · 11 · D1", "Critique round 2 for A, B and C (the code and the edges); D's first", "A v3, B dropped into D, C v3, D v2", "done"],
+  ["D2", "D's second critique round", "D v3", "done"],
+  ["12", "Compare and recommend", "Compare tab", "done"],
+  ["13", "Critique of compare and recommend, then the final version", "Compare, final", "done"],
+  ["14", "Your follow-ups: sections in the paper; every tt-rss feed on Sources", "S1–S4 and F1–F4, one critique round", "done"],
+  ["15", "Your idea: tt-rss feeds inset under the tt-rss row on Sources", "F5 v1, a critique, F5 v2, and a five-way comparison", "done"],
+  ["16", "Redo compare and recommend with F and S, then a critique", "Compare v3", "done"],
+  ["17", "Competitor screenshots of an account's feed list", "Nine screenshots on the Competitors tab (private copy only)", "done"],
+];
+const LOG = [
+  ["Cycle 18 · A1, built (newspaperss cycle 71)", "Building A1 showed its premise was wrong: short items already had their page read, and a long item counted as full text without its page ever being read. With you, the change became: check long items against the page, count pictures too, and keep what's learned per publication for every feed.", "Shipped on the branch with tests, a migration to database version 6, and updated DESIGN.md diagrams."],
+  ["Cycle 17 · competitor screenshots", "Collected screenshots of how nine products list an account's feeds, from their own store and project pages. They sit beside the private page, not in the public repo.", "Found: folding categories is the norm (F1); Read You's indented feeds under one heading is closest to F5; TTRSS-Reader drills in like F4. All of them show unread counts."],
+  ["Cycle 16 · compare and recommend, redone", "After F5 and S4 came in, the comparison had only a paragraph bolted on, contradicting its own first answer. Rewrote it, then a critic checked it against every tab and the code.", "Changed: F5 with feed pages moves to Next (you asked, which is the signal cycle 13 waited for), costed as the biggest step. A1 keys on feed id only, since addresses and categories need the full feed list in step 2. S4 can ship any time. F4 is optional everywhere on the page. Superseded lines marked."],
+  ["Cycle 15 · feeds inset under the tt-rss row", "Mocked your idea as F5 and had a critic walk it as the owner, the Kindle reader, TalkBack and Boox.", "Changed: the tt-rss group stays last, a separate fold button and Settings link, folded until opened, lines only for quiet feeds and duplicates, a plain Left-out list. Added a comparison of F1–F5. F5 is the pick; F4's searchable list is optional, later."],
+  ["Cycle 14 · your follow-ups", "Sections in the paper: three ways the book could show them (today's headings, section fronts, a front page). Every tt-rss feed on Sources: by account, by the paper's sections, one A–Z list. A critic read them on a Kindle, a Boox and KOReader, with 58 feeds and with 5.", "Changed: S4 added and recommended (today's book plus a section flag and a section-aware Next). S3 isn't recommended (Kindle opens past it). S2 only for big sections. F4 added and recommended (all 58 A–Z on the account page). F2 isn't recommended (B again). F1 and F3 now take freshness from tt-rss itself, because the app only fetches unread."],
+  ["Cycles 12–13 · compare, critique, final", "Compared A1, A2, C and D (B dropped) on what each fixes for the owner, who sees it, what code it touches and cost. Then a critic read the comparison as the owner and as a senior engineer.", "Changed: the recommendation now opens with where your gut is right, builds only A1 now (re-rated: it needs a table), puts categories-as-sections and D after living with it, A2 only if missed, and points to OPML export instead of C. Stale lines across tabs fixed."],
+  ["Round D2 · does balance deliver?", "Worked the owner's numbers through the real planner (rotation by featured-longest-ago, caps, one budget).", "Changed: D v3 replaces weights with one rule: one article per section, then More, then Normal, Less if room. Off by default, Take turns only, stars count as their section's one, and the contents say when only one section had news."],
+  ["Round 2 · cycles 5, 8, 11 and D1", "This round read the real code: sync, read sync, mark-read, the planner, the add flow, and the tt-rss API's answers.", "Changed: A keeps articles on the account and stores per-feed settings in a table keyed like the planner's feed key, so sync and delivery stay untouched (this reverses the first doc's storage choice). B is dropped and folded into D. C becomes a second button, \"Add to tt-rss instead\", trimming back issues at the first sync that sees the feed. D moves from minutes to Less / Normal / More shares that weight the turns, with stars exempt (replaced in D2 by a rule)."],
+  ["Round 1 · cycles 4, 7, 10", "Three critics walked A, B and C as the owner, the self-hoster, the Kindle reader in their sixties, a TalkBack user and a Boox owner. Findings are under each proposal.", "Changed: A learns article text per feed with no screen, folds categories and writes settings in words. B is cut to an optional by-section view, with tt-rss folded per section. C is cut to one choice when adding, phone by default, with Undo; Move to tt-rss waits. New: D, a share of the paper per section, which A's and B's critics both arrived at independently."],
+  ["Cycles 3, 6, 9 · proposals v1", "A: feeds open up under the account. B: every tt-rss feed in Sources, by section. C: adding a feed asks phone or tt-rss, and Move to tt-rss.", "All three are clickable on the same made-up account (58 feeds, 7 categories)."],
+  ["Cycle 2 · tt-rss today", "Read the tt-rss source in the code (SourceDetailScreen, TtrssRepository, FeedSync, EditionBuilder) and your screenshots. The app has since renamed \"Mark as read in tt-rss\" to \"Sync read status with tt-rss\"; the mockup follows main.", "Found: per-feed turns and caps already exist in the planner; what's missing is anything the reader can set or see per feed."],
+  ["Cycle 1 · competitors", "Thirteen products and four sync APIs. Grouping an account's feeds under it is the norm; per-feed settings live in the app; write-back is always an explicit choice; digests get scoped.", "Changed the plan: carry settings by the feed's address (Fluent Reader). Round 1 later narrowed that to carrying, not keying."],
+];
+document.getElementById("planRows").innerHTML = PLAN.map(([n, c, o, s]) => `<tr><td>${n}</td><td>${c}</td><td>${o}</td><td>${s ? `<span class="pill ${s === "done" ? "" : "v"}">${s}</span>` : ""}</td></tr>`).join("");
+document.getElementById("log").innerHTML = LOG.map(([h, d, f]) => `<article><h3>${h}</h3><p style="margin:0">${d}</p><p style="margin:0;color:var(--muted)">${f}</p></article>`).join("");
+
+/* ---------- tabs ---------- */
+const tabs = [...document.querySelectorAll(".tab")], tl = document.getElementById("tabs");
+tl.innerHTML = tabs.map(t => `<button role="tab" data-t="${t.id}">${t.dataset.label}</button>`).join("");
+function show(id) {
+  if (!tabs.some(t => t.id === id)) id = tabs[0].id;
+  tabs.forEach(t => t.hidden = t.id !== id);
+  tl.querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === id));
+  const t = document.getElementById(id);
+  t.querySelectorAll(".stage[data-flow]").forEach(s => { if (!s.dataset.ready) { s.dataset.ready = 1; mountPhone(s); } });
+}
+tl.addEventListener("click", e => { const id = e.target.dataset.t; if (id) { show(id); history.replaceState(null, "", "#" + id); } });
+show(location.hash.slice(1) || "compare");
+</script>

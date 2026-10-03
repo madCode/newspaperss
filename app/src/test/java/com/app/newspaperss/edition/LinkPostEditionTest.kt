@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionRepository
@@ -40,7 +41,7 @@ class LinkPostEditionTest {
     private val clock = Clock.fixed(Instant.parse("2026-09-29T06:30:00Z"), ZoneOffset.UTC)
     private val sources = SourceRepository(db, clock)
     private val evidence = mutableListOf<FullTextEvidence>()
-    private val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { _, e -> evidence += e }
+    private val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { _, _, e, _ -> e?.let { evidence += it } }
     private val builder by lazy { EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC) }
     private val editions by lazy { EditionRepository(db, tmp.root, clock) }
     private val sync = FeedSync(db, http, clock)
@@ -112,7 +113,7 @@ class LinkPostEditionTest {
     @Test
     fun aReaderWhoChoseTheFeedsTextGetsThePitch() = runTest {
         val id = addFeed("picks", pick())
-        sources.chooseContentMode(id, ContentMode.FEED)
+        sources.chooseContentMode(id, PublicationEntity.OWN, ContentMode.FEED)
         storyPage()
         sync.syncAll()
 

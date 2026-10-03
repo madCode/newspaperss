@@ -47,59 +47,142 @@ class SourceRepositoryTest {
               <outline text="Science"><outline text="B" xmlUrl="https://b.example/rss"/></outline>
             </body></opml>
         """.trimIndent()
-        assertEquals(1, repo.importOpml(opml))
-        assertEquals("Science", db.sources().byUrl("https://b.example/rss")!!.section)
+        assertEquals(SourceRepository.OpmlImport(inFile = 2, added = 1), repo.importOpml(opml))
 
         val other = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
             .allowMainThreadQueries().build()
-        assertEquals(2, SourceRepository(other).importOpml(repo.exportOpml()))
+        assertEquals(2, SourceRepository(other).importOpml(repo.exportOpml()).added)
         other.close()
     }
 
     private var day = 20_000L
 
     /** [times] pieces of evidence, one a day. */
-    private suspend fun record(id: Long, evidence: FullTextEvidence, times: Int) = repeat(times) { repo.recordFullText(id, evidence, day++) }
+    private suspend fun record(id: Long, evidence: FullTextEvidence, times: Int, originId: String? = null) =
+        repeat(times) { repo.recordFullText(id, originId, evidence, day = day++) }
 
     private suspend fun source(id: Long) = db.sources().byId(id)!!
+
+    private suspend fun learned(id: Long, key: String = PublicationEntity.OWN) = db.sources().publication(id, key)?.contentMode ?: ContentMode.AUTO
 
     @Test
     fun threeTeasersInARowSwitchAFeedToFetchingPages() = runTest {
         val id = repo.addFeed("https://a.example/feed", "A")
         record(id, FullTextEvidence.PAGE_LONGER, 2)
-        assertEquals(ContentMode.AUTO, source(id).contentMode)
+        assertEquals(ContentMode.AUTO, learned(id))
         record(id, FullTextEvidence.PAGE_LONGER, 1)
-        assertEquals(ContentMode.PAGE, source(id).contentMode)
+        assertEquals(ContentMode.PAGE, learned(id))
     }
 
     @Test
     fun aModeTheReaderChoseIsNeverChangedByTheCheck() = runTest {
         val id = repo.addFeed("https://a.example/feed", "A")
-        repo.chooseContentMode(id, ContentMode.FEED)
+        repo.chooseContentMode(id, PublicationEntity.OWN, ContentMode.FEED)
         record(id, FullTextEvidence.PAGE_LONGER, 5)
-        assertEquals(ContentMode.FEED, source(id).contentMode)
-        assertTrue(source(id).contentModeChosen)
+        val publication = db.sources().publication(id, PublicationEntity.OWN)!!
+        assertEquals(ContentMode.FEED, publication.chosenMode)
+        assertEquals("nothing learned against the reader's choice", null, publication.fullTextEvidence)
     }
 
     @Test
     fun choosingAutomaticAgainStartsTheCheckOver() = runTest {
         val id = repo.addFeed("https://a.example/feed", "A")
         record(id, FullTextEvidence.BLOCKED, 3)
-        assertEquals(ContentMode.FEED, source(id).contentMode)
+        assertEquals(ContentMode.FEED, learned(id))
 
-        repo.chooseContentMode(id, ContentMode.AUTO)
+        repo.chooseContentMode(id, PublicationEntity.OWN, ContentMode.AUTO)
 
-        assertEquals(ContentMode.AUTO, source(id).contentMode)
-        assertFalse(source(id).contentModeChosen)
+        assertEquals(ContentMode.AUTO, learned(id))
+        assertEquals(null, db.sources().publication(id, PublicationEntity.OWN)?.chosenMode)
         record(id, FullTextEvidence.PAGE_LONGER, 2)
-        assertEquals("earlier evidence doesn't count towards the new run", ContentMode.AUTO, source(id).contentMode)
+        assertEquals("earlier evidence doesn't count towards the new run", ContentMode.AUTO, learned(id))
     }
 
     @Test
-    fun sourcesMixingManySitesAreLeftAlone() = runTest {
+    fun eachTtrssFeedLearnsOnItsOwn() = runTest {
         val ttrss = repo.addTtrss("https://rss.example/api/")
-        record(ttrss, FullTextEvidence.PAGE_LONGER, 3)
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 3, originId = "7")
+        record(ttrss, FullTextEvidence.FEED_FULL, 3, originId = "8")
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 3, originId = null)
+
+        assertEquals(ContentMode.PAGE, learned(ttrss, "7"))
+        assertEquals(ContentMode.FEED, learned(ttrss, "8"))
+        assertEquals("an article not from any one feed says nothing", ContentMode.AUTO, learned(ttrss))
         assertEquals(ContentMode.AUTO, source(ttrss).contentMode)
+    }
+
+    @Test
+    fun theReadingListIsLeftAlone() = runTest {
+        val list = db.sources().all().firstOrNull { it.kind == SourceKind.READING_LIST }?.id
+            ?: db.sources().insert(SourceEntity(kind = SourceKind.READING_LIST, url = "newspaperss:reading-list", title = "Saved", contentMode = ContentMode.PAGE))
+        record(list, FullTextEvidence.FEED_FULL, 3)
+        assertTrue(db.sources().allPublications().isEmpty())
+    }
+
+    /** A check whose page couldn't be read still counts as the day's check; otherwise it would come back every edition. */
+    @Test
+    fun aCheckThatShowedNothingIsStillRememberedAndChangesNothingElse() = runTest {
+        val id = repo.addFeed("https://a.example/feed", "A")
+        record(id, FullTextEvidence.PAGE_LONGER, 2)
+        repo.recordFullText(id, null, null, checked = true, day = 20_200)
+        val publication = db.sources().publication(id, PublicationEntity.OWN)!!
+        assertEquals(20_200L, publication.checkedDay)
+        assertEquals(FullTextEvidence.PAGE_LONGER, publication.fullTextEvidence)
+        assertEquals(2, publication.fullTextStreak)
+    }
+
+    @Test
+    fun aCheckIsRememberedAsTheDayOfTheLastCheck() = runTest {
+        val id = repo.addFeed("https://a.example/feed", "A")
+        repo.recordFullText(id, null, FullTextEvidence.FEED_FULL, checked = true, day = 20_100)
+        repo.recordFullText(id, null, FullTextEvidence.FEED_FULL, day = 20_101)
+        assertEquals(20_100L, db.sources().publication(id, PublicationEntity.OWN)!!.checkedDay)
+    }
+
+    /** One row holds both, so neither a check nor taking a feed back may write over the other. */
+    @Test
+    fun leavingAFeedOutAndWhatTheCheckLearnedKeepEachOther() = runTest {
+        val ttrss = repo.addTtrss("https://rss.example/api/")
+        val feed = FeedChoice("7", "Teasers", inPaper = true)
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 3, originId = "7")
+        repo.setFeedInPaper(ttrss, feed, inPaper = false)
+        assertEquals(ContentMode.PAGE, learned(ttrss, "7"))
+
+        record(ttrss, FullTextEvidence.PAGE_LONGER, 1, originId = "7")
+        assertEquals(listOf("7"), db.sources().allLeftOut().map { it.key })
+
+        repo.setFeedInPaper(ttrss, feed, inPaper = true)
+        assertTrue(db.sources().allLeftOut().isEmpty())
+        assertEquals(ContentMode.PAGE, learned(ttrss, "7"))
+    }
+
+    /** A tt-rss feed's cap is its own: another feed in the account keeps the edition's. */
+    @Test
+    fun aTtrssFeedsCapIsItsOwnAndKeepsItLeftOut() = runTest {
+        val ttrss = repo.addTtrss("https://rss.example/api/")
+        repo.setFeedInPaper(ttrss, FeedChoice("7", "Teasers", inPaper = true), inPaper = false)
+
+        repo.stepMaxArticles(ttrss, "7", delta = 1, default = 1, limit = 3)
+        repo.stepMaxArticles(ttrss, "7", delta = 5, default = 1, limit = 3)
+
+        val seven = db.sources().publication(ttrss, "7")!!
+        assertEquals(3, seven.maxArticles)
+        assertTrue("still left out", seven.leftOut)
+        assertEquals(null, db.sources().publication(ttrss, "8")?.maxArticles)
+
+        repo.setMaxArticles(ttrss, "7", null)
+        assertEquals(null, db.sources().publication(ttrss, "7")!!.maxArticles)
+    }
+
+    /** The account page's checklist falls back to a feed's id for a name; that isn't saved as one. */
+    @Test
+    fun leavingOutAFeedKnownOnlyByItsIdSavesNoName() = runTest {
+        val ttrss = repo.addTtrss("https://rss.example/api/")
+        repo.setFeedInPaper(ttrss, FeedChoice("7", "7", inPaper = true), inPaper = false)
+        assertEquals(null, db.sources().publication(ttrss, "7")!!.title)
+        db.sources().savePublication(db.sources().publication(ttrss, "7")!!.copy(title = "Quarterly Review"))
+        repo.setFeedInPaper(ttrss, FeedChoice("7", "A feed", inPaper = false), inPaper = true)
+        assertEquals("the listed name stays", "Quarterly Review", db.sources().publication(ttrss, "7")!!.title)
     }
 
     /** Articles by guid, each inserted in [states]' state, with the star given. */

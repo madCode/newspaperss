@@ -35,7 +35,8 @@ class TtrssSyncTest {
     private val http = FakeHttp()
     private val server = FakeTtrss(http)
     private val now = Instant.parse("2026-09-29T06:00:00Z")
-    private val accounts by lazy { TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher()) }
+    private val accountData by lazy { PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") } }
+    private val accounts by lazy { TtrssAccountStore(accountData, testCipher()) }
     private val sources by lazy { SourceRepository(db, Clock.fixed(now, ZoneOffset.UTC)) }
     private val ttrss by lazy { TtrssRepository(db, http, accounts, sources) }
     private val sync by lazy { FeedSync(db, http, Clock.fixed(now, ZoneOffset.UTC), Duration.ofDays(7), accounts) }
@@ -136,9 +137,107 @@ class TtrssSyncTest {
         assertTrue(db.articles().allForSource(source.id).none { it.title == "Another press release" })
         assertEquals("nothing left waiting in vain", ArticleState.EXPIRED, db.articles().allForSource(source.id).single { it.title == "A press release" }.state)
         assertEquals(
-            listOf(FeedChoice("42", "Press Office", inPaper = false), FeedChoice("7", "Quarterly Review", inPaper = true)),
-            sources.observeFeeds(source.id).first(),
+            listOf(Triple("42", "Press Office", false), Triple("7", "Quarterly Review", true)),
+            sources.observeFeeds(source.id).first().map { Triple(it.originId, it.title, it.inPaper) },
         )
+    }
+
+    /** tt-rss's own list names every feed, read ones too, with its address and category; once a day is enough. */
+    @Test
+    fun theAccountsFeedListNamesEveryFeedOnceADay() = runTest {
+        server.categories[2] = "Essays"
+        server.feeds[7] = FakeTtrss.Feed("Quarterly Review", "https://quarterly.example/feed", 2)
+        server.feeds[9] = FakeTtrss.Feed("Quiet Blog", "https://quiet.example/rss", 2)
+        server.add(1, "An essay", feedId = 7, feedTitle = "Quarterly Review", categoryId = 2)
+        val source = connect()
+
+        sync.syncAll()
+
+        val feeds = sources.observeFeeds(source.id).first()
+        assertEquals(listOf("Quarterly Review", "Quiet Blog"), feeds.map { it.title })
+        val quiet = feeds.single { it.title == "Quiet Blog" }.publication!!
+        assertEquals("https://quiet.example/rss" to "Essays", quiet.feedUrl to quiet.category)
+
+        server.feeds.remove(9)
+        server.add(2, "First post", feedId = 11, feedTitle = "Subscribed Today")
+        sync.syncAll()
+        assertEquals(
+            "not asked again the same day, but a feed subscribed since shows once it sends articles",
+            listOf("Quarterly Review", "Quiet Blog", "Subscribed Today"),
+            sources.observeFeeds(source.id).first().map { it.title },
+        )
+
+        val nextDay = FeedSync(db, http, Clock.fixed(now.plus(Duration.ofDays(1)), ZoneOffset.UTC), Duration.ofDays(7), accounts)
+        nextDay.syncAll()
+        assertEquals("unsubscribed in tt-rss", listOf("Quarterly Review", "Subscribed Today"), sources.observeFeeds(source.id).first().map { it.title })
+    }
+
+    @Test
+    fun anotherCategoryListsItsOwnFeedsAtTheNextSync() = runTest {
+        server.categories[2] = "Essays"
+        server.feeds[7] = FakeTtrss.Feed("Quarterly Review", "https://quarterly.example/feed", 2)
+        server.feeds[8] = FakeTtrss.Feed("Daily News", "https://news.example/feed", 0)
+        val source = connect()
+        sync.syncAll()
+        assertEquals(2, sources.observeFeeds(source.id).first().size)
+
+        db.sources().setTtrssCategory(source.id, 2, "Essays")
+        sync.syncAll()
+
+        assertEquals(listOf("Quarterly Review"), sources.observeFeeds(source.id).first().map { it.title })
+    }
+
+    /**
+     * With a category chosen, the rest of the account's feeds are listed as outside it, for
+     * "Not in your paper"; a subcategory's feeds are in the chosen one, not outside it, and
+     * tt-rss's Uncategorized is no category whatever it's called.
+     */
+    @Test
+    fun feedsOutsideTheChosenCategoryAreListedApart() = runTest {
+        server.categories[2] = "Essays"
+        server.categories[3] = "News"
+        server.categories[5] = "Long reads"
+        // Uncategorized under the server's own language: still no category here.
+        server.categories[0] = "Sans catégorie"
+        server.subcategories[5] = 2
+        server.feeds[7] = FakeTtrss.Feed("Quarterly Review", "https://quarterly.example/feed", 2)
+        server.feeds[10] = FakeTtrss.Feed("Slow Essays", "https://slow.example/feed", 5)
+        server.feeds[8] = FakeTtrss.Feed("Daily News", "https://news.example/feed", 3)
+        server.feeds[9] = FakeTtrss.Feed("Someone's Blog", "https://blog.example/rss", 0)
+        val source = connect()
+        db.sources().setTtrssCategory(source.id, 2, "Essays")
+
+        sync.syncAll()
+
+        assertEquals(listOf("Quarterly Review", "Slow Essays"), sources.observeFeeds(source.id).first().map { it.title })
+        assertEquals(
+            setOf("Daily News" to "News", "Someone's Blog" to null),
+            sources.observeOutsideCategory(source.id).first().map { it.title to it.category }.toSet(),
+        )
+
+        db.sources().setTtrssCategory(source.id, null, null)
+        assertEquals("the old list isn't read against the new choice", emptyList<PublicationEntity>(), sources.observeOutsideCategory(source.id).first())
+        sync.syncAll()
+        assertEquals(4, sources.observeFeeds(source.id).first().size)
+        assertTrue(db.sources().allPublications().none { it.outsideCategory })
+    }
+
+    /** The list is extra: a sync that got its articles has succeeded even if the list fails, and tries it again next time. */
+    @Test
+    fun aFeedListThatFailsDoesntFailTheSync() = runTest {
+        server.add(1, "An essay", feedId = 7, feedTitle = "Quarterly Review")
+        server.failFeedList = true
+        val source = connect()
+
+        sync.syncAll()
+
+        val synced = db.sources().byId(source.id)!!
+        assertNull(synced.lastError)
+        assertNull(synced.feedsListedAt)
+        assertEquals(1, db.articles().allForSource(source.id).size)
+        server.failFeedList = false
+        sync.syncAll()
+        assertNotNull(db.sources().byId(source.id)!!.feedsListedAt)
     }
 
     @Test
@@ -151,17 +250,31 @@ class TtrssSyncTest {
     }
 
     @Test
-    fun leftOutFeedsStayForTheSameUserAndGoForAnother() = runTest {
+    fun feedChoicesStayForTheSameUserAndGoForAnother() = runTest {
         // Feed ids belong to each tt-rss user; another user on the same server has their own.
         val source = connect()
         sources.setFeedInPaper(source.id, FeedChoice("42", "Press Office", inPaper = true), inPaper = false)
 
         assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
-        assertEquals(listOf("42"), db.sources().allLeftOut().map { it.originId })
+        assertEquals(listOf("42"), db.sources().allLeftOut().map { it.key })
 
+        db.sources().savePublication(PublicationEntity(source.id, "42", com.app.newspaperss.core.extract.ContentMode.PAGE))
         server.user = "partner"
         assertNull(ttrss.connect("rss.example.com/tt-rss", "partner", "secret"))
         assertTrue(db.sources().allLeftOut().isEmpty())
+        assertTrue("what was learned about feed 42 was about another user's feed", db.sources().allPublications().isEmpty())
+    }
+
+    @Test
+    fun feedChoicesStayForTheSameUserSigningInAfterThePhoneLostThePasswordsKey() = runTest {
+        val source = connect()
+        sources.setFeedInPaper(source.id, FeedChoice("42", "Press Office", inPaper = true), inPaper = false)
+        val lostKey = TtrssAccountStore(accountData, AesGcmCipher { javax.crypto.spec.SecretKeySpec(ByteArray(32) { 7 }, "AES") })
+        assertEquals(StoredAccount.Locked, lostKey.load())
+
+        assertNull(TtrssRepository(db, http, lostKey, sources).connect("rss.example.com/tt-rss", "reader", "secret"))
+
+        assertEquals(listOf("42"), db.sources().allLeftOut().map { it.key })
     }
 
     @Test
@@ -692,7 +805,7 @@ class TtrssSyncTest {
         assertTrue(server.markedRead.isEmpty())
         assertEquals("already known, so not offered again", 0, sync.syncAll().newArticles)
 
-        ttrss.forget(db.sources().byId(source.id)!!)
+        ttrss.signOut()
         connect()
         assertEquals("nor after connecting again", 0, sync.syncAll().newArticles)
     }

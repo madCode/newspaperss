@@ -9,7 +9,11 @@ import java.net.URI
 data class FoundFeed(val url: String, val title: String?)
 
 sealed interface FindResult {
-    data class Found(val feeds: List<FoundFeed>) : FindResult
+    /**
+     * @property page the page typed, when it's an article rather than the feed itself or a site's
+     *   front page: something to save to read later if the feed can't be followed after all.
+     */
+    data class Found(val feeds: List<FoundFeed>, val page: String? = null) : FindResult
     /** @property page the page itself, when it loaded but offers no feed: it can still be saved to read later. */
     data class NotFound(val reason: String, val page: String? = null) : FindResult
 }
@@ -35,8 +39,9 @@ class FeedFinder(private val http: HttpClient) {
             return FindResult.Found(listOf(FoundFeed(response.finalUrl, title)))
         }
 
+        val page = response.finalUrl.takeIf { articleLike(url, it, response.contentType) }
         val advertised = advertisedFeeds(response.body, response.finalUrl)
-        if (advertised.isNotEmpty()) return FindResult.Found(advertised)
+        if (advertised.isNotEmpty()) return FindResult.Found(advertised, page)
 
         // Some sites only link their feed from the page (a webcomic's "RSS" button), with no
         // <link rel="alternate"> in the head.
@@ -44,7 +49,7 @@ class FeedFinder(private val http: HttpClient) {
             val r = try { http.get(candidate) } catch (_: IOException) { continue }
             if (r.isSuccessful && FeedParser.looksLikeFeed(r.body)) {
                 val title = runCatching { FeedParser.parse(r.body, r.finalUrl).title }.getOrNull()
-                return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)))
+                return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)), page)
             }
         }
 
@@ -53,10 +58,10 @@ class FeedFinder(private val http: HttpClient) {
             val r = try { http.get(candidate) } catch (_: IOException) { continue }
             if (r.isSuccessful && FeedParser.looksLikeFeed(r.body)) {
                 val title = runCatching { FeedParser.parse(r.body, r.finalUrl).title }.getOrNull()
-                return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)))
+                return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)), page)
             }
         }
-        return FindResult.NotFound("No feed found at $url.", page = response.finalUrl.takeIf { articleLike(url, it, response.contentType) })
+        return FindResult.NotFound("No feed found at $url.", page = page)
     }
 
     /**

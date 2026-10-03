@@ -2,14 +2,10 @@ package com.app.newspaperss.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
@@ -18,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.feed.FeedFinder
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import kotlinx.coroutines.flow.first
@@ -27,7 +24,6 @@ import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssAccountStore
 import com.app.newspaperss.data.TtrssRepository
 import com.app.newspaperss.testutil.FakeHttp
-import com.app.newspaperss.testutil.FakeTtrss
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.rss
@@ -35,7 +31,6 @@ import com.app.newspaperss.testutil.testCipher
 import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -80,65 +75,6 @@ class SourcesScreenTest {
         compose.waitForIdle()
     }
 
-    @Test
-    fun aTtrssAccountIsAddedFromTheMenuAndAWrongPasswordIsExplained() {
-        val server = FakeTtrss(http)
-        compose.onNodeWithContentDescription("More options").performClick()
-        compose.onNodeWithText("Add tt-rss account").performClick()
-        val fields = compose.onAllNodes(hasSetTextAction())
-        fields[0].performTextInput("rss.example.com/tt-rss")
-        fields[1].performTextInput(server.user)
-        fields[2].performTextInput("wrong")
-        compose.onNodeWithText("Test and add").performClick()
-        waitFor("didn't accept that username and password")
-
-        compose.onAllNodes(hasSetTextAction())[2].performTextClearance()
-        compose.onAllNodes(hasSetTextAction())[2].performTextInput(server.password)
-        compose.onNodeWithText("Test and add").performClick()
-        waitFor("Test and add", present = false)
-        waitFor(SourceRepository.TTRSS_TITLE)
-        compose.onNodeWithText("rss.example.com").assertIsDisplayed()
-        assertEquals(1, syncRequests)
-    }
-
-    private fun signInToTtrss(server: FakeTtrss) {
-        compose.onNodeWithContentDescription("More options").performClick()
-        compose.onNodeWithText("Add tt-rss account").performClick()
-        val fields = compose.onAllNodes(hasSetTextAction())
-        fields[0].performTextInput("rss.example.com/tt-rss")
-        fields[1].performTextInput(server.user)
-        fields[2].performTextInput(server.password)
-        compose.onNodeWithText("Test and add").performClick()
-        waitFor("Which articles?")
-    }
-
-    @Test
-    fun aTtrssAccountWithCategoriesAsksWhichArticlesBeforeItsAdded() {
-        val server = FakeTtrss(http)
-        server.categories[4] = "Ideas"
-        signInToTtrss(server)
-        assertTrue("nothing saved before the choice", runBlocking { db.sources().all() }.none { it.kind == SourceKind.TTRSS })
-
-        compose.onNodeWithText("Ideas").performClick()
-        compose.onNodeWithText("Add").performClick()
-
-        waitFor("Which articles?", present = false)
-        compose.waitUntil(5_000) { syncRequests == 1 }
-        assertEquals(4, runBlocking { db.sources().all().single { it.kind == SourceKind.TTRSS }.ttrssCategoryId })
-    }
-
-    @Test
-    fun cancellingTheTtrssChoiceAddsNothing() {
-        val server = FakeTtrss(http)
-        server.categories[4] = "Ideas"
-        signInToTtrss(server)
-
-        compose.onNodeWithText("Cancel").performClick()
-
-        waitFor("Which articles?", present = false)
-        assertTrue(runBlocking { db.sources().all() }.none { it.kind == SourceKind.TTRSS })
-        assertEquals(0, syncRequests)
-    }
 
     @Test
     fun addingASiteFindsItsFeedAndStartsASync() {
@@ -165,22 +101,12 @@ class SourcesScreenTest {
     }
 
     @Test
-    fun tappingASourceOpensItAndRemovingOneAsksFirst() {
+    fun tappingASourceOpensIt() {
         val id = runBlocking { SourceRepository(db).addFeed("https://example.com/feed", "Posts") }
         waitFor("Posts")
 
         compose.onNodeWithText("Posts").performClick()
         assertEquals(id, opened)
-
-        compose.onNodeWithContentDescription("More for Posts").performClick()
-        compose.onNodeWithText("Remove source").performClick()
-        compose.onNodeWithText("Keep").performClick()
-        assertEquals(1, runBlocking { db.sources().all().size })
-
-        compose.onNodeWithContentDescription("More for Posts").performClick()
-        compose.onNodeWithText("Remove source").performClick()
-        compose.onNode(hasText("Remove source") and hasAnyAncestor(isDialog())).performClick()
-        waitFor("Posts", present = false)
     }
 
     @Test
@@ -207,22 +133,16 @@ class SourcesScreenTest {
     }
 
     @Test
-    fun aSitesArticleTextIsShownAndTheReadersChoiceIsSaved() {
+    fun aSitesArticleTextIsShownAndTheReadersChoiceToo() {
         val id = runBlocking {
-            db.sources().insert(
-                SourceEntity(url = "https://walled.example/feed", title = "Walled", contentMode = ContentMode.FEED, fullTextEvidence = FullTextEvidence.BLOCKED, fullTextStreak = 3),
-            )
+            db.sources().insert(SourceEntity(url = "https://walled.example/feed", title = "Walled")).also { id ->
+                db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, ContentMode.FEED, FullTextEvidence.BLOCKED, 3))
+            }
         }
         waitFor("Site blocks fetching")
 
-        compose.onNodeWithContentDescription("More for Walled").performClick()
-        compose.onNodeWithText("Article text").performClick()
-        compose.onNodeWithText("Always fetch the full page").performClick()
-
+        runBlocking { SourceRepository(db).chooseContentMode(id, PublicationEntity.OWN, ContentMode.PAGE) }
         waitFor("Always fetches the full page (your choice)")
-        val saved = runBlocking { db.sources().byId(id)!! }
-        assertEquals(ContentMode.PAGE, saved.contentMode)
-        assertTrue(saved.contentModeChosen)
     }
 
     @Test

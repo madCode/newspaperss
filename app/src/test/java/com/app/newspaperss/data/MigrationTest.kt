@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
@@ -174,8 +174,90 @@ class MigrationTest {
         }
     }
 
-    private companion object {
-        const val DB = "migration-test.db"
+    private fun rows(c: android.database.Cursor) = generateSequence {
+        if (c.moveToNext()) (0 until c.columnCount).map { if (c.isNull(it)) null else c.getString(it) } else null
+    }.toList()
+
+    /** What each feed learned and what the reader chose move to its own publication; sections aren't kept. */
+    @Test
+    fun version6MovesWhatEachSourceLearnedAndChoseToItsOwnPublication() {
+        helper.createDatabase(DB, 6).use { db ->
+            fun source(id: Int, kind: String, mode: String, chosen: Int, evidence: String?, max: Int?, section: String?) = db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextEvidence, fullTextStreak, fullTextDay, " +
+                    "paused, markReadOnServer, addedAt, maxArticles, section) VALUES ($id, '$kind', 'https://s$id.example/feed', 'S$id', $id, '$mode', $chosen, " +
+                    "${evidence?.let { "'$it'" } ?: "NULL"}, 3, 20000, 0, 1, 0, ${max ?: "NULL"}, ${section?.let { "'$it'" } ?: "NULL"})",
+            )
+            source(1, "FEED", "FEED", 0, "BLOCKED", null, null)
+            source(2, "FEED", "PAGE", 1, null, 2, "World")
+            source(3, "FEED", "AUTO", 0, null, null, "World")
+            source(4, "READING_LIST", "PAGE", 0, null, null, "Saved for later")
+            source(5, "LIST", "PAGE", 0, null, 1, null)
+            source(6, "TTRSS", "AUTO", 0, null, 3, null)
+        }
+
+        helper.runMigrationsAndValidate(DB, 7, true, AppDatabase.MIGRATION_6_7).use { db ->
+            db.query("SELECT sourceId, `key`, contentMode, fullTextEvidence, fullTextStreak, checkedDay, chosenMode, maxArticles FROM publications ORDER BY sourceId").use { c ->
+                assertEquals(
+                    listOf(
+                        listOf("1", "", "FEED", "BLOCKED", "3", null, null, null),
+                        listOf("2", "", "AUTO", null, "0", null, "PAGE", "2"),
+                        listOf("5", "", "AUTO", null, "0", null, null, "1"),
+                    ),
+                    // No row for tt-rss: its feeds are capped one by one, so a cap on the account never applied.
+                    rows(c),
+                )
+            }
+            db.query("SELECT contentMode, contentModeChosen, fullTextEvidence, maxArticles, section, feedsListedAt FROM sources ORDER BY id").use { c ->
+                assertEquals(
+                    "the reading list and curated lists still fetch pages; nothing else is left on the source",
+                    listOf("AUTO", "AUTO", "AUTO", "PAGE", "PAGE", "AUTO").map { listOf(it, "0", null, null, null, null) },
+                    rows(c),
+                )
+            }
+        }
+    }
+
+    /** A tt-rss account's switch covered all its feeds, so each one seen so far keeps it; the account's own row doesn't need it. */
+    @Test
+    fun version6SkippingPaidPostsGoesToEachPublication() {
+        helper.createDatabase(DB, 6).use { db ->
+            fun source(id: Int, kind: String) = db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt, skipPaidPosts) " +
+                    "VALUES ($id, '$kind', 'https://s$id.example/feed', 'S$id', $id, 'AUTO', 0, 0, 0, 1, 0, 1)",
+            )
+            source(1, "FEED")
+            source(2, "TTRSS")
+            db.execSQL(
+                "INSERT INTO articles (sourceId, guid, url, title, discoveredAt, state, originId) VALUES " +
+                    "(2, 'a', 'https://n.example/a', 'A', 0, 'NEW', '7'), (2, 'b', 'https://n.example/b', 'B', 0, 'NEW', '7'), (2, 'c', 'https://n.example/c', 'C', 0, 'NEW', '8')",
+            )
+            db.execSQL("INSERT INTO left_out_feeds (sourceId, originId, title) VALUES (2, '9', 'Press releases')")
+        }
+
+        helper.runMigrationsAndValidate(DB, 7, true, AppDatabase.MIGRATION_6_7).use { db ->
+            db.query("SELECT sourceId, `key`, skipPaidPosts FROM publications ORDER BY sourceId, `key`").use { c ->
+                assertEquals(listOf(listOf("1", "", "1"), listOf("2", "7", "1"), listOf("2", "8", "1"), listOf("2", "9", "1")), rows(c))
+            }
+            db.query("SELECT skipPaidPosts FROM sources").use { c -> assertEquals(listOf(listOf("0"), listOf("0")), rows(c)) }
+        }
+    }
+
+    @Test
+    fun version6LeftOutFeedsBecomeLeftOutPublications() {
+        helper.createDatabase(DB, 6).use { db ->
+            db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt) " +
+                    "VALUES (1, 'TTRSS', 'https://rss.example/api/', 'Tiny Tiny RSS', 0, 'AUTO', 0, 0, 0, 1, 0)",
+            )
+            db.execSQL("INSERT INTO left_out_feeds (sourceId, originId, title) VALUES (1, '42', 'Press releases')")
+        }
+
+        helper.runMigrationsAndValidate(DB, 7, true, AppDatabase.MIGRATION_6_7).use { db ->
+            db.query("SELECT `key`, contentMode, title, leftOut, listed FROM publications").use { c ->
+                assertEquals(listOf(listOf("42", "AUTO", "Press releases", "1", "0")), rows(c))
+            }
+            db.query("SELECT name FROM sqlite_master WHERE name = 'left_out_feeds'").use { c -> assertEquals(0, c.count) }
+        }
     }
 
     @Test
@@ -197,5 +279,9 @@ class MigrationTest {
                 assertEquals("NEW", c.getString(2))
             }
         }
+    }
+
+    private companion object {
+        const val DB = "migration-test.db"
     }
 }

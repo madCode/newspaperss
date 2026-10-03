@@ -1,5 +1,7 @@
 package com.app.newspaperss.edition
 
+import com.app.newspaperss.core.extract.FullTextCheck
+import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.data.FeedChoice
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EpubImage
@@ -13,6 +15,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.MarkReadBatch
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.PaidOnlyCount
 import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.SourceRepository
@@ -51,15 +54,15 @@ class EditionBuilderTest {
     private val sources = SourceRepository(db, clock)
     private val unreadable = mutableSetOf<String>()
     private val broken = mutableSetOf<String>()
-    private val content = ArticleContentProvider { a, _, _ ->
+    private val content = ArticleContentProvider { a, _, _, _ ->
         if (a.guid in broken) throw IllegalStateException("parser crashed on ${a.url}")
         if (a.guid in unreadable) null else ArticleContent(a.title, null, "<p>${a.title} body</p>", wordCount = 2000)
     }
     private val builder by lazy { EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) }
     private val editions by lazy { EditionRepository(db, tmp.root, clock) }
 
-    private suspend fun source(name: String, section: String? = null, vararg guids: String): Long {
-        val id = sources.addFeed("https://$name.example/feed", name, section)
+    private suspend fun source(name: String, vararg guids: String): Long {
+        val id = sources.addFeed("https://$name.example/feed", name)
         db.articles().insertNew(
             guids.mapIndexed { i, g ->
                 ArticleEntity(
@@ -78,12 +81,12 @@ class EditionBuilderTest {
     @Test
     fun aDeletedEditionsTitleIsntReused() = runTest {
         // Send to Kindle drops a title it has seen, and the deleted one may already have been sent.
-        source("a", "World", "a1")
+        source("a", "a1")
         val first = builder.build(EditionSettings()) as BuildResult.Built
         editions.markDelivered(first.editionId)
         assertTrue(editions.delete(first.editionId))
 
-        source("b", "World", "b1")
+        source("b", "b1")
         val second = builder.build(EditionSettings()) as BuildResult.Built
 
         assertEquals("Tuesday Morning Edition, Sep 29 (2)", db.editions().byId(second.editionId)!!.title)
@@ -91,7 +94,7 @@ class EditionBuilderTest {
 
     @Test
     fun aTimedEditionBuiltBeforeMidnightIsTitledForTheDayItsDue() = runTest {
-        source("a", "World", "a1")
+        source("a", "a1")
         val lateMonday = EditionBuilder(db, content, tmp.root, Clock.fixed(Instant.parse("2026-09-28T23:40:00Z"), ZoneOffset.UTC), ZoneOffset.UTC)
 
         val result = lateMonday.build(EditionSettings(), dueAt = Instant.parse("2026-09-29T00:10:00Z")) as BuildResult.Built
@@ -99,17 +102,17 @@ class EditionBuilderTest {
         assertEquals("Tuesday Evening Edition, Sep 29", db.editions().byId(result.editionId)!!.title)
 
         // Send to Kindle drops a document whose title it has already seen.
-        source("b", "World", "b1")
+        source("b", "b1")
         val tuesdayEvening = EditionBuilder(db, content, tmp.root, Clock.fixed(Instant.parse("2026-09-29T20:00:00Z"), ZoneOffset.UTC), ZoneOffset.UTC)
         val second = tuesdayEvening.build(EditionSettings()) as BuildResult.Built
         assertEquals("Tuesday Evening Edition, Sep 29 (2)", db.editions().byId(second.editionId)!!.title)
     }
 
     @Test
-    fun buildsAnEpubWithinTheBudgetTakingTurnsAndGroupingBySection() = runTest {
-        source("a", "World", "a1", "a2")
-        source("b", "Culture", "b1")
-        source("c", "World", "c1")
+    fun buildsAnEpubWithinTheBudgetTakingTurnsInSourceOrder() = runTest {
+        source("a", "a1", "a2")
+        source("b", "b1")
+        source("c", "c1")
 
         val result = builder.build(EditionSettings(minutes = 25, maxPerSource = 1, wordsPerMinute = 200)) as BuildResult.Built
 
@@ -118,7 +121,7 @@ class EditionBuilderTest {
         assertEquals(EditionStatus.READY, edition.status)
         assertEquals(3, edition.articleCount)
         val titles = editions.observeArticles(edition.id).first().map { it.title }
-        assertEquals("sections group the reading order", listOf("a a2", "c c1", "b b1"), titles)
+        assertEquals("the reading order is the sources' order", listOf("a a2", "b b1", "c c1"), titles)
 
         ZipFile(editions.fileOf(edition)!!).use { zip ->
             assertTrue(zip.entries().toList().any { it.name.endsWith(".xhtml") })
@@ -132,7 +135,7 @@ class EditionBuilderTest {
     @Test
     fun theClosingPageAsksTheSameQuestionTheNotesStartWith() = runTest {
         // What she turned over on the Kindle is waiting in her notes app.
-        source("a", null, "a1")
+        source("a", "a1")
         val first = (builder.build(EditionSettings()) as BuildResult.Built).editionId
         val question = Reflection.forEdition(first)
 
@@ -147,7 +150,7 @@ class EditionBuilderTest {
 
     @Test
     fun theNextEditionStartsWithTheSourcesTheLastOneLeftOut() = runTest {
-        for (name in listOf("a", "b", "c", "d")) source(name, null, "${name}1", "${name}2", "${name}3")
+        for (name in listOf("a", "b", "c", "d")) source(name, "${name}1", "${name}2", "${name}3")
         val settings = EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)
         fun sourcesOf(id: Long) = runBlocking { editions.observeArticles(id).first().map { it.title.substringBefore(' ') }.toSet() }
 
@@ -211,8 +214,23 @@ class EditionBuilderTest {
     }
 
     @Test
+    fun aFeedMovedToTtrssStillGivesWhatItHoldsThoughPaused() = runTest {
+        // Paused so it fetches nothing more; its star is still the reader asking for that article.
+        val moved = source("a", "a1")
+        db.articles().setStarred(idOf("a1"), true, clock.instant())
+        sources.setPaused(moved, true)
+        val stillPaused = source("b", "b1")
+        sources.setPaused(stillPaused, true)
+        val withMoved = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC, retiring = { setOf(moved) })
+
+        val built = withMoved.build(EditionSettings()) as BuildResult.Built
+
+        assertEquals(listOf("a a1"), editions.observeArticles(built.editionId).first().map { it.title })
+    }
+
+    @Test
     fun anEditionThatWasNeverSentDoesntCountAsTheirTurn() = runTest {
-        for (name in listOf("a", "b", "c", "d")) source(name, null, "${name}1", "${name}2", "${name}3")
+        for (name in listOf("a", "b", "c", "d")) source(name, "${name}1", "${name}2", "${name}3")
         val settings = EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)
         fun sourcesOf(id: Long) = runBlocking { editions.observeArticles(id).first().map { it.title.substringBefore(' ') }.toSet() }
 
@@ -224,8 +242,8 @@ class EditionBuilderTest {
 
     @Test
     fun aStarredArticleDoesntUseUpItsSourcesTurn() = runTest {
-        val a = source("a", null, "a1")
-        val d = source("d", null, "d1", "d2")
+        val a = source("a", "a1")
+        val d = source("d", "d1", "d2")
         editions.setStarred(db.query("SELECT id FROM articles WHERE guid = 'd1'", null).use { it.moveToFirst(); it.getLong(0) }, true)
 
         val first = builder.build(EditionSettings(minutes = 15, maxPerSource = 1, wordsPerMinute = 200)) as BuildResult.Built
@@ -239,7 +257,7 @@ class EditionBuilderTest {
     /** A source's page names the edition holding an article, then the day it went out. */
     @Test
     fun anArticlesHistoryNamesItsUnsentEditionThenWhenItWentOut() = runTest {
-        val id = source("a", null, "a1")
+        val id = source("a", "a1")
         val built = builder.build(EditionSettings()) as BuildResult.Built
         val title = db.editions().byId(built.editionId)!!.title
 
@@ -256,7 +274,7 @@ class EditionBuilderTest {
     /** Starred from a sent edition that's then marked not sent, an article is in two unsent ones: name the newer. */
     @Test
     fun anArticleInTwoUnsentEditionsNamesTheNewer() = runTest {
-        val id = source("a", null, "a1")
+        val id = source("a", "a1")
         val first = builder.build(EditionSettings()) as BuildResult.Built
         editions.markDelivered(first.editionId)
         editions.setStarred(idOf("a1"), true)
@@ -268,7 +286,7 @@ class EditionBuilderTest {
 
     @Test
     fun articlesAreOnlyUsedUpOnceDelivered() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val first = builder.build(EditionSettings()) as BuildResult.Built
         assertEquals(ArticleState.IN_EDITION, stateOf("a1"))
 
@@ -280,9 +298,9 @@ class EditionBuilderTest {
 
     @Test
     fun anEditionNeverSentGivesItsArticlesToTheNextOne() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val first = builder.build(EditionSettings()) as BuildResult.Built
-        source("b", null, "b1")
+        source("b", "b1")
 
         val second = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
 
@@ -294,13 +312,13 @@ class EditionBuilderTest {
 
     @Test
     fun unreadableArticlesAreSkippedAndAnAllUnreadableEditionFails() = runTest {
-        source("a", null, "a1", "a2")
+        source("a", "a1", "a2")
         unreadable += "a2"
         val built = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
         assertEquals(listOf("a a1"), editions.observeArticles(built.editionId).first().map { it.title })
 
         unreadable += "b1"
-        source("b", null, "b1")
+        source("b", "b1")
         db.articles().setState(listOf(db.articles().candidates().first { it.guid == "a2" }.id), ArticleState.SKIPPED)
         editions.markDelivered(built.editionId)
         val failed = builder.build(EditionSettings()) as BuildResult.Failed
@@ -310,9 +328,9 @@ class EditionBuilderTest {
 
     @Test
     fun aSourcesOwnCapIsAHardLimitWhereTheEditionsGivesWay() = runTest {
-        val a = source("a", null, "a1", "a2", "a3")
-        source("b", null, "b1", "b2")
-        sources.setMaxArticles(a, 2)
+        val a = source("a", "a1", "a2", "a3")
+        source("b", "b1", "b2")
+        sources.setMaxArticles(a, PublicationEntity.OWN, 2)
 
         val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 1)) as BuildResult.Built
 
@@ -323,7 +341,7 @@ class EditionBuilderTest {
 
     @Test
     fun aLinkInTwoSourcesGoesInOnce() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val b = sources.addFeed("https://b.example/feed", "b")
         db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
 
@@ -334,7 +352,7 @@ class EditionBuilderTest {
 
     @Test
     fun pausedSourcesAreLeftOut() = runTest {
-        val id = source("a", null, "a1")
+        val id = source("a", "a1")
         sources.update(db.sources().byId(id)!!.copy(paused = true))
         assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
     }
@@ -345,7 +363,7 @@ class EditionBuilderTest {
 
     @Test
     fun aStarredDeliveredArticleComesBackAndLosesItsStarOnceDeliveredAgain() = runTest {
-        source("a", null, "a1", "a2")
+        source("a", "a1", "a2")
         val first = builder.build(EditionSettings(minutes = 5)) as BuildResult.Built
         editions.markDelivered(first.editionId)
         val delivered = db.editions().articleIds(first.editionId)
@@ -361,7 +379,7 @@ class EditionBuilderTest {
 
     @Test
     fun anArticleInAnUnsentEditionCantBeStarredOrUnstarred() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         editions.setStarred(idOf("a1"), true)
         builder.build(EditionSettings()) as BuildResult.Built
 
@@ -371,7 +389,7 @@ class EditionBuilderTest {
 
     @Test
     fun anEditionNeverSentGivesBackItsStarsAndADeliveredLinkGoesBackToDelivered() = runTest {
-        source("a", null, "a1", "a2")
+        source("a", "a1", "a2")
         val first = builder.build(EditionSettings(minutes = 5)) as BuildResult.Built
         editions.markDelivered(first.editionId)
         editions.setStarred(idOf("a2"), true)
@@ -390,7 +408,7 @@ class EditionBuilderTest {
 
     @Test
     fun whenALinkWaitsInTwoSourcesTheStarredCopyGoesIn() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val b = sources.addFeed("https://b.example/feed", "b")
         db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
         editions.setStarred(idOf("b-copy"), true)
@@ -402,7 +420,7 @@ class EditionBuilderTest {
 
     @Test
     fun starringAnotherSourcesCopyOfALinkInAnUnsentEditionDoesntSendItTwice() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val b = sources.addFeed("https://b.example/feed", "b")
         val unsent = builder.build(EditionSettings()) as BuildResult.Built
         db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
@@ -417,12 +435,12 @@ class EditionBuilderTest {
 
     @Test
     fun marksAndUnstarsDuringABuildWaitSoTheBookAndTheArticlesAgree() = runTest {
-        source("a", null, "a1")
-        source("b", null, "b1")
+        source("a", "a1")
+        source("b", "b1")
         editions.setStarred(idOf("b1"), true)
         var markedDuringBuild: MarkReadBatch? = null
         var unstarredDuringBuild: Boolean? = null
-        val meddling = ArticleContentProvider { a, _, _ ->
+        val meddling = ArticleContentProvider { a, _, _, _ ->
             if (a.guid == "a1") {
                 markedDuringBuild = sources.markRead(listOf(a.id))
                 unstarredDuringBuild = sources.setStarred(idOf("b1"), false)
@@ -473,7 +491,7 @@ class EditionBuilderTest {
 
     @Test
     fun aStarredArticleThatWasMarkedReadIsStillMarkedReadIfItsEditionIsNeverSentAndItsUnstarred() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         sources.markRead(listOf(idOf("a1")))
         editions.setStarred(idOf("a1"), true)
         val unsent = builder.build(EditionSettings()) as BuildResult.Built
@@ -489,7 +507,7 @@ class EditionBuilderTest {
 
     @Test
     fun aLinkStarredInTwoSourcesCountsOnceOnToday() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val b = sources.addFeed("https://b.example/feed", "b")
         db.articles().insertNew(listOf(ArticleEntity(sourceId = b, guid = "b-copy", url = "https://a.example/a1", title = "b copy")))
         editions.setStarred(idOf("a1"), true)
@@ -500,8 +518,8 @@ class EditionBuilderTest {
 
     @Test
     fun aPausedSourceHoldsItsStarsAndTheyArentCountedAsWaiting() = runTest {
-        val a = source("a", null, "a1")
-        source("b", null, "b1")
+        val a = source("a", "a1")
+        source("b", "b1")
         editions.setStarred(idOf("a1"), true)
         assertEquals(1, editions.observeStarredWaiting().first())
         sources.setPaused(a, true)
@@ -515,7 +533,7 @@ class EditionBuilderTest {
 
     @Test
     fun starsThatDontFitWaitAndAreCountedOnToday() = runTest {
-        source("a", null, "a1", "a2", "a3")
+        source("a", "a1", "a2", "a3")
         listOf("a1", "a2", "a3").forEach { editions.setStarred(idOf(it), true) }
 
         builder.build(EditionSettings(minutes = 5, maxPerSource = 5, wordsPerMinute = 200)) as BuildResult.Built
@@ -525,7 +543,7 @@ class EditionBuilderTest {
 
     @Test
     fun removingASourceTakesItsStarsWithIt() = runTest {
-        val a = source("a", null, "a1")
+        val a = source("a", "a1")
         editions.setStarred(idOf("a1"), true)
         sources.remove(db.sources().byId(a)!!)
         assertEquals(0, editions.observeStarredWaiting().first())
@@ -533,7 +551,7 @@ class EditionBuilderTest {
 
     @Test
     fun anArticleMarkedReadIsNeverPickedUntilUndone() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val marked = sources.markRead(listOf(idOf("a1"))).marked.single()
         assertEquals(BuildResult.NothingNew, builder.build(EditionSettings()))
 
@@ -543,8 +561,8 @@ class EditionBuilderTest {
 
     @Test
     fun eachArticlesLanguageReachesTheBook() = runTest {
-        source("a", null, "a1")
-        val french = ArticleContentProvider { a, _, _ -> ArticleContent(a.title, null, "<p>Bonjour</p>", wordCount = 238, language = "fr") }
+        source("a", "a1")
+        val french = ArticleContentProvider { a, _, _, _ -> ArticleContent(a.title, null, "<p>Bonjour</p>", wordCount = 238, language = "fr") }
         val built = EditionBuilder(db, french, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings()) as BuildResult.Built
 
         ZipFile(editions.fileOf(db.editions().byId(built.editionId)!!)!!).use { zip ->
@@ -555,8 +573,8 @@ class EditionBuilderTest {
 
     @Test
     fun imagesPastTheEditionBudgetAreLeftOutInReadingOrder() = runTest {
-        source("a", null, "a1", "a2")
-        val withImage = ArticleContentProvider { a, _, _ ->
+        source("a", "a1", "a2")
+        val withImage = ArticleContentProvider { a, _, _, _ ->
             val href = "images/a${a.id}-1.jpg"
             ArticleContent(
                 a.title, null, "<p>${a.title}</p><figure><img src=\"$href\"/><figcaption>${a.guid} caption</figcaption></figure>",
@@ -579,9 +597,9 @@ class EditionBuilderTest {
 
     @Test
     fun theCoverShowsTheEditionInReadingOrderAndGoesIntoTheEpub() = runTest {
-        source("a", "World", "a1")
-        source("b", "Culture", "b1")
-        source("c", "World", "c1")
+        source("a", "a1")
+        source("b", "b1")
+        source("c", "c1")
         val coverBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1)
         var drawn: CoverInfo? = null
         val built = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) { info ->
@@ -593,7 +611,7 @@ class EditionBuilderTest {
         val info = drawn!!
         assertEquals(edition.title, info.title)
         assertEquals(java.time.LocalDate.of(2026, 9, 29), info.date)
-        assertEquals(listOf(CoverHeadline("a a1", "a"), CoverHeadline("c c1", "c"), CoverHeadline("b b1", "b")), info.headlines)
+        assertEquals(listOf(CoverHeadline("a a1", "a"), CoverHeadline("b b1", "b"), CoverHeadline("c c1", "c")), info.headlines)
         assertEquals(3, info.articleCount)
         assertEquals(edition.minutes, info.minutes, 0.001)
         ZipFile(editions.fileOf(edition)!!).use { zip ->
@@ -605,7 +623,7 @@ class EditionBuilderTest {
 
     @Test
     fun aCoverThatFailsToDrawLeavesATextCoverInsteadOfFailingTheEdition() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val built = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) { error("no fonts") }
             .build(EditionSettings()) as BuildResult.Built
 
@@ -619,9 +637,9 @@ class EditionBuilderTest {
 
     @Test
     fun theCoverCountsAgainstTheEditionsImageBudget() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val href = "images/a1-1.jpg"
-        val withImage = ArticleContentProvider { a, _, _ ->
+        val withImage = ArticleContentProvider { a, _, _, _ ->
             ArticleContent(a.title, null, "<p><img src=\"$href\"/></p>", wordCount = 238, images = listOf(EpubImage(href, "image/jpeg", ByteArray(60))))
         }
         val built = EditionBuilder(db, withImage, tmp.root, clock, ZoneOffset.UTC, imageBudgetBytes = 100) {
@@ -636,7 +654,7 @@ class EditionBuilderTest {
 
     @Test
     fun removingASourceKeepsPastEditionsContents() = runTest {
-        val id = source("a", null, "a1")
+        val id = source("a", "a1")
         val built = builder.build(EditionSettings()) as BuildResult.Built
         editions.markDelivered(built.editionId)
 
@@ -647,7 +665,7 @@ class EditionBuilderTest {
 
     @Test
     fun anArticleThatCrashesTheProviderIsSkipped() = runTest {
-        source("a", null, "a1", "a2", "a3")
+        source("a", "a1", "a2", "a3")
         broken += "a2"
 
         val built = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
@@ -659,7 +677,7 @@ class EditionBuilderTest {
 
     @Test
     fun anEditionWhoseEveryArticleCrashesFailsInsteadOfStayingBuilding() = runTest {
-        source("a", null, "a1", "a2")
+        source("a", "a1", "a2")
         broken += setOf("a1", "a2")
 
         val failed = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Failed
@@ -670,7 +688,7 @@ class EditionBuilderTest {
 
     @Test
     fun anUnexpectedErrorFailsTheEditionAndLeavesItsArticlesForTheNextOne() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
 
         val failed = builder.build(EditionSettings()) { error("progress reporting broke") } as BuildResult.Failed
 
@@ -683,9 +701,9 @@ class EditionBuilderTest {
 
     @Test
     fun aCancelledBuildIsMarkedFailed() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val fetching = CompletableDeferred<Unit>()
-        val hanging = ArticleContentProvider { _, _, _ ->
+        val hanging = ArticleContentProvider { _, _, _, _ ->
             fetching.complete(Unit)
             awaitCancellation()
         }
@@ -702,7 +720,7 @@ class EditionBuilderTest {
     @Test
     fun anEditionLeftBuildingByADeadProcessIsMarkedFailedByTheNextBuild() = runTest {
         val stuck = db.editions().insert(EditionEntity(title = "Monday Evening Edition", status = EditionStatus.BUILDING))
-        source("a", null, "a1")
+        source("a", "a1")
 
         builder.build(EditionSettings()) as BuildResult.Built
 
@@ -727,7 +745,7 @@ class EditionBuilderTest {
 
     @Test
     fun eachTtrssPublicationIsCappedAndBylinedOnItsOwn() = runTest {
-        source("a", null, "a1", "a2")
+        source("a", "a1", "a2")
         ttrss("n1" to ("1" to "Example News"), "n2" to ("1" to "Example News"), "b1" to ("2" to "A Blog"))
 
         // Room for three 10-minute articles: one per publication, if each is capped on its own.
@@ -743,11 +761,50 @@ class EditionBuilderTest {
         }
     }
 
+    /** The paper follows Sources, where tt-rss is last, even when it was added before a feed. */
+    @Test
+    fun ttrssComesAfterFeedsAddedLaterAsOnSources() = runTest {
+        ttrss("n1" to ("1" to "Example News"))
+        source("a", "a1")
+
+        val built = builder.build(EditionSettings(minutes = 600, ordering = com.app.newspaperss.core.edition.Ordering.IN_ORDER)) as BuildResult.Built
+
+        assertEquals(listOf("a", "Example News"), editions.observeArticles(built.editionId).first().map { it.sourceTitle })
+    }
+
+    /** The planner takes turns between a tt-rss account's feeds; the book keeps each feed's articles together. */
+    @Test
+    fun aTtrssFeedsArticlesStayTogetherInTheBook() = runTest {
+        ttrss("n1" to ("1" to "Example News"), "n2" to ("1" to "Example News"), "b1" to ("2" to "A Blog"), "b2" to ("2" to "A Blog"))
+
+        val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 3)) as BuildResult.Built
+
+        val order = editions.observeArticles(built.editionId).first().map { it.sourceTitle }
+        assertEquals(4, order.size)
+        assertEquals("one run per feed", 2, order.zipWithNext().count { (a, b) -> a != b } + 1)
+    }
+
+    /** A tt-rss feed's own cap is its own: the account's other feeds keep the edition's. */
+    @Test
+    fun aTtrssFeedsOwnCapAppliesToItAlone() = runTest {
+        val account = ttrss(
+            "n1" to ("1" to "Example News"), "n2" to ("1" to "Example News"), "n3" to ("1" to "Example News"),
+            "b1" to ("2" to "A Blog"), "b2" to ("2" to "A Blog"),
+        )
+        sources.setMaxArticles(account, "1", 1)
+
+        val built = builder.build(EditionSettings(minutes = 600, maxPerSource = 3)) as BuildResult.Built
+
+        val contents = editions.observeArticles(built.editionId).first()
+        assertEquals(1, contents.count { it.sourceTitle == "Example News" })
+        assertEquals(2, contents.count { it.sourceTitle == "A Blog" })
+    }
+
     @Test
     fun deliveringAnEditionWithTtrssArticlesAsksForThemToBeMarkedRead() = runTest {
         val asked = mutableListOf<Long>()
         val delivering = EditionRepository(db, tmp.root, clock) { asked += it }
-        source("a", null, "a1")
+        source("a", "a1")
         val feedOnly = builder.build(EditionSettings()) as BuildResult.Built
         delivering.markDelivered(feedOnly.editionId)
         assertTrue(asked.isEmpty())
@@ -771,7 +828,7 @@ class EditionBuilderTest {
     /** A send that never arrived can be undone: the articles aren't lost, and the edition can go again. */
     @Test
     fun anEditionMarkedAsNotSentCanBeSentAgainAsIfItNeverWent() = runTest {
-        source("a", null, "a1", "a2")
+        source("a", "a1", "a2")
         editions.setStarred(idOf("a2"), true)
         val built = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
         editions.markDelivered(built.editionId)
@@ -795,7 +852,7 @@ class EditionBuilderTest {
 
     @Test
     fun anEditionMarkedAsNotSentAndNotSentAgainGivesItsArticlesToTheNextOne() = runTest {
-        source("a", null, "a1", "a2")
+        source("a", "a1", "a2")
         val first = builder.build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
         editions.markDelivered(first.editionId)
         editions.markNotSent(first.editionId)
@@ -808,7 +865,7 @@ class EditionBuilderTest {
 
     @Test
     fun onlyADeliveredEditionWithItsBookStillThereCanBeMarkedAsNotSent() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val ready = builder.build(EditionSettings()) as BuildResult.Built
         assertFalse("not sent yet", editions.markNotSent(ready.editionId))
 
@@ -822,7 +879,7 @@ class EditionBuilderTest {
     /** One article in two unsent editions: giving back the older one mustn't free it from the newer. */
     @Test
     fun anArticleBroughtBackIntoANewerEditionStaysThereWhenTheOldOneIsMarkedAsNotSent() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         val first = builder.build(EditionSettings()) as BuildResult.Built
         editions.markDelivered(first.editionId)
         editions.setStarred(idOf("a1"), true)
@@ -839,7 +896,7 @@ class EditionBuilderTest {
     /** An article that went out again in a newer edition was delivered: marking the old one as not sent mustn't send it a third time. */
     @Test
     fun anArticleDeliveredAgainInANewerEditionStaysDeliveredWhenTheOldOneIsMarkedAsNotSent() = runTest {
-        source("a", null, "a1")
+        source("a", "a1")
         editions.setStarred(idOf("a1"), true)
         val first = builder.build(EditionSettings()) as BuildResult.Built
         editions.markDelivered(first.editionId)
@@ -859,7 +916,7 @@ class EditionBuilderTest {
     fun sendingAgainAfterMarkingAsNotSentDoesntRepeatTheWorkOfDelivery() = runTest {
         val followUps = mutableListOf<Long>()
         val delivering = EditionRepository(db, tmp.root, clock, onDelivered = { followUps += it })
-        source("a", null, "a1")
+        source("a", "a1")
         val built = builder.build(EditionSettings()) as BuildResult.Built
         delivering.markSent(built.editionId)
         delivering.markNotSent(built.editionId)
@@ -873,7 +930,7 @@ class EditionBuilderTest {
     fun markingAsNotSentAsksForItsTtrssArticlesToBeMarkedUnread() = runTest {
         val asked = mutableListOf<Long>()
         val marking = EditionRepository(db, tmp.root, clock) { asked += it }
-        source("a", null, "a1")
+        source("a", "a1")
         val feedOnly = builder.build(EditionSettings()) as BuildResult.Built
         marking.markDelivered(feedOnly.editionId)
         marking.markNotSent(feedOnly.editionId)
@@ -902,7 +959,9 @@ class EditionBuilderTest {
     @Test
     fun oneMorningOfBotChecksDoesntSettleASite() = runTest {
         val http = FakeHttp()
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onEvidence = sources::recordFullText)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            sources.recordFullText(sourceId, originId, e, text.check)
+        }
         val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
         val id = sources.addFeed("https://blocked.example/feed", "Blocked")
         db.articles().insertNew(
@@ -914,27 +973,117 @@ class EditionBuilderTest {
 
         tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
 
-        assertEquals(ContentMode.AUTO, db.sources().byId(id)!!.contentMode)
+        assertEquals(ContentMode.AUTO, db.sources().publication(id, PublicationEntity.OWN)?.contentMode ?: ContentMode.AUTO)
     }
 
     @Test
     fun aSiteSettledOnItsSummariesIsRecheckedAndCanMoveToFullPages() = runTest {
         val http = FakeHttp()
         var day = 20_000L
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, e ->
-            sources.recordFullText(sourceId, e, day)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            sources.recordFullText(sourceId, originId, e, text.check, day)
         }
         val id = sources.addFeed("https://unblocked.example/feed", "Unblocked")
-        db.sources().setFullText(id, ContentMode.FEED, com.app.newspaperss.core.extract.FullTextEvidence.BLOCKED, 3, day)
+        db.sources().savePublication(PublicationEntity(id, PublicationEntity.OWN, ContentMode.FEED, com.app.newspaperss.core.extract.FullTextEvidence.BLOCKED, 3, day))
         val words = (1..800).joinToString(" ") { "word$it" }
         repeat(3) { i ->
             day++
             http.page("https://unblocked.example/$i", "<html><body><article><h1>Story</h1><p>$words</p></article></body></html>")
             val article = ArticleEntity(id = 100L + i, sourceId = id, guid = "$i", url = "https://unblocked.example/$i", title = "Story $i", feedHtml = "<p>A teaser.</p>")
-            provider.contentFor(article, db.sources().byId(id)!!, com.app.newspaperss.core.images.ImageAllowance())
+            val learned = db.sources().publication(id, PublicationEntity.OWN)?.contentMode
+            provider.contentFor(article, db.sources().byId(id)!!, com.app.newspaperss.core.images.ImageAllowance(), TextChoice(learned))
         }
 
-        assertEquals(ContentMode.PAGE, db.sources().byId(id)!!.contentMode)
+        assertEquals(ContentMode.PAGE, db.sources().publication(id, PublicationEntity.OWN)!!.contentMode)
+    }
+
+    private fun longArticle(sourceId: Long, guid: String, host: String, http: FakeHttp, originId: String? = null): ArticleEntity {
+        val text = (1..600).joinToString(" ") { "word$it" }
+        http.page("https://$host/$guid", "<html><body><article><p>$text</p></article></body></html>")
+        return ArticleEntity(sourceId = sourceId, guid = guid, url = "https://$host/$guid", title = "Story $guid", feedHtml = "<p>$text</p>", originId = originId)
+    }
+
+    /** Checking costs page fetches, so an edition checks a few publications, each once. */
+    @Test
+    fun anEditionChecksAtMostFiveLongItemsOnePerPublication() = runTest {
+        val http = FakeHttp()
+        val checked = mutableListOf<Pair<Long, String?>>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            if (text.check) checked += sourceId to originId
+            sources.recordFullText(sourceId, originId, e, text.check, text.day!!)
+        }
+        val feeds = (1..6).map { sources.addFeed("https://site$it.example/feed", "Site $it") }
+        val ttrss = sources.addTtrss("https://rss.example/api/")
+        db.articles().insertNew(
+            feeds.flatMap { id -> listOf(longArticle(id, "a$id", "site$id.example", http), longArticle(id, "b$id", "site$id.example", http)) } +
+                listOf(longArticle(ttrss, "t1", "news.example", http, originId = "7"), longArticle(ttrss, "t2", "news.example", http, originId = "8")),
+        )
+
+        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals(FullTextCheck.CHECKS_PER_EDITION, checked.size)
+        assertEquals("one item per publication", checked.size, checked.distinct().size)
+        assertEquals(FullTextCheck.CHECKS_PER_EDITION, db.sources().allPublications().count { it.checkedDay != null })
+    }
+
+    @Test
+    fun eachTtrssFeedIsCheckedOnItsOwn() = runTest {
+        val http = FakeHttp()
+        val checked = mutableListOf<String>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            if (text.check) checked += originId.orEmpty()
+            sources.recordFullText(sourceId, originId, e, text.check, text.day!!)
+        }
+        val ttrss = sources.addTtrss("https://rss.example/api/")
+        db.articles().insertNew((1..3).map { longArticle(ttrss, "t$it", "news.example", http, originId = if (it == 3) "8" else "7") })
+
+        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals(listOf("7", "8"), checked.sorted())
+        assertEquals(setOf("7", "8"), db.sources().allPublications().map { it.key }.toSet())
+    }
+
+    /** A long item ending in "Read more" has its page read anyway, so it doesn't take a feed's check. */
+    @Test
+    fun aReadMoreTeaserIsntUsedAsACheck() = runTest {
+        val http = FakeHttp()
+        val checked = mutableListOf<String>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { _, originId, e, text ->
+            if (text.check) checked += originId.orEmpty()
+        }
+        val ttrss = sources.addTtrss("https://rss.example/api/")
+        val teaser = longArticle(ttrss, "t1", "news.example", http, originId = "7")
+        db.articles().insertNew(
+            listOf(
+                teaser.copy(feedHtml = teaser.feedHtml + "<p><a href=\"${teaser.url}\">Read more</a></p>"),
+                longArticle(ttrss, "t2", "news.example", http, originId = "8"),
+            ),
+        )
+
+        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals(listOf("8"), checked)
+    }
+
+    /** A feed wrongly settled on its own text needs three teasers in a row to switch: daily checks, not one a fortnight. */
+    @Test
+    fun aFeedWhoseLastCheckFoundATeaserIsCheckedTheNextDay() = runTest {
+        val http = FakeHttp()
+        val checked = mutableListOf<Long>()
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
+            if (text.check) checked += sourceId
+            sources.recordFullText(sourceId, originId, e, text.check, text.day!!)
+        }
+        val today = clock.instant().atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+        val teaser = sources.addFeed("https://teaser.example/feed", "Teaser")
+        val full = sources.addFeed("https://full.example/feed", "Full")
+        db.sources().savePublication(PublicationEntity(teaser, PublicationEntity.OWN, ContentMode.FEED, FullTextEvidence.PAGE_LONGER, 1, today - 1, checkedDay = today - 1))
+        db.sources().savePublication(PublicationEntity(full, PublicationEntity.OWN, ContentMode.FEED, FullTextEvidence.FEED_FULL, 3, today - 1, checkedDay = today - 1))
+        db.articles().insertNew(listOf(longArticle(teaser, "a", "teaser.example", http), longArticle(full, "b", "full.example", http)))
+
+        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+
+        assertEquals("the settled one waits its 14 days", listOf(teaser), checked)
     }
 
     /**
@@ -945,7 +1094,7 @@ class EditionBuilderTest {
     @Test
     fun paidPostsWithNothingFreeAreSkippedWhereTheSourceSaysSo() = runTest {
         val http = FakeHttp()
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly, onEvidence = sources::recordFullText)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly, onEvidence = { sourceId, originId, e, text -> sources.recordFullText(sourceId, originId, e, text.check) })
         val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
         val id = sources.addFeed("https://paid.example/feed", "Paid")
         val words = (1..400).joinToString(" ") { "word$it" }
@@ -955,7 +1104,7 @@ class EditionBuilderTest {
         }
         db.articles().insertNew(listOf(post("paid", true), post("starred", true), post("free", false)))
         sources.setStarred(idOf("starred"), true)
-        db.sources().setSkipPaidPosts(id, true)
+        sources.setSkipPaidPosts(id, PublicationEntity.OWN, true)
 
         val built = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
 
@@ -963,16 +1112,16 @@ class EditionBuilderTest {
         val skipped = db.articles().byId(idOf("paid"))!!
         assertEquals(ArticleState.EXPIRED, skipped.state)
         assertTrue(skipped.paidOnly)
-        assertEquals(PaidOnlyCount(found = 2, skipped = 1), sources.observePaidOnly(id).first())
+        assertEquals(PaidOnlyCount(found = 2, skipped = 1), sources.observePaidOnly(id, PublicationEntity.OWN).first())
 
         editions.markDelivered(built.editionId)
-        db.sources().setSkipPaidPosts(id, false)
+        sources.setSkipPaidPosts(id, PublicationEntity.OWN, false)
         db.articles().insertNew(listOf(post("kept", true)))
         val next = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
         assertEquals(listOf("Post kept"), editions.observeArticles(next.editionId).first().map { it.title })
         assertTrue(db.articles().byId(idOf("kept"))!!.paidOnly)
         db.articles().setState(listOf(idOf("kept")), ArticleState.EXPIRED)
-        assertEquals("one let in that then got old wasn't skipped", 1, sources.observePaidOnly(id).first().skipped)
+        assertEquals("one let in that then got old wasn't skipped", 1, sources.observePaidOnly(id, PublicationEntity.OWN).first().skipped)
     }
 
     /** Marking a skipped paid post unread is asking for it: the next edition takes it. */
@@ -985,7 +1134,7 @@ class EditionBuilderTest {
         assertEquals(ArticleState.EXPIRED, db.articles().byId(idOf("paid"))!!.state)
 
         db.articles().markUnread(idOf("paid"), clock.instant())
-        assertEquals(0, sources.observePaidOnly(id).first().skipped)
+        assertEquals(0, sources.observePaidOnly(id, PublicationEntity.OWN).first().skipped)
         val next = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
         assertEquals(listOf("Post paid"), editions.observeArticles(next.editionId).first().map { it.title })
     }
@@ -1002,9 +1151,9 @@ class EditionBuilderTest {
 
     private suspend fun paidSource(): Triple<EditionBuilder, Long, (String, Boolean) -> ArticleEntity> {
         val http = FakeHttp()
-        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly, onEvidence = sources::recordFullText)
+        val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly, onEvidence = { sourceId, originId, e, text -> sources.recordFullText(sourceId, originId, e, text.check) })
         val id = sources.addFeed("https://paid.example/feed", "Paid")
-        db.sources().setSkipPaidPosts(id, true)
+        sources.setSkipPaidPosts(id, PublicationEntity.OWN, true)
         val words = (1..400).joinToString(" ") { "word$it" }
         val paywall = """<div data-testid="paywall"><h2>Keep reading with a 7-day free trial</h2></div>"""
         val post = { g: String, paid: Boolean ->

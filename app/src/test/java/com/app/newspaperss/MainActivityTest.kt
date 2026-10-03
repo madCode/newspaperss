@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -17,7 +18,9 @@ import com.app.newspaperss.testutil.idleUntil
 import kotlinx.coroutines.runBlocking
 import androidx.work.testing.WorkManagerTestInitHelper
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import com.app.newspaperss.settings.FeedsFrom
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -80,12 +83,30 @@ class MainActivityTest {
         shows("Sources")
         compose.onAllNodes(hasText("Settings") and hasClickAction()).onFirst().performClick()
         shows("Reading notes")
-        compose.onNodeWithText("Reading notes").performClick()
+        compose.onNodeWithText("Reading notes").performScrollTo().performClick()
         shows("Save notes for each edition")
 
         compose.onAllNodes(hasText("Settings") and hasClickAction()).onFirst().performClick()
         shows("About 30 minutes")
         compose.onNodeWithText("Save notes for each edition").assertDoesNotExist()
+    }
+
+    @Test
+    fun anUpgradedTtrssReaderWhosePasswordIsGoneIsAskedToSignInFromSources() = try {
+        // tt-rss was added before there was a choice, and its login didn't survive (a restore, say).
+        runBlocking {
+            app.container.sources.addTtrss("https://rss.example.com/tt-rss/api/")
+            app.container.settings.update { it.copy(feedsFrom = null) }
+            assertEquals(FeedsFrom.SERVER, app.container.settleFeedsFrom())
+        }
+        launchWith(onboarded = true)
+        compose.onAllNodes(hasText("Sources") and hasClickAction()).onFirst().performClick()
+        shows("Sign in to your tt-rss")
+        compose.onNodeWithText("Sign in").performClick()
+        shows("Where your feeds live")
+        shows("Sign in again")
+    } finally {
+        runBlocking { app.container.settings.update { it.copy(feedsFrom = null) } }
     }
 
     @Test

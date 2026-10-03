@@ -5,8 +5,32 @@ import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.ttrss.TtrssCategory
 import com.app.newspaperss.core.ttrss.TtrssClient
 import com.app.newspaperss.core.ttrss.TtrssException
+import com.app.newspaperss.core.ttrss.TtrssFeed
+import com.app.newspaperss.core.ttrss.TtrssSubscription
+import kotlinx.coroutines.flow.first
+import java.time.Clock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import java.io.IOException
+
+/**
+ * The tt-rss account as the screens show it.
+ *
+ * @property source the account's source; null when there's none (never signed in, or signed out).
+ * @property user the saved username, readable even when the password isn't.
+ * @property usable a saved login for [source] whose password can be read.
+ */
+data class TtrssStatus(val source: SourceEntity?, val user: String?, val usable: Boolean) {
+    /** Articles can come from it: there's a source and a login that works for it. */
+    val signedIn get() = source != null && usable
+
+    companion object {
+        val NONE = TtrssStatus(null, null, false)
+    }
+}
 
 /** Connecting a tt-rss account, forgetting it, and telling tt-rss what was delivered. */
 class TtrssRepository(
@@ -14,26 +38,33 @@ class TtrssRepository(
     private val http: HttpClient,
     private val accounts: TtrssAccountStore,
     private val sources: SourceRepository,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     sealed interface Check {
         data class Failed(val message: String) : Check
-        /** The login works; [categories] is empty if they couldn't be read. */
-        data class Passed(val categories: List<TtrssCategory>) : Check
+        /**
+         * The login works; [categories] is empty if they couldn't be read, and [feeds] null if
+         * they weren't asked for or couldn't be read.
+         */
+        data class Passed(val categories: List<TtrssCategory>, val feeds: List<TtrssFeed>? = null) : Check
     }
 
-    /** Logs in to check the account and reads its categories if asked, saving nothing. */
-    suspend fun check(address: String, user: String, password: String, readCategories: Boolean = true): Check {
+    /** Logs in to check the account and reads its categories and feeds if asked, saving nothing. */
+    suspend fun check(address: String, user: String, password: String, readCategories: Boolean = true, readFeeds: Boolean = false): Check {
         val client = TtrssAccount(TtrssClient.apiUrl(address), user.trim(), password).client(http)
         try {
             client.login()
-            val categories = if (!readCategories) emptyList() else try {
-                client.categories()
+            // Either is only shown to the reader; failing to read one isn't failing to sign in.
+            suspend fun <T> optional(read: suspend () -> T): T? = try {
+                read()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                emptyList()
+                null
             }
-            return Check.Passed(categories)
+            val categories = if (!readCategories) emptyList() else optional { client.categories() }.orEmpty()
+            val feeds = if (!readFeeds) null else optional { client.allFeeds() }
+            return Check.Passed(categories, feeds)
         } catch (e: TtrssException) {
             return Check.Failed(e.message ?: "tt-rss reported an error.")
         } catch (e: IOException) {
@@ -56,14 +87,60 @@ class TtrssRepository(
         return add(address, user, password, category = null)
     }
 
+    /** What a sign-in found in the account: [feeds] in [categories] (the ones that have feeds). */
+    data class Found(val feeds: Int, val categories: Int)
+
+    sealed interface SignIn {
+        data class Failed(val message: String) : SignIn
+        /** Signed in and saved; [found] is null if the feed list couldn't be read. */
+        data class SignedIn(val found: Found?) : SignIn
+    }
+
+    /**
+     * Checks the login and, if it works, saves it and adds its source, taking articles from all
+     * feeds. The same login signing in again keeps its category; another one starts from all.
+     *
+     * @param saved runs straight after the account is saved, e.g. to record the server setup.
+     *   The saving and it can't be cancelled once begun: cut short between them, the account
+     *   would be there with nothing saying it was chosen.
+     */
+    suspend fun signIn(address: String, user: String, password: String, saved: suspend () -> Unit = {}): SignIn {
+        val check = check(address, user, password, readCategories = false, readFeeds = true)
+        if (check is Check.Failed) return SignIn.Failed(check.message)
+        val feeds = (check as Check.Passed).feeds
+        withContext(NonCancellable) {
+            add(address, user, password, category = null, keepCategory = true)?.let { return@withContext it }
+            saved()
+            null
+        }?.let { return SignIn.Failed(it) }
+        return SignIn.SignedIn(feeds?.let { f -> Found(f.size, f.mapNotNull { it.categoryId }.distinct().size) })
+    }
+
+    /** Forgets the login and removes the account's source, with its articles. */
+    suspend fun signOut() {
+        accounts.clear()
+        db.sources().ofKind(SourceKind.TTRSS).forEach { sources.remove(it) }
+    }
+
+    /** The account's source and whether its saved login can be used, kept up to date. */
+    fun observeStatus(): Flow<TtrssStatus> = combine(sources.observe(), accounts.observe()) { all, stored ->
+        val source = all.firstOrNull { it.kind == SourceKind.TTRSS }
+        when (stored) {
+            is StoredAccount.Ready -> TtrssStatus(source, stored.account.user, usable = source != null && stored.account.apiUrl == source.url)
+            StoredAccount.Locked -> TtrssStatus(source, accounts.login()?.second, usable = false)
+            StoredAccount.None -> TtrssStatus(source, null, usable = false)
+        }
+    }
+
     /**
      * Saves an account that [check] passed and adds its source, taking articles from [category]
-     * (null for all unread) from the first sync. Returns an error to show the reader, or null.
+     * (null for all unread) from the first sync; with [keepCategory], the same login signing in
+     * again keeps the one it had. Returns an error to show the reader, or null.
      */
-    suspend fun add(address: String, user: String, password: String, category: TtrssCategory?): String? {
+    suspend fun add(address: String, user: String, password: String, category: TtrssCategory?, keepCategory: Boolean = false): String? {
         val account = TtrssAccount(TtrssClient.apiUrl(address), user.trim(), password)
         val previous = try {
-            (accounts.load() as? StoredAccount.Ready)?.account
+            accounts.login()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -78,10 +155,19 @@ class TtrssRepository(
         }
         val sourceId = sources.addTtrss(account.apiUrl)
         // Category and feed ids belong to each tt-rss user, and this may be another user on the same
-        // server. The category is asked again each time; left-out feeds aren't, so they're kept for
-        // the same user signing in again (after a lost Keystore key, say) unless the old login is gone.
-        db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
-        if (previous?.apiUrl != account.apiUrl || previous.user != account.user) db.sources().clearLeftOut(sourceId)
+        // server. Another login starts from the category asked for (all, unless chosen); its feeds' publications (left out, what the
+        // text check learned) aren't, so they're kept for the same user signing in again, after a
+        // lost Keystore key say, and go only when the login is another one or was forgotten.
+        val sameLogin = previous == (account.apiUrl to account.user)
+        db.withTransaction {
+            val kept = if (keepCategory && sameLogin) db.sources().byId(sourceId) else null
+            if (kept != null) {
+                db.sources().setTtrssCategory(sourceId, kept.ttrssCategoryId, kept.ttrssCategoryTitle)
+            } else {
+                db.sources().setTtrssCategory(sourceId, category?.id, category?.title)
+            }
+            if (!sameLogin) db.sources().clearPublications(sourceId)
+        }
         return null
     }
 
@@ -90,8 +176,11 @@ class TtrssRepository(
         data class Failed(val message: String) : Categories
     }
 
-    /** The account's categories, for choosing which one its source takes articles from. */
-    suspend fun categories(): Categories {
+    /**
+     * The account's categories, for choosing which one its source takes articles from, or with
+     * [includeEmpty] one to subscribe a feed into.
+     */
+    suspend fun categories(includeEmpty: Boolean = false): Categories {
         // Some devices' Keystore throws runtime exceptions of its own.
         val account = try {
             (accounts.load() as? StoredAccount.Ready)?.account
@@ -102,7 +191,7 @@ class TtrssRepository(
         } ?: return Categories.Failed(FeedSync.SIGN_IN_AGAIN)
         val client = account.client(http)
         return try {
-            Categories.Loaded(client.categories())
+            Categories.Loaded(client.categories(includeEmpty))
         } catch (e: TtrssException) {
             Categories.Failed(e.message ?: "tt-rss reported an error.")
         } catch (e: IOException) {
@@ -162,13 +251,264 @@ class TtrssRepository(
         return null
     }
 
-    suspend fun setMarkRead(sourceId: Long, markRead: Boolean) = db.sources().setMarkReadOnServer(sourceId, markRead)
+    /** A tt-rss login: its API address and username. Feed ids belong to it. */
+    data class Login(val apiUrl: String, val user: String)
 
-    /** Removes the account's source and its saved login. */
-    suspend fun forget(source: SourceEntity) {
-        accounts.clear()
-        sources.remove(source)
+    /** What subscribing to a feed in tt-rss came to. */
+    sealed interface Subscribed {
+        /**
+         * In tt-rss now, in [category] (null is Uncategorized). [feedId] is null when neither
+         * tt-rss nor its feed list said it, so it can't be undone from here. [outsidePaper]: it's
+         * outside the category the paper takes articles from.
+         */
+        data class Added(val feedId: Int?, val category: String?, val outsidePaper: Boolean = false, val login: Login? = null) : Subscribed
+        /** [feed] is how it's listed here, or null if it isn't yet. */
+        data class Already(val feed: PublicationEntity?) : Subscribed
+        /** [couldntFetch]: tt-rss couldn't download or read a feed the phone just could. */
+        data class Failed(val reason: String, val couldntFetch: Boolean = false) : Subscribed
     }
+
+    /**
+     * The account's feed at [feedUrl], as last listed, or null. A feed unsubscribed in tt-rss is
+     * still stored here, unlisted, and doesn't count.
+     */
+    suspend fun feedAt(feedUrl: String): PublicationEntity? {
+        val source = db.sources().ofKind(SourceKind.TTRSS).firstOrNull() ?: return null
+        return db.sources().observePublicationsOf(source.id).first().firstOrNull { p ->
+            p.feedUrl != null && sameFeed(p.feedUrl, feedUrl) && (p.listed || p.outsideCategory)
+        }
+    }
+
+    /**
+     * Subscribes to [feedUrl] in tt-rss, in [category], then lists the account's feeds straight
+     * away rather than at the next daily check, so the feed shows on Sources and its id is known
+     * for Undo. tt-rss fetches the feed before it answers, so this can take half a minute; the
+     * caller runs it where closing a screen doesn't cancel it.
+     */
+    suspend fun subscribe(feedUrl: String, category: TtrssCategory): Subscribed {
+        val (account, source) = usableAccount() ?: return Subscribed.Failed(FeedSync.SIGN_IN_AGAIN)
+        val login = Login(account.apiUrl, account.user)
+        // Feeds already listed: on a server that doesn't return the new feed's id, the one to
+        // undo is a new row, never a near-duplicate address the reader already had.
+        val before = listedKeys(source.id)
+        val client = account.client(http)
+        val answer = when (val asked = ask(client, feedUrl, category.id)) {
+            is Asked.Answered -> asked.answer
+            is Asked.Failed -> {
+                logOut(client)
+                return asked.failed
+            }
+        }
+        // tt-rss has it now: nothing after this may report a failure.
+        val id = when (answer) {
+            is TtrssSubscription.Added -> answer.feedId
+            is TtrssSubscription.AlreadySubscribed -> answer.feedId
+            is TtrssSubscription.Refused -> null
+        }
+        val listed = try {
+            // Not if another login signed in while tt-rss was answering: this client would list
+            // the old account's feeds under the new one. Read again otherwise, since the subscribe
+            // may have taken long enough for the daily list to run.
+            if (accounts.login() == login.apiUrl to login.user) db.sources().byId(source.id)?.let { listTtrssFeeds(db, client, it, clock.instant()) }
+            id?.let { db.sources().publication(source.id, it.toString()) }?.takeIf { it.listed || it.outsideCategory }
+                ?: if (answer is TtrssSubscription.AlreadySubscribed) feedAt(feedUrl) else newFeedAt(source.id, feedUrl, before)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } finally {
+            logOut(client)
+        }
+        return if (answer is TtrssSubscription.AlreadySubscribed) {
+            Subscribed.Already(listed)
+        } else {
+            Subscribed.Added(
+                id ?: listed?.key?.toIntOrNull(),
+                if (listed != null) listed.category else category.title.takeIf { category.id != 0 },
+                outsidePaper = listed?.outsideCategory == true,
+                login = login,
+            )
+        }
+    }
+
+    private sealed interface Asked {
+        /** tt-rss subscribed to it, or has it already. */
+        data class Answered(val answer: TtrssSubscription) : Asked
+        /** [unreachable]: tt-rss didn't answer, rather than saying no. */
+        data class Failed(val failed: Subscribed.Failed, val unreachable: Boolean = false) : Asked
+    }
+
+    /** Asks tt-rss to subscribe; a refusal or no answer at all comes back as [Asked.Failed], in words. */
+    private suspend fun ask(client: TtrssClient, feedUrl: String, categoryId: Int): Asked {
+        val answer = try {
+            client.subscribeToFeed(feedUrl, categoryId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TtrssException) {
+            return Asked.Failed(Subscribed.Failed(e.message ?: "tt-rss reported an error."))
+        } catch (e: IOException) {
+            // tt-rss may still add it after the app stops waiting.
+            return Asked.Failed(
+                Subscribed.Failed(
+                    if (FeedSync.tooSlow(e)) "tt-rss took too long to answer. It may still add it: check in tt-rss before trying again." else FeedSync.ttrssUnreachable(e),
+                ),
+                unreachable = true,
+            )
+        } catch (e: Exception) {
+            return Asked.Failed(Subscribed.Failed("Something went wrong asking tt-rss."))
+        }
+        if (answer is TtrssSubscription.Refused) return Asked.Failed(Subscribed.Failed(answer.reason, answer.couldntFetch))
+        return Asked.Answered(answer)
+    }
+
+    /** The login saved, whether or not its password can be read. */
+    suspend fun savedLogin(): Login? = accounts.login()?.let { (url, user) -> Login(url, user) }
+
+    /** The login the account's source can be used with now, or null. */
+    suspend fun login(): Login? = usableAccount()?.let { (account, _) -> Login(account.apiUrl, account.user) }
+
+    /** The account's feeds as last listed, by key: what a move compares with to find a new feed. */
+    suspend fun listedKeys(): Set<String> = db.sources().ofKind(SourceKind.TTRSS).firstOrNull()?.let { listedKeys(it.id) }.orEmpty()
+
+    /** What asking tt-rss to take a phone feed came to. */
+    sealed interface MoveAnswer {
+        /** In tt-rss now; [already] it was there before. [feedId] is null when tt-rss didn't say it. */
+        data class In(val feedId: Int?, val already: Boolean) : MoveAnswer
+        /** [unreachable]: tt-rss didn't answer, so asking about the next feed now is likely no use either. */
+        data class Failed(val reason: String, val unreachable: Boolean = false) : MoveAnswer
+    }
+
+    /**
+     * Subscribes to [feedUrl] in [categoryId] for a move, only while [login] is still the one
+     * signed in: a move started under one login mustn't put feeds into another's account. Unlike
+     * [subscribe], the feeds aren't listed after each one; [listFor] does that once for the batch.
+     */
+    suspend fun subscribeForMove(feedUrl: String, categoryId: Int, login: Login): MoveAnswer {
+        val (account, _) = usableAccount() ?: return MoveAnswer.Failed(FeedSync.SIGN_IN_AGAIN)
+        if (Login(account.apiUrl, account.user) != login) return MoveAnswer.Failed(SIGNED_IN_AGAIN)
+        val client = account.client(http)
+        return try {
+            when (val asked = ask(client, feedUrl, categoryId)) {
+                is Asked.Failed -> MoveAnswer.Failed(asked.failed.reason, asked.unreachable)
+                is Asked.Answered -> when (val answer = asked.answer) {
+                    is TtrssSubscription.Added -> MoveAnswer.In(answer.feedId, already = false)
+                    is TtrssSubscription.AlreadySubscribed -> MoveAnswer.In(answer.feedId, already = true)
+                    is TtrssSubscription.Refused -> MoveAnswer.Failed(answer.reason)
+                }
+            }
+        } finally {
+            logOut(client)
+        }
+    }
+
+    /**
+     * Lists the account's feeds again, if [login] is still the one signed in: otherwise the list
+     * would be another account's, filed under this one. Returns whether it listed them.
+     */
+    suspend fun listFor(login: Login): Boolean {
+        val (account, source) = usableAccount() ?: return false
+        if (Login(account.apiUrl, account.user) != login) return false
+        val client = account.client(http)
+        return try {
+            listTtrssFeeds(db, client, source, clock.instant())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        } finally {
+            logOut(client)
+        }
+    }
+
+    /**
+     * The feed a move put [feedUrl] in as, once listed: by the id tt-rss gave, else for a feed it
+     * already had by address, else the feed new since [before] (see [newFeedAt]). Null when none
+     * is sure: carrying settings onto a guess could give them to another feed.
+     */
+    suspend fun movedFeedAt(feedUrl: String, feedId: Int?, already: Boolean, before: Set<String>): PublicationEntity? {
+        val source = db.sources().ofKind(SourceKind.TTRSS).firstOrNull() ?: return null
+        feedId?.let { id -> return db.sources().publication(source.id, id.toString()) ?: PublicationEntity(source.id, id.toString()) }
+        return if (already) feedAt(feedUrl) else newFeedAt(source.id, feedUrl, before)
+    }
+
+    /**
+     * The feed a subscribe to [feedUrl] just added, from a server that didn't say its id: new
+     * since [before], at that address exactly, or failing that the only new one at much the same
+     * address. Anything less sure is no answer, since Undo would unsubscribe it.
+     */
+    private suspend fun newFeedAt(sourceId: Long, feedUrl: String, before: Set<String>): PublicationEntity? {
+        val new = db.sources().observePublicationsOf(sourceId).first()
+            .filter { (it.listed || it.outsideCategory) && it.key !in before && it.feedUrl != null && sameFeed(it.feedUrl, feedUrl) }
+        return new.firstOrNull { it.feedUrl == feedUrl } ?: new.singleOrNull()
+    }
+
+    private suspend fun listedKeys(sourceId: Long): Set<String> =
+        db.sources().observePublicationsOf(sourceId).first().filter { it.listed || it.outsideCategory }.map { it.key }.toSet()
+
+    /**
+     * Unsubscribes from the feed [feedId] of [login] in tt-rss, as Undo after [subscribe].
+     * The feed is also left out here, and its waiting articles go, except starred ones: tt-rss
+     * may have fetched it and a sync brought them in the seconds before Undo, and a sync still
+     * running can add more after this, which the planner then skips. Returns an error to show
+     * the reader, or null.
+     */
+    suspend fun unsubscribe(feedId: Int, login: Login?): String? {
+        val (account, source) = usableAccount() ?: return FeedSync.SIGN_IN_AGAIN
+        // Another login since: the id is someone else's feed, or none.
+        if (login != null && login != Login(account.apiUrl, account.user)) return "You've signed in to tt-rss again since. Remove it in tt-rss itself."
+        val client = account.client(http)
+        try {
+            try {
+                client.unsubscribeFeed(feedId)
+            } catch (e: TtrssException.ApiError) {
+                // Both mean there's no such feed: it's already gone, as asked.
+                if (e.code != "E_OPERATION_FAILED" && e.code != "FEED_NOT_FOUND") throw e
+            }
+            val key = feedId.toString()
+            db.withTransaction {
+                val publication = db.sources().publication(source.id, key) ?: PublicationEntity(source.id, key)
+                db.sources().savePublication(publication.copy(leftOut = true))
+                db.articles().expireWaitingFromFeed(source.id, key)
+            }
+            db.sources().byId(source.id)?.let { listTtrssFeeds(db, client, it, clock.instant()) }
+            return null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: TtrssException) {
+            return e.message ?: "tt-rss reported an error."
+        } catch (e: IOException) {
+            return FeedSync.ttrssUnreachable(e)
+        } catch (e: Exception) {
+            return "Something went wrong taking it out."
+        } finally {
+            logOut(client)
+        }
+    }
+
+    /** The saved login and the account's source, when the login is for that source's server. */
+    private suspend fun usableAccount(): Pair<TtrssAccount, SourceEntity>? {
+        val source = db.sources().ofKind(SourceKind.TTRSS).firstOrNull() ?: return null
+        // Some devices' Keystore throws runtime exceptions of its own.
+        val account = try {
+            (accounts.load() as? StoredAccount.Ready)?.account
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } ?: return null
+        // Feed and category ids mean nothing on another server.
+        return if (account.apiUrl == source.url) account to source else null
+    }
+
+    companion object {
+        /** Another login signed in while a move was under way. */
+        const val SIGNED_IN_AGAIN = "You signed in to tt-rss again while it was moving. Move it again to put it in this account."
+    }
+
+    /** Nothing in the app pauses a tt-rss account, but one can already be paused: this is the way back. */
+    suspend fun resume(sourceId: Long) = sources.setPaused(sourceId, false)
+
+    suspend fun setMarkRead(sourceId: Long, markRead: Boolean) = db.sources().setMarkReadOnServer(sourceId, markRead)
 
     /**
      * Brings the server in line with the edition: its tt-rss articles read once it's delivered,
