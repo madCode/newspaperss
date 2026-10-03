@@ -70,21 +70,36 @@ internal fun FeedsFromSection(vm: FeedsFromViewModel) {
     val server = s.choice == FeedsFrom.SERVER
     val source = s.ttrss.source
     Text(
-        "Your sites come from one place. The reading list and curated lists are always on this phone.",
+        "The reading list and curated lists are always on this phone, whichever you choose.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 8.dp),
     )
     // Picking the other one asks first (sign in, or the leaving dialog) rather than switching at once.
     Column(Modifier.selectableGroup()) {
-        SetupChoice(!server, "This phone", "newspapeRSS finds and fetches your sites itself") { if (server) vm.usePhone() }
+        SetupChoice(!server, "I pick my own sites", "Newspapers, magazines, blogs, newsletters. This phone fetches them.") {
+            if (server) vm.usePhone()
+        }
         SetupChoice(
             server,
-            "My own RSS server",
-            if (server && source != null) "tt-rss · ${SourceRepository.hostOf(source.url)}" else "tt-rss today. FreshRSS and Miniflux are coming.",
+            "On my own RSS server",
+            if (server && source != null) {
+                "Tiny Tiny RSS · ${SourceRepository.hostOf(source.url)}"
+            } else {
+                "Tiny Tiny RSS. Your feeds stay there; the paper is made from them."
+            },
         ) { if (!server) vm.openSignIn() }
     }
-    if (!server) return
+    // Onboarding's third answer, "In another reader app", is this choice plus an import.
+    if (!server) {
+        Text(
+            "Coming from Feedly, Inoreader or another reader app? In Sources, open the menu and choose Import from another reader.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        return
+    }
     HorizontalDivider(Modifier.padding(vertical = 12.dp))
     Text("Your tt-rss", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
     if (source == null) {
@@ -167,7 +182,7 @@ private fun Account(source: SourceEntity, status: TtrssStatus) {
 private fun LeaveDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Fetch your feeds on this phone instead?") },
+        title = { Text("Pick your own sites instead?") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
@@ -180,7 +195,7 @@ private fun LeaveDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Switch to this phone") } },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Stop using tt-rss") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

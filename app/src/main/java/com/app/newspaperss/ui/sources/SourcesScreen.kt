@@ -98,7 +98,7 @@ fun SourcesScreen(
     onOpenFeed: (sourceId: Long, key: String) -> Unit = { _, _ -> },
     onOpenLeftOut: (sourceId: Long) -> Unit = {},
     onOpenNotInPaper: (sourceId: Long) -> Unit = {},
-    /** Opens Settings › Where your feeds come from: the tt-rss account, and signing in to it. */
+    /** Opens Settings › Where your feeds live: the tt-rss account, and signing in to it. */
     onOpenAccount: () -> Unit = {},
 ) {
     val screen by viewModel.screen.collectAsState()
@@ -147,7 +147,7 @@ fun SourcesScreen(
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             // With a server, its feeds are tt-rss's to import and export (Preferences › Feeds there).
                             if (server) {
-                                DropdownMenuItem(text = { Text("Where your feeds come from") }, onClick = { menu = false; onOpenAccount() })
+                                DropdownMenuItem(text = { Text("Where your feeds live") }, onClick = { menu = false; onOpenAccount() })
                             } else {
                                 DropdownMenuItem(
                                     text = { Text("Import from another reader (OPML)") },

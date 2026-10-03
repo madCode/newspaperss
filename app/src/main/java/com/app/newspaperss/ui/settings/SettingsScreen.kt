@@ -143,7 +143,7 @@ private fun SummaryRow(title: String, summary: Summary, onClick: () -> Unit) {
 /**
  * One Settings page, opened from the summary: the same controls the summary row describes.
  *
- * @param feedsFrom the "Where your feeds come from" page's own state; that page is empty without it.
+ * @param feedsFrom the "Where your feeds live" page's own state; that page is empty without it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

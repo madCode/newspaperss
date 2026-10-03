@@ -103,7 +103,7 @@ class MainActivityTest {
         compose.onAllNodes(hasText("Sources") and hasClickAction()).onFirst().performClick()
         shows("Sign in to your tt-rss")
         compose.onNodeWithText("Sign in").performClick()
-        shows("Where your feeds come from")
+        shows("Where your feeds live")
         shows("Sign in again")
     } finally {
         runBlocking { app.container.settings.update { it.copy(feedsFrom = null) } }

@@ -304,8 +304,8 @@ class FeedSync(
         const val TTRSS_GUID_PREFIX = "ttrss:"
         /** Unread articles taken from each tt-rss feed per sync; a paper takes one or two per feed. */
         const val TTRSS_PER_FEED = 5
-        const val CATEGORY_GONE = "Your chosen tt-rss category isn't there any more. Choose another in Settings › Where your feeds come from."
-        const val SIGN_IN_AGAIN = "Sign in to tt-rss again: Settings › Where your feeds come from."
+        const val CATEGORY_GONE = "Your chosen tt-rss category isn't there any more. Choose another in Settings › Where your feeds live."
+        const val SIGN_IN_AGAIN = "Sign in to tt-rss again: Settings › Where your feeds live."
 
         /**
          * What to tell the reader when tt-rss couldn't be read. A slow answer gets its own words: a

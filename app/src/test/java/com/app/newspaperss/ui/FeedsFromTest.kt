@@ -58,7 +58,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** Settings › Where your feeds come from, and the server setup's sign-in state on Sources. */
+/** Settings › Where your feeds live, and the server setup's sign-in state on Sources. */
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class)
 class FeedsFromTest {
@@ -122,12 +122,13 @@ class FeedsFromTest {
     fun thePhoneSetupSaysSoAndChoosingTheServerSignsInFirst() {
         runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.PHONE) } }
         showSettings()
-        waitFor("This phone")
-        compose.onNodeWithText("Where your feeds come from").performScrollTo().performClick()
-        waitFor("My own RSS server")
-        compose.onNodeWithText("This phone").assertIsSelected()
+        waitFor("Sites you pick")
+        compose.onNodeWithText("Where your feeds live").performScrollTo().performClick()
+        waitFor("On my own RSS server")
+        compose.onNodeWithText("I pick my own sites").assertIsSelected()
+        compose.onNodeWithText("Import from another reader", substring = true).assertExists()
 
-        compose.onNodeWithText("My own RSS server").performClick()
+        compose.onNodeWithText("On my own RSS server").performClick()
         waitFor("Sign in to your tt-rss")
         assertEquals("nothing changes before signing in", FeedsFrom.PHONE, runBlocking { store.current().feedsFrom })
         signInWith("wrong")
@@ -138,8 +139,9 @@ class FeedsFromTest {
         compose.onNodeWithText("Sign in").performClick()
         waitFor("Signed in as reader")
         assertEquals(FeedsFrom.SERVER, runBlocking { store.current().feedsFrom })
-        compose.onNodeWithText("My own RSS server").assertIsSelected()
-        compose.onNodeWithText("tt-rss · rss.example.com").assertExists()
+        compose.onNodeWithText("On my own RSS server").assertIsSelected()
+        compose.onNodeWithText("Tiny Tiny RSS · rss.example.com").assertExists()
+        compose.onNodeWithText("Import from another reader", substring = true).assertDoesNotExist()
         assertEquals("a sync is asked for so the articles arrive", 1, syncs)
     }
 
@@ -147,12 +149,12 @@ class FeedsFromTest {
     fun backFromSigningInLeavesThePageAsItWas() {
         runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.PHONE) } }
         showSettings(SettingsPage.FEEDS)
-        waitFor("My own RSS server")
-        compose.onNodeWithText("My own RSS server").performClick()
+        waitFor("On my own RSS server")
+        compose.onNodeWithText("On my own RSS server").performClick()
         waitFor("Sign in to your tt-rss")
         compose.onNode(androidx.compose.ui.test.hasContentDescription("Back")).performClick()
         waitGone("Sign in to your tt-rss")
-        compose.onNodeWithText("This phone").assertIsSelected()
+        compose.onNodeWithText("I pick my own sites").assertIsSelected()
     }
 
     @Test
@@ -164,24 +166,24 @@ class FeedsFromTest {
         showSettings(SettingsPage.FEEDS)
         waitFor("Signed in as reader")
 
-        compose.onNodeWithText("This phone").performClick()
-        waitFor("Fetch your feeds on this phone instead?")
+        compose.onNodeWithText("I pick my own sites").performClick()
+        waitFor("Pick your own sites instead?")
         compose.onNode(isDialog()).assertExists()
         compose.onNodeWithText("won't come along yet", substring = true).assertExists()
         compose.onNodeWithText("Cancel").performClick()
-        waitGone("Fetch your feeds on this phone instead?")
+        waitGone("Pick your own sites instead?")
         assertEquals("cancelling changes nothing", FeedsFrom.SERVER, runBlocking { store.current().feedsFrom })
         assertEquals(1, runBlocking { db.sources().all() }.size)
 
-        compose.onNodeWithText("This phone").performClick()
-        waitFor("Switch to this phone")
-        compose.onNodeWithText("Switch to this phone").performClick()
+        compose.onNodeWithText("I pick my own sites").performClick()
+        waitFor("Stop using tt-rss")
+        compose.onNodeWithText("Stop using tt-rss").performClick()
         idleUntil { runBlocking { store.current().feedsFrom } == FeedsFrom.PHONE }
         assertTrue(runBlocking { db.sources().all() }.isEmpty())
         assertTrue("its articles go with it", runBlocking { db.articles().byIds(listOf(1L, 2L, 3L)) }.isEmpty())
         assertEquals(StoredAccount.None, runBlocking { accounts.load() })
         waitGone("Your tt-rss")
-        compose.onNodeWithText("This phone").assertIsSelected()
+        compose.onNodeWithText("I pick my own sites").assertIsSelected()
     }
 
     @Test
@@ -193,7 +195,7 @@ class FeedsFromTest {
         }
         showSettings(SettingsPage.FEEDS)
         waitFor("Until you do")
-        compose.onNodeWithText("This phone").performClick()
+        compose.onNodeWithText("I pick my own sites").performClick()
         idleUntil { runBlocking { store.current().feedsFrom } == FeedsFrom.PHONE }
         compose.onNode(isDialog()).assertDoesNotExist()
         idleUntil { runBlocking { accounts.load() } == StoredAccount.None }
@@ -258,7 +260,7 @@ class FeedsFromTest {
         runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.SERVER) } }
         showSettings()
         waitFor("Not signed in. Tap to sign in.")
-        compose.onNodeWithText("Where your feeds come from").performScrollTo().performClick()
+        compose.onNodeWithText("Where your feeds live").performScrollTo().performClick()
         waitFor("Until you do, your paper has only what's on this phone")
         compose.onNodeWithText("Sign in").performClick()
         waitFor("Sign in to your tt-rss")

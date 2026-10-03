@@ -303,7 +303,7 @@ class ServerAddTest {
         signedIn()
         show()
         compose.onNodeWithContentDescription("More options").performClick()
-        assertTrue(visible("Where your feeds come from"))
+        assertTrue(visible("Where your feeds live"))
         assertFalse(visible("OPML"))
     }
 

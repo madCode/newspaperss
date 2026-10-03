@@ -38,7 +38,7 @@ sealed interface CategoryPicker {
 }
 
 /**
- * Settings › Where your feeds come from: this phone or the reader's tt-rss, and with tt-rss, the
+ * Settings › Where your feeds live: this phone or the reader's tt-rss, and with tt-rss, the
  * account's settings. Picking the other setup changes nothing until it's confirmed: signing in
  * one way, the leaving dialog the other.
  *

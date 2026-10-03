@@ -26,7 +26,7 @@ enum class SettingsPage(val slug: String, val title: String) {
     SCHEDULE("schedule", "Schedule"),
     // One page: the e-reader decides which delivery choices are offered.
     DELIVERY("delivery", "E-reader & delivery"),
-    FEEDS("feeds", "Where your feeds come from"),
+    FEEDS("feeds", "Where your feeds live"),
     NOTES("notes", "Reading notes"),
     ;
 
@@ -87,7 +87,7 @@ object SettingsSummary {
     }
 
     fun feedsFrom(choice: FeedsFrom, status: TtrssStatus): Summary {
-        if (choice == FeedsFrom.PHONE) return Summary("This phone")
+        if (choice == FeedsFrom.PHONE) return Summary("Sites you pick")
         val source = status.source ?: return Summary("Your tt-rss", "Not signed in. Tap to sign in.")
         val text = "Your tt-rss · ${SourceRepository.hostOf(source.url)}"
         return Summary(text, if (loginProblem(status) != null) "Can't sign in to tt-rss. Tap to sign in again." else null)

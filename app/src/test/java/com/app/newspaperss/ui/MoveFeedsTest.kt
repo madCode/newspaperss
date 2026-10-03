@@ -195,8 +195,8 @@ class MoveFeedsTest {
         phoneFeed("https://aeon.example/feed", "Aeon")
         phoneFeed("https://quanta.example/feed", "Quanta")
         showFeedsFrom()
-        waitFor("My own RSS server")
-        compose.onNodeWithText("My own RSS server").performClick()
+        waitFor("On my own RSS server")
+        compose.onNodeWithText("On my own RSS server").performClick()
         waitFor("Sign in to your tt-rss")
         signInFromTheForm()
 
@@ -218,8 +218,8 @@ class MoveFeedsTest {
         runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.PHONE) } }
         phoneFeed("https://aeon.example/feed", "Aeon")
         showFeedsFrom()
-        waitFor("My own RSS server")
-        compose.onNodeWithText("My own RSS server").performClick()
+        waitFor("On my own RSS server")
+        compose.onNodeWithText("On my own RSS server").performClick()
         waitFor("Sign in to your tt-rss")
         signInFromTheForm()
 

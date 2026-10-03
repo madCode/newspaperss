@@ -639,7 +639,7 @@ class ScreenshotTest {
         shoot("07g-settings-delivery-200", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.DELIVERY, onBack = {}) }
     }
 
-    /** Settings › Where your feeds come from, signed in to a tt-rss account. */
+    /** Settings › Where your feeds live, signed in to a tt-rss account. */
     private fun feedsFromWithServer(): Pair<SettingsViewModel, FeedsFromViewModel> {
         val server = sampleServer()
         runBlocking {
@@ -679,7 +679,7 @@ class ScreenshotTest {
         val (vm, feeds) = feedsFromWithServer()
         shoot(
             "07k-settings-leave-server", ready = { feeds.state.value?.ttrss?.signedIn == true }, dialog = true,
-            act = { compose.onNodeWithText("This phone").performClick() },
+            act = { compose.onNodeWithText("I pick my own sites").performClick() },
         ) { SettingsPageScreen(vm, SettingsPage.FEEDS, onBack = {}, feedsFrom = feeds) }
     }
 

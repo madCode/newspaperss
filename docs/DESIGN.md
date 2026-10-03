@@ -313,7 +313,7 @@ phone restarts.
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
   read on the server once delivered (and unread again if the edition is
   marked as not sent). One category can be taken instead of all unread,
-  chosen in Settings › Where your feeds come from; a new account starts
+  chosen in Settings › Where your feeds live; a new account starts
   with all. tt-rss's own stars
   aren't synced: there a star usually means "keep this", not "for tomorrow".
   - **Sync read status with tt-rss** (on by default) keeps read and unread
@@ -345,7 +345,7 @@ phone restarts.
     every feed's settings: feed ids belong to each tt-rss user. The same
     user signing in again keeps them.
   - **Start fresh** ("Back after a break?" in Settings › Where your feeds
-    come from), after a
+    live), after a
     confirmation, marks everything that reached tt-rss more than two weeks
     ago read there (in the source's category, if it has one), starred ones
     included. Articles already waiting in the app aren't touched by it;
@@ -465,7 +465,7 @@ whose Kindle and KOReader answers ask for more on the same page).
       tt-rss** with no working account; otherwise what's wrong in words
       ("⚠ Couldn't reach tt-rss. Since 6:10 AM. Showing what it last
       listed.", or that it's paused) with **Settings**, which opens
-      Settings › Where your feeds come from. Nothing when all is well.
+      Settings › Where your feeds live. Nothing when all is well.
     - **The reading list.**
     - **Still on this phone**, a heading, only while there are phone feeds:
       a banner, "8 feeds are fetched by this phone, not your tt-rss", with
@@ -573,7 +573,7 @@ whose Kindle and KOReader answers ask for more on the same page).
       one of the curated lists, which stay on the phone.
     - If the dialog was closed, the answer comes as a snackbar when Sources
       is open.
-    - The ⋮ menu has **Where your feeds come from** instead of OPML: tt-rss
+    - The ⋮ menu has **Where your feeds live** instead of OPML: tt-rss
       imports and exports OPML itself. No starter packs are offered.
   Getting or leaving a server is in Settings.
 - **Reading list:** links you shared into the app, each with its title,
@@ -605,14 +605,17 @@ whose Kindle and KOReader answers ask for more on the same page).
     was revoked, or its app uninstalled) says "Can't reach <name>. Tap to
     choose it again." instead of saving automatically, and tapping picks
     it again; so does the notes folder, which also offers **Turn off**.
-  - **Where your feeds come from** (its row says "This phone" or "Your
+  - **Where your feeds live** (its row says "Sites you pick" or "Your
     tt-rss · host"; in red, "Not signed in" or "Can't sign in to tt-rss"):
-    the two setups as radio rows. Picking the other one changes nothing
-    until it's confirmed. **My own RSS server** opens the sign-in, in place
+    the two setups as radio rows, in onboarding's words: **I pick my own
+    sites** and **On my own RSS server**. Onboarding's third answer, "In
+    another reader app", is the first plus an import, so under it a line
+    says where the import is (Sources' menu). Picking the other setup
+    changes nothing until it's confirmed. **On my own RSS server** opens the sign-in, in place
     of the page (Back returns to it). Signed in from the phone setup with
     phone feeds, the page offers the move at once: "Signed in. 58 feeds in
     7 categories. Move your 8 phone feeds to tt-rss?", **Move 8** (the same
-    sheet as Sources) or **Not now** (the banner on Sources stays). **This phone** asks first, saying
+    sheet as Sources) or **Not now** (the banner on Sources stays). **I pick my own sites** asks first ("Pick your own sites instead?"), saying
     what happens: newspapeRSS signs out of tt-rss and removes it here, with
     its waiting and starred articles; nothing changes in tt-rss; its feeds
     don't come along yet (add sites again, or import tt-rss's OPML export).

@@ -19,7 +19,7 @@ import java.time.LocalTime
 
 class SettingsViewModel(
     private val store: SettingsStore,
-    /** The tt-rss account, for the "Where your feeds come from" row. */
+    /** The tt-rss account, for the "Where your feeds live" row. */
     ttrss: Flow<TtrssStatus> = flowOf(TtrssStatus.NONE),
     /** Called after every change so the edition timer follows the schedule. */
     private val onChanged: (Settings) -> Unit,
