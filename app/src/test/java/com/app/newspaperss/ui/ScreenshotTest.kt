@@ -50,6 +50,13 @@ import com.app.newspaperss.core.epub.EpubWriter
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
+import com.app.newspaperss.ui.onboarding.Step
+import com.app.newspaperss.settings.FeedsFrom
+import com.app.newspaperss.data.TtrssAccountStore
+import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.testutil.FakeTtrss
+import com.app.newspaperss.testutil.testCipher
+import com.app.newspaperss.ui.settings.FeedsFromViewModel
 import com.app.newspaperss.ui.settings.SettingsPage
 import com.app.newspaperss.ui.settings.SettingsPageScreen
 import com.app.newspaperss.ui.settings.SettingsScreen
@@ -123,17 +130,76 @@ class ScreenshotTest {
     }
 
     @Test
+    fun onboardingFeedsFrom() {
+        val vm = onboarding().apply { next(); chooseDevice(Device.KOBO); next(); chooseFeedsFrom(FeedsFrom.PHONE) }
+        shoot("02b-onboarding-feeds-from") { OnboardingScreen(vm) }
+    }
+
+    /** Through the fork to this phone's sources step; saving the choice finishes off the main thread. */
+    private fun onboardingOnThePhone(vm: OnboardingViewModel) = vm.apply {
+        next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com"); next()
+        chooseFeedsFrom(FeedsFrom.PHONE); next()
+        idleUntil { state.value.step == Step.SOURCES }
+    }
+
+    @Test
     fun onboardingSources() {
-        val vm = onboarding().apply { next(); chooseDevice(Device.KOBO); next(); togglePack(StarterPacks.all[1].name) }
+        val vm = onboardingOnThePhone(onboarding()).apply { togglePack(StarterPacks.all[1].name) }
         shoot("03-onboarding-sources") { OnboardingScreen(vm) }
     }
 
     @Test
     fun onboardingSize() {
-        val vm = onboarding().apply {
-            next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com"); next(); toggleFeed(StarterPacks.all[0].feeds[0].url); next()
-        }
+        val vm = onboardingOnThePhone(onboarding()).apply { toggleFeed(StarterPacks.all[0].feeds[0].url); next() }
         shoot("04-onboarding-size") { OnboardingScreen(vm) }
+    }
+
+    private val ttrssHttp = FakeHttp()
+    private val ttrssAccounts by lazy { TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher()) }
+    private val ttrss by lazy { TtrssRepository(db, ttrssHttp, ttrssAccounts, SourceRepository(db)) }
+
+    /** A sample tt-rss server: 58 feeds in 7 categories. */
+    private fun sampleServer() = FakeTtrss(ttrssHttp).apply {
+        val names = listOf("News", "Tech", "Science", "Essays", "Arts", "Local", "Comics")
+        names.forEachIndexed { i, name -> categories[i + 1] = name }
+        (1..58).forEach { feeds[it] = FakeTtrss.Feed("Feed $it", "https://feed$it.example/rss", categoryId = (it % 7) + 1) }
+    }
+
+    /** On the server path, at the sign-in step. */
+    private fun onboardingOnTheServer(): OnboardingViewModel =
+        OnboardingViewModel(store, SourceRepository(db), FeedFinder(ttrssHttp), ttrss) {}.apply {
+            next(); chooseDevice(Device.KINDLE); editKindleEmail("name_abc123@kindle.com"); next()
+            chooseFeedsFrom(FeedsFrom.SERVER); next()
+            idleUntil { state.value.step == Step.SIGN_IN }
+        }
+
+    @Test
+    fun onboardingSignIn() {
+        val vm = onboardingOnTheServer().apply { editSignIn(state.value.signIn.copy(address = "rss.example.com/tt-rss", user = "reader")) }
+        shoot("03b-onboarding-sign-in") { OnboardingScreen(vm) }
+    }
+
+    @Test
+    fun onboardingFoundFeeds() {
+        val server = sampleServer()
+        val vm = onboardingOnTheServer().apply {
+            editSignIn(state.value.signIn.copy(address = "rss.example.com/tt-rss", user = server.user, password = server.password))
+            signIn()
+        }
+        shoot("03c-onboarding-found-feeds", ready = { vm.state.value.serverFound != null }) { OnboardingScreen(vm) }
+    }
+
+    @Test
+    fun onboardingExtras() {
+        val server = sampleServer()
+        val vm = onboardingOnTheServer().apply {
+            editSignIn(state.value.signIn.copy(address = "rss.example.com/tt-rss", user = server.user, password = server.password))
+            signIn()
+        }
+        idleUntil { vm.state.value.signedIn }
+        vm.next()
+        val readingList = com.app.newspaperss.ui.readinglist.ReadingListViewModel(com.app.newspaperss.data.ReadingListRepository(db))
+        shoot("03d-onboarding-extras") { OnboardingScreen(vm, readingList = readingList) }
     }
 
     @Test
@@ -441,6 +507,67 @@ class ScreenshotTest {
         runBlocking { store.update { it.copy(device = Device.BOOX) } }
         val vm = SettingsViewModel(store) {}
         shoot("07g-settings-delivery-200", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.DELIVERY, onBack = {}) }
+    }
+
+    /** Settings › Where your feeds come from, signed in to a tt-rss account. */
+    private fun feedsFromWithServer(): Pair<SettingsViewModel, FeedsFromViewModel> {
+        val server = sampleServer()
+        runBlocking {
+            ttrss.connect("rss.example.com/tt-rss", server.user, server.password)
+            store.update { it.copy(feedsFrom = FeedsFrom.SERVER) }
+            db.sources().ofKind(com.app.newspaperss.data.SourceKind.TTRSS).forEach { db.sources().recordSuccess(it.id, Instant.now(), null, null, it.title) }
+        }
+        return SettingsViewModel(store, ttrss.observeStatus()) {} to FeedsFromViewModel(store, ttrss)
+    }
+
+    @Test
+    fun settingsWithAServer() {
+        val (vm, _) = feedsFromWithServer()
+        shoot("07h-settings-with-server", ready = { vm.settings.value != null && vm.ttrssStatus.value.source != null }) { SettingsScreen(vm, onOpen = {}) }
+    }
+
+    @Test
+    fun settingsFeedsFromServer() {
+        val (vm, feeds) = feedsFromWithServer()
+        shoot("07i-settings-feeds-from-server", ready = { feeds.state.value?.ttrss?.signedIn == true }) {
+            SettingsPageScreen(vm, SettingsPage.FEEDS, onBack = {}, feedsFrom = feeds)
+        }
+    }
+
+    @Test
+    fun settingsFeedsFromPhone() {
+        runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.PHONE) } }
+        val vm = SettingsViewModel(store, ttrss.observeStatus()) {}
+        val feeds = FeedsFromViewModel(store, ttrss)
+        shoot("07j-settings-feeds-from-phone", ready = { feeds.state.value != null }) {
+            SettingsPageScreen(vm, SettingsPage.FEEDS, onBack = {}, feedsFrom = feeds)
+        }
+    }
+
+    @Test
+    fun settingsLeavingTheServer() {
+        val (vm, feeds) = feedsFromWithServer()
+        shoot(
+            "07k-settings-leave-server", ready = { feeds.state.value?.ttrss?.signedIn == true }, dialog = true,
+            act = { compose.onNodeWithText("This phone").performClick() },
+        ) { SettingsPageScreen(vm, SettingsPage.FEEDS, onBack = {}, feedsFrom = feeds) }
+    }
+
+    @Test
+    fun settingsServerSignIn() {
+        runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.PHONE) } }
+        val vm = SettingsViewModel(store, ttrss.observeStatus()) {}
+        val feeds = FeedsFromViewModel(store, ttrss)
+        shoot("07l-settings-server-sign-in", ready = { feeds.state.value != null }, act = { feeds.openSignIn() }) {
+            SettingsPageScreen(vm, SettingsPage.FEEDS, onBack = {}, feedsFrom = feeds)
+        }
+    }
+
+    @Test
+    fun sourcesSignedOutOfTheServer() {
+        runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.SERVER) } }
+        val vm = SourcesViewModel(SourceRepository(db), FeedFinder(FakeHttp()), ttrss, settings = store) {}
+        shoot("06f-sources-sign-in", ready = { vm.needsSignIn.value && vm.rows.value != null }) { SourcesScreen(vm) }
     }
 
     @Test

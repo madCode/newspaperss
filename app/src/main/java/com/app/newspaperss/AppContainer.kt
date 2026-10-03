@@ -12,6 +12,7 @@ import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.ReadingListTitles
 import com.app.newspaperss.data.SecretCipher
+import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssAccountStore
 import com.app.newspaperss.data.TtrssRepository
@@ -70,4 +71,7 @@ class AppContainer(
     private val folderDelivery = FolderDelivery(context.contentResolver)
     val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier)
     val notesSaver = NotesSaver(settings, editions, editionNotes, folderDelivery, notifier)
+
+    /** See [SettingsStore.settleFeedsFrom]: a tt-rss source from before the choice means the server setup. */
+    suspend fun settleFeedsFrom() = settings.settleFeedsFrom { db.sources().ofKind(SourceKind.TTRSS).isNotEmpty() }
 }

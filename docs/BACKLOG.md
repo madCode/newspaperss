@@ -148,6 +148,8 @@ source among many. A feed the reader's server already follows would come from th
 there, read state kept there, and the same in their other reader apps. Sources the server can't
 handle (saved links, curated lists) stay on the phone.
 - Designed: two setups, server or phone, never mixed, with a build order ([research/server-mode.md](research/server-mode.md)).
+  Step (a), the choice in onboarding and Settings, is built (cycle 83). Next: (b) Sources for a
+  server, (c) adding a site to the server, (d) moving phone feeds there, (e) leaving brings them back.
 - Which servers: tt-rss (done as one source today) and the
   [Google Reader API](https://freshrss.github.io/FreshRSS/en/developers/06_GoogleReader_API.html),
   which [FreshRSS](https://freshrss.org), [Miniflux](https://miniflux.app/docs/google_reader.html),
@@ -271,6 +273,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Server or phone, chosen up front: a question in onboarding, a Settings page for the choice and the tt-rss account, and a "Sign in to your tt-rss" state; step (a) of [research/server-mode](research/server-mode.md) *(you asked)*
 - [x] Your tt-rss feeds on Sources: inset under the tt-rss row, folded until you open them, each with its own page (leave out, article text, cap, its articles); a daily feed list from tt-rss names every feed; article text and cap are per publication, so a tt-rss feed has its own
 - [x] Article text is checked, not assumed: each edition reads the pages of up to 5 long items, one per publication (a feed here, or one feed in tt-rss), which each learn on their own; pictures the feed's copy lacks count for the page
 - [x] Email editions straight to your Kindle: its own address, your mail app opened ready to send *(you asked, #123)*

@@ -11,13 +11,9 @@ import com.app.newspaperss.data.StarBatch
 import com.app.newspaperss.core.plural
 import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
-import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
-import com.app.newspaperss.data.TtrssRepository
 import com.app.newspaperss.data.FeedChoice
 import com.app.newspaperss.ui.settings.SettingsViewModel
-import com.app.newspaperss.core.ttrss.TtrssCategory
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,13 +40,6 @@ data class SourceDetail(
     val paidOnly: PaidOnlyCount = PaidOnlyCount(0, 0),
 )
 
-/** The tt-rss category chooser: loading, the choices, or why they couldn't be loaded. */
-sealed interface CategoryPicker {
-    data object Loading : CategoryPicker
-    data class Choosing(val categories: List<TtrssCategory>) : CategoryPicker
-    data class Failed(val message: String) : CategoryPicker
-}
-
 /**
  * A source's page, or with [key] one of a tt-rss account's feeds: the same settings about the
  * writing, on its [PublicationEntity].
@@ -61,7 +50,6 @@ class SourceDetailViewModel(
     private val repository: SourceRepository,
     private val id: Long,
     defaultMax: Flow<Int>,
-    private val ttrss: TtrssRepository? = null,
     val key: String = PublicationEntity.OWN,
     private val onSourceChanged: () -> Unit = {},
 ) : ViewModel() {
@@ -114,71 +102,11 @@ class SourceDetailViewModel(
         viewModelScope.launch { repository.chooseContentMode(id, key, mode) }
     }
 
-    private val _categories = MutableStateFlow<CategoryPicker?>(null)
-    /** The open tt-rss category chooser, or null when it's closed. */
-    val categories: StateFlow<CategoryPicker?> = _categories.asStateFlow()
-    private var loadingCategories: Job? = null
-
-    fun openCategories() {
-        val repo = ttrss ?: return
-        _categories.value = CategoryPicker.Loading
-        loadingCategories = viewModelScope.launch {
-            _categories.value = when (val result = repo.categories()) {
-                is TtrssRepository.Categories.Loaded -> CategoryPicker.Choosing(result.categories)
-                is TtrssRepository.Categories.Failed -> CategoryPicker.Failed(result.message)
-            }
-        }
-    }
-
-    fun closeCategories() {
-        loadingCategories?.cancel()
-        _categories.value = null
-    }
-
-    /** Null takes unread articles from every feed. */
-    fun chooseCategory(category: TtrssCategory?) {
-        val repo = ttrss ?: return
-        _categories.value = null
-        viewModelScope.launch {
-            repo.chooseCategory(id, category)
-            onSourceChanged()
-        }
-    }
-
-    fun setMarkReadOnServer(markRead: Boolean) {
-        val repo = ttrss ?: return
-        viewModelScope.launch { repo.setMarkRead(id, markRead) }
-    }
-
     /** A tt-rss account's feeds, for leaving some out of the paper. */
     val feeds: StateFlow<List<FeedChoice>> = repository.observeFeeds(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setFeedInPaper(feed: FeedChoice, inPaper: Boolean) {
         viewModelScope.launch { repository.setFeedInPaper(id, feed, inPaper) }
-    }
-
-    private val _startingFresh = MutableStateFlow(false)
-    /** tt-rss is being asked to mark its backlog read. */
-    val startingFresh: StateFlow<Boolean> = _startingFresh.asStateFlow()
-
-    fun startFresh() {
-        val repo = ttrss ?: return
-        if (_startingFresh.value) return
-        _startingFresh.value = true
-        viewModelScope.launch {
-            try {
-                val category = detail.value?.source?.ttrssCategoryTitle
-                val problem = repo.startFresh(id)
-                _notice.value = problem ?: if (category != null) {
-                    "Done. $category has only the last two weeks unread in tt-rss now."
-                } else {
-                    "Done. tt-rss has only the last two weeks unread now."
-                }
-                if (problem == null) onSourceChanged()
-            } finally {
-                _startingFresh.value = false
-            }
-        }
     }
 
     fun setStarred(articleId: Long, starred: Boolean) {
@@ -252,7 +180,7 @@ class SourceDetailViewModel(
     fun remove() {
         val source = detail.value?.source ?: return
         viewModelScope.launch {
-            if (source.kind == SourceKind.TTRSS && ttrss != null) ttrss.forget(source) else repository.remove(source)
+            repository.remove(source)
         }
     }
 }

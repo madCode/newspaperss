@@ -57,6 +57,7 @@ import com.app.newspaperss.ui.onboarding.OnboardingScreen
 import com.app.newspaperss.ui.onboarding.OnboardingViewModel
 import com.app.newspaperss.ui.readinglist.ReadingListScreen
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
+import com.app.newspaperss.ui.settings.FeedsFromViewModel
 import com.app.newspaperss.ui.settings.SettingsPage
 import com.app.newspaperss.ui.settings.SettingsPageScreen
 import com.app.newspaperss.ui.settings.SettingsScreen
@@ -79,6 +80,7 @@ private const val SOURCE = "source/{id}"
 private const val FEED = "source/{id}/feed/{key}"
 private const val LEFT_OUT = "source/{id}/left-out"
 private const val SETTINGS_PAGE = "settings/{page}"
+private val FEEDS_FROM = "settings/${SettingsPage.FEEDS.slug}"
 
 class MainActivity : ComponentActivity() {
     @Volatile private var settingsLoaded = false
@@ -98,14 +100,14 @@ class MainActivity : ComponentActivity() {
                         val context = LocalContext.current.applicationContext
                         val vm = viewModel {
                             OnboardingViewModel(
-                                container.settings, container.sources, container.feedFinder, createSavedStateHandle(),
+                                container.settings, container.sources, container.feedFinder, container.ttrss, createSavedStateHandle(),
                                 savedLinks = container.readingList.observeWaiting(),
                             ) { saved ->
                                 container.appScope.launch { EditionScheduler.reschedule(context, saved) }
                                 EditionWorker.buildNow(context)
                             }
                         }
-                        val sources = viewModel { SourcesViewModel(container.sources, container.feedFinder, container.ttrss) { SyncWorker.syncNow(context) } }
+                        val sources = viewModel { SourcesViewModel(container.sources, container.feedFinder) { SyncWorker.syncNow(context) } }
                         val readingList = viewModel { ReadingListViewModel(container.readingList) }
                         OnboardingScreen(vm, sources, readingList)
                     }
@@ -203,6 +205,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                     onOpenSource = { nav.navigate("source/$it") { launchSingleTop = true } },
                     onOpenFeed = { id, key -> nav.navigate("source/$id/feed/${Uri.encode(key)}") { launchSingleTop = true } },
                     onOpenLeftOut = { nav.navigate("source/$it/left-out") { launchSingleTop = true } },
+                    onSignIn = { nav.navigate(FEEDS_FROM) { launchSingleTop = true } },
                 )
             }
             composable(FEED, arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("key") { type = NavType.StringType })) { entry ->
@@ -210,20 +213,23 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                 val key = entry.arguments?.getString("key").orEmpty()
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel {
-                    SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, container.ttrss, key) { SyncWorker.syncNow(context) }
+                    SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, key) { SyncWorker.syncNow(context) }
                 }
                 SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(FEED, inclusive = true) })
             }
             composable(LEFT_OUT, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, container.ttrss) }
+                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }) }
                 LeftOutScreen(vm, onBack = { nav.navigateUp() }, onOpenFeed = { nav.navigate("source/$id/feed/${Uri.encode(it)}") { launchSingleTop = true } })
             }
             composable(SOURCE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.arguments?.getLong("id") ?: 0L
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, container.ttrss) { SyncWorker.syncNow(context) } }
-                SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) })
+                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }) { SyncWorker.syncNow(context) } }
+                SourceDetailScreen(
+                    vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) },
+                    onOpenAccount = { nav.navigate(FEEDS_FROM) { launchSingleTop = true } },
+                )
             }
             composable(READING_LIST) {
                 val vm = viewModel { ReadingListViewModel(container.readingList) }
@@ -234,7 +240,9 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
             }
             composable(SETTINGS_PAGE, arguments = listOf(navArgument("page") { type = NavType.StringType })) { entry ->
                 val page = SettingsPage.of(entry.arguments?.getString("page")) ?: SettingsPage.EDITION
-                SettingsPageScreen(settingsViewModel(container), page, onBack = { nav.navigateUp() })
+                val context = LocalContext.current.applicationContext
+                val feedsFrom = if (page != SettingsPage.FEEDS) null else viewModel { FeedsFromViewModel(container.settings, container.ttrss) { SyncWorker.syncNow(context) } }
+                SettingsPageScreen(settingsViewModel(container), page, onBack = { nav.navigateUp() }, feedsFrom = feedsFrom)
             }
         }
     }
@@ -243,5 +251,5 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
 @Composable
 private fun settingsViewModel(container: AppContainer): SettingsViewModel {
     val context = LocalContext.current.applicationContext
-    return viewModel { SettingsViewModel(container.settings) { container.appScope.launch { EditionScheduler.reschedule(context, it) } } }
+    return viewModel { SettingsViewModel(container.settings, container.ttrss.observeStatus()) { container.appScope.launch { EditionScheduler.reschedule(context, it) } } }
 }

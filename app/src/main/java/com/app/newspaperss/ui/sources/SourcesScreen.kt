@@ -27,6 +27,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Surface
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
@@ -55,10 +59,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -82,8 +84,11 @@ fun SourcesScreen(
     onOpenSource: (Long) -> Unit = {},
     onOpenFeed: (sourceId: Long, key: String) -> Unit = { _, _ -> },
     onOpenLeftOut: (sourceId: Long) -> Unit = {},
+    /** Opens Settings › Where your feeds come from, to sign in to tt-rss. */
+    onSignIn: () -> Unit = {},
 ) {
     val rows by viewModel.rows.collectAsState()
+    val needsSignIn by viewModel.needsSignIn.collectAsState()
     val feedsShown by viewModel.feedsShown.collectAsState()
     val add by viewModel.add.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -119,9 +124,6 @@ fun SourcesScreen(
                                 text = { Text("Export your sites (OPML)") },
                                 onClick = { menu = false; exportFile.launch("newspapeRSS-sources.opml") },
                             )
-                            if (viewModel.canAddTtrss) {
-                                DropdownMenuItem(text = { Text("Add tt-rss account") }, onClick = { menu = false; viewModel.openTtrss() })
-                            }
                         }
                     }
                 },
@@ -144,10 +146,12 @@ fun SourcesScreen(
         when {
             list == null -> Box(Modifier.fillMaxSize().padding(padding))
             list.isEmpty() -> Column(Modifier.padding(padding)) {
+                if (needsSignIn) SignInBanner(onSignIn)
                 ReadingListRow(onOpenReadingList)
-                EmptySources(Modifier)
+                if (!needsSignIn) EmptySources(Modifier)
             }
             else -> LazyColumn(contentPadding = PaddingValues(bottom = 96.dp), modifier = Modifier.padding(padding)) {
+                if (needsSignIn) item(key = "sign-in") { SignInBanner(onSignIn) }
                 item { ReadingListRow(onOpenReadingList) }
                 list.forEach { row ->
                     item(key = row.source.id) {
@@ -180,106 +184,25 @@ fun SourcesScreen(
     }
     val curatedLists by viewModel.curatedLists.collectAsState()
     AddSourceDialog(add, curatedLists, viewModel)
-    val ttrssForm by viewModel.ttrssForm.collectAsState()
-    ttrssForm?.let { TtrssDialog(it, viewModel) }
 }
 
+/** The server setup with no working account: nothing comes from tt-rss until the reader signs in. */
 @Composable
-internal fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
-    val categories = form.categories
-    if (categories != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::closeTtrss,
-            // A stray tap beside it (easy on e-ink) shouldn't throw the choice away.
-            properties = DialogProperties(dismissOnClickOutside = false),
-            title = { Text("Which articles?") },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text(
-                        "Take unread articles from all your feeds, or from one category. You can change this on the source's page.",
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    Column(Modifier.selectableGroup()) {
-                        TtrssCategoryRow("All your unread articles", form.category == null) { viewModel.pickTtrssCategory(null) }
-                        categories.forEach { category ->
-                            TtrssCategoryRow(category.title, form.category?.id == category.id) { viewModel.pickTtrssCategory(category) }
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = viewModel::finishTtrss, enabled = !form.testing) { Text("Add") } },
-            dismissButton = { TextButton(onClick = viewModel::closeTtrss) { Text("Cancel") } },
-        )
-        return
-    }
-    AlertDialog(
-        onDismissRequest = viewModel::closeTtrss,
-        title = { Text("Add tt-rss account") },
-        text = {
-            Column {
-                Text(
-                    "If you run Tiny Tiny RSS, newspapeRSS can make editions from your unread articles and mark them read there once an edition is delivered.",
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-                OutlinedTextField(
-                    value = form.address,
-                    onValueChange = { viewModel.editTtrss(form.copy(address = it)) },
-                    label = { Text("Address") },
-                    placeholder = { Text("rss.example.com/tt-rss") },
-                    singleLine = true,
-                    enabled = !form.testing,
-                    supportingText = if (form.address.trim().startsWith("http://", ignoreCase = true)) {
-                        { Text("This address isn't encrypted: your password would be sent in the clear. Use https:// if your server supports it.") }
-                    } else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = form.user,
-                    onValueChange = { viewModel.editTtrss(form.copy(user = it)) },
-                    label = { Text("Username") },
-                    singleLine = true,
-                    enabled = !form.testing,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = form.password,
-                    onValueChange = { viewModel.editTtrss(form.copy(password = it)) },
-                    label = { Text("Password") },
-                    singleLine = true,
-                    enabled = !form.testing,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = { viewModel.connectTtrss() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                when {
-                    form.testing -> Text("Signing in…", modifier = Modifier.padding(top = 12.dp))
-                    form.error != null -> Text(
-                        form.error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = viewModel::connectTtrss, enabled = form.address.isNotBlank() && !form.testing) { Text("Test and add") }
-        },
-        dismissButton = { TextButton(onClick = viewModel::closeTtrss) { Text("Cancel") } },
-    )
-}
-
-@Composable
-private fun TtrssCategoryRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun SignInBanner(onSignIn: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(label, modifier = Modifier.padding(start = 12.dp))
+        Column(Modifier.padding(16.dp)) {
+            Text("Sign in to your tt-rss", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+            Text(
+                "Your sites come from your tt-rss, and newspapeRSS isn't signed in to it. Until it is, your paper has only what's on this phone.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            )
+            Button(onClick = onSignIn) { Text("Sign in") }
+        }
     }
 }
 

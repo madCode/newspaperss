@@ -14,6 +14,18 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 83: server or phone, chosen up front
+- **From you:** build step (a) of the server-or-phone design: the setup is an explicit choice, in onboarding and in Settings.
+- **Shipped:** onboarding asks "Where do your sites come from?" after "Where do you read?". This phone leads to the sources step, without Connect tt-rss; My own RSS server leads to sign-in on the step itself, then "Found 58 feeds in 7 categories", then the reading list and curated lists. "Step N of M" follows the path (4 or 5). Going back and choosing this phone signs out. Settings has a new page, Where your feeds come from, after E-reader & delivery: the choice, and with tt-rss the account's settings (Articles from, read sync, Start fresh, Sign in again), moved off the tt-rss source's page, which links there. Leaving tt-rss says what happens first, including that its feeds don't come along yet. With a server but no working account, Sources and Settings say "Sign in to your tt-rss". "Add tt-rss account" is gone from the Sources menu. No database change: the choice is a setting.
+- **Review caught:** going back to the phone while a sign-in was still running, or leaving Settings mid sign-in, could leave a tt-rss account in the phone setup with no way to remove it; Back waits now, and saving the account and the choice can't be cut in half. Sites added on the phone path stayed when the reader went back and picked the server; they're removed, and the step says so first. Choosing this phone with no account left a stray saved login. Leaving the server could be cut short by pressing Back. Left: switching from phone to server in Settings keeps the phone feeds, as designed until step (d) moves them; a DataStore write failing at the fork isn't caught, as elsewhere in Settings.
+- **Decided for you:**
+  - The choice is explicit: asked in onboarding, changed in Settings, and never guessed again once set.
+  - Someone who added tt-rss before the choice existed lands in the server setup; anyone else on this phone.
+  - The reading list and curated lists stay on the phone in both setups.
+  - No "fetch it from the phone instead" exception yet.
+  - With a server, onboarding doesn't offer the starter packs, and sites added on the phone path before switching to the server are removed.
+  - Onboarding doesn't ask for a category: the paper takes from all of tt-rss, and Settings narrows it.
+
 ### Cycle 82: skipping paid posts, per feed
 - **From you:** paid posts are a habit of the writer, not of how the articles arrive, so the switch belongs to the publication.
 - **Shipped:** "Skip paid posts with nothing free" moves from the source to the publication: a feed's page and a curated list's page keep it, each tt-rss feed has its own on its page, and the tt-rss account's page has none. Its count of skipped posts is per publication too. A tt-rss account that had it on carries it to every feed already seen in its articles and to its left-out feeds; a feed first seen later starts with it off. Database version 7.

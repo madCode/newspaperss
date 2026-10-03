@@ -18,11 +18,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import java.time.Instant
 import com.app.newspaperss.data.TtrssRepository
-import com.app.newspaperss.core.ttrss.TtrssCategory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import com.app.newspaperss.data.FeedChoice
+import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -68,21 +68,8 @@ sealed interface AddState {
     data class Choosing(val input: String, val feeds: List<FoundFeed>) : AddState
 }
 
-/** The "Add tt-rss account" form. */
-data class TtrssForm(
-    val address: String = "",
-    val user: String = "",
-    val password: String = "",
-    val testing: Boolean = false,
-    val error: String? = null,
-    /** Set once the login is checked: its categories, to choose from before the account is added. */
-    val categories: List<TtrssCategory>? = null,
-    /** The chosen category; null is all unread articles. */
-    val category: TtrssCategory? = null,
-)
-
 /**
- * @param ttrss null hides the tt-rss account option.
+ * @param ttrss with [settings], says when the server setup has no working account.
  */
 class SourcesViewModel(
     private val repository: SourceRepository,
@@ -189,60 +176,14 @@ class SourcesViewModel(
         }
     }
 
-    val canAddTtrss get() = ttrss != null
-
-    private val _ttrssForm = MutableStateFlow<TtrssForm?>(null)
-    /** The open tt-rss form, or null when it's closed. */
-    val ttrssForm: StateFlow<TtrssForm?> = _ttrssForm.asStateFlow()
-    private var connecting: Job? = null
-
-    fun openTtrss() { _ttrssForm.value = TtrssForm() }
-
-    fun closeTtrss() {
-        connecting?.cancel()
-        _ttrssForm.value = null
-    }
-
-    fun editTtrss(form: TtrssForm) {
-        if (_ttrssForm.value?.testing == false) _ttrssForm.value = form.copy(error = null)
-    }
-
-    fun connectTtrss() {
-        val form = _ttrssForm.value?.takeIf { !it.testing && it.address.isNotBlank() } ?: return
-        val repo = ttrss ?: return
-        _ttrssForm.value = form.copy(testing = true, error = null)
-        connecting = viewModelScope.launch {
-            when (val check = repo.check(form.address, form.user, form.password)) {
-                is TtrssRepository.Check.Failed -> _ttrssForm.value = form.copy(error = check.message)
-                // Nothing's saved until the reader has chosen, so no sync can take articles from
-                // the wrong place first. With only Uncategorized there's nothing to choose.
-                is TtrssRepository.Check.Passed ->
-                    if (check.categories.none { it.id != 0 }) add(form, category = null)
-                    else _ttrssForm.value = form.copy(testing = false, categories = check.categories)
-            }
-        }
-    }
-
-    fun pickTtrssCategory(category: TtrssCategory?) {
-        _ttrssForm.value = _ttrssForm.value?.takeIf { it.categories != null && !it.testing }?.copy(category = category)
-    }
-
-    fun finishTtrss() {
-        val form = _ttrssForm.value?.takeIf { it.categories != null && !it.testing } ?: return
-        _ttrssForm.value = form.copy(testing = true)
-        connecting = viewModelScope.launch { add(form, form.category) }
-    }
-
-    private suspend fun add(form: TtrssForm, category: TtrssCategory?) {
-        val repo = ttrss ?: return
-        val error = repo.add(form.address, form.user, form.password, category)
-        if (error == null) {
-            _ttrssForm.value = null
-            onSourcesChanged()
-        } else {
-            _ttrssForm.value = form.copy(testing = false, categories = null, category = null, error = error)
-        }
-    }
+    /**
+     * The server setup without a working account to take articles from: never signed in,
+     * signed out, or its password unreadable. Sources says so at the top.
+     */
+    val needsSignIn: StateFlow<Boolean> =
+        (if (settings == null || ttrss == null) flowOf(false) else combine(settings.settings, ttrss.observeStatus()) { s, status ->
+            s.feedsFrom(hasServer = status.source != null) == FeedsFrom.SERVER && !status.signedIn
+        }).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun refresh() = onSourcesChanged()
 

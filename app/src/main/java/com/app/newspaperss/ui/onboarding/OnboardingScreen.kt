@@ -21,7 +21,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -64,7 +66,9 @@ import com.app.newspaperss.ui.components.CheckChip
 import com.app.newspaperss.ui.components.KindleEmailFields
 import com.app.newspaperss.ui.readinglist.ReadingListViewModel
 import com.app.newspaperss.ui.sources.SourcesViewModel
-import com.app.newspaperss.ui.sources.TtrssDialog
+import com.app.newspaperss.core.lists.CuratedLists
+import com.app.newspaperss.settings.FeedsFrom
+import com.app.newspaperss.ui.ttrss.TtrssSignInFields
 import com.app.newspaperss.ui.today.Masthead
 import java.time.LocalDate
 import java.time.LocalTime
@@ -73,7 +77,7 @@ import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
 @Composable
-/** @param sources offers importing from another reader: an OPML file or a tt-rss account. */
+/** @param sources offers importing an OPML file from another reader. */
 fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? = null, readingList: ReadingListViewModel? = null) {
     val s by viewModel.state.collectAsState()
     BackHandler(enabled = s.step != Step.WELCOME) { viewModel.back() }
@@ -87,28 +91,34 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             if (s.step != Step.WELCOME) {
+                // Counted along the path chosen: the server's has one step more.
+                val of = s.path.size
                 LinearProgressIndicator(
-                    progress = { s.step.ordinal / (Step.entries.size - 1f) },
+                    progress = { s.stepNumber / of.toFloat() },
                     // TalkBack would read "33 percent"; the welcome screen isn't a step.
-                    modifier = Modifier.fillMaxWidth().semantics { stateDescription = "Step ${s.step.ordinal} of ${Step.entries.size - 1}" },
+                    modifier = Modifier.fillMaxWidth().semantics { stateDescription = "Step ${s.stepNumber} of $of" },
                 )
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp)) {
                 when (s.step) {
                     Step.WELCOME -> Welcome()
                     Step.DEVICE -> DeviceStep(s, viewModel)
+                    Step.FEEDS_FROM -> FeedsFromStep(s, viewModel)
                     Step.SOURCES -> SourcesStep(s, viewModel, sources, readingList)
+                    Step.SIGN_IN -> SignInStep(s, viewModel)
+                    Step.EXTRAS -> ExtrasStep(s, viewModel, readingList)
                     Step.SIZE -> SizeStep(s, viewModel)
                 }
             }
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (s.step != Step.WELCOME) TextButton(onClick = viewModel::back) { Text("Back") }
+                if (s.step != Step.WELCOME) TextButton(onClick = viewModel::back, enabled = !s.signIn.testing) { Text("Back") }
                 Spacer(Modifier.weight(1f))
-                when (s.step) {
-                    Step.WELCOME -> Button(onClick = viewModel::next) { Text("Get started") }
-                    Step.SIZE -> Button(onClick = finish, enabled = s.canContinue) {
+                when {
+                    s.step == Step.WELCOME -> Button(onClick = viewModel::next) { Text("Get started") }
+                    s.step == Step.SIZE -> Button(onClick = finish, enabled = s.canContinue) {
                         Text(if (s.finishing) "Setting up…" else "Make my first edition")
                     }
+                    s.step == Step.SIGN_IN && !s.signedIn -> Button(onClick = viewModel::signIn, enabled = s.signIn.canSubmit) { Text("Sign in") }
                     else -> Button(onClick = viewModel::next, enabled = s.canContinue) { Text("Next") }
                 }
             }
@@ -268,7 +278,6 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel, sources: So
 private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sources: SourcesViewModel) {
     val context = LocalContext.current
     val message by sources.message.collectAsState()
-    val ttrssForm by sources.ttrssForm.collectAsState()
     val rows by sources.rows.collectAsState()
     val count = rows?.size
     LaunchedEffect(count) {
@@ -284,13 +293,11 @@ private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sourc
     Text("Already use a feed reader?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Import an OPML file") }
-        if (sources.canAddTtrss) OutlinedButton(onClick = sources::openTtrss) { Text("Connect tt-rss") }
     }
     val status = message ?: if (added > 0) "${plural(added, "source")} added. Pick more below, or go on; you can remove any later in Sources." else null
     status?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp).semantics { liveRegion = LiveRegionMode.Polite })
     }
-    ttrssForm?.let { TtrssDialog(it, sources) }
 }
 
 /** For someone leaving Pocket or Instapaper: their saved links can be the whole paper. */
@@ -318,6 +325,114 @@ private fun FeedCheck(title: String, checked: Boolean, onToggle: () -> Unit) {
     ) {
         Checkbox(checked = checked, onCheckedChange = null)
         Text(title, Modifier.padding(start = 8.dp))
+    }
+}
+
+@Composable
+private fun FeedsFromStep(s: OnboardingState, vm: OnboardingViewModel) {
+    Title("Where do your sites come from?")
+    // A radio group then Next, not cards that act on tap: TalkBack users hear both first, and a
+    // mis-tap on e-ink costs nothing.
+    Column(Modifier.selectableGroup()) {
+        SetupChoice(s.feedsFrom == FeedsFrom.PHONE, "This phone finds and fetches them", "Most people. Nothing to set up.") {
+            vm.chooseFeedsFrom(FeedsFrom.PHONE)
+        }
+        SetupChoice(s.feedsFrom == FeedsFrom.SERVER, "My own RSS server", "tt-rss today. FreshRSS and Miniflux are coming.") {
+            vm.chooseFeedsFrom(FeedsFrom.SERVER)
+        }
+    }
+    Text(
+        "Not sure? It's this phone. You can change this later in Settings.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 12.dp),
+    )
+    if (s.server && s.phoneFeeds > 0) {
+        Text(
+            "The ${plural(s.phoneFeeds, "site")} you added on this phone will be removed: with a server, your sites come from it.",
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        )
+    }
+    if (s.forking && s.signedIn && !s.server) Text("Signing out of tt-rss…", Modifier.padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite })
+}
+
+/** On e-ink a filled background turns grey, so the chosen one has a thicker border too. */
+@Composable
+private fun SetupChoice(selected: Boolean, title: String, detail: String, onClick: () -> Unit) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+    ) {
+        Row(
+            Modifier.selectable(selected, role = Role.RadioButton, onClick = onClick).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(selected = selected, onClick = null)
+            Column(Modifier.padding(start = 12.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** The tt-rss sign-in, then, once signed in, what's in the account. */
+@Composable
+private fun SignInStep(s: OnboardingState, vm: OnboardingViewModel) {
+    if (s.signedIn) {
+        Title("Signed in")
+        val form = s.signIn
+        val who = listOfNotNull(form.address.trim().takeIf { it.isNotEmpty() }, form.user.trim().takeIf { it.isNotEmpty() }?.let { "signed in as $it" })
+        if (who.isNotEmpty()) Text(who.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val found = s.serverFound
+        Text(
+            when {
+                found == null -> "Your tt-rss is connected."
+                found.categories > 1 -> "Found ${plural(found.feeds, "feed")} in ${found.categories} categories."
+                else -> "Found ${plural(found.feeds, "feed")}."
+            },
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(top = 16.dp),
+        )
+        Text(
+            "Your paper takes from all of them. To narrow it to one category, or leave feeds out, use Sources or Settings later.",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        return
+    }
+    Title("Sign in to your tt-rss")
+    Text("FreshRSS and Miniflux are coming.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
+    TtrssSignInFields(s.signIn, vm::editSignIn, vm::signIn)
+    TextButton(onClick = vm::usePhoneInstead, enabled = !s.signIn.testing, contentPadding = PaddingValues(end = 12.dp)) { Text("Use this phone instead") }
+}
+
+/** What stays on the phone with a server: the reading list and curated lists. */
+@Composable
+private fun ExtrasStep(s: OnboardingState, vm: OnboardingViewModel, readingList: ReadingListViewModel?) {
+    Title("Also on this phone")
+    Text("These stay on the phone, whatever your server does.", style = MaterialTheme.typography.bodyMedium)
+    Text("Your reading list", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
+    Text(
+        "Links you share from any app: tap Share and choose \u201cRead in newspapeRSS\u201d. Always on.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (readingList != null) SavedLinks(s.savedLinks, readingList)
+    Text("Curated lists", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
+    CuratedLists.all.forEach { list ->
+        Row(
+            Modifier.fillMaxWidth().toggleable(list.id in s.lists, role = Role.Checkbox) { vm.toggleList(list.id) }.padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(checked = list.id in s.lists, onCheckedChange = null)
+            Column(Modifier.padding(start = 8.dp)) {
+                Text(list.title)
+                Text(list.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 

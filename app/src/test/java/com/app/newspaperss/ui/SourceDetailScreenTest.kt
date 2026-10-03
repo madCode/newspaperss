@@ -65,13 +65,6 @@ import com.app.newspaperss.ui.sources.looksRead
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import com.app.newspaperss.data.SourceKind
-import com.app.newspaperss.data.TtrssAccountStore
-import com.app.newspaperss.data.TtrssRepository
-import com.app.newspaperss.testutil.FakeHttp
-import com.app.newspaperss.testutil.FakeTtrss
-import com.app.newspaperss.testutil.testCipher
 import org.junit.rules.TemporaryFolder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -196,32 +189,18 @@ class SourceDetailScreenTest {
     }
 
     @Test
-    fun aTtrssAccountCanTakeOneCategoryAndLeaveArticlesUnread() {
-        val http = FakeHttp()
-        val server = FakeTtrss(http)
-        server.categories[5] = "Tech"
-        val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
-        val ttrss = TtrssRepository(db, http, accounts, repo)
-        val id = runBlocking {
-            assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
-            db.sources().ofKind(SourceKind.TTRSS).single().id
-        }
-        var syncs = 0
-        val vm = SourceDetailViewModel(repo, id, flowOf(1), ttrss) { syncs++ }
-        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
-        idleUntil { visible("All your unread articles") }
-        compose.onNodeWithText("from this site", substring = true).assertDoesNotExist()
+    fun aTtrssAccountsPageLeavesItsAccountSettingsToSettings() {
+        val id = runBlocking { repo.addTtrss("https://rss.example/api/") }
+        var opened = false
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        compose.setContent { SourceDetailScreen(vm, onBack = {}, onOpenAccount = { opened = true }) }
+        idleUntil { visible("Your tt-rss account") }
+        // Removing it here would leave the server setup with no account and no warning.
+        compose.onNodeWithContentDescription("More options").assertDoesNotExist()
+        compose.onNodeWithText("Pause").assertExists()
 
-        compose.onNodeWithText("Change").performClick()
-        idleUntil { compose.waitForIdle(); visible("Tech") }
-        compose.onNodeWithText("Special").assertDoesNotExist()
-        compose.onNodeWithText("Tech").performClick()
-        idleUntil { compose.waitForIdle(); syncs == 1 && visible("Tech") }
-        assertEquals(5, runBlocking { db.sources().byId(id)!!.ttrssCategoryId })
-
-        compose.onNodeWithText("Sync read status with tt-rss").performClick()
-        idleUntil { compose.waitForIdle(); visible("keep their own read and unread") }
-        assertEquals(false, runBlocking { db.sources().byId(id)!!.markReadOnServer })
+        compose.onNodeWithText("Your tt-rss account").performClick()
+        assertTrue(opened)
     }
 
     @Test
@@ -249,35 +228,6 @@ class SourceDetailScreenTest {
         idleUntil { compose.waitForIdle(); visible("All 2") }
         compose.onNodeWithText("Done").performClick()
         assertTrue(runBlocking { db.sources().allLeftOut().isEmpty() })
-    }
-
-    @Test
-    fun startingFreshAsksFirstThenCatchesUpTtrss() {
-        val http = FakeHttp()
-        val server = FakeTtrss(http)
-        val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
-        val ttrss = TtrssRepository(db, http, accounts, repo)
-        val id = runBlocking {
-            assertNull(ttrss.connect("rss.example.com/tt-rss", "reader", "secret"))
-            db.sources().ofKind(SourceKind.TTRSS).single().id
-        }
-        var syncs = 0
-        val vm = SourceDetailViewModel(repo, id, flowOf(1), ttrss) { syncs++ }
-        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
-        idleUntil { visible("Back after a break?") }
-
-        compose.onNodeWithText("Start fresh").performClick()
-        idleUntil { compose.waitForIdle(); visible("newspapeRSS can't undo this") }
-        compose.onNodeWithText("Cancel").performClick()
-        compose.waitForIdle()
-        assertTrue("backing out asks nothing of tt-rss", server.caughtUp.isEmpty())
-
-        compose.onNodeWithText("Start fresh").performClick()
-        idleUntil { compose.waitForIdle(); visible("newspapeRSS can't undo this") }
-        compose.onNodeWithText("Mark as read").performClick()
-        idleUntil { compose.waitForIdle(); visible("only the last two weeks unread") }
-        assertEquals(1, server.caughtUp.size)
-        assertEquals("the next sync takes what's still unread", 1, syncs)
     }
 
     /**

@@ -1,6 +1,10 @@
 package com.app.newspaperss.ui.settings
 
 import com.app.newspaperss.core.edition.Ordering
+import com.app.newspaperss.core.ttrss.TtrssException
+import com.app.newspaperss.data.SourceRepository
+import com.app.newspaperss.data.TtrssStatus
+import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
@@ -22,6 +26,7 @@ enum class SettingsPage(val slug: String, val title: String) {
     SCHEDULE("schedule", "Schedule"),
     // One page: the e-reader decides which delivery choices are offered.
     DELIVERY("delivery", "E-reader & delivery"),
+    FEEDS("feeds", "Where your feeds come from"),
     NOTES("notes", "Reading notes"),
     ;
 
@@ -80,6 +85,25 @@ object SettingsSummary {
             else -> Summary("Saved to $name", "Can't reach $name.")
         }
     }
+
+    fun feedsFrom(choice: FeedsFrom, status: TtrssStatus): Summary {
+        if (choice == FeedsFrom.PHONE) return Summary("This phone")
+        val source = status.source ?: return Summary("Your tt-rss", "Not signed in. Tap to sign in.")
+        val text = "Your tt-rss · ${SourceRepository.hostOf(source.url)}"
+        return Summary(text, if (loginProblem(status) != null) "Can't sign in to tt-rss. Tap to sign in again." else null)
+    }
+
+    /**
+     * Why the account's login doesn't work, or null: no login this phone can use for it (its
+     * password's key was lost, or the sign-in never finished), or tt-rss refusing it at the last sync.
+     */
+    fun loginProblem(status: TtrssStatus): String? {
+        val source = status.source ?: return null
+        if (!status.usable) return "Can't sign in: this phone has no working login for it. Sign in again."
+        return source.lastError?.takeIf { it in LOGIN_REFUSED }?.let { "Can't sign in: $it" }
+    }
+
+    private val LOGIN_REFUSED = setOf(TtrssException.LoginFailed().message, TtrssException.ApiDisabled().message)
 
     // The labels in the picker explain themselves; a summary line has room for a name.
     private fun shortName(device: Device) = when (device) {

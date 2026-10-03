@@ -158,7 +158,7 @@ class TtrssFeedsTest {
         runBlocking { repo.markPaidOnly(db.articles().allForSource(account).first().id, skip = false) }
         val vm = SourceDetailViewModel(repo, account, flowOf(1))
         compose.setContent { SourceDetailScreen(vm, onBack = {}) }
-        idleUntil { compose.waitForIdle(); visible("Sync read status") }
+        idleUntil { compose.waitForIdle(); visible("Your tt-rss account") }
         assertFalse(visible("Skip paid posts"))
     }
 

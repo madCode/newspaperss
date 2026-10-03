@@ -770,7 +770,7 @@ class TtrssSyncTest {
         assertTrue(server.markedRead.isEmpty())
         assertEquals("already known, so not offered again", 0, sync.syncAll().newArticles)
 
-        ttrss.forget(db.sources().byId(source.id)!!)
+        ttrss.signOut()
         connect()
         assertEquals("nor after connecting again", 0, sync.syncAll().newArticles)
     }

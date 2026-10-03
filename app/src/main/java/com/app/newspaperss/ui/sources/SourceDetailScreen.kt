@@ -61,21 +61,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.ui.semantics.Role
 import com.app.newspaperss.core.plural
-import com.app.newspaperss.core.ttrss.TtrssCategory
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -125,8 +122,10 @@ import java.util.Locale
 /**
  * @param onGone leaves the screen once the source is removed, from here or elsewhere. It runs
  *   after the removal finishes, when the reader may already have left, so it mustn't just go up.
+ * @param onOpenAccount opens Settings › Where your feeds come from, which has a tt-rss
+ *   account's own settings.
  */
-fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onGone: () -> Unit = onBack) {
+fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onGone: () -> Unit = onBack, onOpenAccount: () -> Unit = {}) {
     val detail by viewModel.detail.collectAsState()
     val source = detail?.source
     val locale = LocalConfiguration.current.locales[0]
@@ -191,10 +190,10 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                 TopAppBar(
                     title = { Text(if (viewModel.isFeed) feedTitle else source?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-                    // Removing is rare and destructive: in the menu, as on the Sources list and an
-                    // edition's page, not beside Pause.
+                    // Removing is rare and destructive: in the menu, as on an edition's page, not
+                    // beside Pause. A tt-rss account is left from Settings, as the server setup.
                     actions = {
-                        if (source != null && !viewModel.isFeed) {
+                        if (source != null && !viewModel.isFeed && source.kind != SourceKind.TTRSS) {
                             var menu by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
@@ -244,11 +243,9 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                             if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(publication)}") }
                         }
                         if (source.kind == SourceKind.TTRSS) {
-                            TtrssOptions(source, viewModel::openCategories, viewModel::setMarkReadOnServer)
                             val feeds by viewModel.feeds.collectAsState()
                             FeedsRow(feeds, viewModel::setFeedInPaper)
-                            val startingFresh by viewModel.startingFresh.collectAsState()
-                            StartFresh(source, startingFresh, viewModel::startFresh)
+                            AccountLink(onOpenAccount)
                         } else {
                             cap()
                         }
@@ -322,8 +319,6 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     if (leavingOut) {
         LeaveOutDialog(feedTitle, onConfirm = { leavingOut = false; viewModel.setInPaper(knownTitle, false) }, onDismiss = { leavingOut = false })
     }
-    val categories by viewModel.categories.collectAsState()
-    categories?.let { CategoryDialog(it, source?.ttrssCategoryId, viewModel::chooseCategory, viewModel::closeCategories) }
     if (removing && source != null) {
         RemoveSourceDialog(source, onConfirm = { removing = false; viewModel.remove() }, onDismiss = { removing = false })
     }
@@ -369,35 +364,22 @@ private fun Health(source: SourceEntity, learned: PublicationEntity?, lastNew: I
     }
 }
 
+/** The account's own settings live with the setup choice; this page says where. */
 @Composable
-private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onMarkRead: (Boolean) -> Unit) {
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Articles from")
-            Text(source.ttrssCategoryTitle ?: "All your unread articles", style = MaterialTheme.typography.bodySmall, color = muted)
-        }
-        TextButton(onClick = onChangeCategory) { Text("Change") }
-    }
+private fun AccountLink(onOpen: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth()
-            .toggleable(value = source.markReadOnServer, role = Role.Switch, onValueChange = onMarkRead)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onOpen).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Sync read status with tt-rss")
+            Text("Your tt-rss account")
             Text(
-                if (source.markReadOnServer) {
-                    "What you read or mark unread here or in tt-rss shows in both. Delivered articles count as read."
-                } else {
-                    "tt-rss and this app keep their own read and unread"
-                },
+                "Articles from, read status, signing in: in Settings › Where your feeds come from",
                 style = MaterialTheme.typography.bodySmall,
-                color = muted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = source.markReadOnServer, onCheckedChange = null)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -468,68 +450,6 @@ private fun FeedsRow(feeds: List<FeedChoice>, onChange: (FeedChoice, Boolean) ->
             },
             confirmButton = { TextButton(onClick = { choosing = false }) { Text("Done") } },
         )
-    }
-}
-
-@Composable
-private fun StartFresh(source: SourceEntity, working: Boolean, onConfirm: () -> Unit) {
-    var confirming by rememberSaveable { mutableStateOf(false) }
-    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Back after a break?")
-            Text(
-                "Mark everything older than two weeks as read in tt-rss, and start from what's recent.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        TextButton(onClick = { confirming = true }, enabled = !working) { Text(if (working) "Marking…" else "Start fresh") }
-    }
-    if (confirming) {
-        val scope = source.ttrssCategoryTitle?.let { " in $it" } ?: ""
-        AlertDialog(
-            onDismissRequest = { confirming = false },
-            title = { Text("Start fresh?") },
-            text = {
-                Text(
-                    "Every unread article that reached tt-rss more than two weeks ago$scope will be marked read there. " +
-                        "Starred ones too: they stay starred, but read. newspapeRSS can't undo this.",
-                )
-            },
-            confirmButton = { TextButton(onClick = { confirming = false; onConfirm() }) { Text("Mark as read") } },
-            dismissButton = { TextButton(onClick = { confirming = false }) { Text("Cancel") } },
-        )
-    }
-}
-
-@Composable
-private fun CategoryDialog(picker: CategoryPicker, current: Int?, onChoose: (TtrssCategory?) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Articles from") },
-        text = {
-            when (picker) {
-                CategoryPicker.Loading -> Text("Asking tt-rss for your categories…")
-                is CategoryPicker.Failed -> Text(picker.message, color = MaterialTheme.colorScheme.error)
-                is CategoryPicker.Choosing -> Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
-                    CategoryChoice("All your unread articles", current == null) { onChoose(null) }
-                    picker.categories.forEach { category -> CategoryChoice(category.title, current == category.id) { onChoose(category) } }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-@Composable
-private fun CategoryChoice(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(label, modifier = Modifier.padding(start = 12.dp))
     }
 }
 

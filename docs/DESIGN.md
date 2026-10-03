@@ -304,11 +304,17 @@ phone restarts.
 - **Titles for curated picks.** A list that gives only a teaser (Arts & Letters
   Daily) has each pick's title looked up from its page in the background, as
   saved links do, retried for two days; a bot-check page's title is never taken.
+- **Two setups, never mixed.** Your sites come from this phone, or from
+  your own RSS server (tt-rss). The reading list and curated lists stay on
+  the phone in both. It's chosen in onboarding and changed in Settings;
+  someone who added tt-rss before the choice existed lands in the server
+  setup, anyone else on this phone.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
   read on the server once delivered (and unread again if the edition is
-  marked as not sent). One category can be taken instead of all unread;
-  adding the account asks which, before the first sync. tt-rss's own stars
+  marked as not sent). One category can be taken instead of all unread,
+  chosen in Settings › Where your feeds come from; a new account starts
+  with all. tt-rss's own stars
   aren't synced: there a star usually means "keep this", not "for tomorrow".
   - **Sync read status with tt-rss** (on by default) keeps read and unread
     the same in both, the newest change winning. tt-rss doesn't say when a
@@ -338,7 +344,8 @@ phone restarts.
     is the same choice as a checklist. Signing in as another user clears
     every feed's settings: feed ids belong to each tt-rss user. The same
     user signing in again keeps them.
-  - **Start fresh** ("Back after a break?" on the source's page), after a
+  - **Start fresh** ("Back after a break?" in Settings › Where your feeds
+    come from), after a
     confirmation, marks everything that reached tt-rss more than two weeks
     ago read there (in the source's category, if it has one), starred ones
     included. Articles already waiting in the app aren't touched by it;
@@ -362,14 +369,30 @@ phone restarts.
    or kindle.cn gets a warning), the mail app to send with, and a reminder
    to approve the sending address on Amazon. **Use the Kindle app
    instead** shares to the Kindle app.
-3. **Pick your sources:** starter packs of well-known public feeds; paste
-   any website (the app finds its feed); import an OPML file (its folders
-   are ignored: the paper has no sections); connect a
-   tt-rss account; or import saved links from Pocket or Instapaper, which
-   alone are enough to start.
-4. **How much, and when?** A 10–90 minute slider, "A new edition every
+3. **Where do your sites come from?** A radio group, then Next: **This
+   phone finds and fetches them** ("Most people. Nothing to set up.") or
+   **My own RSS server** (tt-rss today), with "Not sure? It's this phone."
+   The chosen one has a thicker border, which shows on e-ink. The choice is
+   saved on Next. "Step N of M" follows the path: 4 steps with this phone,
+   5 with a server.
+4. **With this phone, pick your sources:** starter packs of well-known
+   public feeds; paste any website (the app finds its feed); import an OPML
+   file (its folders are ignored: the paper has no sections); or import
+   saved links from Pocket or Instapaper, which alone are enough to start.
+5. **With a server, sign in**, then see what's there: the address,
+   username and password on the step itself, one message per cause when it
+   fails (API off, wrong password, can't reach it), with what was typed
+   kept, and **Use this phone instead**. Signed in, the same step says
+   "Found 58 feeds in 7 categories"; the paper takes from all of them, and
+   one category can be chosen later in Settings. Then **Also on this
+   phone:** the reading list (with Pocket and Instapaper import) and curated
+   lists. No starter packs. Going back to the question and choosing this
+   phone signs out, so no half-made account is left; going back from this
+   phone's sources and choosing the server removes the sites added there,
+   and the step says so first. Back waits while signing in.
+6. **How much, and when?** A 10–90 minute slider, "A new edition every
    day", and a "Ready by" time.
-5. **The first edition** builds right away, with its progress on Today.
+7. **The first edition** builds right away, with its progress on Today.
 
 ## 9. Screens
 
@@ -418,6 +441,13 @@ phone restarts.
     the account's page.
   - A feed added here that's also in your tt-rss says "Also in your tt-rss",
     matched by address.
+  - The tt-rss account's page has its articles, **Feeds in your paper** and
+    **Pause**, and a row that opens Settings › Where your feeds come from,
+    which has the account's own settings. It has no **Remove source**:
+    leaving tt-rss is done there.
+  - In the server setup with no working account (never signed in, or a
+    password the phone can no longer read), the top of Sources says **Sign
+    in to your tt-rss**, with a button to that Settings page.
   Each row is a status mark (`●` waiting, `✓` delivered, `○` read or not
   used), the title, a details line and a trailing **☆**; tapping the row
   opens the original. Two toggles, one per question:
@@ -448,7 +478,8 @@ phone restarts.
   - Nothing moves: a marked-read row stays in place with `○`, and
     entering or leaving selection doesn't shift the list, so e-ink
     doesn't redraw it.
-  Add a source, import or export OPML, or add a tt-rss account.
+  Add a source, or import or export OPML. Getting or leaving a server is
+  in Settings.
 - **Reading list:** links you shared into the app, each with its title,
   site and reading time (looked up in the background). They go first in
   the next edition. Import and export as a Markdown
@@ -478,6 +509,19 @@ phone restarts.
     was revoked, or its app uninstalled) says "Can't reach <name>. Tap to
     choose it again." instead of saving automatically, and tapping picks
     it again; so does the notes folder, which also offers **Turn off**.
+  - **Where your feeds come from** (its row says "This phone" or "Your
+    tt-rss · host"; in red, "Not signed in" or "Can't sign in to tt-rss"):
+    the two setups as radio rows. Picking the other one changes nothing
+    until it's confirmed. **My own RSS server** opens the sign-in, in place
+    of the page (Back returns to it). **This phone** asks first, saying
+    what happens: newspapeRSS signs out of tt-rss and removes it here, with
+    its waiting and starred articles; nothing changes in tt-rss; its feeds
+    don't come along yet (add sites again, or import tt-rss's OPML export).
+    With a server, the page also has the account: its address, who's
+    signed in or why the login fails, when it was last checked, **Sign in
+    again** (the address and username filled in; the same user keeps their
+    category), **Articles from**, **Sync read status with tt-rss** and
+    **Start fresh**.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
     delivered, by share, folder or Open, in the background so a slow cloud folder

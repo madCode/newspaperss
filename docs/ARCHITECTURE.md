@@ -375,6 +375,17 @@ stays as a `DELETED` row to keep its title taken.
 Auto Backup leaves out the EPUBs, the timer state and the tt-rss account
 (`app/src/main/res/xml/backup_rules.xml`).
 
+**Where the feeds come from** is the setting `feedsFrom` (`PHONE` or
+`SERVER`), never guessed after it's set. It's unset only until the app's
+first start after the upgrade that added it: `AppContainer.settleFeedsFrom`
+sets it to `SERVER` if a tt-rss source exists, else `PHONE`; until then
+screens read it the same way (`Settings.feedsFrom(hasServer)`). `SERVER`
+with no working account (no tt-rss source, or a password the phone can't
+read, e.g. after a restore) is a state of its own, `TtrssStatus`, which
+Sources and Settings show as "Sign in to your tt-rss". Leaving the server
+is `TtrssRepository.signOut`: the login and the tt-rss source go, and with
+it, by cascade, its articles.
+
 ## Doing things safely at the same time
 
 - **One build at a time:** the build's unique work name with KEEP.
