@@ -450,9 +450,14 @@ takes `retiring` sources' articles though they're paused, so stars and
 waiting articles still reach the paper. `FeedMoves.tidy`, after each
 periodic sync and each move, deletes them with `SourceDao.deleteSpent`,
 one statement that checks nothing starred, waiting or `IN_EDITION` is
-left. Delivered links are in `delivered_urls`, so tt-rss's copies of them
-aren't delivered again. Leaving the server (`FeedMoves.restore`) unpauses
-the ones still kept and drops a move under way.
+left, and nothing in an edition delivered in the last 14 days, which Mark
+as not sent could give back with its stars. Delivered links are in
+`delivered_urls`, and at the move the feed's links the reader marked read
+are added there too (`ArticleDao.rememberRead`), so tt-rss's copies of
+neither go in the paper. Leaving the server, or signing in as another
+user (`FeedMoves.restore`), unpauses the ones still kept and drops a move
+under way. A worker that keeps failing (three tries) gives what's left
+back to the banner (`FeedMoves.giveUp`).
 
 ## Doing things safely at the same time
 

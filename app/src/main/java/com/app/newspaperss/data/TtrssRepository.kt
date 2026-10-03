@@ -361,6 +361,9 @@ class TtrssRepository(
         return Asked.Answered(answer)
     }
 
+    /** The login saved, whether or not its password can be read. */
+    suspend fun savedLogin(): Login? = accounts.login()?.let { (url, user) -> Login(url, user) }
+
     /** The login the account's source can be used with now, or null. */
     suspend fun login(): Login? = usableAccount()?.let { (account, _) -> Login(account.apiUrl, account.user) }
 

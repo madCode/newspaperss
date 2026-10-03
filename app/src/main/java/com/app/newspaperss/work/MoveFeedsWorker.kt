@@ -23,12 +23,19 @@ class MoveFeedsWorker(context: Context, params: WorkerParameters) : CoroutineWor
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        // A database error, say: the batch is still stored, so later is worth a try.
-        Result.retry()
+        // A database error, say: the batch is still stored, so later is worth a try, a few
+        // times. After that what's left goes back to the banner, rather than "Moving" for good.
+        if (runAttemptCount + 1 < MAX_ATTEMPTS) {
+            Result.retry()
+        } else {
+            (applicationContext as NewspaperssApp).container.feedMoves.giveUp("Something went wrong moving it. Try again.")
+            Result.failure()
+        }
     }
 
     companion object {
         private const val UNIQUE = "move-feeds"
+        internal const val MAX_ATTEMPTS = 3
 
         fun enqueue(context: Context) {
             val request = OneTimeWorkRequestBuilder<MoveFeedsWorker>()

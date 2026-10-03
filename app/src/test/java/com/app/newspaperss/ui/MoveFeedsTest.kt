@@ -229,4 +229,26 @@ class MoveFeedsTest {
         idleUntil { runBlocking { moves.current().running } }
         waitFor("Moving 1 of 1 · Aeon")
     }
+
+    @Test
+    fun signingInAsSomeoneElseGivesBackFeedsMovedIntoTheLastAccount() {
+        signedIn()
+        val aeon = phoneFeed("https://aeon.example/feed", "Aeon")
+        runBlocking {
+            db.articles().insertIgnoring(com.app.newspaperss.data.ArticleEntity(sourceId = aeon, guid = "s", url = "https://aeon.example/s", title = "Starred", starredAt = java.time.Instant.now()))
+            moves.start(listOf(aeon), TtrssCategory(0, "Uncategorized"))
+            moves.run()
+        }
+        assertTrue(runBlocking { db.sources().byId(aeon)!!.paused })
+        val vm = showFeedsFrom()
+        server.user = "partner"
+        server.password = "theirs"
+        idleUntil { vm.state.value?.ttrss?.source != null }
+        vm.openSignIn()
+        vm.editSignIn(vm.form.value!!.copy(user = "partner", password = "theirs"))
+        vm.signIn()
+
+        // A phone feed again, which the banner offers to move into this account.
+        idleUntil { runBlocking { !db.sources().byId(aeon)!!.paused && moves.current().retiring.isEmpty() } }
+    }
 }

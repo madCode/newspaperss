@@ -16,6 +16,8 @@ import com.app.newspaperss.core.ttrss.TtrssCategory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.time.Clock
+import java.time.Duration
 import java.util.UUID
 
 private val Context.feedMovesStore by preferencesDataStore(
@@ -41,10 +43,11 @@ class FeedMoves(
     private val store: DataStore<Preferences>,
     private val db: AppDatabase,
     private val ttrss: TtrssRepository,
+    private val clock: Clock = Clock.systemUTC(),
     private val schedule: () -> Unit,
 ) {
     constructor(context: Context, db: AppDatabase, ttrss: TtrssRepository, schedule: () -> Unit) :
-        this(context.feedMovesStore, db, ttrss, schedule)
+        this(context.feedMovesStore, db, ttrss, schedule = schedule)
 
     /** A feed tt-rss has: [feedId] as it said, if it did; [wasPaused] on the phone before the move. */
     data class Subscribed(val sourceId: Long, val feedId: Int?, val already: Boolean, val wasPaused: Boolean)
@@ -178,14 +181,16 @@ class FeedMoves(
             return
         }
         // A list that fails leaves the feeds tt-rss gave an id for to be carried anyway.
-        ttrss.listFor(login)
+        val listed = ttrss.listFor(login)
         for (moved in subscribed) {
+            // Stopped meanwhile (leaving the server): pausing the feed now would leave it paused.
+            if (current().batch != batch) return
             val source = db.sources().byId(moved.sourceId)
             val target = source?.let { ttrss.movedFeedAt(it.url, moved.feedId, moved.already, before) }
             when {
                 source == null -> edit(batch) { s -> s.copy(subscribed = s.subscribed - moved, total = s.total - 1) }
                 target == null -> edit(batch) { s ->
-                    s.copy(subscribed = s.subscribed - moved, failed = s.failed + Failure(moved.sourceId, NOT_LISTED))
+                    s.copy(subscribed = s.subscribed - moved, failed = s.failed + Failure(moved.sourceId, if (listed) NOT_FOUND else NOT_LISTED))
                 }
                 else -> {
                     carry(source, target, moved.wasPaused)
@@ -223,6 +228,7 @@ class FeedMoves(
         )
         sources.setPaused(source.id, true)
         if (wasPaused) db.articles().expireWaiting(source.id)
+        db.articles().rememberRead(source.id, clock.instant())
     }
 
     /**
@@ -233,7 +239,7 @@ class FeedMoves(
         val retiring = current().retiring.keys
         if (retiring.isEmpty()) return
         val paused = db.sources().all().filter { it.id in retiring && it.paused }.map { it.id }
-        if (paused.isNotEmpty()) db.sources().deleteSpent(paused)
+        if (paused.isNotEmpty()) db.sources().deleteSpent(paused, clock.instant().minus(KEEP_AFTER_DELIVERY))
         val kept = db.sources().all().filter { it.id in paused }.map { it.id }.toSet()
         val gone = retiring - kept
         if (gone.isNotEmpty()) store.edit { p -> write(p, read(p).let { it.copy(retiring = it.retiring - gone) }) }
@@ -247,6 +253,17 @@ class FeedMoves(
     suspend fun restore() {
         current().retiring.forEach { (id, wasPaused) -> if (!wasPaused) db.sources().setPaused(id, false) }
         store.edit { it.clear() }
+    }
+
+    /**
+     * Ends a batch that can't go on (the work kept failing): what's left stays on the phone, said
+     * with [reason], so the banner offers it again rather than saying it's moving for good.
+     */
+    suspend fun giveUp(reason: String) = store.edit { p ->
+        val s = read(p)
+        if (s.running) {
+            write(p, s.copy(queued = emptySet(), subscribed = emptyList(), failed = s.failed + (s.queued + s.subscribed.map { it.sourceId }).map { Failure(it, reason) }))
+        }
     }
 
     /** A batch that moved everything has been reported; a partial one stays until the next. */
@@ -297,7 +314,13 @@ class FeedMoves(
     companion object {
         private const val SEP = "|"
 
-        /** tt-rss subscribed to it but no list said which feed it is: moving it again finds it. */
+        /** tt-rss subscribed to it but its feeds couldn't be listed: moving it again finds it. */
         const val NOT_LISTED = "tt-rss has it now, but hasn't listed it yet. Move it again in a while: it won't be added twice."
+
+        /** Listed, but no feed there is surely this one: tt-rss may have it under another address. */
+        const val NOT_FOUND = "tt-rss has it, but under another address. Check it's there in tt-rss, then remove it here."
+
+        /** How long a moved feed is kept after an edition with its articles is delivered, for Mark as not sent. */
+        private val KEEP_AFTER_DELIVERY: Duration = Duration.ofDays(14)
     }
 }

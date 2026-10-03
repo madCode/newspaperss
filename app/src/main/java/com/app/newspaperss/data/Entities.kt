@@ -219,9 +219,10 @@ data class PublicationEntity(
 data class FeedName(val originId: String, val title: String?, val lastSeen: Instant)
 
 /**
- * A link that went out in a delivered edition. Kept apart from articles, which go when their
- * source is removed, so a source removed and added again, or a story that turns up later in
- * another source, doesn't deliver it a second time.
+ * A link that went out in a delivered edition, or that the reader marked read in a feed since
+ * moved to tt-rss. Kept apart from articles, which go when their source is removed, so a source
+ * removed and added again, or a story that turns up later in another source, doesn't deliver it
+ * a second time.
  */
 @Entity(tableName = "delivered_urls")
 data class DeliveredUrlEntity(

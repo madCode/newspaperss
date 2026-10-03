@@ -460,8 +460,12 @@ phone restarts.
       learned. A feed paused on the phone is left out in tt-rss. The phone
       feed stops fetching and leaves Sources at once, but it's only deleted
       when nothing starred, waiting or in an unsent edition is left in it:
-      until then editions still take from it, so stars are kept. A link
-      already delivered isn't delivered again when tt-rss brings it.
+      until then editions still take from it, so stars are kept, and for
+      two weeks after an edition with its articles is delivered, so Mark as
+      not sent still brings them back. A link already delivered, or marked
+      read on the phone, isn't delivered again when tt-rss brings it.
+      Signing in as another tt-rss user makes feeds still kept phone feeds
+      again, to move into that account if wanted.
     - **From your tt-rss:** each category a heading, "News · 9 feeds"
       ("News, 9 feeds" to TalkBack), its feeds A to Z under it. Feeds with
       no category go under **Uncategorized**, last. A line under a feed only

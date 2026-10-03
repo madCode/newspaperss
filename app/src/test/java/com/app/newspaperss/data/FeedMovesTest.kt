@@ -48,7 +48,7 @@ class FeedMovesTest {
     private val sync by lazy { FeedSync(db, http, clock, Duration.ofDays(7), accounts) }
     private val movesData by lazy { PreferenceDataStoreFactory.create { tmp.newFile("moves.preferences_pb") } }
     private var scheduled = 0
-    private val moves by lazy { FeedMoves(movesData, db, ttrss) { scheduled++ } }
+    private val moves by lazy { FeedMoves(movesData, db, ttrss, clock) { scheduled++ } }
     private val science = TtrssCategory(4, "Science")
 
     private suspend fun connect(): SourceEntity {
@@ -297,5 +297,54 @@ class FeedMovesTest {
 
         assertNotNull(db.sources().byId(aeon.id))
         assertTrue(moves.current().retiring.isEmpty())
+    }
+
+    @Test
+    fun aMovedFeedStaysWhileAnEditionWithItsArticlesCanStillBeMarkedNotSent() = runTest {
+        connect()
+        val aeon = phoneFeed("https://aeon.example/feed", "Aeon")
+        val starred = article(aeon.id, "starred", starred = true)
+        moves.start(listOf(aeon.id), science)
+        moves.run()
+        val edition = db.editions().insert(EditionEntity(title = "Saturday", status = EditionStatus.DELIVERED, deliveredAt = now))
+        db.editions().insertArticles(listOf(EditionArticleEntity(editionId = edition, articleId = starred, position = 0, title = "starred", sourceTitle = "Aeon", minutes = 1.0, starred = true)))
+        db.articles().setDelivered(listOf(starred))
+
+        moves.tidy()
+        assertNotNull("Mark as not sent would bring its star back", db.sources().byId(aeon.id))
+
+        FeedMoves(movesData, db, ttrss, Clock.fixed(now.plus(Duration.ofDays(15)), ZoneOffset.UTC)) {}.tidy()
+        assertNull(db.sources().byId(aeon.id))
+    }
+
+    @Test
+    fun whatTheReaderMarkedReadOnThePhoneDoesntComeBackFromTtrss() = runTest {
+        val account = connect()
+        val wire = phoneFeed("https://wire.example/rss", "Morning Wire")
+        db.articles().insertIgnoring(ArticleEntity(sourceId = wire.id, guid = "read", url = "https://news.example/900", title = "Read already", state = ArticleState.SKIPPED))
+        moves.start(listOf(wire.id), science)
+        moves.run()
+        val feedId = feedIdOf("https://wire.example/rss")
+        server.fetch(feedId)
+        server.add(900, "Read already", feedId = feedId, feedTitle = "Morning Wire", categoryId = 4)
+        server.add(901, "New since", feedId = feedId, feedTitle = "Morning Wire", categoryId = 4)
+
+        sync.sync(db.sources().byId(account.id)!!)
+
+        assertEquals(listOf("New since"), db.articles().allForSource(account.id).map { it.title })
+    }
+
+    @Test
+    fun aMoveThatCantGoOnIsGivenBackToTheBanner() = runTest {
+        connect()
+        val aeon = phoneFeed("https://aeon.example/feed", "Aeon")
+        moves.start(listOf(aeon.id), science)
+
+        moves.giveUp("Something went wrong moving it. Try again.")
+
+        val state = moves.current()
+        assertFalse(state.running)
+        assertEquals(listOf(FeedMoves.Failure(aeon.id, "Something went wrong moving it. Try again.")), state.failed)
+        assertTrue("a new move can start", moves.start(listOf(aeon.id), science))
     }
 }

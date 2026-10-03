@@ -124,16 +124,20 @@ interface SourceDao {
 
     /**
      * Deletes the phone feeds among [ids], moved to tt-rss and paused, that have nothing left to
-     * give: no starred article, none waiting, none in an unsent edition. Deleting a source deletes
-     * its articles, stars and all, so the check and the delete are one statement: an article
-     * starred or picked for an edition in between keeps its source.
+     * give: no starred article, none waiting, none in an unsent edition, and none in an edition
+     * delivered since [deliveredSince], which "Mark as not sent" could still give back, stars and
+     * all. Deleting a source deletes its articles, so the check and the delete are one statement:
+     * an article starred or picked for an edition in between keeps its source.
      */
     @Query(
         """DELETE FROM sources WHERE id IN (:ids) AND paused = 1 AND kind = 'FEED' AND NOT EXISTS (
                SELECT 1 FROM articles WHERE articles.sourceId = sources.id
-               AND (articles.starredAt IS NOT NULL OR articles.state IN ('NEW', 'IN_EDITION')))""",
+               AND (articles.starredAt IS NOT NULL OR articles.state IN ('NEW', 'IN_EDITION')))
+           AND NOT EXISTS (
+               SELECT 1 FROM articles a JOIN edition_articles ea ON ea.articleId = a.id JOIN editions e ON e.id = ea.editionId
+               WHERE a.sourceId = sources.id AND e.status = 'DELIVERED' AND e.deliveredAt >= :deliveredSince)""",
     )
-    suspend fun deleteSpent(ids: Collection<Long>): Int
+    suspend fun deleteSpent(ids: Collection<Long>, deliveredSince: Instant): Int
 }
 
 /**
@@ -191,6 +195,14 @@ interface ArticleDao {
 
     @Query("INSERT OR REPLACE INTO delivered_urls (url, deliveredAt) SELECT url, :at FROM articles WHERE id IN (:ids) AND url != ''")
     suspend fun rememberDelivered(ids: List<Long>, at: Instant)
+
+    /**
+     * A source's links the reader marked read, remembered as delivered: moved to tt-rss, the
+     * feed's posts arrive again unread there, and those would otherwise go in the paper. One
+     * already remembered keeps the time it went out.
+     */
+    @Query("INSERT OR IGNORE INTO delivered_urls (url, deliveredAt) SELECT url, :at FROM articles WHERE sourceId = :sourceId AND state = 'SKIPPED' AND url != ''")
+    suspend fun rememberRead(sourceId: Long, at: Instant)
 
     /**
      * Uses up other waiting copies of the articles' links, from a second feed, tt-rss or the

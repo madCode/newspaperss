@@ -97,10 +97,14 @@ class FeedsFromViewModel(
         _form.value = form.copy(testing = true, error = null)
         signingIn = viewModelScope.launch {
             val fromPhone = settings.current().feedsFrom(hasServer = ttrss.observeStatus().first().source != null) == FeedsFrom.PHONE
+            val before = ttrss.savedLogin()
             val result = ttrss.signIn(form.address, form.user, form.password) { settings.update { it.copy(feedsFrom = FeedsFrom.SERVER) } }
             when (result) {
                 is TtrssRepository.SignIn.Failed -> _form.value = form.copy(error = result.message)
                 is TtrssRepository.SignIn.SignedIn -> {
+                    // Another account: feeds moved into the last one, kept for their stars, aren't
+                    // in this one, so they're phone feeds again, to move here if wanted.
+                    if (before != null && before != ttrss.savedLogin()) withContext(NonCancellable) { moves?.restore() }
                     _form.value = null
                     onSourcesChanged()
                     // Only on the way from the phone: signing in again isn't the moment to ask.
