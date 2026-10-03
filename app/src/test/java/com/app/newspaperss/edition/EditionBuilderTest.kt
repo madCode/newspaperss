@@ -1089,7 +1089,7 @@ class EditionBuilderTest {
         }
         db.articles().insertNew(listOf(post("paid", true), post("starred", true), post("free", false)))
         sources.setStarred(idOf("starred"), true)
-        db.sources().setSkipPaidPosts(id, true)
+        sources.setSkipPaidPosts(id, PublicationEntity.OWN, true)
 
         val built = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
 
@@ -1097,16 +1097,16 @@ class EditionBuilderTest {
         val skipped = db.articles().byId(idOf("paid"))!!
         assertEquals(ArticleState.EXPIRED, skipped.state)
         assertTrue(skipped.paidOnly)
-        assertEquals(PaidOnlyCount(found = 2, skipped = 1), sources.observePaidOnly(id).first())
+        assertEquals(PaidOnlyCount(found = 2, skipped = 1), sources.observePaidOnly(id, PublicationEntity.OWN).first())
 
         editions.markDelivered(built.editionId)
-        db.sources().setSkipPaidPosts(id, false)
+        sources.setSkipPaidPosts(id, PublicationEntity.OWN, false)
         db.articles().insertNew(listOf(post("kept", true)))
         val next = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
         assertEquals(listOf("Post kept"), editions.observeArticles(next.editionId).first().map { it.title })
         assertTrue(db.articles().byId(idOf("kept"))!!.paidOnly)
         db.articles().setState(listOf(idOf("kept")), ArticleState.EXPIRED)
-        assertEquals("one let in that then got old wasn't skipped", 1, sources.observePaidOnly(id).first().skipped)
+        assertEquals("one let in that then got old wasn't skipped", 1, sources.observePaidOnly(id, PublicationEntity.OWN).first().skipped)
     }
 
     /** Marking a skipped paid post unread is asking for it: the next edition takes it. */
@@ -1119,7 +1119,7 @@ class EditionBuilderTest {
         assertEquals(ArticleState.EXPIRED, db.articles().byId(idOf("paid"))!!.state)
 
         db.articles().markUnread(idOf("paid"), clock.instant())
-        assertEquals(0, sources.observePaidOnly(id).first().skipped)
+        assertEquals(0, sources.observePaidOnly(id, PublicationEntity.OWN).first().skipped)
         val next = tuned.build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
         assertEquals(listOf("Post paid"), editions.observeArticles(next.editionId).first().map { it.title })
     }
@@ -1138,7 +1138,7 @@ class EditionBuilderTest {
         val http = FakeHttp()
         val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly, onEvidence = { sourceId, originId, e, text -> sources.recordFullText(sourceId, originId, e, text.check) })
         val id = sources.addFeed("https://paid.example/feed", "Paid")
-        db.sources().setSkipPaidPosts(id, true)
+        sources.setSkipPaidPosts(id, PublicationEntity.OWN, true)
         val words = (1..400).joinToString(" ") { "word$it" }
         val paywall = """<div data-testid="paywall"><h2>Keep reading with a 7-day free trial</h2></div>"""
         val post = { g: String, paid: Boolean ->

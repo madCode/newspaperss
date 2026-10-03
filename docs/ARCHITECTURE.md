@@ -156,8 +156,8 @@ The steps, with where they live:
 7. **Commit.** One Room transaction writes `edition_articles`, sets the
    articles to `IN_EDITION` and the edition to `READY`. Until then no
    article has changed state, so a failure leaves them all for next time.
-   (The one exception: a paid post its source skips becomes `EXPIRED` as
-   soon as its fetch finds it, and stays so.)
+   (The one exception: a paid post its publication skips becomes
+   `EXPIRED` as soon as its fetch finds it, and stays so.)
 8. **Deliver.** With folder delivery, `EditionRun` copies the file
    (`FolderDelivery`, through the Storage Access Framework) and marks it
    delivered. Otherwise a timed run posts the "ready" notification.
@@ -274,6 +274,7 @@ erDiagram
         enum contentMode "what the check learned"
         int maxArticles
         bool leftOut
+        bool skipPaidPosts
         string title "tt-rss"
         string feedUrl "tt-rss"
         string category "tt-rss"
@@ -314,10 +315,10 @@ erDiagram
 
 - **Sources carry, publications write.** A source is how articles arrive
   (a feed address, a tt-rss account, the reading list, a curated list):
-  sync, read sync, sign-in, Pause and Skip paid posts are per source. A publication is who
+  sync, read sync, sign-in and Pause are per source. A publication is who
   wrote them, and holds the settings about the writing: article text, cap,
-  left out. A feed added here and a feed in tt-rss differ only in which
-  source carries them. An article's publication is
+  left out, Skip paid posts. A feed added here and a feed in tt-rss differ
+  only in which source carries them. An article's publication is
   `(sourceId, originId ?: "")` (`PublicationEntity.keyOf`).
 - **A publication's row** is written only once there's something to keep;
   no row means the defaults. Every read-modify-write of one runs in a

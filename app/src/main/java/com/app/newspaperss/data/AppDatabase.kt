@@ -108,9 +108,9 @@ abstract class AppDatabase : RoomDatabase() {
         /**
          * Sources carry, publications write: a new table holds the settings about each
          * publication's writing (what the text check learned, the article text the reader chose,
-         * the cap, leaving a tt-rss feed out) and what tt-rss's feed list says about it. They
-         * move off the source row, and the left-out table goes. Sections aren't kept: the paper
-         * has none.
+         * the cap, leaving a tt-rss feed out, skipping paid posts) and what tt-rss's feed list says
+         * about it. They move off the source row, and the left-out table goes. Sections aren't
+         * kept: the paper has none.
          */
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -118,7 +118,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE TABLE IF NOT EXISTS `publications` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, " +
                         "`fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, " +
                         "`leftOut` INTEGER NOT NULL DEFAULT 0, `chosenMode` TEXT, `maxArticles` INTEGER, `feedUrl` TEXT, `category` TEXT, " +
-                        "`listed` INTEGER NOT NULL DEFAULT 0, " +
+                        "`listed` INTEGER NOT NULL DEFAULT 0, `skipPaidPosts` INTEGER NOT NULL DEFAULT 0, " +
                         "PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
                 )
                 // What the check learned about a feed the reader left to it. With no checkedDay, a
@@ -152,11 +152,26 @@ abstract class AppDatabase : RoomDatabase() {
                         "WHERE l.sourceId = publications.sourceId AND l.originId = publications.`key`) " +
                         "WHERE EXISTS (SELECT 1 FROM left_out_feeds l WHERE l.sourceId = publications.sourceId AND l.originId = publications.`key`)",
                 )
+                // Skipping paid posts. A tt-rss account's switch covered all its feeds; it goes to each
+                // one seen so far, and a feed first seen later starts with it off.
+                db.execSQL(
+                    "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +
+                        "SELECT id, '', 'AUTO', 0 FROM sources WHERE skipPaidPosts = 1 AND kind != 'TTRSS'",
+                )
+                db.execSQL(
+                    "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +
+                        "SELECT DISTINCT a.sourceId, a.originId, 'AUTO', 0 FROM articles a JOIN sources s ON s.id = a.sourceId " +
+                        "WHERE s.kind = 'TTRSS' AND s.skipPaidPosts = 1 AND a.originId IS NOT NULL",
+                )
+                db.execSQL(
+                    "UPDATE publications SET skipPaidPosts = 1 WHERE sourceId IN (SELECT id FROM sources WHERE skipPaidPosts = 1) " +
+                        "AND (`key` != '' OR sourceId NOT IN (SELECT id FROM sources WHERE kind = 'TTRSS'))",
+                )
                 db.execSQL("DROP TABLE left_out_feeds")
                 db.execSQL("ALTER TABLE sources ADD COLUMN `feedsListedAt` INTEGER")
                 db.execSQL("UPDATE sources SET contentMode = 'AUTO' WHERE kind IN ('FEED', 'TTRSS')")
                 db.execSQL(
-                    "UPDATE sources SET contentModeChosen = 0, maxArticles = NULL, section = NULL, " +
+                    "UPDATE sources SET contentModeChosen = 0, maxArticles = NULL, section = NULL, skipPaidPosts = 0, " +
                         "fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL",
                 )
             }

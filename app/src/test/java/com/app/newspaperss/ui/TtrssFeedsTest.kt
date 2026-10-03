@@ -138,6 +138,41 @@ class TtrssFeedsTest {
         idleUntil { runBlocking { db.sources().publication(account, "7")!!.leftOut } == false }
     }
 
+    /** Skipping paid posts is each feed's own: its page has the switch, the account's page doesn't. */
+    @Test
+    fun aFeedSkipsPaidPostsOnItsOwn() {
+        val account = account()
+        runBlocking { repo.markPaidOnly(db.articles().allForSource(account).first { it.originId == "7" }.id, skip = false) }
+        val vm = SourceDetailViewModel(repo, account, flowOf(1), key = "7")
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { compose.waitForIdle(); visible("Skip paid posts with nothing free") }
+
+        compose.onNodeWithText("Skip paid posts with nothing free").performClick()
+        idleUntil { runBlocking { db.sources().publication(account, "7")!!.skipPaidPosts } }
+        assertFalse(runBlocking { db.sources().publication(account, "8")!!.skipPaidPosts })
+    }
+
+    @Test
+    fun theAccountsPageHasNoPaidPostsSwitch() {
+        val account = account()
+        runBlocking { repo.markPaidOnly(db.articles().allForSource(account).first().id, skip = false) }
+        val vm = SourceDetailViewModel(repo, account, flowOf(1))
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { compose.waitForIdle(); visible("Sync read status") }
+        assertFalse(visible("Skip paid posts"))
+    }
+
+    /** A left-out feed's page shows none of the settings about its writing, its paid posts included. */
+    @Test
+    fun aLeftOutFeedHasNoPaidPostsSwitch() {
+        val account = account()
+        runBlocking { repo.setSkipPaidPosts(account, "42", true) }
+        val vm = SourceDetailViewModel(repo, account, flowOf(1), key = "42")
+        compose.setContent { SourceDetailScreen(vm, onBack = {}) }
+        idleUntil { compose.waitForIdle(); visible("Bring back") }
+        assertFalse(visible("Skip paid posts"))
+    }
+
     @Test
     fun theLeftOutListOpensEachFeed() {
         val account = account()

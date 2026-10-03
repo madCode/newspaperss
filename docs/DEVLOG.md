@@ -14,6 +14,10 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 82: skipping paid posts, per feed
+- **From you:** paid posts are a habit of the writer, not of how the articles arrive, so the switch belongs to the publication.
+- **Shipped:** "Skip paid posts with nothing free" moves from the source to the publication: a feed's page and a curated list's page keep it, each tt-rss feed has its own on its page, and the tt-rss account's page has none. Its count of skipped posts is per publication too. A tt-rss account that had it on carries it to every feed already seen in its articles and to its left-out feeds; a feed first seen later starts with it off. Database version 7.
+
 ### Cycle 81: up to date with main; plain rows on Sources
 - **From you:** bring the branch up to date with main; take the ⋮ menus off Sources, since everything in them is on the source's page.
 - **Shipped:** main's paid posts, Kindle email and Settings pages are in. Main's database version 6 shipped first, so this branch's database changes are one step from it, to version 7. A row on Sources opens its page and has nothing else to tap, except tt-rss's ▾.

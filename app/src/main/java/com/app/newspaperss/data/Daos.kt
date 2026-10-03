@@ -112,9 +112,6 @@ interface SourceDao {
     @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")
     suspend fun setMarkReadOnServer(id: Long, markRead: Boolean)
 
-    @Query("UPDATE sources SET skipPaidPosts = :skip WHERE id = :id")
-    suspend fun setSkipPaidPosts(id: Long, skip: Boolean)
-
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 
@@ -259,12 +256,15 @@ interface ArticleDao {
     )
     suspend fun markPaidOnly(id: Long, skip: Boolean)
 
-    /** How many of a source's articles were paid posts with nothing free, and how many of them are left out. */
+    /**
+     * How many of a publication's articles were paid posts with nothing free, and how many of them
+     * are left out. [key] as [PublicationEntity.key].
+     */
     @Query(
         """SELECT COUNT(*) AS found, COALESCE(SUM(CASE WHEN paidSkipped = 1 AND state = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS skipped
-           FROM articles WHERE sourceId = :sourceId AND paidOnly = 1""",
+           FROM articles WHERE sourceId = :sourceId AND COALESCE(originId, '') = :key AND paidOnly = 1""",
     )
-    fun observePaidOnly(sourceId: Long): Flow<PaidOnlyCount>
+    fun observePaidOnly(sourceId: Long, key: String): Flow<PaidOnlyCount>
 
     @Query("SELECT COUNT(*) FROM articles WHERE id IN (:ids) AND paidSkipped = 1 AND state = 'EXPIRED'")
     suspend fun countPaidSkipped(ids: Collection<Long>): Int

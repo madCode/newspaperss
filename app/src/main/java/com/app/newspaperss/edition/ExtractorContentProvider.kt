@@ -28,7 +28,7 @@ import java.io.IOException
  * later by [EditionBuilder], in reading order.
  *
  * @param onPaidOnly told of each paid post with next to nothing free, and whether it was left out
- *   for its source's [SourceEntity.skipPaidPosts], for [com.app.newspaperss.data.SourceRepository.markPaidOnly].
+ *   for its publication's [TextChoice.skipPaid], for [com.app.newspaperss.data.SourceRepository.markPaidOnly].
  * @param onEvidence receives what each article showed about where its publication's full text is
  *   (null if nothing, which is still passed on for a check, so the check counts as done), with the
  *   article's [TextChoice], for [com.app.newspaperss.data.SourceRepository.recordFullText].
@@ -66,7 +66,7 @@ class ExtractorContentProvider(
         if (extracted.nothingFree) {
             // A star asks for this article whatever it turns out to be, and one found before and
             // still here was let in or brought back by the reader: only a first find is skipped.
-            val skip = source.skipPaidPosts && article.starredAt == null && !article.paidOnly
+            val skip = text.skipPaid && article.starredAt == null && !article.paidOnly
             onPaidOnly(article.id, skip)
             if (skip) return null
         }

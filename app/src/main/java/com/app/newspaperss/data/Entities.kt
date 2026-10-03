@@ -70,10 +70,7 @@ data class SourceEntity(
      * back succeeds.
      */
     val serverNote: String? = null,
-    /**
-     * Leave out paid posts with next to nothing free (see
-     * [com.app.newspaperss.core.extract.ExtractedArticle.nothingFree]) instead of giving them a place.
-     */
+    /** Unused, and always false: the switch is kept per [PublicationEntity.skipPaidPosts]. Kept as [section] is. */
     @ColumnInfo(defaultValue = "0") val skipPaidPosts: Boolean = false,
 )
 
@@ -134,7 +131,7 @@ data class ArticleEntity(
     /** A paid post that turned out, when an edition tried it, to have next to nothing free. */
     @ColumnInfo(defaultValue = "0") val paidOnly: Boolean = false,
     /**
-     * Left out, as EXPIRED, for its source's [SourceEntity.skipPaidPosts] the first time it was found
+     * Left out, as EXPIRED, for its publication's [PublicationEntity.skipPaidPosts] the first time it was found
      * [paidOnly]. Cleared when the reader marks it unread: then they want it, and it isn't skipped again.
      */
     @ColumnInfo(defaultValue = "0") val paidSkipped: Boolean = false,
@@ -149,7 +146,7 @@ data class ArticleEntity(
 /**
  * Who wrote a source's articles, as against how they arrive: a feed's own publication has [key]
  * "", and each feed in a tt-rss account is one, keyed by its id there ([ArticleEntity.originId]).
- * Settings about the writing live here (article text, cap, left out), settings about
+ * Settings about the writing live here (article text, cap, left out, paid posts), settings about
  * the connection on the source. A row is written only once there's something to keep, so no
  * row means the defaults.
  */
@@ -184,6 +181,11 @@ data class PublicationEntity(
     val chosenMode: ContentMode? = null,
     /** At most this many articles per edition; null follows the edition setting. */
     val maxArticles: Int? = null,
+    /**
+     * Leave out paid posts with next to nothing free (see
+     * [com.app.newspaperss.core.extract.ExtractedArticle.nothingFree]) instead of giving them a place.
+     */
+    @ColumnInfo(defaultValue = "0") val skipPaidPosts: Boolean = false,
     /** tt-rss only: the feed's own address, from the account's feed list. */
     val feedUrl: String? = null,
     /** tt-rss only: the category it's in there. */

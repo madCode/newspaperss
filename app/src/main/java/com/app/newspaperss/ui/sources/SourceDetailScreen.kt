@@ -254,10 +254,14 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                         }
                     }
                     val paidOnly = detail?.paidOnly
-                    // Only once the source has had one: most never do, and the page has enough on it.
-                    // A setting of the whole account, so not on one of its feeds' pages.
-                    if (!viewModel.isFeed && source.kind != SourceKind.READING_LIST && paidOnly != null && (source.skipPaidPosts || paidOnly.found > 0)) {
-                        PaidPostsOption(source.skipPaidPosts, paidOnly.skipped, source.kind == SourceKind.TTRSS, viewModel::setSkipPaidPosts)
+                    // Only once the publication has had one: most never do, and the page has enough on it.
+                    // Each tt-rss feed has its own, on its page; the account's page has none. Like the
+                    // other settings about the writing, it's hidden while the feed is left out.
+                    val ownsPosts = source.kind != SourceKind.READING_LIST && (source.kind != SourceKind.TTRSS || viewModel.isFeed) &&
+                        publication?.leftOut != true
+                    val skip = publication?.skipPaidPosts == true
+                    if (ownsPosts && paidOnly != null && (skip || paidOnly.found > 0)) {
+                        PaidPostsOption(skip, paidOnly.skipped, viewModel::setSkipPaidPosts)
                     }
                     HorizontalDivider(Modifier.padding(top = 16.dp))
                     ArticlesHeading(articles, selecting, onSelect = { selecting = true })
@@ -398,7 +402,7 @@ private fun TtrssOptions(source: SourceEntity, onChangeCategory: () -> Unit, onM
 }
 
 @Composable
-private fun PaidPostsOption(skip: Boolean, skipped: Int, wholeAccount: Boolean, onChange: (Boolean) -> Unit) {
+private fun PaidPostsOption(skip: Boolean, skipped: Int, onChange: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth()
             .toggleable(value = skip, role = Role.Switch, onValueChange = onChange)
@@ -408,14 +412,11 @@ private fun PaidPostsOption(skip: Boolean, skipped: Int, wholeAccount: Boolean, 
         Column(Modifier.weight(1f)) {
             Text("Skip paid posts with nothing free")
             Text(
-                listOfNotNull(
-                    when {
-                        skip && skipped > 0 -> "${plural(skipped, "paid post")} skipped so far: a title and a picture, nothing to read."
-                        skip -> "A post that's only a title and a picture won't take a place."
-                        else -> "Some of its posts are for paying subscribers, with only a title and a picture free."
-                    },
-                    "For every feed in this account.".takeIf { wholeAccount },
-                ).joinToString(" "),
+                when {
+                    skip && skipped > 0 -> "${plural(skipped, "paid post")} skipped so far: a title and a picture, nothing to read."
+                    skip -> "A post that's only a title and a picture won't take a place."
+                    else -> "Some of its posts are for paying subscribers, with only a title and a picture free."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

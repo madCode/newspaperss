@@ -29,8 +29,15 @@ data class ArticleContent(
  * @property learned what the full-text check has learned about the article's publication, if anything.
  * @property check fetch the page even for a long item and compare, as one of the edition's checks.
  * @property day the edition's epoch day, which evidence and checks are counted under; null for today.
+ * @property skipPaid leave the article out if it turns out a paid post with next to nothing free.
  */
-data class TextChoice(val learned: ContentMode? = null, val check: Boolean = false, val day: Long? = null, val chosen: ContentMode? = null)
+data class TextChoice(
+    val learned: ContentMode? = null,
+    val check: Boolean = false,
+    val day: Long? = null,
+    val chosen: ContentMode? = null,
+    val skipPaid: Boolean = false,
+)
 
 fun interface ArticleContentProvider {
     /** The article's readable content, or null if there's nothing worth including. */

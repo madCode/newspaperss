@@ -72,7 +72,7 @@ class SourceDetailViewModel(
     val detail: StateFlow<SourceDetail?> =
         combine(
             combine(repository.observe(id), repository.observeRecentArticles(id, key), defaultMax, ::Triple),
-            repository.observePublication(id, key), repository.observeHistory(id), repository.observePaidOnly(id),
+            repository.observePublication(id, key), repository.observeHistory(id), repository.observePaidOnly(id, key),
         ) { (source, articles, max), publication, history, paidOnly ->
             SourceDetail(source, articles, max, publication, history, paidOnly)
         }
@@ -107,7 +107,7 @@ class SourceDetailViewModel(
     }
 
     fun setSkipPaidPosts(skip: Boolean) {
-        viewModelScope.launch { repository.setSkipPaidPosts(id, skip) }
+        viewModelScope.launch { repository.setSkipPaidPosts(id, key, skip) }
     }
 
     fun chooseContentMode(mode: ContentMode) {

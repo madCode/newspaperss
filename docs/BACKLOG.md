@@ -274,6 +274,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 - [x] Article text is checked, not assumed: each edition reads the pages of up to 5 long items, one per publication (a feed here, or one feed in tt-rss), which each learn on their own; pictures the feed's copy lacks count for the page
 - [x] Email editions straight to your Kindle: its own address, your mail app opened ready to send *(you asked, #123)*
 - [x] Paid posts say they're only the free part; a source can skip the ones with nothing free (a title and a picture), off by default, with a count on its page *(you asked)*
+- [x] Skip paid posts is per publication, so each tt-rss feed has its own switch on its page; a tt-rss account's switch carried over to the feeds already seen *(you asked)*
 - [x] After a send with the Kindle app, a line says it can take a few minutes to show up in the library *(device)*
 - [x] A text size setting for the article preview (Aa in its top bar) *(your brother asked)*
 - [x] Comics in the preview: large pictures standing alone fill the width, and the page can be pinched to zoom *(you asked)*

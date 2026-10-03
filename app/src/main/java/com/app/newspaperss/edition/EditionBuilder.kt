@@ -344,15 +344,16 @@ private class TextChoices(publications: List<PublicationEntity>, private val tod
     private val checked = mutableSetOf<Pair<Long, String>>()
 
     fun choose(article: ArticleEntity, source: SourceEntity): TextChoice {
-        if (source.kind != SourceKind.FEED && source.kind != SourceKind.TTRSS) return TextChoice()
         val key = source.id to PublicationEntity.keyOf(article)
         val publication = byKey[key]
-        publication?.chosenMode?.let { return TextChoice(chosen = it) }
+        val skipPaid = publication?.skipPaidPosts == true
+        if (source.kind != SourceKind.FEED && source.kind != SourceKind.TTRSS) return TextChoice(skipPaid = skipPaid)
+        publication?.chosenMode?.let { return TextChoice(chosen = it, skipPaid = skipPaid) }
         val mode = publication?.contentMode ?: ContentMode.AUTO
         val check = checked.size < FullTextCheck.CHECKS_PER_EDITION && key !in checked && article.viaUrl == null &&
             FullTextCheck.dueForCheck(mode, publication?.fullTextEvidence, publication?.checkedDay, today) && isLong(article)
         if (check) checked += key
-        return TextChoice(publication?.contentMode, check, today)
+        return TextChoice(publication?.contentMode, check, today, skipPaid = skipPaid)
     }
 
     // A short item, or one ending in "Read more", has its page fetched anyway; only a long one

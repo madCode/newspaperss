@@ -813,7 +813,7 @@ class SourceDetailScreenTest {
         idleUntil { compose.waitForIdle(); visible("Skip paid posts with nothing free") }
         assertTrue(visible("Some of its posts are for paying subscribers"))
         compose.onNodeWithText("Skip paid posts with nothing free").performClick()
-        idleUntil { runBlocking { db.sources().byId(id)!!.skipPaidPosts } }
+        idleUntil { runBlocking { db.sources().publication(id, PublicationEntity.OWN)?.skipPaidPosts == true } }
 
         runBlocking { repo.markPaidOnly(ids.getValue("waiting"), skip = true) }
         idleUntil { compose.waitForIdle(); visible("1 paid post skipped so far") }

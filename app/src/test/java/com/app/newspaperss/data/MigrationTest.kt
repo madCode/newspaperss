@@ -217,6 +217,31 @@ class MigrationTest {
         }
     }
 
+    /** A tt-rss account's switch covered all its feeds, so each one seen so far keeps it; the account's own row doesn't need it. */
+    @Test
+    fun version6SkippingPaidPostsGoesToEachPublication() {
+        helper.createDatabase(DB, 6).use { db ->
+            fun source(id: Int, kind: String) = db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt, skipPaidPosts) " +
+                    "VALUES ($id, '$kind', 'https://s$id.example/feed', 'S$id', $id, 'AUTO', 0, 0, 0, 1, 0, 1)",
+            )
+            source(1, "FEED")
+            source(2, "TTRSS")
+            db.execSQL(
+                "INSERT INTO articles (sourceId, guid, url, title, discoveredAt, state, originId) VALUES " +
+                    "(2, 'a', 'https://n.example/a', 'A', 0, 'NEW', '7'), (2, 'b', 'https://n.example/b', 'B', 0, 'NEW', '7'), (2, 'c', 'https://n.example/c', 'C', 0, 'NEW', '8')",
+            )
+            db.execSQL("INSERT INTO left_out_feeds (sourceId, originId, title) VALUES (2, '9', 'Press releases')")
+        }
+
+        helper.runMigrationsAndValidate(DB, 7, true, AppDatabase.MIGRATION_6_7).use { db ->
+            db.query("SELECT sourceId, `key`, skipPaidPosts FROM publications ORDER BY sourceId, `key`").use { c ->
+                assertEquals(listOf(listOf("1", "", "1"), listOf("2", "7", "1"), listOf("2", "8", "1"), listOf("2", "9", "1")), rows(c))
+            }
+            db.query("SELECT skipPaidPosts FROM sources").use { c -> assertEquals(listOf(listOf("0"), listOf("0")), rows(c)) }
+        }
+    }
+
     @Test
     fun version6LeftOutFeedsBecomeLeftOutPublications() {
         helper.createDatabase(DB, 6).use { db ->
