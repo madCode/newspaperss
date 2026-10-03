@@ -147,6 +147,7 @@ Consider letting a reader server be the backend for every source it can handle, 
 source among many. A feed the reader's server already follows would come from the server: fetched
 there, read state kept there, and the same in their other reader apps. Sources the server can't
 handle (saved links, curated lists) stay on the phone.
+- Designed: two setups, server or phone, never mixed, with a build order ([research/server-mode.md](research/server-mode.md)).
 - Which servers: tt-rss (done as one source today) and the
   [Google Reader API](https://freshrss.github.io/FreshRSS/en/developers/06_GoogleReader_API.html),
   which [FreshRSS](https://freshrss.org), [Miniflux](https://miniflux.app/docs/google_reader.html),
