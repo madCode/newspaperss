@@ -176,9 +176,69 @@ class ArticlePreviewScreenTest {
 
         size = PreviewTextSize.LARGEST
         compose.waitForIdle()
-        val large = webView()
-        assertEquals(175, large.settings.textZoom)
-        assertTrue("justified text opens wide gaps at this size", shadowOf(large).lastLoadDataWithBaseURL.data.contains(leftAligned))
+        assertSame("restyled in place, so Share still follows the page on screen", view, webView())
+        assertEquals(175, view.settings.textZoom)
+        assertTrue("justified text opens wide gaps at this size", shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
+
+        size = PreviewTextSize.DEFAULT
+        compose.waitForIdle()
+        assertSame(view, webView())
+        assertFalse(shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
+    }
+
+    @Test
+    fun aNewAlignmentRestylesThePageOnScreenNotTheFirst() {
+        val file = tmp.newFile("n.epub")
+        val articles = listOf("One", "Two").map {
+            EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 30.0)
+        }
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
+        }
+        var size by mutableStateOf(PreviewTextSize.DEFAULT)
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}, textSize = size) }
+        val view = webView()
+        val client = shadowOf(view).webViewClient
+        val first = BOOK_ORIGIN + EpubPages.articleHref(0)
+
+        // A real WebView reports the first page, loaded as data, as about:blank.
+        client.doUpdateVisitedHistory(view, "about:blank", false)
+        size = PreviewTextSize.LARGER
+        compose.waitForIdle()
+        assertEquals("the first page itself, not about:blank", first, shadowOf(view).lastLoadDataWithBaseURL.baseUrl)
+        assertTrue(shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
+
+        // "Next", then a footnote on that page: the page itself is served again, restyled.
+        val second = BOOK_ORIGIN + EpubPages.articleHref(1)
+        client.doUpdateVisitedHistory(view, second, false)
+        client.doUpdateVisitedHistory(view, "$second#a2-fn1", false)
+        size = PreviewTextSize.DEFAULT
+        compose.waitForIdle()
+        assertEquals(second, shadowOf(view).lastLoadedUrl)
+        assertSame(view, webView())
+    }
+
+    @Test
+    fun aSizePickedWithAaIsSavedAndMarked() {
+        val file = oneArticleEdition()
+        var size by mutableStateOf(PreviewTextSize.DEFAULT)
+        val picked = mutableListOf<PreviewTextSize>()
+        compose.setContent {
+            ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size, onTextSize = { picked += it; size = it })
+        }
+        val view = webView()
+
+        compose.onNodeWithContentDescription("Text size").performClick()
+        compose.onNodeWithText("Largest").performClick()
+        compose.waitForIdle()
+
+        assertEquals(listOf(PreviewTextSize.LARGEST), picked)
+        assertEquals(175, view.settings.textZoom)
+        assertSame("the same page, so the reader keeps their place", view, webView())
+        // The menu marks the current size.
+        compose.onNodeWithContentDescription("Text size").performClick()
+        compose.onNode(hasText("Largest") and hasContentDescription("Current size")).assertExists()
+        compose.onNode(hasText("Default") and hasContentDescription("Current size")).assertDoesNotExist()
     }
 
     @Test
@@ -255,7 +315,7 @@ class ArticlePreviewScreenTest {
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}) }
         webView()
         compose.waitForIdle()
-        compose.onNodeWithContentDescription("Back").assertExists()
+        compose.onNodeWithContentDescription("Text size").assertExists()
         compose.onNodeWithContentDescription("Share link").assertDoesNotExist()
     }
 

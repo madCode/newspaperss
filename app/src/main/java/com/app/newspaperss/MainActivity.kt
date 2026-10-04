@@ -190,6 +190,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                     title = contents.getOrNull(position)?.entry?.title ?: editionTitle.orEmpty(),
                     onBack = { nav.navigateUp() },
                     textSize = textSize,
+                    onTextSize = { size -> container.appScope.launch { container.settings.update { it.copy(previewTextSize = size) } } },
                 )
             }
             composable(Tab.SOURCES.route) {
