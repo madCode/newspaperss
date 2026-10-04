@@ -122,6 +122,8 @@ class SourcesScreenTest {
         waitFor("Which part of this site?")
         compose.onNodeWithText("Essays").performClick()
         waitFor("Which part of this site?", present = false)
+        // The dialog closes at once; the row once the new source has reached the list.
+        waitFor("Essays")
         compose.onNodeWithText("Essays").assertIsDisplayed()
     }
 
