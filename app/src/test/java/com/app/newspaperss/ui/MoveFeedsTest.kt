@@ -136,14 +136,17 @@ class MoveFeedsTest {
         idleUntil { compose.waitForIdle(); visible("Uncategorized") }
         compose.onNodeWithText("Move 2").performClick()
         idleUntil { runBlocking { moves.current().running } }
-        assertEquals(1, scheduled)
+        // Scheduled after the move is saved as running, from the screen's own coroutine.
+        idleUntil { scheduled == 1 }
         waitFor("Moving 1 of 2 · Aeon")
 
         runBlocking { moves.run() }
         waitFor("Moved 2 feeds to your tt-rss")
-        assertFalse(visible("fetched by this phone"))
-        assertFalse(visible("Morning Wire (phone)"))
-        assertFalse("once they're moved, the group goes", visible("Still on this phone"))
+        // The snackbar comes from the move's own state; the rows go once the paused sources
+        // come back from the database, a moment apart.
+        waitGone("fetched by this phone")
+        waitGone("Morning Wire (phone)")
+        waitGone("Still on this phone")
     }
 
     @Test

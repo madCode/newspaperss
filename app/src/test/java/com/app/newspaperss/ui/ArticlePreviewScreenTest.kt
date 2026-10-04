@@ -1,8 +1,6 @@
 package com.app.newspaperss.ui
 
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasProgressBarRangeInfo
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -77,7 +75,8 @@ class ArticlePreviewScreenTest {
         }
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}) }
 
-        idleUntil { compose.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).fetchSemanticsNodes().isEmpty() }
+        // Once the page is up, the file has been read.
+        webView()
         compose.onNodeWithText("file is gone", substring = true).assertDoesNotExist()
     }
 

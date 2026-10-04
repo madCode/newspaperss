@@ -145,7 +145,8 @@ class ServerAddTest {
         assertFalse("the dialog has closed", visible("Subscribe in your tt-rss"))
         waitFor("Science Weekly")
         assertTrue("its row, under Science", visible("Science") && visible("Not fetched by tt-rss yet"))
-        assertEquals(4, runBlocking { settings.current().lastCategoryId })
+        // Saved by its own coroutine, apart from tt-rss's answer.
+        idleUntil { runBlocking { settings.current().lastCategoryId } == 4 }
 
         compose.onNodeWithText("Undo").performClick()
         waitFor("Took Science Weekly out of your tt-rss.")
@@ -163,6 +164,8 @@ class ServerAddTest {
         pick("News")
         compose.onNodeWithText("Subscribe").performClick()
         waitFor("Added to your tt-rss, in News.")
+        // The next dialog reads the category last used, saved apart from tt-rss's answer.
+        idleUntil { runBlocking { settings.current().lastCategoryId } == 5 }
 
         http.page("https://other.example/rss", rss("Other", "1" to "Story"))
         add("other.example/rss")
