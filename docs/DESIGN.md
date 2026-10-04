@@ -45,7 +45,7 @@ This document describes how the app works today. What's planned is in
 | Concept | What it is |
 |---|---|
 | **Source** | Where articles come from: an RSS, Atom or JSON feed; the **reading list** (links you shared or saved); a tt-rss account; or a **curated list**, a page that picks a few links a day (Arts & Letters Daily). |
-| **Section** | A heading in the edition's contents. Sections come from OPML folders, and the reading list is "Saved for later". |
+| **Publication** | Who wrote a source's articles, as against how they arrive: a feed added here is one, each feed inside a tt-rss account is one, and the reading list is one (your picks). Takes turns in the paper and holds the settings about the writing: article text, cap, left out, paid posts. |
 | **Edition settings** | One recipe: size (minutes), per-source cap, order (take turns / in order / shuffle), and the time and days it should be ready. |
 | **Edition** | One built issue: a dated title ("Tuesday Morning Edition, Sep 29"), its articles, the EPUB and its status: building, ready, delivered, failed or deleted. |
 | **Article state** | `NEW`, then `IN_EDITION`, then `DELIVERED`; or `SKIPPED` (you marked it as read), or `EXPIRED` (older than the source keeps articles). |
@@ -87,12 +87,12 @@ module so it's all unit-tested without Android.
   post (Substack's paid openings, excerpt feeds) counts as an excerpt
   however long, so the page is fetched; that link and the pitch over the
   paywall are removed. One with next to nothing free (under 50 words: a
-  title and a picture) can be left out instead, per source, with **Skip
-  paid posts with nothing free** on its page. That switch shows once the
-  source has had one, is off until turned on, and says how many it has
-  skipped (on a tt-rss account, for every feed in it). Only a first find
-  is skipped: it counts as not picked ("Skipped: a paid post") and isn't
-  fetched again. Starring it or marking it unread asks for it, so it goes
+  title and a picture) can be left out instead, per publication, with
+  **Skip paid posts with nothing free** on its page: a feed's or a curated
+  list's page, or each tt-rss feed's page. That switch shows once the
+  publication has had one, is off until turned on, and says how many it
+  has skipped. Only a first find is skipped: it counts as not picked
+  ("Skipped: a paid post") and isn't fetched again. Starring it or marking it unread asks for it, so it goes
   in. An edition whose every new article was skipped is nothing new, not
   a failure.
 - **Embeds.** A video can't play in a book: a video's poster frame stands
@@ -144,11 +144,24 @@ module so it's all unit-tested without Android.
   feed's thumbnail. An image's title text (xkcd's hover joke) becomes a
   caption under it, unless it only repeats the image's description or file
   name, or the article already shows it.
-- **Which text to use, per source.** Each article is evidence: a page with
-  twice the feed's words means the feed is a teaser; a feed of 300+ words,
-  or a site that blocks fetching, means the feed is enough. Three days
-  pointing the same way set the source to that; the reader can override it
-  on the source's page ("Article text: Automatic / Feed's text / Full page").
+- **Which text to use, per publication.** A publication is who wrote the
+  articles: a feed added here, or one feed inside a tt-rss account, each
+  learning on its own. Each article whose page was read is evidence:
+  - a page with twice the feed's words, or with pictures the feed's copy
+    lacks, means the feed is a teaser;
+  - a feed of 300+ words whose page has no more, or a site that blocks
+    fetching, means the feed is enough.
+  Three days pointing the same way set the publication to that; the reader
+  can override it on its page, a tt-rss feed's included ("Article text:
+  Automatic / Feed's text / Full page").
+  - A short item, or one ending in "Read more", always has its page read. A long one is taken from the feed,
+    so it only counts once checked: each edition reads the pages of up to 5
+    long items, one per publication, from publications still being worked
+    out, or settled on the feed's text and not checked for 14 days (daily
+    once a check finds a teaser, so it can switch in three days).
+  - A check that finds a teaser uses the page in that edition already;
+    otherwise the article is as it would have been without one. A page with
+    pictures counts only if it has all of the feed's text.
 - **Language.** Each article is tagged with its language (`xml:lang`, and
   `dir="rtl"` for right-to-left scripts) so e-readers hyphenate and lay it
   out correctly. The text decides; the page's declared language breaks ties.
@@ -159,9 +172,9 @@ module so it's all unit-tested without Android.
     spine;
   - a generated cover image (masthead, a large date, first headlines) so
     library thumbnails show which day's edition it is;
-  - "In this edition" contents with each section's and article's reading
-    time. Kindle opens the book here, like a paper's front page;
-  - each article: section and source, headline, "By … · date · N min read",
+  - "In this edition" contents with each article's reading time, in one
+    list: no section headings, since a 30-minute paper is often 8 articles. Kindle opens the book here, like a paper's front page;
+  - each article: source, headline, "By … · date · N min read",
     the body, an end mark, "Read the original at site", and, after a read of
     5 minutes or more, a "Next" link with the next one's source and time (a
     pause after a long piece; after a short one, turning the page is enough);
@@ -243,7 +256,7 @@ Kindle, so for half an hour after a send the edition (on Today and its own
 page) says so: "Sent to Kindle. It can take a few minutes to show up in
 your library." after the Kindle app, or "Emailed to your Kindle. It can
 take a few minutes to arrive; it shows up by itself." after an email. Both
-add "Not there after an hour? Use ⋮ to mark it as not sent." (TalkBack
+add "Not there after 20 minutes? Use ⋮ to mark it as not sent." (TalkBack
 reads ⋮ as "More options"). Any
 other delivery, or marking it as not sent, takes the note away. It's only
 remembered while the app is running.
@@ -293,11 +306,17 @@ phone restarts.
 - **Titles for curated picks.** A list that gives only a teaser (Arts & Letters
   Daily) has each pick's title looked up from its page in the background, as
   saved links do, retried for two days; a bot-check page's title is never taken.
+- **Two setups, never mixed.** Your sites come from this phone, or from
+  your own RSS server (tt-rss). The reading list and curated lists stay on
+  the phone in both. It's chosen in onboarding and changed in Settings;
+  someone who added tt-rss before the choice existed lands in the server
+  setup, anyone else on this phone.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
   read on the server once delivered (and unread again if the edition is
-  marked as not sent). One category can be taken instead of all unread;
-  adding the account asks which, before the first sync. tt-rss's own stars
+  marked as not sent). One category can be taken instead of all unread,
+  chosen in Settings › Where your feeds live; a new account starts
+  with all. tt-rss's own stars
   aren't synced: there a star usually means "keep this", not "for tomorrow".
   - **Sync read status with tt-rss** (on by default) keeps read and unread
     the same in both, the newest change winning. tt-rss doesn't say when a
@@ -313,12 +332,22 @@ phone restarts.
       it's among that feed's newest five unread.
     - Changed on both sides between two syncs: the change made here wins.
     - Off, nothing flows either way: tt-rss and the app keep their own.
-  - **Feeds in your paper** (on the source's page) lists the account's feeds
-    seen in the last month, with a checkbox each. A feed left out isn't
-    fetched, and its waiting articles go too, except starred ones. It stays
-    in tt-rss, and stays listed so it can come back. Signing in as another
-    user clears the choices: feed ids belong to each tt-rss user.
-  - **Start fresh** ("Back after a break?" on the source's page), after a
+  - **The feed list.** Once a day a sync asks tt-rss for every feed the
+    account takes articles from (in its category, if it has one), read ones
+    too, with each feed's name, address and category. Until the first list,
+    the feeds seen in the last month stand in. A failed list waits for the
+    next sync; the sync itself has still succeeded. Changing the category
+    lists the feeds again.
+  - **Each feed is a publication** with its own page: leave it out or bring
+    it back, its article text and cap, and its own recent
+    articles. A feed left out isn't fetched, and its waiting articles go
+    too, except starred ones. It stays in tt-rss and on the Left out list,
+    so it can come back. **Feeds in your paper** on the account's page
+    is the same choice as a checklist. Signing in as another user clears
+    every feed's settings: feed ids belong to each tt-rss user. The same
+    user signing in again keeps them.
+  - **Start fresh** ("Back after a break?" in Settings › Where your feeds
+    live), after a
     confirmation, marks everything that reached tt-rss more than two weeks
     ago read there (in the source's category, if it has one), starred ones
     included. Articles already waiting in the app aren't touched by it;
@@ -342,13 +371,54 @@ phone restarts.
    or kindle.cn gets a warning), the mail app to send with, and a reminder
    to approve the sending address on Amazon. **Use the Kindle app
    instead** shares to the Kindle app.
-3. **Pick your sources:** starter packs of well-known public feeds; paste
-   any website (the app finds its feed); import an OPML file; connect a
-   tt-rss account; or import saved links from Pocket or Instapaper, which
-   alone are enough to start.
-4. **How much, and when?** A 10–90 minute slider, "A new edition every
+3. **Where do your feeds live now?** Three cards; tapping one answers and
+   moves on, with no Next:
+   - **I'll pick some sites** ("Newspapers, magazines, blogs, newsletters.
+     Most people start here."): this phone's sources step.
+   - **On my own RSS server** ("Tiny Tiny RSS. Your feeds stay there; the
+     paper is made from them."): sign-in.
+   - **In another reader app** ("Feedly, Inoreader and others: bring your
+     list as a file."): this phone too, starting with the import step.
+
+   Each card is a full-width bordered button with an arrow, one TalkBack
+   button read as its title and description, with no selected state to
+   show in colour. Below: "You can change this later in Settings." With
+   sites already added on this phone, the server card asks first: "Remove
+   the 3 sites you added?", **Remove and use my server** or **Keep them**.
+   The answer is saved as the tap moves on. "Step N of M"
+   follows the path: 4 steps for picking sites, 5 for a server or another
+   reader app.
+4. **From another reader app, bring your list:** "In Feedly or Inoreader,
+   look for Export or OPML in settings. Save the file, then choose it
+   here." **Choose the file** opens the system file picker; the step then
+   says "Added 42 sites", what was there already, or a plain error with
+   **Try again**. **Skip** (Next once sites are in) goes on to the sources
+   step below, which the import counts towards. The result survives the app
+   being closed in the picker.
+5. **With this phone, pick your sources:** starter packs of well-known
+   public feeds; paste any website (the app finds its feed); import an OPML
+   file (its folders are ignored: the paper has no sections); or import
+   saved links from Pocket or Instapaper, which alone are enough to start.
+6. **With a server, sign in**, then see what's there: the address,
+   username and password on the step itself, one message per cause when it
+   fails (API off, wrong password, can't reach it), with what was typed
+   kept, and **Use this phone instead**. Signed in, the same step says
+   "Found 58 feeds in 7 categories"; the paper takes from all of them, and
+   one category can be chosen later in Settings. Then **Also on this
+   phone:** the reading list (with Pocket and Instapaper import) and curated
+   lists. No starter packs. Going back to the question and choosing this
+   phone signs out, so no half-made account is left; going back from this
+   phone's sources and choosing the server removes the sites added there,
+   and the question asks first. Back waits while signing in, and an import
+   still reading stops before anything is removed.
+7. **How much, and when?** A 10–90 minute slider, "A new edition every
    day", and a "Ready by" time.
-5. **The first edition** builds right away, with its progress on Today.
+8. **The first edition** builds right away, with its progress on Today.
+
+Tap cards are for a single choice that moves you forward with nothing else
+to set on the page; multiple choices are checkboxes; a choice with a usual
+default on a page with more to set stays a radio group (Where do you read?,
+whose Kindle and KOReader answers ask for more on the same page).
 
 ## 9. Screens
 
@@ -392,11 +462,81 @@ phone restarts.
   to the articles (an unsent edition's go back for the next one). An article that went in because it was starred says
   "You starred it". On delivered editions each article has a trailing **☆** to
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
-- **Sources:** each source with its health ("Full articles", "Summaries
-  only", "Site blocks fetching", "Failing for N days"). A source's page
-  shows its recent articles, its cap, pause and the article-text setting;
-  **Remove source** is in its ⋮ menu, as on the list.
-  Each row is a status mark (`●` waiting, `✓` delivered, `○` read or not
+- **Sources:** one plain list, ruled between rows. Nothing on it folds or
+  moves, so e-ink doesn't redraw it, and TalkBack can jump by heading.
+  Tapping a row opens its page; a row has nothing else to tap.
+  - **Without a server:** the reading list, then each source in your order
+    with its health ("Full articles", "Summaries only", "Site blocks
+    fetching", "Failing for N days"). No headings, and nothing about servers.
+  - **With a server**, one list, not split into tt-rss and this phone:
+    nearly everything on it is tt-rss's, and the account's settings are in
+    Settings. Top to bottom:
+    - **Only when something needs doing**, a banner above the list (so one
+      that appears later isn't scrolled out of sight; at most a third of
+      the screen, scrolling within it, with TalkBack hearing it as a
+      heading and when it appears): **Sign in to your
+      tt-rss** with no working account; otherwise what's wrong in words
+      ("⚠ Couldn't reach tt-rss. Since 6:10 AM. Showing what it last
+      listed.", or that it's paused) with **Settings**, which opens
+      Settings › Where your feeds live. Nothing when all is well.
+    - **The reading list.**
+    - **Still on this phone**, a heading, only while there are phone feeds:
+      a banner, "8 feeds are fetched by this phone, not your tt-rss", with
+      **Move them to tt-rss** (only with a working account), then those
+      feeds. Above the server's feeds, since it asks for something; it goes
+      once they're moved.
+    - **Moving them:** a sheet lists every phone feed, ticked. One tt-rss
+      already has at the same address says "Already in your tt-rss: just
+      removed here". One category for the new ones (the paper's, else the
+      last used; a different one is warned about), and "Their settings here
+      come along". **Move N** starts it in the background; the banner then
+      shows stepped lines, "✓ Aeon · subscribed", then "Moving 5 of 8 ·
+      Quanta Magazine", changing once per feed. At the end a snackbar says
+      "Moved 8 feeds to your tt-rss". If some couldn't move, the banner says
+      "Moved 5 of 8", why each other one didn't, and **Move the other 3**,
+      which opens the sheet with just those ticked. If tt-rss stops
+      answering, the rest stop with it rather than each waiting in turn.
+    - **What a move does:** each feed is subscribed in tt-rss (or found
+      there), then its settings are carried onto its tt-rss feed: article
+      text, the cap, Skip paid posts, left out, and what the text check
+      learned. A feed paused on the phone is left out in tt-rss. The phone
+      feed stops fetching and leaves Sources at once, but it's only deleted
+      when nothing starred, waiting or in an unsent edition is left in it:
+      until then editions still take from it, so stars are kept, and for
+      two weeks after an edition with its articles is delivered, so Mark as
+      not sent still brings them back. A link already delivered, or marked
+      read on the phone, isn't delivered again when tt-rss brings it.
+      Signing in as another tt-rss user makes feeds still kept phone feeds
+      again, to move into that account if wanted.
+    - **The server's feeds:** each category a heading with its count and
+      an arrow ("News, 9 feeds, Expanded" to TalkBack), pinned at the top
+      while its feeds scroll by; its feeds A to Z under it. Tapping the
+      heading folds the category to just that line, and folded categories
+      stay folded, kept by name in the app's settings. Feeds with
+      no category go under **Uncategorized**, last. A line under a feed only
+      when it says something: "Not fetched by tt-rss yet" for a feed
+      just added, or its own settings ("Feed's text", "Full page", "At most
+      2", "Skips paid posts"). Each opens its own page, which says "In your
+      tt-rss · category News". Right after Articles from changes,
+      until the next check lists the new category, it says "Your feeds in
+      Science show here after the next check" instead.
+    - **Curated lists**, a heading, when there are any. They and the
+      reading list stay on the phone in both setups, and are never moved.
+    - **Not in your paper**, a heading, when either of these is there:
+      **Outside News** ("43 feeds") when the paper takes from one category,
+      whose page lists the other categories with their feeds and points to
+      Articles from in Settings; and **Left out** ("2 feeds"), whose page
+      lists the left-out feeds, each opening its page to bring it back.
+    - Every group (the reading list, Still on this phone, each category,
+      Curated lists, Not in your paper) has the same heading, semibold
+      serif in black like Settings' own (rust is for what you tap), and
+      ends with a rule across the page. Shorter rules, starting at the
+      text, divide the rows within one.
+  - A source's page shows its recent articles, pause, its cap and, for a
+    feed, the article-text setting; **Remove source** is in its ⋮ menu. A
+    tt-rss account has no page of its own: its settings, and leaving it,
+    are in Settings, and each of its feeds has a page.
+  On a source's or feed's page, each article row is a status mark (`●` waiting, `✓` delivered, `○` read or not
   used), the title, a details line and a trailing **☆**; tapping the row
   opens the original. Two toggles, one per question:
   - The status mark marks the article read (`●` → `○`) or unread (`○` or
@@ -426,10 +566,40 @@ phone restarts.
   - Nothing moves: a marked-read row stays in place with `○`, and
     entering or leaving selection doesn't shift the list, so e-ink
     doesn't redraw it.
-  Add a source, import or export OPML, or add a tt-rss account.
+  - **Without a server**, **Add a source** finds a site's feed and adds it
+    to the phone, offers the curated lists, or saves a page with no feed to
+    the reading list. The ⋮ menu imports or exports OPML.
+  - **With a server**, **Add a site** puts the site into tt-rss, so other
+    reader apps get it too:
+    - The phone finds the feed first, with the same finder (and "Which
+      part of this site?").
+    - Already in tt-rss (matched by address): "Already in your tt-rss",
+      "Quanta Magazine is in Science.", and nothing else.
+    - Otherwise **Subscribe in your tt-rss**, with a **Category** picker:
+      the category used last, else the one the paper takes articles from,
+      else Uncategorized. "To add a category, make it in tt-rss first":
+      tt-rss's API can't make one.
+    - **Asking tt-rss to subscribe…**, in plain text with no spinner. It
+      can take half a minute, as tt-rss downloads the feed first. Closing
+      the dialog doesn't stop it.
+    - Then a snackbar, "Added to your tt-rss, in Science.", with **Undo**,
+      which unsubscribes it. The feed's row appears at once, waiting for
+      tt-rss's first fetch.
+    - tt-rss refusing (it couldn't download or read the feed, an old
+      server, a read-only account) says why in plain words, and offers
+      **Save this page to your reading list** when the address typed was an
+      article. Fetching it from the phone instead is an open question.
+    - A site with no feed: "No feed on this site", with **Save this page to
+      your reading list**, or **Add Arts & Letters Daily** when the site is
+      one of the curated lists, which stay on the phone.
+    - If the dialog was closed, the answer comes as a snackbar when Sources
+      is open.
+    - The ⋮ menu has **Where your feeds live** instead of OPML: tt-rss
+      imports and exports OPML itself. No starter packs are offered.
+  Getting or leaving a server is in Settings.
 - **Reading list:** links you shared into the app, each with its title,
-  site and reading time (looked up in the background). They go into the
-  next edition under "Saved for later". Import and export as a Markdown
+  site and reading time (looked up in the background). They go first in
+  the next edition. Import and export as a Markdown
   checklist (compatible with the library); Pocket and Instapaper exports
   import too. **✕** removes a link at once, with **Undo** in a snackbar, since
   removing is routine and a confirm would only be tapped through.
@@ -456,6 +626,27 @@ phone restarts.
     was revoked, or its app uninstalled) says "Can't reach <name>. Tap to
     choose it again." instead of saving automatically, and tapping picks
     it again; so does the notes folder, which also offers **Turn off**.
+  - **Where your feeds live** (its row says "Sites you pick" or "Your
+    tt-rss · host"; in red, "Not signed in" or "Can't sign in to tt-rss"):
+    the two setups as radio rows, in onboarding's words: **I pick my own
+    sites** and **On my own RSS server**. Onboarding's third answer, "In
+    another reader app", is the first plus an import, so under it a line
+    says where the import is (Sources' menu). Picking the other setup
+    changes nothing until it's confirmed. **On my own RSS server** opens the sign-in, in place
+    of the page (Back returns to it). Signed in from the phone setup with
+    phone feeds, the page offers the move at once: "Signed in. 58 feeds in
+    7 categories. Move your 8 phone feeds to tt-rss?", **Move 8** (the same
+    sheet as Sources) or **Not now** (the banner on Sources stays). **I pick my own sites** asks first ("Pick your own sites instead?"), saying
+    what happens: newspapeRSS signs out of tt-rss and removes it here, with
+    its waiting and starred articles; nothing changes in tt-rss; its feeds
+    don't come along yet (add sites again, or import tt-rss's OPML export).
+    Feeds moved to tt-rss and still kept for their stars become phone feeds
+    again, and a move under way stops.
+    With a server, the page also has the account: its address, who's
+    signed in or why the login fails, when it was last checked, **Sign in
+    again** (the address and username filled in; the same user keeps their
+    category), **Articles from**, **Sync read status with tt-rss** and
+    **Start fresh**, and **Resume** if the account was paused.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
     delivered, by share, folder or Open, in the background so a slow cloud folder
@@ -489,7 +680,7 @@ How the code is built, with diagrams, is in [ARCHITECTURE.md](ARCHITECTURE.md).
 - **`:core` is pure Kotlin,** so the planner, parser, extractor and EPUB
   writer run as fast JVM tests.
 - **One activity, Jetpack Compose, ViewModels with StateFlow.**
-- **Room** holds sources, articles and editions, with exported schemas
+- **Room** holds sources, publications, articles and editions, with exported schemas
   (`app/schemas`) and tested migrations. **DataStore** holds settings.
 - **WorkManager** runs the sync, the build, the timers, and what follows
   delivery (marking tt-rss read, saving notes).

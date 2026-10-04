@@ -49,7 +49,7 @@ Setup takes a couple of minutes, in four steps:
   more), so no site drowns out the others. The full article is fetched and
   cleaned for e-ink when a site only sends summaries; the app works out
   which sites need that. A paid post goes in as its free part, with a note
-  saying so; a source can skip paid posts with nothing free at all.
+  saying so; a feed can skip paid posts with nothing free at all.
 - **Ready when you are.** Set a "ready by" time; the app starts early so the
   paper is there when you wake.
 - **A proper book.** A cover with the day's headlines, contents with

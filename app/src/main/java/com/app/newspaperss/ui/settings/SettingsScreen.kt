@@ -40,6 +40,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -95,12 +100,14 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpen: (SettingsPage) -> Unit)
         val notificationsOn = rememberNotificationsEnabled()
         val folderReachable = rememberReachable(s.folderUri)
         val notesReachable = rememberReachable(s.notesFolderUri)
+        val ttrss by viewModel.ttrssStatus.collectAsState()
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
             SettingsPage.entries.forEach { page ->
                 val summary = when (page) {
                     SettingsPage.EDITION -> SettingsSummary.edition(s)
                     SettingsPage.SCHEDULE -> SettingsSummary.schedule(s, notificationsOn, locale)
                     SettingsPage.DELIVERY -> SettingsSummary.delivery(s, folderReachable)
+                    SettingsPage.FEEDS -> SettingsSummary.feedsFrom(s.feedsFrom(hasServer = ttrss.source != null), ttrss)
                     SettingsPage.NOTES -> SettingsSummary.notes(s, notesReachable)
                 }
                 SummaryRow(page.title, summary) { onOpen(page) }
@@ -133,18 +140,42 @@ private fun SummaryRow(title: String, summary: Summary, onClick: () -> Unit) {
     }
 }
 
-/** One Settings page, opened from the summary: the same controls the summary row describes. */
+/**
+ * One Settings page, opened from the summary: the same controls the summary row describes.
+ *
+ * @param feedsFrom the "Where your feeds live" page's own state; that page is empty without it.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsPageScreen(viewModel: SettingsViewModel, page: SettingsPage, onBack: () -> Unit) {
+fun SettingsPageScreen(viewModel: SettingsViewModel, page: SettingsPage, onBack: () -> Unit, feedsFrom: FeedsFromViewModel? = null) {
     val settings by viewModel.settings.collectAsState()
+    val signingIn = page == SettingsPage.FEEDS && feedsFrom != null && feedsFrom.form.collectAsState().value != null
+    // Signing in takes the page over, as a step of its own: Back returns to the page.
+    BackHandler(enabled = signingIn) { feedsFrom?.closeSignIn() }
+    val snackbar = remember { SnackbarHostState() }
+    if (page == SettingsPage.FEEDS && feedsFrom != null) {
+        val notice by feedsFrom.notice.collectAsState()
+        LaunchedEffect(notice) {
+            val text = notice ?: return@LaunchedEffect
+            try {
+                snackbar.showSnackbar(text, duration = SnackbarDuration.Long)
+            } finally {
+                feedsFrom.noticeShown()
+            }
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(page.title) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+                title = { Text(if (signingIn) "Sign in to your tt-rss" else page.title) },
+                navigationIcon = {
+                    IconButton(onClick = { if (signingIn) feedsFrom.closeSignIn() else onBack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val s = settings ?: return@Scaffold
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
@@ -154,6 +185,11 @@ fun SettingsPageScreen(viewModel: SettingsViewModel, page: SettingsPage, onBack:
                 SettingsPage.DELIVERY -> {
                     ReaderPicker(s, viewModel)
                     DeliverySection(s, viewModel)
+                }
+                SettingsPage.FEEDS -> when {
+                    feedsFrom == null -> {}
+                    signingIn -> FeedsFromSignIn(feedsFrom)
+                    else -> FeedsFromSection(feedsFrom)
                 }
                 SettingsPage.NOTES -> NotesSection(s, viewModel)
             }

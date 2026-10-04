@@ -35,6 +35,14 @@ class ArticleExtractorTest {
         ExtractInput(url, feedTitle, feedHtml, feedAuthor = null, mode = mode)
 
     @Test
+    fun readingThePageCountsThePicturesInEachVersion() = runTest {
+        val http = FakeHttp(mapOf(url to page()))
+        val article = ArticleExtractor(http).extract(input(teaser))
+        assertEquals("the teaser has none", 0, article.feedImageCount)
+        assertEquals("the page's article has its hero image", 1, article.pageImageCount)
+    }
+
+    @Test
     fun autoFetchesThePageWhenTheFeedIsATeaser() = runTest {
         val http = FakeHttp(mapOf(url to page()))
         val article = ArticleExtractor(http).extract(input(teaser))

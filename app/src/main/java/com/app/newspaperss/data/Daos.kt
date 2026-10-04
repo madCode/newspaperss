@@ -18,17 +18,11 @@ import java.time.Instant
 
 @Dao
 interface SourceDao {
-    @Query("SELECT * FROM left_out_feeds WHERE sourceId = :sourceId")
-    fun observeLeftOut(sourceId: Long): Flow<List<LeftOutFeedEntity>>
+    @Query("SELECT * FROM publications WHERE sourceId = :sourceId AND leftOut = 1")
+    fun observeLeftOut(sourceId: Long): Flow<List<PublicationEntity>>
 
-    @Query("SELECT * FROM left_out_feeds")
-    suspend fun allLeftOut(): List<LeftOutFeedEntity>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun leaveOut(feed: LeftOutFeedEntity)
-
-    @Query("DELETE FROM left_out_feeds WHERE sourceId = :sourceId AND originId = :originId")
-    suspend fun takeBack(sourceId: Long, originId: String)
+    @Query("SELECT * FROM publications WHERE leftOut = 1")
+    suspend fun allLeftOut(): List<PublicationEntity>
 
     /**
      * The feeds an aggregator's articles came from since [since], each with the name it was last
@@ -39,9 +33,6 @@ interface SourceDao {
             "WHERE sourceId = :sourceId AND originId IS NOT NULL AND discoveredAt >= :since GROUP BY originId",
     )
     fun observeFeeds(sourceId: Long, since: Instant): Flow<List<FeedName>>
-
-    @Query("DELETE FROM left_out_feeds WHERE sourceId = :sourceId")
-    suspend fun clearLeftOut(sourceId: Long)
 
     @Query("SELECT * FROM sources ORDER BY position, id")
     fun observeAll(): Flow<List<SourceEntity>>
@@ -87,33 +78,66 @@ interface SourceDao {
     @Query("UPDATE sources SET serverNote = :note WHERE id = :id")
     suspend fun setServerNote(id: Long, note: String?)
 
-    @Query("UPDATE sources SET contentMode = :mode, fullTextEvidence = :evidence, fullTextStreak = :streak, fullTextDay = :day WHERE id = :id")
-    suspend fun setFullText(id: Long, mode: ContentMode, evidence: FullTextEvidence?, streak: Int, day: Long?)
+    @Query("SELECT * FROM publications WHERE sourceId = :sourceId AND `key` = :key")
+    suspend fun publication(sourceId: Long, key: String): PublicationEntity?
 
-    @Query("UPDATE sources SET contentMode = :mode, contentModeChosen = :chosen, fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL WHERE id = :id")
-    suspend fun setContentMode(id: Long, mode: ContentMode, chosen: Boolean)
+    @Query("SELECT * FROM publications")
+    suspend fun allPublications(): List<PublicationEntity>
 
-    @Query("UPDATE sources SET maxArticles = :max WHERE id = :id")
-    suspend fun setMaxArticles(id: Long, max: Int?)
+    @Query("SELECT * FROM publications")
+    fun observePublications(): Flow<List<PublicationEntity>>
 
-    /** Steps from the source's own cap, or from [default] if it has none, within 1..[limit]; in SQL so quick taps each count. */
-    @Query("UPDATE sources SET maxArticles = MAX(1, MIN(:limit, COALESCE(maxArticles, :default) + :delta)) WHERE id = :id")
-    suspend fun stepMaxArticles(id: Long, delta: Int, default: Int, limit: Int)
+    @Query("SELECT * FROM publications WHERE sourceId = :sourceId AND `key` = :key")
+    fun observePublication(sourceId: Long, key: String): Flow<PublicationEntity?>
 
-    @Query("UPDATE sources SET ttrssCategoryId = :categoryId, ttrssCategoryTitle = :title WHERE id = :id")
+    @Query("SELECT * FROM publications WHERE sourceId = :sourceId")
+    fun observePublicationsOf(sourceId: Long): Flow<List<PublicationEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun savePublication(publication: PublicationEntity)
+
+    @Query("DELETE FROM publications WHERE sourceId = :sourceId")
+    suspend fun clearPublications(sourceId: Long)
+
+    /** A new category, or a sign-in, lists the account's feeds again at the next sync. */
+    @Query("UPDATE sources SET ttrssCategoryId = :categoryId, ttrssCategoryTitle = :title, feedsListedAt = NULL WHERE id = :id")
     suspend fun setTtrssCategory(id: Long, categoryId: Int?, title: String?)
+
+    @Query("UPDATE sources SET feedsListedAt = :at WHERE id = :id")
+    suspend fun setFeedsListed(id: Long, at: Instant)
+
+    @Query("UPDATE publications SET listed = 0, outsideCategory = 0 WHERE sourceId = :sourceId")
+    suspend fun unlistPublications(sourceId: Long)
+
+    /** tt-rss has fetched these feeds: they have unread articles there. */
+    @Query("UPDATE publications SET awaitingFirstFetch = 0 WHERE sourceId = :sourceId AND `key` IN (:keys) AND awaitingFirstFetch = 1")
+    suspend fun fetchedByServer(sourceId: Long, keys: List<String>)
 
     @Query("UPDATE sources SET markReadOnServer = :markRead WHERE id = :id")
     suspend fun setMarkReadOnServer(id: Long, markRead: Boolean)
-
-    @Query("UPDATE sources SET skipPaidPosts = :skip WHERE id = :id")
-    suspend fun setSkipPaidPosts(id: Long, skip: Boolean)
 
     @Query("SELECT * FROM sources WHERE kind = :kind")
     suspend fun ofKind(kind: SourceKind): List<SourceEntity>
 
     @Delete
     suspend fun delete(source: SourceEntity)
+
+    /**
+     * Deletes the phone feeds among [ids], moved to tt-rss and paused, that have nothing left to
+     * give: no starred article, none waiting, none in an unsent edition, and none in an edition
+     * delivered since [deliveredSince], which "Mark as not sent" could still give back, stars and
+     * all. Deleting a source deletes its articles, so the check and the delete are one statement:
+     * an article starred or picked for an edition in between keeps its source.
+     */
+    @Query(
+        """DELETE FROM sources WHERE id IN (:ids) AND paused = 1 AND kind = 'FEED' AND NOT EXISTS (
+               SELECT 1 FROM articles WHERE articles.sourceId = sources.id
+               AND (articles.starredAt IS NOT NULL OR articles.state IN ('NEW', 'IN_EDITION')))
+           AND NOT EXISTS (
+               SELECT 1 FROM articles a JOIN edition_articles ea ON ea.articleId = a.id JOIN editions e ON e.id = ea.editionId
+               WHERE a.sourceId = sources.id AND e.status = 'DELIVERED' AND e.deliveredAt >= :deliveredSince)""",
+    )
+    suspend fun deleteSpent(ids: Collection<Long>, deliveredSince: Instant): Int
 }
 
 /**
@@ -171,6 +195,14 @@ interface ArticleDao {
 
     @Query("INSERT OR REPLACE INTO delivered_urls (url, deliveredAt) SELECT url, :at FROM articles WHERE id IN (:ids) AND url != ''")
     suspend fun rememberDelivered(ids: List<Long>, at: Instant)
+
+    /**
+     * A source's links the reader marked read, remembered as delivered: moved to tt-rss, the
+     * feed's posts arrive again unread there, and those would otherwise go in the paper. One
+     * already remembered keeps the time it went out.
+     */
+    @Query("INSERT OR IGNORE INTO delivered_urls (url, deliveredAt) SELECT url, :at FROM articles WHERE sourceId = :sourceId AND state = 'SKIPPED' AND url != ''")
+    suspend fun rememberRead(sourceId: Long, at: Instant)
 
     /**
      * Uses up other waiting copies of the articles' links, from a second feed, tt-rss or the
@@ -253,12 +285,15 @@ interface ArticleDao {
     )
     suspend fun markPaidOnly(id: Long, skip: Boolean)
 
-    /** How many of a source's articles were paid posts with nothing free, and how many of them are left out. */
+    /**
+     * How many of a publication's articles were paid posts with nothing free, and how many of them
+     * are left out. [key] as [PublicationEntity.key].
+     */
     @Query(
         """SELECT COUNT(*) AS found, COALESCE(SUM(CASE WHEN paidSkipped = 1 AND state = 'EXPIRED' THEN 1 ELSE 0 END), 0) AS skipped
-           FROM articles WHERE sourceId = :sourceId AND paidOnly = 1""",
+           FROM articles WHERE sourceId = :sourceId AND COALESCE(originId, '') = :key AND paidOnly = 1""",
     )
-    fun observePaidOnly(sourceId: Long): Flow<PaidOnlyCount>
+    fun observePaidOnly(sourceId: Long, key: String): Flow<PaidOnlyCount>
 
     @Query("SELECT COUNT(*) FROM articles WHERE id IN (:ids) AND paidSkipped = 1 AND state = 'EXPIRED'")
     suspend fun countPaidSkipped(ids: Collection<Long>): Int
@@ -270,6 +305,14 @@ interface ArticleDao {
            LIMIT :limit""",
     )
     fun observeRecentForSource(sourceId: Long, limit: Int): Flow<List<ArticleEntity>>
+
+    /** [observeRecentForSource] for one of an aggregator's feeds. */
+    @Query(
+        """SELECT * FROM articles WHERE sourceId = :sourceId AND originId = :originId
+           ORDER BY CASE WHEN published IS NULL OR published > discoveredAt + 86400000 THEN discoveredAt ELSE published END DESC, id DESC
+           LIMIT :limit""",
+    )
+    fun observeRecentForFeed(sourceId: Long, originId: String, limit: Int): Flow<List<ArticleEntity>>
 
     @Query("SELECT * FROM articles WHERE sourceId = :sourceId ORDER BY discoveredAt, id")
     suspend fun allForSource(sourceId: Long): List<ArticleEntity>

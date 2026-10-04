@@ -35,7 +35,6 @@ class ReadingListRepository(
                 contentMode = ContentMode.PAGE,
                 // First in line, so a saved link doesn't wait behind every feed.
                 position = -1,
-                section = SECTION,
             ),
         )
         return if (id == -1L) db.sources().byUrl(URL)!!.id else id
@@ -99,6 +98,5 @@ class ReadingListRepository(
     companion object {
         /** Not a web address, so it can never collide with a real feed's. */
         const val URL = "newspaperss:reading-list"
-        const val SECTION = "Saved for later"
     }
 }

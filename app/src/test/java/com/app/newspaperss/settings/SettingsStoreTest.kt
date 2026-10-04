@@ -37,6 +37,7 @@ class SettingsStoreTest {
                 previewTextSize = PreviewTextSize.LARGER,
                 kindleEmail = "me_42@kindle.com",
                 mailApp = "com.example.mail",
+                feedsFrom = FeedsFrom.SERVER,
             )
         }
         val s = store.current()
@@ -55,6 +56,37 @@ class SettingsStoreTest {
         assertEquals(PreviewTextSize.LARGER, s.previewTextSize)
         assertEquals("me_42@kindle.com", s.kindleEmail)
         assertEquals("com.example.mail", s.mailApp)
+        assertEquals(FeedsFrom.SERVER, s.feedsFrom)
+    }
+
+    @Test
+    fun anUpgradeWithATtrssAccountLandsInTheServerSetupAndWithoutOneOnThePhone() = runTest {
+        assertNull("unset before it's settled", store.current().feedsFrom)
+        assertEquals(FeedsFrom.SERVER, store.settleFeedsFrom { true })
+        assertEquals(FeedsFrom.SERVER, store.current().feedsFrom)
+
+        val other = SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("other.preferences_pb") })
+        assertEquals(FeedsFrom.PHONE, other.settleFeedsFrom { false })
+        assertEquals(FeedsFrom.PHONE, other.current().feedsFrom)
+    }
+
+    @Test
+    fun onceSettledTheSetupIsntGuessedAgain() = runTest {
+        store.settleFeedsFrom { false }
+        var asked = false
+        assertEquals("a tt-rss account added later doesn't switch it", FeedsFrom.PHONE, store.settleFeedsFrom { asked = true; true })
+        assertFalse(asked)
+        store.update { it.copy(feedsFrom = FeedsFrom.SERVER) }
+        assertEquals("nor does one removed", FeedsFrom.SERVER, store.settleFeedsFrom { false })
+        store.update { it.copy(edition = it.edition.copy(minutes = 20)) }
+        assertEquals("other changes keep it", FeedsFrom.SERVER, store.current().feedsFrom)
+    }
+
+    @Test
+    fun beforeItsSettledTheSetupFollowsTheAccount() {
+        assertEquals(FeedsFrom.SERVER, Settings().feedsFrom(hasServer = true))
+        assertEquals(FeedsFrom.PHONE, Settings().feedsFrom(hasServer = false))
+        assertEquals(FeedsFrom.PHONE, Settings(feedsFrom = FeedsFrom.PHONE).feedsFrom(hasServer = true))
     }
 
     @Test

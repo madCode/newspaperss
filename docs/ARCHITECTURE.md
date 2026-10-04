@@ -125,17 +125,20 @@ The steps, with where they live:
 1. **Sync.** `FeedSync.syncAll` (`app/data/FeedSync.kt`) fetches every
    unpaused source except the reading list, four at a time. Feeds go
    through `FeedParser`, tt-rss through `TtrssClient`, curated lists
-   through `CuratedLists`. It then
+   through `CuratedLists`; once a day a tt-rss sync also asks for the
+   account's whole feed list (`listTtrssFeeds`) to name its
+   publications. It then
    expires old waiting articles, forgets delivered links after a year and
    drops old feed text.
 2. **Start.** `EditionBuilder.build` (`app/edition/EditionBuilder.kt`)
    marks any edition left `BUILDING` by a dead process as failed, and
    releases editions still `READY` (never sent) so their articles go back.
    It then inserts the new edition as `BUILDING` and reads the candidates
-   (`ArticleDao.candidates`).
+   (`ArticleDao.candidates`), dropping left-out publications' unless starred.
 3. **Order.** `EditionPlanner.order` (`core/edition/EditionPlanner.kt`)
-   sorts candidates: stars first, then by turns across sources. A tt-rss
-   account's feeds each count as their own source ("publication").
+   sorts candidates: stars first, then by turns across publications: a
+   feed added here is one, and each of a tt-rss account's feeds is one. A
+   publication's own cap replaces the edition's.
 4. **Fill.** `EditionPlanner.fill` walks that order, fetching one article
    at a time through a callback, and stops when the time budget is met.
    Fetching inside the loop is what keeps a big pool cheap: articles
@@ -144,16 +147,17 @@ The steps, with where they live:
    (`app/edition/ExtractorContentProvider.kt`) runs `ArticleExtractor`
    (`core/extract/`), then downloads the images, four at a time, drawing
    on an `ImageAllowance` so images that can't fit aren't downloaded.
-   Decoding is one at a time (a mutex) to bound memory.
-6. **Fit and write.** Articles are put in reading order (sections, then
-   sources in list order), `ImageBudget.fit` settles the final image set,
+   Decoding is one at a time (a mutex) to bound memory. Which text to use
+   is chosen per publication (`TextChoices` in `EditionBuilder`), below.
+6. **Fit and write.** Articles are put in reading order (sources in list
+   order, tt-rss last as on Sources, each feed's articles together), `ImageBudget.fit` settles the final image set,
    `CoverRenderer` draws the cover, and `EpubWriter` (`core/epub/`) writes
    the book to `files/editions/`.
 7. **Commit.** One Room transaction writes `edition_articles`, sets the
    articles to `IN_EDITION` and the edition to `READY`. Until then no
    article has changed state, so a failure leaves them all for next time.
-   (The one exception: a paid post its source skips becomes `EXPIRED` as
-   soon as its fetch finds it, and stays so.)
+   (The one exception: a paid post its publication skips becomes
+   `EXPIRED` as soon as its fetch finds it, and stays so.)
 8. **Deliver.** With folder delivery, `EditionRun` copies the file
    (`FolderDelivery`, through the Storage Access Framework) and marks it
    delivered. Otherwise a timed run posts the "ready" notification.
@@ -161,6 +165,25 @@ The steps, with where they live:
 Failures inside a build mark the edition `FAILED` with a reason the
 reader can read; an exception never escapes as a crash
 (`EditionBuilder.fail`, `EditionWorker.doWork`).
+
+### Choosing an article's text
+
+The rules are in DESIGN.md; the evidence and its arithmetic are in
+`core/extract/FullTextCheck.kt`, recorded by `SourceRepository.recordFullText`.
+
+```mermaid
+flowchart TD
+    A[Article in plan order] --> B{Reader chose a mode for its publication?}
+    B -- yes --> M[Use it]
+    B -- no --> C{Long item, publication due a check,<br/>fewer than 5 checks this edition?}
+    C -- yes --> P[Read the page and compare]
+    P --> E[Evidence for its publication]
+    P --> T{Teaser?}
+    T -- yes --> PG[Page text]
+    T -- no --> FT[Feed text]
+    C -- no --> L[The publication's learned mode,<br/>short items still read the page]
+    E --> S[Three days the same way settles the publication]
+```
 
 ## Delivery and what follows
 
@@ -216,6 +239,7 @@ twice.
 | `NotesWorker` | First delivery | `notes-<edition>`, KEEP | Saves the notes file to the notes folder. |
 | `TtrssMarkReadWorker` | Delivery, mark not sent | `ttrss-mark-read-<edition>`, REPLACE | Up to 4 attempts. Reads the edition's state when it runs. |
 | `ReadingListTitleWorker` | New untitled links | `reading-list-titles`, APPEND_OR_REPLACE | Batches of 20, one batch at a time. |
+| `MoveFeedsWorker` | Moving phone feeds to tt-rss; app start, if a move is stored | `move-feeds`, APPEND_OR_REPLACE | Connected. Runs `FeedMoves.run`; what's left is in DataStore, so a run stopped part way carries on in the next. Appended so a run finishing up can't swallow a new move. |
 
 Timed editions use a chain of one-off timers, not periodic work, because
 periodic work can't say "6:30 on weekdays" and its start time drifts
@@ -233,17 +257,31 @@ exported to `app/schemas/`, and each version step has a `Migration`.
 ```mermaid
 erDiagram
     sources ||--o{ articles : "has (cascade delete)"
-    sources ||--o{ left_out_feeds : "tt-rss feeds left out"
+    sources ||--o{ publications : "carries (cascade delete)"
     editions ||--o{ edition_articles : "contains (cascade delete)"
     articles |o--o{ edition_articles : "set null on delete"
     sources {
         long id PK
         enum kind "FEED, READING_LIST, TTRSS, LIST"
         string url UK
-        string section
-        enum contentMode
-        int maxArticles
+        enum contentMode "PAGE for kinds with no feed text"
         bool paused
+        instant feedsListedAt "tt-rss: last full feed list"
+    }
+    publications {
+        long sourceId PK
+        string key PK "empty for its source's own, else the tt-rss feed id"
+        enum chosenMode "the reader's article text"
+        enum contentMode "what the check learned"
+        int maxArticles
+        bool leftOut
+        bool skipPaidPosts
+        string title "tt-rss"
+        string feedUrl "tt-rss"
+        string category "tt-rss"
+        bool listed "tt-rss: in the latest list"
+        bool outsideCategory "tt-rss: in the account, outside Articles from"
+        bool awaitingFirstFetch "tt-rss: not fetched there yet"
     }
     articles {
         long id PK
@@ -276,12 +314,23 @@ erDiagram
         string url PK
         instant deliveredAt
     }
-    left_out_feeds {
-        long sourceId PK
-        string originId PK
-        string title
-    }
 ```
+
+- **Sources carry, publications write.** A source is how articles arrive
+  (a feed address, a tt-rss account, the reading list, a curated list):
+  sync, read sync, sign-in and Pause are per source. A publication is who
+  wrote them, and holds the settings about the writing: article text, cap,
+  left out, Skip paid posts. A feed added here and a feed in tt-rss differ
+  only in which source carries them. An article's publication is
+  `(sourceId, originId ?: "")` (`PublicationEntity.keyOf`).
+- **A publication's row** is written only once there's something to keep;
+  no row means the defaults. Every read-modify-write of one runs in a
+  transaction (`SourceRepository.editPublication`, `recordFullText`,
+  `setFeedInPaper`, `listTtrssFeeds`), so none drops another's fields.
+- **`sources` keeps some unused columns** (`section`, `maxArticles`,
+  `contentModeChosen`, the old check state): dropping a column means
+  rebuilding the table, and with foreign keys on that would delete every
+  article.
 
 - **`delivered_urls`** stands alone, with no foreign key, so a delivered
   link is remembered even after its source is removed.
@@ -321,6 +370,7 @@ stays as a `DELETED` row to keep its title taken.
 |---|---|---|
 | Settings | DataStore (Preferences) | `app/settings/SettingsStore.kt` |
 | tt-rss account | Its own DataStore; the password encrypted with an Android Keystore AES-GCM key, excluded from backups | `app/data/TtrssAccountStore.kt`, `app/data/SecretCipher.kt` |
+| A move of phone feeds to tt-rss, and moved feeds still kept | Its own DataStore, `feed_moves` | `app/data/FeedMoves.kt` |
 | Timer state | SharedPreferences `edition-schedule` | `app/work/EditionScheduler.kt` |
 | EPUBs | `files/editions/`; only the newest 14 keep their file (unsent ones always do) | `EditionRepository.pruneFiles` |
 | Notes files | `files/notes/` | `app/edition/EditionNotes.kt` |
@@ -328,6 +378,87 @@ stays as a `DELETED` row to keep its title taken.
 
 Auto Backup leaves out the EPUBs, the timer state and the tt-rss account
 (`app/src/main/res/xml/backup_rules.xml`).
+
+**Where the feeds come from** is the setting `feedsFrom` (`PHONE` or
+`SERVER`), never guessed after it's set. It's unset only until the app's
+first start after the upgrade that added it: `AppContainer.settleFeedsFrom`
+sets it to `SERVER` if a tt-rss source exists, else `PHONE`; until then
+screens read it the same way (`Settings.feedsFrom(hasServer)`). `SERVER`
+with no working account (no tt-rss source, or a password the phone can't
+read, e.g. after a restore) is a state of its own, `TtrssStatus`, which
+Sources and Settings show as "Sign in to your tt-rss". Sources reads the
+setup too: with `SERVER` it shows the account only as a banner when it has
+a problem, then the reading list, the phone feeds still to move, the
+account's feeds by `publications.category`, and curated lists; with
+`PHONE` nothing of tt-rss. Its rows, the tt-rss part and the sign-in state load as one
+value (`SourcesViewModel.screen`), so nothing lands above rows already
+shown. The once-a-day feed list (`listTtrssFeeds`, in `FeedSync.kt`) marks feeds in the
+chosen category `listed` and, with a category chosen, asks for the rest
+and marks them `outsideCategory`: that's "Not in your paper". Both flags
+are cleared and redrawn together, and ignored while `feedsListedAt` is
+null after the category changes. Leaving the server
+is `TtrssRepository.signOut`: the login and the tt-rss source go, and with
+it, by cascade, its articles.
+
+**Adding a site with a server** subscribes in tt-rss rather than adding a
+phone feed. The phone finds the feed (`FeedFinder`), `TtrssRepository.feedAt`
+checks the account's listed feeds with `sameFeed`, and
+`TtrssRepository.subscribe` calls `TtrssClient.subscribeToFeed`, then lists
+the feeds at once (`listTtrssFeeds`, outside the daily gate, which keeps
+`feedsListedAt` set), so the row shows and Undo has the feed id even from
+a tt-rss too old to return it. tt-rss downloads the feed before it answers,
+so `TtrssSubscriptions` runs the request in the container's `appScope`:
+closing the dialog or leaving Sources doesn't cancel it, and the outcome
+waits in its `results` until Sources shows it, in the dialog if it's still
+open on that feed, else as a snackbar. A worker would survive the process
+dying, but an answer it got couldn't reach an open dialog or offer Undo;
+a subscribe cut off that way is in tt-rss anyway, and the next daily list
+shows it. The list after subscribing runs only if the same login is still
+signed in, and from a tt-rss that doesn't return the id, Undo's id is a
+feed new since the subscribe. Undo (`TtrssRepository.unsubscribe`, for
+that login only) unsubscribes, leaves the feed out and expires its waiting
+articles (a sync may have brought some, or still be bringing them), and
+lists again. A snackbar waits while an Add dialog is open, so its Undo
+can be reached. A feed tt-rss hasn't fetched yet (`last_updated` 0) is
+`awaitingFirstFetch` until a sync sees unread articles from it or the
+next list. The last category used is the setting `lastCategoryId`.
+
+**Moving phone feeds to tt-rss** (`FeedMoves`, run by `MoveFeedsWorker`;
+the sheet and banner are `PhoneFeedMover` in `ui/sources/MoveFeeds.kt`).
+`start` stores the batch in its DataStore: the source ids still to ask
+about, the category, the login signed in, and the account's feed keys as
+listed then. `run` takes the queue in Sources' order. A feed `feedAt`
+finds (by `sameFeed`) isn't subscribed again; any other goes through
+`TtrssRepository.subscribeForMove`, whose "already subscribed" (code 0)
+counts as there too. Each answer is stored before the next feed, so a run
+stopped by the app dying or WorkManager's time limit picks up after the
+last answer; the feed it was asking about is asked again, which tt-rss
+answers with code 0. A different login, or none, stops the rest; so does
+tt-rss not answering. Once the queue is empty the feeds are listed once
+(`listFor`, only under the same login), and each moved feed's tt-rss
+publication is found (`movedFeedAt`: the id tt-rss gave; on old servers
+the feed new since the batch began, at that address, never one listed
+before). The settings are copied from `(phoneSourceId, "")` onto
+`(ttrssId, feedId)` and the phone source paused in one transaction; the
+fields `listTtrssFeeds` owns (title, address, category, the list flags)
+are left to it.
+
+**Retiring a moved phone feed:** deleting a source cascades to its
+articles, starred ones too, so a moved feed is paused and kept in
+`FeedMoves`' `retiring` set instead, which Sources hides (only while it's
+paused: resumed from its page it's a phone feed again). `EditionBuilder`
+takes `retiring` sources' articles though they're paused, so stars and
+waiting articles still reach the paper. `FeedMoves.tidy`, after each
+periodic sync and each move, deletes them with `SourceDao.deleteSpent`,
+one statement that checks nothing starred, waiting or `IN_EDITION` is
+left, and nothing in an edition delivered in the last 14 days, which Mark
+as not sent could give back with its stars. Delivered links are in
+`delivered_urls`, and at the move the feed's links the reader marked read
+are added there too (`ArticleDao.rememberRead`), so tt-rss's copies of
+neither go in the paper. Leaving the server, or signing in as another
+user (`FeedMoves.restore`), unpauses the ones still kept and drops a move
+under way. A worker that keeps failing (three tries) gives what's left
+back to the banner (`FeedMoves.giveUp`).
 
 ## Doing things safely at the same time
 
@@ -343,7 +474,14 @@ Auto Backup leaves out the EPUBs, the timer state and the tt-rss account
   `NonCancellable` before rethrowing.
 - **Short-lived callers hand off:** receivers use `goAsync()` and the
   container's `appScope`, and work that may be slow (notes to a cloud
-  folder, tt-rss) goes to a worker.
+  folder, tt-rss) goes to a worker. Subscribing in tt-rss is the
+  exception, in `appScope`, since its answer goes back to the screen.
+- **One move at a time:** `FeedMoves.start` refuses a batch while one is
+  stored, checked inside the DataStore edit, and each step of a batch
+  writes only if its batch is still the stored one.
+- **One subscribe per feed at a time:** `TtrssSubscriptions` won't ask
+  tt-rss about a feed it's already asking about, so a double tap sends one
+  request.
 
 ## Tests and CI
 

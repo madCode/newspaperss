@@ -12,8 +12,131 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
+## Day 6 · Sat 3 Oct
+
+### Cycle 90: categories that fold
+- **From you:** a line after a category's last feed; categories you can fold; and whether categories should be at the page's own heading level.
+- **Shipped:** yes, one level: with no "Your tt-rss" heading, categories and the page's own groups are siblings. Every group heading is now the same semibold serif in black, as Settings' are (rust was only on Sources, and rust is what you tap). Each group ends with a rule across the page; rows within it keep the shorter rule. A category's heading shows its count and an arrow, and tapping it folds the category to that one line; folded categories stay folded, kept by name in the settings ("" for Uncategorized). TalkBack hears "News, 9 feeds, Expanded".
+
+### Cycle 89: a calmer Sources
+- **From you:** Sources felt overwhelming, and the category headings looked random next to the rest of the page.
+- **Shipped:** two critique passes. A rule ran under every row and above and below every category, about 25 on a page of 18 feeds; now rules only divide rows within a group, start at the text, and the space above each heading separates groups. Categories were small sans text boxed in by rules, reading like rows; they're now the page's serif a size down, in black ("Essays · 4"), and pinned at the top while a long category scrolls by. The page's own groups (Still on this phone, Curated lists, Not in your paper) keep the rust heading. The page ends with a **Not in your paper** heading over **Outside News** and **Left out**, each with its count. "Waiting for tt-rss's first fetch" is now "Not fetched by tt-rss yet".
+- **Critique caught, and left:** a fresh-eyes critic also suggested dropping the rules between feeds (kept: you asked for them with 50+ feeds), a "Your tt-rss" section heading (left: it brings back the split you removed), and one-line rows for phone feeds and curated lists, without the address and "Checking…" (open).
+
+### Cycle 88: Settings in onboarding's words
+- **From you:** match the Settings wording to onboarding.
+- **Shipped:** the Settings page is now **Where your feeds live**, with onboarding's words for its two setups: **I pick my own sites** ("Newspapers, magazines, blogs, newsletters. This phone fetches them.") and **On my own RSS server** ("Tiny Tiny RSS. Your feeds stay there; the paper is made from them.", or "Tiny Tiny RSS · host" when signed in). It stays radio rows, as it shows what's chosen now. Onboarding's third answer, another reader app, is the phone setup plus an import, so with sites you pick a line says the import is in Sources' menu. The row on Settings says "Sites you pick" instead of "This phone"; leaving the server asks "Pick your own sites instead?" with **Stop using tt-rss**. The Sources menu item and the tt-rss error messages use the new page name.
+
+### Cycle 87: onboarding in the reader's words; one list on Sources
+- **From you:** the clean-room wording for the onboarding question, as cards that move on when tapped, with a third answer for a list in another reader app; and Sources with a server as one list, since nearly all of it is tt-rss and its settings are in Settings.
+- **Shipped:** onboarding asks "Where do your feeds live now?" with three full-width cards: **I'll pick some sites**, **On my own RSS server** (Tiny Tiny RSS only, as it's the one that works) and **In another reader app**. A tap answers and moves on; each card is one TalkBack button read as its title and description, with an arrow and no state shown only in colour. Under them, "You can change this later in Settings". With sites already added on this phone, the server card asks before removing them: "Remove the 3 sites you added?" Another reader app is the phone setup starting with a step of its own: how to get the file from Feedly or Inoreader, **Choose the file**, then "Added 42 sites", what was there already, "No sites in that file", or "Couldn't read that file" with **Try again**; **Skip** goes on to picking sites. Its path counts 5 steps; going back and picking the server removes what it added, after asking. The result survives the app being killed in the file picker. With a server, Sources drops the account row and the "On this phone" and "From your tt-rss" headings: a banner only when the account needs something (sign in, can't reach it since a time, paused, a problem marking read) with **Settings**; then the reading list; **Still on this phone** with the Move banner and its feeds while there are any; the server's categories; **Curated lists**; Not in your paper and Left out. Sources' own OPML import now says when a file has no sites in it rather than "No new sites".
+- **Review caught:** with no Next, one tap (or a late e-ink tap, or TalkBack reaching the server card before the warning under the cards) removed every site already added; the server card now asks first. Going back while a file was still being read and then choosing the server let the import add its sites afterwards, mixing the setups; the fork now stops the import first. An earlier file's "Added 12 sites" stayed on the import step after those sites were removed; and sites added on the sources step showed as the file's before any file was chosen; the step shows only this visit's file now. The account banner could fill the screen at large text or in landscape; it takes at most a third and scrolls. It wasn't a TalkBack heading nor announced when it appeared; it's both now. Back during the fork's sign-out was overridden when it finished; Back waits now (from before this cycle). The second look caught the first fix waiting for a file still downloading before moving on, with Back refused meanwhile; the server choice now stops the import without waiting, and a lock keeps its adds and the removal apart. It also caught the phone choice cutting an import short, the confirmation flashing "0 sites" after the app was killed, and Back looking tappable while it did nothing. Found while testing: the banner as the list's first item appeared out of sight when it came up with the list open, as the list keeps its first row in place; it's above the list now.
+- **Decided for you:**
+  - The onboarding audit, by the rule (a single choice that moves you forward with nothing else to set becomes cards; multi-select stays checkboxes; a choice with a usual default on a page with more to set stays radios):
+
+    | Step | Choice | Decision | Why |
+    |---|---|---|---|
+    | Welcome | none | unchanged | Nothing to choose. |
+    | Where do you read? | device, single | stays radios | Kindle opens its email setup and KOReader its folder on the same page, and the others show a tip to read before going on. |
+    | ↳ Kindle's mail app | single, in a menu | stays a menu | "Ask each time" is the usual answer, on a page with the address to type. |
+    | Where do your feeds live now? | single | **cards** | Moves you on, with nothing else on the page. |
+    | Bring your list | none (a file) | unchanged | One button. |
+    | What do you like to read? | starter packs and sites, multiple | stays chips and checkboxes | Several at once. |
+    | Sign in to your tt-rss | none (a form) | unchanged | Fields to fill. |
+    | Also on this phone | curated lists, multiple | stays checkboxes | Several at once, or none. |
+    | How big, how often? | slider, switch, time | unchanged | No single choice. |
+  - The import step reads the file itself, with the same SourceRepository import as Sources, so its result is part of onboarding's saved state.
+  - Skip on the import step goes to the starter packs rather than straight to the end: someone whose file didn't work still needs sites.
+  - Coming back to the question shows no answer as chosen: each card is a way forward, not a setting.
+  - The account's "54 feeds in your paper" and "Articles from News" lines went with the row; Not in your paper ("43 feeds outside News") still says which category the paper takes.
+  - Settings › Where your feeds come from keeps its own wording (This phone / My own RSS server): it's a setting with a current value, so radios fit there.
+
+### Cycle 86: moving your phone feeds into tt-rss
+- **From you:** build step (d) of the server-or-phone design: phone feeds move into tt-rss in one tap, with their settings, and stars kept.
+- **Shipped:** with a server, Sources puts the phone's own feeds last under On this phone, beneath a banner, "8 feeds are fetched by this phone, not your tt-rss", with **Move them to tt-rss** (only with a working account; curated lists and the reading list never count). The sheet lists them all ticked, says "Already in your tt-rss: just removed here" for one tt-rss has at the same address, takes one category for the new ones, and says their settings come along. The move runs in the background, one feed at a time, as stepped lines: "✓ Aeon · subscribed", "Moving 3 of 4 · Quanta Magazine". At the end, "Moved 8 feeds to your tt-rss"; if some couldn't move, "Moved 5 of 8", why each didn't, and **Move the other 3**. Signing in from the phone setup in Settings offers the same at once: "Move your 8 phone feeds to tt-rss?", Move 8 or Not now. Each moved feed's article text, cap, Skip paid posts, left out and what the text check learned go onto its tt-rss feed; the phone feed stops fetching and leaves Sources, and is deleted only when nothing starred, waiting or in an unsent edition is left in it.
+- **Review caught:** signing in as another tt-rss user after a move left the moved feeds hidden and paused, then deleted, in neither account; they're phone feeds again now. Stories marked read on the phone came back unread from tt-rss; their links are remembered at the move. A moved feed was deleted as soon as its stars were delivered, so Mark as not sent on that edition lost them; it stays two weeks after delivery. Leaving the server just as a move finished could leave a phone feed paused; the move checks it's still on before each feed. A move whose work kept failing said "Moving" for good and refused a new one; after three tries what's left goes back to the banner. A feed an old tt-rss has under another address said "move it again" forever; it says to check tt-rss now. Left: Today's count of starred articles doesn't count those in moved feeds, though they go in; a feed paused on the phone sends its old stars once moved, which a paused feed wouldn't; leaving the server at the very moment a feed is moved can still leave that one paused.
+- **Decided for you:**
+  - Stars are kept by keeping the phone feed, paused and hidden, rather than moving its articles: editions still take what it holds, and it's deleted, in one statement that checks again, once nothing is left. Moving starred articles onto the tt-rss account would mix them into tt-rss's read sync.
+  - Its waiting articles still go in the paper meanwhile, so nothing goes missing while tt-rss makes its first fetch. For up to a week, a site can then fill two places in one edition (one from the phone, one from tt-rss) and the same post can wait twice, out of sight; the same link never goes in twice, and one delivered isn't delivered again.
+  - A feed tt-rss already has at much the same address isn't subscribed again (it would be a second feed in tt-rss); for anything else tt-rss's own "already subscribed" counts too.
+  - The phone's settings win over the tt-rss feed's own when it was already there: it's the one that was in the paper. A feed paused on the phone is left out in tt-rss.
+  - The category starts on the one the paper takes articles from, so moved feeds stay in it; another one is warned about.
+  - When tt-rss stops answering, or another login signs in, the rest of the batch stops at once instead of each waiting its turn.
+  - Leaving the server makes feeds still kept for their stars phone feeds again; without that they'd stay hidden with nothing to come from.
+  - No progress screen of its own: the banner on Sources (and the page in Settings) shows it, and the reader can leave.
+  - A move that loses its connection waits for it, saying "Moving", rather than failing; it carries on once connected.
+
+### Cycle 85: adding a site to your tt-rss
+- **From you:** build step (c) of the server-or-phone design: with a server, Add puts the site into tt-rss, with fallbacks when it can't.
+- **Shipped:** with a server, **Add a site** finds the feed on the phone as before, then asks **Subscribe in your tt-rss** with a category picker (the one used last, else the paper's, else Uncategorized; "To add a category, make it in tt-rss first"). "Asking tt-rss to subscribe…" can be closed: the request carries on in the app, and the answer comes as a snackbar, "Added to your tt-rss, in Science.", with **Undo**, which unsubscribes it and lets go of anything it brought meanwhile. The feed list is read again straight away, so the new row shows at once, "Waiting for tt-rss's first fetch", on Sources and its page. A feed already there says "Already in your tt-rss" and its category, matched by address or by tt-rss's own answer. tt-rss refusing says why in words (it couldn't download or read the feed, an old server, a read-only account) and offers the reading list for an article; a site with no feed offers the reading list, or Arts & Letters Daily when that's the site. With a server, the Sources ⋮ menu has Where your feeds come from instead of OPML. On the phone, nothing changes. tt-rss's subscribe status codes are checked against its source.
+- **Review caught:** signing in as another user while tt-rss was still answering listed the first user's feeds under the new account, and Undo then reported a removal that never happened; the list waits for the same login now, and Undo refuses another login's feed. Undo during a sync could still let that sync's articles from the feed into the paper; the feed is left out as well now. On an older tt-rss that doesn't say the new feed's id, Undo could pick a feed already there under a near-same address; it takes only a new feed now. An answer arriving while another Add was open hid its snackbar, and Undo, under the dialog; it waits now. Back from the category list closed the whole dialog. Re-adding a site while its Undo ran stayed on "Asking…". A database error after tt-rss had added the feed said it hadn't, and one during Undo could crash the app. A feed unsubscribed in tt-rss long ago counted as "already there" right after a category change. Left: "Waiting for tt-rss's first fetch" stays until the next daily list when the feed has no unread articles; a feed whose address redirects can still be added twice if tt-rss has it under the old address; an Undo snackbar not yet shown is lost if Android clears Sources (the feed stays in tt-rss, where it can be removed).
+- **Decided for you:**
+  - The subscribe runs in the app, not as background work: its answer goes back to the dialog or a snackbar with Undo. If the app is closed mid-way, tt-rss still adds it, and the next daily list shows it.
+  - No "fetch it from this phone instead" when tt-rss can't: that's your open question.
+  - The reading-list fallback is offered only for an article's address, not a site's front page, as on the phone setup.
+  - The curated lists stay offered in the Add dialog with a server, as on the phone: they're on the phone in both setups.
+  - The starter packs weren't offered anywhere after onboarding, and onboarding already hid them with a server, so nothing else changed there.
+  - New categories come from tt-rss: the picker lists empty ones too, so one just made there shows.
+
+### Cycle 84: Sources for a server
+- **From you:** build step (b) of the server-or-phone design: Sources for the server setup, P1 v3 of the mockups.
+- **Shipped:** with a server, Sources starts with **Your tt-rss · host** ("54 feeds in your paper", or what's wrong in words with a ⚠, such as "Couldn't reach tt-rss. Since 6:10 AM. Showing what it last listed."), which opens Settings › Where your feeds come from. Then **On this phone** (the reading list, curated lists, any phone feeds), then **From your tt-rss**: each category a TalkBack heading ("News, 9 feeds") with its feeds A to Z, Uncategorized last, each feed opening its page ("In your tt-rss · category News"). A line under a feed only for its own settings. **Not in your paper** counts the feeds outside a chosen category and opens a page listing them by category; **Left out · N** opens the left-out feeds. Without a server, Sources is today's list with nothing of tt-rss. The inset feeds, the fold button and its saved setting, the "Also on this phone" and "Also in your tt-rss" lines and the tt-rss-last sort on Sources are gone. The daily feed list now also lists the account's other feeds when a category is chosen (a new `outsideCategory` flag, folded into this branch's unreleased database step). A paused tt-rss account gets **Resume** in Settings.
+- **Review caught:** The list would open scrolled past the account row and the sign-in banner, which loaded after the rows (caught in the screenshots; the list now loads as one). After a category change, the old category's feeds showed as in the paper until the next check; they're hidden until then, with the left-out ones still reachable. Not in your paper said the paper took from everything right after a change. A left-out feed outside the category didn't say it was left out. tt-rss's Uncategorized in another language sorted as a category of its own. A comment claimed the paper's tt-rss order matched the screen's. Left: the paper still orders tt-rss feeds its own way, not by category; a feed list that keeps failing leaves "Checking…" until it succeeds, as before.
+- **Decided for you:**
+  - The account row opens Settings, as the mockups show; the tt-rss account's own source page (its articles, Feeds in your paper, Pause) can no longer be reached, so its Feeds in your paper checklist is gone. Each feed's page and Left out cover leaving feeds out.
+  - Pause isn't offered for the account any more; an account paused before gets Resume in Settings so it can't be stuck.
+  - Not in your paper lists the other categories with their feeds' names, not tappable feeds: a feed there comes back by changing Articles from.
+  - A left-out feed outside the chosen category counts under Not in your paper, not Left out.
+  - Left out and Not in your paper show only when they have something in them.
+  - Add a source is unchanged: with a server it still adds to the phone until step (c).
+  - Sources waits for the whole list (phone rows, the tt-rss part, the sign-in state) before showing it, so nothing lands above what's on screen.
+
+### Cycle 83: server or phone, chosen up front
+- **From you:** build step (a) of the server-or-phone design: the setup is an explicit choice, in onboarding and in Settings.
+- **Shipped:** onboarding asks "Where do your sites come from?" after "Where do you read?". This phone leads to the sources step, without Connect tt-rss; My own RSS server leads to sign-in on the step itself, then "Found 58 feeds in 7 categories", then the reading list and curated lists. "Step N of M" follows the path (4 or 5). Going back and choosing this phone signs out. Settings has a new page, Where your feeds come from, after E-reader & delivery: the choice, and with tt-rss the account's settings (Articles from, read sync, Start fresh, Sign in again), moved off the tt-rss source's page, which links there. Leaving tt-rss says what happens first, including that its feeds don't come along yet. With a server but no working account, Sources and Settings say "Sign in to your tt-rss". "Add tt-rss account" is gone from the Sources menu. No database change: the choice is a setting.
+- **Review caught:** going back to the phone while a sign-in was still running, or leaving Settings mid sign-in, could leave a tt-rss account in the phone setup with no way to remove it; Back waits now, and saving the account and the choice can't be cut in half. Sites added on the phone path stayed when the reader went back and picked the server; they're removed, and the step says so first. Choosing this phone with no account left a stray saved login. Leaving the server could be cut short by pressing Back. Left: switching from phone to server in Settings keeps the phone feeds, as designed until step (d) moves them; a DataStore write failing at the fork isn't caught, as elsewhere in Settings.
+- **Decided for you:**
+  - The choice is explicit: asked in onboarding, changed in Settings, and never guessed again once set.
+  - Someone who added tt-rss before the choice existed lands in the server setup; anyone else on this phone.
+  - The reading list and curated lists stay on the phone in both setups.
+  - No "fetch it from the phone instead" exception yet.
+  - With a server, onboarding doesn't offer the starter packs, and sites added on the phone path before switching to the server are removed.
+  - Onboarding doesn't ask for a category: the paper takes from all of tt-rss, and Settings narrows it.
+
+### Cycle 82: skipping paid posts, per feed
+- **From you:** paid posts are a habit of the writer, not of how the articles arrive, so the switch belongs to the publication.
+- **Shipped:** "Skip paid posts with nothing free" moves from the source to the publication: a feed's page and a curated list's page keep it, each tt-rss feed has its own on its page, and the tt-rss account's page has none. Its count of skipped posts is per publication too. A tt-rss account that had it on carries it to every feed already seen in its articles and to its left-out feeds; a feed first seen later starts with it off. Database version 7.
+
+### Cycle 81: up to date with main; plain rows on Sources
+- **From you:** bring the branch up to date with main; take the ⋮ menus off Sources, since everything in them is on the source's page.
+- **Shipped:** main's paid posts, Kindle email and Settings pages are in. Main's database version 6 shipped first, so this branch's database changes are one step from it, to version 7. A row on Sources opens its page and has nothing else to tap, except tt-rss's ▾.
+
+### Cycle 80: no sections; rules between the feeds
+- **From you:** sections are complexity a 30-minute paper of 8 articles doesn't need; take them out, and bring them back if they're missed. 50+ feeds without rules between them would be overwhelming.
+- **Shipped:** the paper is one list in your sources' order, with no headings, the reading list's "Saved for later" included; there's no Section setting, OPML folders are ignored on import and not written on export. The feeds under tt-rss have an inset rule between each. Database version 7 simply doesn't have sections.
+
+### Cycle 79: your tt-rss feeds on Sources, each with a page
+- **From you:** build the rest of "sources carry, publications write", through to the inset feeds on Sources.
+- **Shipped:** the article text you choose and the cap now belong to each publication, so a tt-rss feed can have its own ("at most 2 from Morning Wire"). Once a day tt-rss is asked for its whole feed list, read feeds included, with addresses and categories. On Sources, tt-rss is last, with a ▾ button that shows its feeds just beneath it, each opening a page like a feed's own, and a Left out list. The same site on the phone and in tt-rss says so on both rows. Database version 7.
+- **Left for later:** "Nothing new in 3 weeks" for quiet feeds (tt-rss's feed list says when it last fetched a feed, not when it last posted).
+
+### Cycle 78: left out moves onto the publication
+- **From you:** go with "sources carry, publications write": settings about the writing belong to the publication, settings about the connection to the source.
+- **Shipped:** the first step. Leaving a tt-rss feed out is now a flag on its publication, beside what the text check learned, instead of a table of its own. Nothing changes on screen. Database version 7.
+- **Review caught:** signing in again after the phone lost the password's key (same user, same server) wiped every left-out feed, and would now wipe what each feed had learned too. The saved address and username are now compared, which stay readable without the password.
+
+## Day 5 · Fri 2 Oct
+
+### Cycle 77: article text, checked and per publication
+- **From you:** Automatic should look at the page now and then before deciding a feed is full text; tt-rss feeds should each learn on their own; count pictures, not just words.
+- **Found:** a long item (300+ words) counted as proof the feed was full without its page ever being read, so a feed of long teasers settled on "Full articles". tt-rss feeds learned nothing at all.
+- **Shipped:** what the check learns lives per publication (a feed here, or one feed in tt-rss), moved from the source row. Each edition reads the pages of up to 5 long items, one per publication, while it's still working out or every 14 days once settled on the feed; a teaser found that way gets its page in that edition. A page with pictures the feed's copy lacks counts for the page.
+
 ## Day 4 · Thu 1 Oct
 
+### Cycle 76: what tt-rss is as a source, explored
+- **From you:** each tt-rss feed as its own source? add what you subscribe to here back to tt-rss? does either clutter?
+- **Did:** competitors, today's screens and clickable proposals, each critiqued by the personas over several rounds; in [docs/research/ttrss-backend/](research/ttrss-backend/index.html). Recommended: tt-rss stays one row with its feeds inset under it, folded; each feed learns its article text (cycle 77); sections and balance later; adding to tt-rss only by hand for now.
 ### Cycle 75: a tidier Settings page
 - **From you:** a pass over Settings, to clean it up.
 - **Shipped:**

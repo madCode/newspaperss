@@ -1,6 +1,11 @@
 package com.app.newspaperss.ui.sources
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -9,24 +14,47 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
+import com.app.newspaperss.core.plural
 import androidx.compose.material.icons.filled.Refresh
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Surface
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.first
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import android.text.format.DateFormat
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import com.app.newspaperss.data.FeedChoice
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,10 +79,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -62,6 +88,7 @@ import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.core.extract.ContentMode
 import com.app.newspaperss.core.extract.FullTextEvidence
 import com.app.newspaperss.core.lists.CuratedList
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
 import androidx.compose.foundation.selection.selectable
@@ -71,8 +98,17 @@ import androidx.compose.ui.semantics.Role
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {}, onOpenSource: (Long) -> Unit = {}) {
-    val rows by viewModel.rows.collectAsState()
+fun SourcesScreen(
+    viewModel: SourcesViewModel,
+    onOpenReadingList: () -> Unit = {},
+    onOpenSource: (Long) -> Unit = {},
+    onOpenFeed: (sourceId: Long, key: String) -> Unit = { _, _ -> },
+    onOpenLeftOut: (sourceId: Long) -> Unit = {},
+    onOpenNotInPaper: (sourceId: Long) -> Unit = {},
+    /** Opens Settings › Where your feeds live: the tt-rss account, and signing in to it. */
+    onOpenAccount: () -> Unit = {},
+) {
+    val screen by viewModel.screen.collectAsState()
     val add by viewModel.add.collectAsState()
     val message by viewModel.message.collectAsState()
     val snackbar = remember { SnackbarHostState() }
@@ -90,6 +126,23 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
             viewModel.dismissMessage()
         }
     }
+    // tt-rss's answers, which can arrive after the dialog that asked has closed.
+    val results by viewModel.subscribeResults.collectAsState()
+    LaunchedEffect(results) { results.firstOrNull()?.let(viewModel::take) }
+    LaunchedEffect(Unit) {
+        viewModel.notices.collect { waiting ->
+            val notice = waiting.firstOrNull() ?: return@collect
+            // A snackbar under an open dialog can't be reached, and its Undo would time out unseen.
+            viewModel.add.first { it == AddState.Closed }
+            val undo = notice.undo
+            val answer = snackbar.showSnackbar(notice.text, actionLabel = undo?.let { "Undo" }, duration = SnackbarDuration.Long)
+            if (answer == SnackbarResult.ActionPerformed && undo != null) viewModel.undo(undo)
+            viewModel.noticeShown(notice)
+        }
+    }
+    val server = screen?.server != null
+    val locale = LocalConfiguration.current.locales[0]
+    val is24Hour = DateFormat.is24HourFormat(context)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -99,16 +152,18 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Import from another reader (OPML)") },
-                                onClick = { menu = false; importFile.launch(arrayOf("*/*")) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Export your sites (OPML)") },
-                                onClick = { menu = false; exportFile.launch("newspapeRSS-sources.opml") },
-                            )
-                            if (viewModel.canAddTtrss) {
-                                DropdownMenuItem(text = { Text("Add tt-rss account") }, onClick = { menu = false; viewModel.openTtrss() })
+                            // With a server, its feeds are tt-rss's to import and export (Preferences › Feeds there).
+                            if (server) {
+                                DropdownMenuItem(text = { Text("Where your feeds live") }, onClick = { menu = false; onOpenAccount() })
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Import from another reader (OPML)") },
+                                    onClick = { menu = false; importFile.launch(arrayOf("*/*")) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Export your sites (OPML)") },
+                                    onClick = { menu = false; exportFile.launch("newspapeRSS-sources.opml") },
+                                )
                             }
                         }
                     }
@@ -119,7 +174,7 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
             ExtendedFloatingActionButton(
                 onClick = viewModel::openAdd,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Add a source") },
+                text = { Text(if (server) "Add a site" else "Add a source") },
                 // Filled like the app's other main buttons: the default pale container turns
                 // almost white on e-ink.
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -128,130 +183,116 @@ fun SourcesScreen(viewModel: SourcesViewModel, onOpenReadingList: () -> Unit = {
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        val list = rows
+        val shown = screen
+        val list = shown?.rows
+        val srv = shown?.server
         when {
             list == null -> Box(Modifier.fillMaxSize().padding(padding))
-            list.isEmpty() -> Column(Modifier.padding(padding)) {
+            srv == null && list.isEmpty() -> Column(Modifier.padding(padding)) {
                 ReadingListRow(onOpenReadingList)
                 EmptySources(Modifier)
             }
-            else -> LazyColumn(contentPadding = PaddingValues(bottom = 96.dp), modifier = Modifier.padding(padding)) {
-                item { ReadingListRow(onOpenReadingList) }
-                items(list, key = { it.source.id }) { row ->
-                    SourceItem(
-                        row,
-                        onOpen = { onOpenSource(row.source.id) },
-                        onRemove = { viewModel.remove(row.source) },
-                        onTogglePause = { viewModel.togglePaused(row.source) },
-                        onChooseMode = { viewModel.chooseContentMode(row.source, it) },
-                    )
-                    HorizontalDivider()
+            // Nothing folds or moves, and every key is unique and stable: on e-ink a list that
+            // shifts is redrawn whole, and two equal keys crash the list.
+            else -> Column(Modifier.padding(padding)) {
+                // With a server, the account itself only shows when something needs doing: its
+                // settings are in Settings, and nearly everything listed comes from it. Above the
+                // list rather than in it: the list keeps its first row in place, so a banner
+                // appearing later as its first item would land out of sight.
+                val account = srv?.account
+                // At most a third of the screen, scrolling within it, so with large text the list keeps room.
+                val bannerMax = (LocalConfiguration.current.screenHeightDp / 3).dp
+                Column(Modifier.heightIn(max = bannerMax).verticalScroll(rememberScrollState())) {
+                    if (srv != null && shown.needsSignIn) SignInBanner(onOpenAccount)
+                    else account?.let { accountProblem(it, locale, is24Hour) }?.let { AccountProblemBanner(it, onOpenAccount) }
                 }
+                SourceList(shown, viewModel, onOpenReadingList, onOpenSource, onOpenFeed, onOpenLeftOut, onOpenNotInPaper)
             }
         }
     }
     val curatedLists by viewModel.curatedLists.collectAsState()
-    AddSourceDialog(add, curatedLists, viewModel)
-    val ttrssForm by viewModel.ttrssForm.collectAsState()
-    ttrssForm?.let { TtrssDialog(it, viewModel) }
-}
-
-@Composable
-internal fun TtrssDialog(form: TtrssForm, viewModel: SourcesViewModel) {
-    val categories = form.categories
-    if (categories != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::closeTtrss,
-            // A stray tap beside it (easy on e-ink) shouldn't throw the choice away.
-            properties = DialogProperties(dismissOnClickOutside = false),
-            title = { Text("Which articles?") },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text(
-                        "Take unread articles from all your feeds, or from one category. You can change this on the source's page.",
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    Column(Modifier.selectableGroup()) {
-                        TtrssCategoryRow("All your unread articles", form.category == null) { viewModel.pickTtrssCategory(null) }
-                        categories.forEach { category ->
-                            TtrssCategoryRow(category.title, form.category?.id == category.id) { viewModel.pickTtrssCategory(category) }
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = viewModel::finishTtrss, enabled = !form.testing) { Text("Add") } },
-            dismissButton = { TextButton(onClick = viewModel::closeTtrss) { Text("Cancel") } },
-        )
-        return
+    AddSourceDialog(add, curatedLists, viewModel, server)
+    viewModel.mover?.let { mover ->
+        val sheet by mover.sheet.collectAsState()
+        sheet?.let { MoveSheetDialog(it, mover) }
     }
-    AlertDialog(
-        onDismissRequest = viewModel::closeTtrss,
-        title = { Text("Add tt-rss account") },
-        text = {
-            Column {
-                Text(
-                    "If you run Tiny Tiny RSS, newspapeRSS can make editions from your unread articles and mark them read there once an edition is delivered.",
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-                OutlinedTextField(
-                    value = form.address,
-                    onValueChange = { viewModel.editTtrss(form.copy(address = it)) },
-                    label = { Text("Address") },
-                    placeholder = { Text("rss.example.com/tt-rss") },
-                    singleLine = true,
-                    enabled = !form.testing,
-                    supportingText = if (form.address.trim().startsWith("http://", ignoreCase = true)) {
-                        { Text("This address isn't encrypted: your password would be sent in the clear. Use https:// if your server supports it.") }
-                    } else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = form.user,
-                    onValueChange = { viewModel.editTtrss(form.copy(user = it)) },
-                    label = { Text("Username") },
-                    singleLine = true,
-                    enabled = !form.testing,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = form.password,
-                    onValueChange = { viewModel.editTtrss(form.copy(password = it)) },
-                    label = { Text("Password") },
-                    singleLine = true,
-                    enabled = !form.testing,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = { viewModel.connectTtrss() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                when {
-                    form.testing -> Text("Signing in…", modifier = Modifier.padding(top = 12.dp))
-                    form.error != null -> Text(
-                        form.error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = viewModel::connectTtrss, enabled = form.address.isNotBlank() && !form.testing) { Text("Test and add") }
-        },
-        dismissButton = { TextButton(onClick = viewModel::closeTtrss) { Text("Cancel") } },
-    )
 }
 
+// Every group heading is pinned, not just the categories': a pinned heading stays until the
+// next one pushes it off, so the last category's would otherwise sit over the groups after it.
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TtrssCategoryRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun SourceList(
+    shown: SourcesList,
+    viewModel: SourcesViewModel,
+    onOpenReadingList: () -> Unit,
+    onOpenSource: (Long) -> Unit,
+    onOpenFeed: (sourceId: Long, key: String) -> Unit,
+    onOpenLeftOut: (sourceId: Long) -> Unit,
+    onOpenNotInPaper: (sourceId: Long) -> Unit,
+) {
+    val list = shown.rows
+    val srv = shown.server
+    val account = srv?.account
+    val folded = viewModel.folded.collectAsState().value ?: return
+    LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
+        item(key = "reading-list") {
+            ReadingListRow(onOpenReadingList)
+            GroupEnd()
+        }
+        if (srv == null) {
+            itemsIndexed(list, key = { _, it -> "source/${it.source.id}" }) { i, row ->
+                if (i > 0) RowDivider()
+                SourceItem(row, onOpen = { onOpenSource(row.source.id) })
+                if (i == list.lastIndex) GroupEnd()
+            }
+            return@LazyColumn
+        }
+        val (feeds, lists) = list.partition { it.source.kind == SourceKind.FEED }
+        // Above the server's feeds, since they ask for something: moving into tt-rss.
+        val mover = viewModel.mover
+        val moving = shown.phoneFeeds?.takeIf { mover != null }
+        if (feeds.isNotEmpty() || moving != null) {
+            stickyHeader(key = "on-phone") { SectionHeading("Still on this phone") }
+            if (mover != null && moving != null) {
+                item(key = "phone-feeds") { PhoneFeedsBanner(moving, onMove = { mover.open() }, onMoveOthers = mover::open) }
+            }
+            itemsIndexed(feeds, key = { _, it -> "source/${it.source.id}" }) { i, row ->
+                if (i > 0) RowDivider()
+                SourceItem(row, onOpen = { onOpenSource(row.source.id) })
+                if (i == feeds.lastIndex) GroupEnd()
+            }
+        }
+        if (account != null) serverCategories(account.id, srv, folded, viewModel::toggleCategory, onOpenFeed)
+        if (lists.isNotEmpty()) {
+            stickyHeader(key = "lists") { SectionHeading("Curated lists") }
+            itemsIndexed(lists, key = { _, it -> "source/${it.source.id}" }) { i, row ->
+                if (i > 0) RowDivider()
+                SourceItem(row, onOpen = { onOpenSource(row.source.id) })
+                if (i == lists.lastIndex) GroupEnd()
+            }
+        }
+        if (account != null) outsidePaper(account.id, srv, onOpenLeftOut, onOpenNotInPaper)
+    }
+}
+
+/** The server setup with no working account: nothing comes from tt-rss until the reader signs in. */
+@Composable
+private fun SignInBanner(onSignIn: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(label, modifier = Modifier.padding(start = 12.dp))
+        Column(Modifier.padding(16.dp)) {
+            Text("Sign in to your tt-rss", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+            Text(
+                "Your sites come from your tt-rss, and newspapeRSS isn't signed in to it. Until it is, your paper has only what's on this phone.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            )
+            Button(onClick = onSignIn) { Text("Sign in") }
+        }
     }
 }
 
@@ -263,7 +304,6 @@ private fun ReadingListRow(onClick: () -> Unit) {
         leadingContent = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
         modifier = Modifier.clickable(onClickLabel = "Open reading list", onClick = onClick),
     )
-    HorizontalDivider()
 }
 
 @Composable
@@ -282,13 +322,207 @@ private fun EmptySources(modifier: Modifier) {
     }
 }
 
+/** The problem with the tt-rss account, and the way to Settings, where it's put right. */
 @Composable
-private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit, onTogglePause: () -> Unit, onChooseMode: (ContentMode) -> Unit) {
-    var menu by remember { mutableStateOf(false) }
-    var choosingMode by remember { mutableStateOf(false) }
-    var removing by remember { mutableStateOf(false) }
+private fun AccountProblemBanner(problem: String, onOpen: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            // A heading, so TalkBack can jump to it, and announced when it appears while Sources is open.
+            Text(problem, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite })
+            OutlinedButton(onClick = onOpen, modifier = Modifier.padding(top = 8.dp).semantics { contentDescription = "Your tt-rss settings" }) {
+                Text("Settings")
+            }
+        }
+    }
+}
+
+/** The paper's feeds from tt-rss, under its categories. */
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.serverCategories(
+    accountId: Long,
+    server: ServerSources,
+    folded: Set<String>,
+    onToggle: (String) -> Unit,
+    onOpenFeed: (sourceId: Long, key: String) -> Unit,
+) {
+    if (server.categories.isEmpty()) {
+        item(key = "no-feeds") {
+            val category = server.account?.ttrssCategoryTitle
+            Text(
+                when {
+                    server.waitingForList -> "Your feeds${category?.let { " in $it" }.orEmpty()} show here after the next check."
+                    server.account?.lastFetchedAt == null -> "Your feeds show here once your tt-rss has been checked."
+                    else -> "None of your feeds are in the paper."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+    }
+    server.categories.forEach { category ->
+        val name = category.name ?: UNCATEGORIZED
+        // A feed is listed once, under one category, so its id alone is a unique key.
+        // Pinned while its feeds scroll by, so in a long category you know which one you're in.
+        val foldKey = category.name.orEmpty()
+        val open = foldKey !in folded
+        stickyHeader(key = category.name?.let { "category/$it" } ?: "uncategorized") {
+            CategoryHeading(name, category.feeds.size, open) { onToggle(foldKey) }
+            if (!open) GroupEnd()
+        }
+        if (open) {
+            itemsIndexed(category.feeds, key = { _, it -> "feed/${it.originId}" }) { i, feed ->
+                if (i > 0) RowDivider()
+                ListItem(
+                    headlineContent = { Text(feed.title) },
+                    supportingContent = feedNote(feed)?.let { { Text(it, style = MaterialTheme.typography.bodySmall) } },
+                    modifier = Modifier.clickable(onClickLabel = "Open ${feed.title}") { onOpenFeed(accountId, feed.originId) },
+                )
+                if (i == category.feeds.lastIndex) GroupEnd()
+            }
+        }
+    }
+}
+
+/** The account's feeds that aren't in the paper: outside its category, and left out. */
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.outsidePaper(accountId: Long, server: ServerSources, onOpenLeftOut: (Long) -> Unit, onOpenNotInPaper: (Long) -> Unit) {
+    if (server.outside.isNotEmpty() || server.leftOut > 0) stickyHeader(key = "outside-heading") { SectionHeading("Not in your paper") }
+    if (server.outside.isNotEmpty()) {
+        item(key = "not-in-paper") {
+            val title = server.account?.ttrssCategoryTitle?.let { "Outside $it" } ?: "Outside your category"
+            LinkRow(title, plural(server.outside.sumOf { it.feeds.size }, "feed")) { onOpenNotInPaper(accountId) }
+            if (server.leftOut == 0) GroupEnd()
+        }
+    }
+    if (server.leftOut > 0) {
+        item(key = "left-out") {
+            if (server.outside.isNotEmpty()) RowDivider()
+            LinkRow("Left out", plural(server.leftOut, "feed")) { onOpenLeftOut(accountId) }
+            GroupEnd()
+        }
+    }
+}
+
+/**
+ * The heading every group on the page shares, categories included. Black, as rust is for what
+ * you tap and turns a light grey on e-ink; semibold, as at a row's size it would otherwise pass
+ * for one.
+ */
+private val headingStyle @Composable get() = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+
+@Composable
+private fun SectionHeading(text: String) {
+    Text(
+        text,
+        style = headingStyle,
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 4.dp).semantics { heading() },
+    )
+}
+
+/**
+ * A server category: the section heading with its count, folding its feeds away when tapped.
+ * Opaque, as it's pinned over the rows while they scroll by. TalkBack reads "News, 9 feeds".
+ */
+@Composable
+private fun CategoryHeading(name: String, feeds: Int, open: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)
+            .clickable(onClickLabel = if (open) "Hide its feeds" else "Show its feeds", role = Role.Button, onClick = onToggle)
+            .heightIn(min = 48.dp)
+            .padding(start = 16.dp, end = 12.dp, top = 16.dp, bottom = 4.dp)
+            .semantics(mergeDescendants = true) {
+                heading()
+                contentDescription = "$name, ${plural(feeds, "feed")}"
+                stateDescription = if (open) "Expanded" else "Collapsed"
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(name, style = headingStyle, modifier = Modifier.weight(1f))
+        Text("$feeds", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            if (open) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
+}
+
+/** Between two rows of one group, starting at the text so the groups' edges stay clean. */
+@Composable
+private fun RowDivider() = HorizontalDivider(Modifier.padding(start = 16.dp))
+
+/** Closes a group, across the whole width. */
+@Composable
+private fun GroupEnd() = HorizontalDivider()
+
+@Composable
+private fun LinkRow(title: String, detail: String, onOpen: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(detail, style = MaterialTheme.typography.bodySmall) },
+        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+        modifier = Modifier.clickable(onClickLabel = "Open $title", onClick = onOpen),
+    )
+}
+
+/**
+ * Why nothing new is coming from the account, or null: paused, its last sync's error and since
+ * when, or a problem telling tt-rss what was read. A problem is marked with ⚠, as colour doesn't
+ * show on e-ink.
+ */
+internal fun accountProblem(account: SourceEntity, locale: Locale, is24Hour: Boolean, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String? = when {
+    account.paused -> "Your tt-rss is paused: nothing new comes from it until you resume it in Settings."
+    account.lastError != null -> listOfNotNull(
+        "⚠ ${account.lastError}",
+        account.failingSince?.let { failingSinceLine(it, locale, is24Hour, now, zone) },
+        "Showing what it last listed.",
+    ).joinToString(" ")
+    account.serverNote != null -> "⚠ ${account.serverNote}"
+    else -> null
+}
+
+/** "Since 6:10 AM" today, or "Since Sep 30". */
+private fun failingSinceLine(since: Instant, locale: Locale, is24Hour: Boolean, now: Instant, zone: ZoneId): String {
+    val date = since.atZone(zone)
+    val skeleton = when {
+        date.toLocalDate() == now.atZone(zone).toLocalDate() -> if (is24Hour) "Hm" else "hma"
+        date.year == now.atZone(zone).year -> "MMMd"
+        else -> "yMMMd"
+    }
+    return "Since ${DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)}."
+}
+
+/** A feed just subscribed to in tt-rss, which has nothing to give until tt-rss's own schedule fetches it. */
+internal const val WAITING_FOR_FIRST_FETCH = "Not fetched by tt-rss yet"
+
+/**
+ * A line under a feed only when it has something to say: a first fetch still to come, or its own
+ * settings. A line under all of them would be noise.
+ */
+internal fun feedNote(feed: FeedChoice): String? {
+    val p = feed.publication
+    return listOfNotNull(
+        WAITING_FOR_FIRST_FETCH.takeIf { p?.awaitingFirstFetch == true },
+        when (p?.chosenMode) {
+            ContentMode.FEED -> "Feed's text"
+            ContentMode.PAGE -> "Full page"
+            else -> null
+        },
+        p?.maxArticles?.let { "At most $it" },
+        "Skips paid posts".takeIf { p?.skipPaidPosts == true },
+    ).joinToString(" · ").ifEmpty { null }
+}
+
+/** A source's row: tapping it opens the source's page, where its settings are. Nothing else on the row, so 50+ rows stay plain. */
+@Composable
+private fun SourceItem(row: SourceRow, onOpen: () -> Unit) {
     val s = row.source
-    val fullText = fullTextLine(s)
+    val fullText = if (s.kind == SourceKind.FEED) fullTextLine(row.text) else null
     val status = statusLine(s, row.lastNew)
     ListItem(
         modifier = Modifier.clickable(onClickLabel = "Open ${s.title}", onClick = onOpen),
@@ -306,25 +540,7 @@ private fun SourceItem(row: SourceRow, onOpen: () -> Unit, onRemove: () -> Unit,
                 }
             }
         },
-        trailingContent = {
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More for ${s.title}") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text(if (s.paused) "Resume" else "Pause") }, onClick = { menu = false; onTogglePause() })
-                    if (s.kind == SourceKind.FEED) {
-                        DropdownMenuItem(text = { Text("Article text") }, onClick = { menu = false; choosingMode = true })
-                    }
-                    DropdownMenuItem(text = { Text("Remove source") }, onClick = { menu = false; removing = true })
-                }
-            }
-        },
     )
-    if (choosingMode) {
-        ContentModeDialog(s, onChoose = { choosingMode = false; onChooseMode(it) }, onDismiss = { choosingMode = false })
-    }
-    if (removing) {
-        RemoveSourceDialog(s, onConfirm = { removing = false; onRemove() }, onDismiss = { removing = false })
-    }
 }
 
 @Composable
@@ -346,14 +562,14 @@ internal fun RemoveSourceDialog(source: SourceEntity, onConfirm: () -> Unit, onD
 }
 
 @Composable
-internal fun ContentModeDialog(source: SourceEntity, onChoose: (ContentMode) -> Unit, onDismiss: () -> Unit) {
-    val current = if (source.contentModeChosen) source.contentMode else ContentMode.AUTO
+internal fun ContentModeDialog(current: ContentMode, onChoose: (ContentMode) -> Unit, onDismiss: () -> Unit, automatic: String = "Automatic") {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Article text") },
         text = {
             Column(Modifier.selectableGroup()) {
-                CONTENT_MODE_CHOICES.forEach { (mode, label) ->
+                CONTENT_MODE_CHOICES.forEach { (mode, choice) ->
+                    val label = if (mode == ContentMode.AUTO) automatic else choice
                     Row(
                         Modifier.fillMaxWidth()
                             .selectable(selected = mode == current, role = Role.RadioButton, onClick = { onChoose(mode) })
@@ -388,20 +604,20 @@ internal fun statusLine(source: SourceEntity, lastNew: Instant?): String = when 
 
 internal fun hasProblem(source: SourceEntity) = (source.lastError != null || source.serverNote != null) && !source.paused
 
-/** Where a site's article text comes from, once the app knows or the reader has chosen; null while it's still checking. */
-internal fun fullTextLine(source: SourceEntity): String? {
-    if (source.kind != SourceKind.FEED) return null
-    if (source.contentModeChosen) {
-        return when (source.contentMode) {
-            ContentMode.FEED -> "Uses the text the site sends (your choice)"
-            ContentMode.PAGE -> "Always fetches the full page (your choice)"
-            ContentMode.AUTO -> null
-        }
+/**
+ * Where a publication's article text comes from, once the app knows or the reader has chosen;
+ * null while it's still checking.
+ */
+internal fun fullTextLine(learned: PublicationEntity?): String? {
+    when (learned?.chosenMode) {
+        ContentMode.FEED -> return "Uses the text the site sends (your choice)"
+        ContentMode.PAGE -> return "Always fetches the full page (your choice)"
+        else -> {}
     }
-    return when (source.contentMode) {
+    return when (learned?.contentMode ?: ContentMode.AUTO) {
         ContentMode.AUTO -> null
         ContentMode.PAGE -> "Full articles"
-        ContentMode.FEED -> when (source.fullTextEvidence) {
+        ContentMode.FEED -> when (learned?.fullTextEvidence) {
             FullTextEvidence.FEED_SHORT -> "Summaries only"
             FullTextEvidence.BLOCKED -> "Site blocks fetching: using the summaries it sends"
             else -> "Full articles"
@@ -410,11 +626,26 @@ internal fun fullTextLine(source: SourceEntity): String? {
 }
 
 @Composable
-private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, viewModel: SourcesViewModel) {
+private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, viewModel: SourcesViewModel, server: Boolean) {
     if (state == AddState.Closed) return
+    // The category list replaces the Subscribe step's content, then Done brings it back.
+    var picking by remember(state is AddState.Subscribing) { mutableStateOf(false) }
     AlertDialog(
-        onDismissRequest = viewModel::closeAdd,
-        title = { Text(if (state is AddState.Choosing) "Which part of this site?" else "Add a source") },
+        // Back from the category list returns to the Subscribe step rather than losing the feed found.
+        onDismissRequest = { if (picking) picking = false else viewModel.closeAdd() },
+        title = {
+            Text(
+                when (state) {
+                    is AddState.Choosing -> "Which part of this site?"
+                    is AddState.Subscribing -> if (picking) "Category" else "Subscribe in your tt-rss"
+                    is AddState.Asking -> "Subscribe in your tt-rss"
+                    is AddState.AlreadyIn -> "Already in your tt-rss"
+                    is AddState.NoFeed -> if (state.list != null) "A curated list" else "No feed on this site"
+                    is AddState.Refused -> if (state.couldntFetch) "tt-rss couldn't fetch it" else "tt-rss didn't add it"
+                    else -> if (server) "Add a site" else "Add a source"
+                },
+            )
+        },
         text = {
             when (state) {
                 // Scrolls: at large text an error plus the curated lists can outgrow the dialog.
@@ -431,12 +662,13 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
                         keyboardActions = KeyboardActions(onGo = { viewModel.find() }),
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (server) Muted("It goes into your tt-rss, so your other reader apps get it too.")
                     if (state.page != null) {
                         TextButton(onClick = viewModel::saveInstead) { Text("Save this page to your reading list instead") }
                     }
                     if (curatedLists.isNotEmpty()) CuratedListChoices(curatedLists, viewModel::addList)
                 }
-                is AddState.Searching -> Text("Checking ${state.input}…")
+                is AddState.Searching -> Text("Checking ${state.input}…", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 is AddState.Choosing -> Column {
                     Text("This site offers more than one set of articles.", modifier = Modifier.padding(bottom = 8.dp))
                     state.feeds.forEach { feed ->
@@ -446,16 +678,94 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
                         )
                     }
                 }
+                is AddState.Subscribing -> if (picking) CategoryChoices(state, viewModel::chooseCategory) else SubscribeStep(state, onPick = { picking = true })
+                is AddState.Asking -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Stepped text rather than a spinner: e-ink redraws the whole screen for an animation.
+                    Text("Asking tt-rss to subscribe…", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                    Muted("A slow server can take half a minute. You can close this; it carries on.")
+                }
+                is AddState.AlreadyIn -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${state.title} is in ${state.category ?: UNCATEGORIZED}.")
+                    alreadyNote(state)?.let { Muted(it) }
+                }
+                is AddState.NoFeed -> Column {
+                    Text(
+                        if (state.list != null) "${state.site} has no feed, but newspapeRSS can read its picks each day, on this phone."
+                        else "${state.site} doesn't offer a feed, so tt-rss can't follow it.",
+                    )
+                    state.list?.let { list -> TextButton(onClick = { viewModel.addList(list) }) { Text("Add ${list.title}") } }
+                    if (state.page != null) TextButton(onClick = viewModel::saveInstead) { Text("Save this page to your reading list") }
+                }
+                is AddState.Refused -> Column {
+                    Text(state.reason)
+                    if (state.couldntFetch) Muted("Some sites block servers, or your server can't reach them.")
+                    if (state.page != null) TextButton(onClick = viewModel::saveInstead) { Text("Save this page to your reading list") }
+                }
                 AddState.Closed -> {}
             }
         },
         confirmButton = {
-            if (state is AddState.Editing) {
-                TextButton(onClick = viewModel::find, enabled = state.input.isNotBlank()) { Text("Add") }
+            when {
+                state is AddState.Editing -> TextButton(onClick = viewModel::find, enabled = state.input.isNotBlank()) { Text("Add") }
+                state is AddState.Subscribing && picking -> TextButton(onClick = { picking = false }) { Text("Done") }
+                state is AddState.Subscribing -> TextButton(onClick = viewModel::subscribeInTtrss, enabled = state.categories != null) { Text("Subscribe") }
+                state is AddState.AlreadyIn -> TextButton(onClick = viewModel::closeAdd) { Text("OK") }
             }
         },
-        dismissButton = { TextButton(onClick = viewModel::closeAdd) { Text("Cancel") } },
+        dismissButton = {
+            when (state) {
+                is AddState.AlreadyIn -> {}
+                is AddState.Asking -> TextButton(onClick = viewModel::closeAdd) { Text("Close") }
+                else -> if (!(state is AddState.Subscribing && picking)) TextButton(onClick = viewModel::closeAdd) { Text("Cancel") }
+            }
+        },
     )
+}
+
+@Composable
+private fun Muted(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+}
+
+/** The feed found, and the tt-rss category it goes into. */
+@Composable
+private fun SubscribeStep(state: AddState.Subscribing, onPick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(state.feed.title ?: SourceRepository.hostOf(state.feed.url), style = MaterialTheme.typography.titleSmall)
+        Muted(state.feed.url.substringAfter("://").removePrefix("www."))
+        Text("Category", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp))
+        val categories = state.categories
+        if (categories == null) {
+            Text("Loading your categories…", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        } else {
+            val name = categories.firstOrNull { it.id == state.chosen }?.title ?: UNCATEGORIZED
+            OutlinedButton(onClick = onPick, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Category, $name" }) {
+                Text(name, modifier = Modifier.weight(1f))
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+        }
+        state.error?.let { Text("Couldn't load your categories. $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        // tt-rss's API can't make a category.
+        Muted("To add a category, make it in tt-rss first.")
+    }
+}
+
+@Composable
+private fun CategoryChoices(state: AddState.Subscribing, onChoose: (Int) -> Unit) {
+    Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
+        state.categories.orEmpty().forEach { category ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .selectable(selected = category.id == state.chosen, role = Role.RadioButton, onClick = { onChoose(category.id) })
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = category.id == state.chosen, onClick = null)
+                Text(category.title, modifier = Modifier.padding(start = 12.dp))
+            }
+        }
+        Muted("To add a category, make it in tt-rss first.")
+    }
 }
 
 /** Sites that aren't feeds but pick a few links a day; one tap adds one. */

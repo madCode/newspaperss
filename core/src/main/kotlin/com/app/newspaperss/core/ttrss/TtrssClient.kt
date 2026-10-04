@@ -27,8 +27,32 @@ data class TtrssHeadline(
     val feedId: String,
 )
 
-/** One of the reader's feeds with unread articles, as getFeeds reports it. */
-data class TtrssFeed(val id: Int, val title: String, val unread: Int)
+/**
+ * One of the reader's feeds, as getFeeds reports it.
+ *
+ * @property lastUpdated when tt-rss last fetched it, in seconds since the epoch: 0 before its
+ *   first fetch, null from a version that doesn't say.
+ */
+data class TtrssFeed(
+    val id: Int,
+    val title: String,
+    val unread: Int,
+    val feedUrl: String? = null,
+    val categoryId: Int? = null,
+    val lastUpdated: Long? = null,
+)
+
+/** What tt-rss answered when asked to subscribe to a feed. */
+sealed interface TtrssSubscription {
+    /** [feedId] is null from versions that don't say it. */
+    data class Added(val feedId: Int?) : TtrssSubscription
+    data class AlreadySubscribed(val feedId: Int?) : TtrssSubscription
+    /**
+     * Not subscribed, with [reason] fit to show the reader. [couldntFetch] when tt-rss couldn't
+     * download or read the feed, which the phone just could: some sites block servers.
+     */
+    data class Refused(val code: Int, val reason: String, val couldntFetch: Boolean = false) : TtrssSubscription
+}
 
 /** A category of the reader's own feeds, as getCategories reports it. */
 data class TtrssCategory(val id: Int, val title: String)
@@ -41,7 +65,7 @@ sealed class TtrssException(message: String) : Exception(message) {
     class Redirected(val to: String) : TtrssException("The server sent us to $to. Try that address instead.")
     class NotTtrss : TtrssException("That address doesn't look like a tt-rss server.")
     class ApiError(val code: String) : TtrssException("tt-rss reported an error ($code).")
-    class TooOld : TtrssException("Your tt-rss is too old for this. Update it, or use Mark as read in tt-rss itself.")
+    class TooOld(message: String = "Your tt-rss is too old for this. Update it, or use Mark as read in tt-rss itself.") : TtrssException(message)
 }
 
 /**
@@ -114,16 +138,23 @@ class TtrssClient(
      *
      * @param categoryId a category, its subcategories included, or null for every feed.
      */
-    suspend fun unreadFeeds(categoryId: Int? = null): List<TtrssFeed> = unreadFeeds(categoryId, mutableSetOf())
+    suspend fun unreadFeeds(categoryId: Int? = null): List<TtrssFeed> = feeds(categoryId, unreadOnly = true, mutableSetOf())
 
-    private suspend fun unreadFeeds(categoryId: Int?, seen: MutableSet<Int>): List<TtrssFeed> {
+    /**
+     * Every one of the reader's feeds, read or not, with its address and category.
+     *
+     * @param categoryId a category, its subcategories included, or null for every feed.
+     */
+    suspend fun allFeeds(categoryId: Int? = null): List<TtrssFeed> = feeds(categoryId, unreadOnly = false, mutableSetOf())
+
+    private suspend fun feeds(categoryId: Int?, unreadOnly: Boolean, seen: MutableSet<Int>): List<TtrssFeed> {
         if (categoryId != null && !seen.add(categoryId)) return emptyList()
         val content = withSession { sid ->
             post(buildJsonObject {
                 put("sid", sid)
                 put("op", "getFeeds")
                 put("cat_id", categoryId ?: ALL_FEEDS)
-                put("unread_only", true)
+                put("unread_only", unreadOnly)
                 if (categoryId != null) put("include_nested", true)
             })
         }
@@ -135,22 +166,32 @@ class TtrssClient(
             // include_nested lists a subcategory as an item of its own, with an id from the
             // category sequence: fetched as a feed, it would be some unrelated feed.
             if ((o["is_cat"] as? JsonPrimitive)?.contentOrNull == "true") {
-                return@flatMap if (categoryId != null) unreadFeeds(id, seen) else emptyList()
+                return@flatMap if (categoryId != null) feeds(id, unreadOnly, seen) else emptyList()
             }
-            val unread = (o["unread"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0
-            listOf(TtrssFeed(id, (o["title"] as? JsonPrimitive)?.contentOrNull ?: "", unread))
+            fun text(key: String) = (o[key] as? JsonPrimitive)?.contentOrNull
+            listOf(
+                TtrssFeed(
+                    id, text("title") ?: "", text("unread")?.toIntOrNull() ?: 0,
+                    feedUrl = text("feed_url")?.takeIf { it.isNotBlank() }, categoryId = text("cat_id")?.toIntOrNull(),
+                    lastUpdated = text("last_updated")?.toLongOrNull(),
+                ),
+            )
         }
     }
 
     /**
      * The reader's categories, "Uncategorized" included. tt-rss's own Special and Labels
      * groups have negative ids and aren't categories of feeds, so they're left out.
+     *
+     * @param includeEmpty also categories with no feeds yet, which tt-rss otherwise leaves out:
+     *   a category made in tt-rss to subscribe a feed into is empty until then.
      */
-    suspend fun categories(): List<TtrssCategory> {
+    suspend fun categories(includeEmpty: Boolean = false): List<TtrssCategory> {
         val content = withSession { sid ->
             post(buildJsonObject {
                 put("sid", sid)
                 put("op", "getCategories")
+                if (includeEmpty) put("include_empty", true)
             })
         }
         val items = content as? JsonArray ?: throw TtrssException.NotTtrss()
@@ -235,6 +276,57 @@ class TtrssClient(
         }
     }
 
+    /**
+     * Subscribes the reader to [feedUrl] in [categoryId] (0 is Uncategorized). tt-rss downloads
+     * the feed before it answers, so this can take as long as a slow site does.
+     *
+     * @throws TtrssException.TooOld before API level 5, which has no subscribeToFeed.
+     */
+    suspend fun subscribeToFeed(feedUrl: String, categoryId: Int): TtrssSubscription {
+        val content = withSession { sid ->
+            if ((apiLevel ?: 0) < SUBSCRIBE_LEVEL) throw TtrssException.TooOld(TOO_OLD_TO_SUBSCRIBE)
+            post(buildJsonObject {
+                put("sid", sid)
+                put("op", "subscribeToFeed")
+                put("feed_url", feedUrl)
+                put("category_id", categoryId)
+            })
+        }
+        // {"status": {"code": 1, "feed_id": 12}}; versions before 2021 send no feed_id.
+        val status = (content as? JsonObject)?.get("status") ?: throw TtrssException.NotTtrss()
+        fun int(e: JsonElement?) = (e as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
+        val code = int((status as? JsonObject)?.get("code") ?: status) ?: throw TtrssException.NotTtrss()
+        val feedId = int((status as? JsonObject)?.get("feed_id"))?.takeIf { it > 0 }
+        return when (code) {
+            0 -> TtrssSubscription.AlreadySubscribed(feedId)
+            1 -> TtrssSubscription.Added(feedId)
+            2 -> TtrssSubscription.Refused(code, "tt-rss says that isn't a valid address.")
+            3 -> TtrssSubscription.Refused(code, "tt-rss found a web page there, not a feed.", couldntFetch = true)
+            4 -> TtrssSubscription.Refused(code, "tt-rss found more than one feed there.")
+            5 -> TtrssSubscription.Refused(code, "tt-rss couldn't download it.", couldntFetch = true)
+            6 -> TtrssSubscription.Refused(code, "tt-rss couldn't read the feed it downloaded.", couldntFetch = true)
+            7 -> TtrssSubscription.Refused(code, "tt-rss couldn't save it.")
+            8 -> TtrssSubscription.Refused(code, "Your tt-rss account can only read feeds, not subscribe to them.")
+            else -> TtrssSubscription.Refused(code, "tt-rss didn't subscribe to it (code $code).")
+        }
+    }
+
+    /**
+     * Unsubscribes the reader from the feed [feedId]; tt-rss deletes its articles with it.
+     *
+     * @throws TtrssException.TooOld before API level 5, which has no unsubscribeFeed.
+     */
+    suspend fun unsubscribeFeed(feedId: Int) {
+        withSession { sid ->
+            if ((apiLevel ?: 0) < SUBSCRIBE_LEVEL) throw TtrssException.TooOld(TOO_OLD_TO_SUBSCRIBE)
+            post(buildJsonObject {
+                put("sid", sid)
+                put("op", "unsubscribeFeed")
+                put("feed_id", feedId)
+            })
+        }
+    }
+
     /** Ends the session, if there is one. */
     suspend fun logout() {
         val sid = sessionId ?: return
@@ -305,6 +397,9 @@ class TtrssClient(
         private const val FIELD_UNREAD = 2
         /** catchupFeed takes a `mode` from here on; before, it marks everything read. */
         const val CATCHUP_MODE_LEVEL = 15
+        /** subscribeToFeed and unsubscribeFeed arrived in API level 5 (tt-rss 1.7.6). */
+        const val SUBSCRIBE_LEVEL = 5
+        const val TOO_OLD_TO_SUBSCRIBE = "Your tt-rss is too old to add feeds from newspapeRSS. Update it, or add the feed in tt-rss itself."
 
         /**
          * The API endpoint for an address the reader typed: "rss.example.com/tt-rss" becomes

@@ -22,7 +22,8 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
 
 ### The book
-- [ ] EPUB design, round 2: the cover image, section pages, and a look on real devices (Kindle, Kobo, KOReader) *(device)*
+- [ ] Video and audio players vanish without a trace: the cleaner drops every iframe, video and audio, leaving "Watch:" or a heading over nothing. In a sample of 405 recent items from 41 feeds (Oct 2), 8% had a player (16% outside the starter packs), almost all YouTube. Put a line where each was ("▶ Video: title, youtube.com/…") *(live)*
+- [ ] EPUB design, round 2: the cover image and a look on real devices (Kindle, Kobo, KOReader) *(device)*
 - [ ] Substack Notes embedded in posts that come through tt-rss: tt-rss strips the Note's text, so the sentence introducing it hangs. Fetching the post's page would bring it back (the full post is in the page's data), at one page fetch per Substack article *(device)*
 
 ### Delivery and schedule
@@ -33,8 +34,9 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
-- [ ] Decide what tt-rss is as a source *(you asked; sitting with it for a week first)*. Is it one source by itself, as now, or a doorway to the feeds underneath it, each with its own controls? Your gut says the current simple approach is best. The per-feed cap below and "tt-rss categories as sections" in the proposals depend on the answer
-- [ ] Per-feed cap on the tt-rss source page ("two from Current Affairs"); leaving a feed out is done
+- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page, is built (cycles 77–79). Still open: adding feeds to tt-rss from here, and how this joins "tt-rss and Google Reader API servers as full backends" below. Sections were taken out (cycle 80)
+- [ ] A quiet tt-rss feed says so under its row ("Nothing new in 3 weeks"). tt-rss's feed list gives when it last fetched a feed, not when it last posted, so this needs the newest article's date from getHeadlines, once a day
+- [ ] Search on the account page's feed list (F4), if scrolling 50+ feeds on Sources gets slow
 - [ ] Several categories, and tt-rss's Starred and Published as choices
 - [ ] A heart for "loved this / keep it", synced to tt-rss *(you asked)*. The ☆ stays "put it in my next edition": two different wishes, and tt-rss's own star already means "keep" (which is why its stars aren't synced as ☆ today). Things to settle first:
   - Where: on a source's rows, on delivered editions, and maybe from the book (a link on each article's end that opens the app).
@@ -130,35 +132,35 @@ Kindle (My Clippings), Kobo or KOReader; where notes should live (the app, or a 
 Several timed editions (a weekday morning paper and Sunday long reads), and a one-off custom edition
 (pick sources, size) without changing the defaults.
 
-### tt-rss categories as sections
-newspapeRSS sits on top of a reader rather than replacing it. tt-rss is one source today, optionally
-one category; its categories could become the paper's sections. This is the direction rather than
-making the app a full client, and it pairs with "Add sources to tt-rss": sources found here get
-subscribed on the server, and the server's categories come back as the paper's sections.
-
 Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
 
 ### Add sources to tt-rss, not just the phone
-For someone with a tt-rss account, a site found in newspapeRSS (a starter pack, a curated list, a
-pasted address) could be subscribed on the server instead, with the API's `subscribeToFeed`. It would
-then show up in their other reader apps too, and read state stays in one place. Open questions:
-- which tt-rss category it goes in;
-- whether the phone-side source is then dropped, so articles don't arrive twice;
-- what to do for an OPML import.
+With a server, Add a site now subscribes in tt-rss, into a category the reader picks (cycle 85).
+Still open:
+- a site tt-rss can't fetch: offer to fetch it from the phone instead, labelled as the one
+  exception to "never mixed"? Today it offers only the reading list;
+- unsubscribing in tt-rss from a feed's page.
 
 ### tt-rss and Google Reader API servers as full backends *(you asked)*
 Consider letting a reader server be the backend for every source it can handle, rather than one
 source among many. A feed the reader's server already follows would come from the server: fetched
 there, read state kept there, and the same in their other reader apps. Sources the server can't
 handle (saved links, curated lists) stay on the phone.
+- Designed: two setups, server or phone, never mixed, with a build order ([research/server-mode.md](research/server-mode.md)).
+  Steps (a), the choice in onboarding and Settings (cycle 83), (b), Sources for a server
+  (cycle 84), (c), adding a site to the server (cycle 85), and (d), moving phone feeds there
+  (cycle 86), are built. Next: (e) leaving a server (its feeds become phone feeds, starred
+  articles go to the reading list).
 - Which servers: tt-rss (done as one source today) and the
   [Google Reader API](https://freshrss.github.io/FreshRSS/en/developers/06_GoogleReader_API.html),
   which [FreshRSS](https://freshrss.org), [Miniflux](https://miniflux.app/docs/google_reader.html),
   [Inoreader](https://www.inoreader.com/developers/), The Old Reader and BazQux speak. One Google
   Reader client covers all of them, and it lessens the risk of tt-rss living on as a
   [fork](https://linuxiac.com/tt-rss-shuts-down-but-the-project-lives-on-under-a-new-fork/).
-- Settle first: "Decide what tt-rss is as a source" above, since a backend makes each server feed
-  its own source; and how this joins "Add sources to tt-rss".
+- What a server's feed is, is settled (cycles 77–79): a publication the account's source carries,
+  with its own settings and page, not a source of its own. A Google Reader API account would be
+  another source carrying publications the same way. Still to settle: how this joins "Add sources
+  to tt-rss".
 - An architecture change: the server, not the phone, would fetch and track those feeds.
 
 ### Languages
@@ -242,6 +244,13 @@ phone. What's missing:
 - **Generated summaries:** not doing. The paper gives whole articles; AI-shortened digests are what
   the competitors do, not what this app is for.
 
+### Sections in the paper (taken out)
+Taken out in cycle 80, with OPML folders, the reading list's "Saved for later" heading, tt-rss
+categories as sections and balancing by section. A 30-minute paper is often 8 articles, so headings
+mostly sat over one article each, and they added a setting to every feed's page. Feed readers group
+feeds into folders to find them, which is what the inset list on Sources does; the paper doesn't
+need it. Bring back if longer papers make the contents hard to scan.
+
 ### Local news for your city or country (parked)
 Parked: hard to do well, and curated lists go stale. Adding a local paper by its address already works.
 Help people find news sources near them: local papers, public broadcasters, city blogs.
@@ -265,8 +274,16 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Onboarding asks "Where do your feeds live now?" with three tap cards (pick sites, your own RSS server, another reader app), and another reader app starts with importing its OPML file; Sources with a server is one list, the account only showing when something's wrong, phone feeds still to move under "Still on this phone", and curated lists in a group *(you asked)*
+- [x] Moving your phone feeds into tt-rss: a banner on Sources and an offer right after signing in, a sheet with every feed ticked and one category, stepped progress in the background, "Move the other 3" for what didn't move; settings carried over, and a moved feed kept, paused and hidden, until its stars are delivered; step (d) of [research/server-mode](research/server-mode.md) *(you asked)*
+- [x] Adding a site with a server subscribes in your tt-rss, in a category you pick (the last one used), with Undo; already there, no feed, or tt-rss refusing each say so and offer the reading list or a curated list; OPML items give way to Where your feeds come from; step (c) of [research/server-mode](research/server-mode.md) *(you asked)*
+- [x] Sources for a server: your tt-rss account first, then what's on this phone, then the server's categories as headings with their feeds A to Z, Uncategorized, Not in your paper and Left out last; without a server, nothing of tt-rss; step (b) of [research/server-mode](research/server-mode.md) *(you asked)*
+- [x] Server or phone, chosen up front: a question in onboarding, a Settings page for the choice and the tt-rss account, and a "Sign in to your tt-rss" state; step (a) of [research/server-mode](research/server-mode.md) *(you asked)*
+- [x] Your tt-rss feeds on Sources: inset under the tt-rss row, folded until you open them, each with its own page (leave out, article text, cap, its articles); a daily feed list from tt-rss names every feed; article text and cap are per publication, so a tt-rss feed has its own
+- [x] Article text is checked, not assumed: each edition reads the pages of up to 5 long items, one per publication (a feed here, or one feed in tt-rss), which each learn on their own; pictures the feed's copy lacks count for the page
 - [x] Email editions straight to your Kindle: its own address, your mail app opened ready to send *(you asked, #123)*
 - [x] Paid posts say they're only the free part; a source can skip the ones with nothing free (a title and a picture), off by default, with a count on its page *(you asked)*
+- [x] Skip paid posts is per publication, so each tt-rss feed has its own switch on its page; a tt-rss account's switch carried over to the feeds already seen *(you asked)*
 - [x] After a send with the Kindle app, a line says it can take a few minutes to show up in the library *(device)*
 - [x] A text size setting for the article preview (Aa in its top bar) *(your brother asked)*
 - [x] Comics in the preview: large pictures standing alone fill the width, and the page can be pinched to zoom *(you asked)*

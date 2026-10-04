@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Server or phone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;600;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400&display=swap">
+<style>
+/* Layout: a newsprint review folder. Tabs across the top; each proposal pairs its notes with a live phone. */
+:root {
+  /* The app's own palette (ui/theme/Theme.kt), light */
+  --bg: #F7F4EC; --fg: #1C1B1A; --muted: #4A4740; --accent: #8C2F1B; --on-accent: #ffffff;
+  --accent-soft: #F3D9CF; --on-accent-soft: #3B0D02;
+  --card: #EFEADD; --card-hi: #E4DDCC; --line: #948D80; --line-soft: #D8D1C1;
+  --good: #2F5D3A; --warn: #8A5A00;
+  --serif: "Noto Serif", Georgia, "Times New Roman", serif;
+  --sans: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Roboto Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161514; --fg: #E9E4D8; --muted: #CBC5B8; --accent: #E8A594; --on-accent: #3B0D02;
+  --accent-soft: #5C2112; --on-accent-soft: #F3D9CF;
+  --card: #211F1D; --card-hi: #363330; --line: #7A746A; --line-soft: #3A3733;
+  --good: #9CCB9F; --warn: #E3B860; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #161514; --fg: #E9E4D8; --muted: #CBC5B8; --accent: #E8A594; --on-accent: #3B0D02;
+  --accent-soft: #5C2112; --on-accent-soft: #F3D9CF;
+  --card: #211F1D; --card-hi: #363330; --line: #7A746A; --line-soft: #3A3733;
+  --good: #9CCB9F; --warn: #E3B860; color-scheme: dark;
+}
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); padding-inline: 16px; padding-block: 0 48px; margin: 0 }
+.wrap { max-width: 1120px; margin: 0 auto }
+h1, h2, h3 { font-family: var(--serif); text-wrap: balance; line-height: 1.2; margin: 0 }
+h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 700 }
+h2 { font-size: 1.5rem; font-weight: 700 }
+h3 { font-size: 1.1rem; font-weight: 600 }
+p, li { max-width: 68ch }
+a { color: var(--accent) }
+code { font: 0.86em var(--mono); background: var(--card); padding: 0 4px; border-radius: 3px }
+.masthead { padding-block: 28px 12px; border-bottom: 3px double var(--line); display: grid; gap: 6px }
+.kicker { font: 500 0.72rem var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted) }
+.dek { color: var(--muted); max-width: 70ch; margin: 0 }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); display: flex; gap: 4px; overflow-x: auto; padding-block: 10px; border-bottom: 1px solid var(--line-soft) }
+.tabs button { font: 500 0.9rem var(--sans); color: var(--muted); background: none; border: 1px solid transparent; border-radius: 999px; padding: 6px 14px; cursor: pointer; white-space: nowrap }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--on-accent-soft); }
+.tabs button:focus-visible, .phone :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.tab { padding-block: 24px; display: grid; gap: 20px }
+.lede { display: grid; gap: 10px }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 32px; align-items: start }
+@media (max-width: 860px) { .split { grid-template-columns: minmax(0, 1fr) } .split .stage { justify-self: center } }
+.notes { display: grid; gap: 14px; min-width: 0 }
+.notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px }
+.pill { display: inline-block; font: 500 0.72rem var(--sans); letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; background: var(--card-hi); color: var(--fg) }
+.pill.v { background: var(--accent-soft); color: var(--on-accent-soft) }
+.pros-cons { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px }
+.pros-cons > div { border-top: 2px solid var(--line); padding-top: 8px }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 6px }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line-soft) }
+th { font-weight: 500; background: var(--card); position: sticky; top: 0 }
+td.y { color: var(--good) } td.n { color: var(--muted) }
+.log { display: grid; gap: 14px }
+.log article { border-left: 3px solid var(--line-soft); padding-left: 14px; display: grid; gap: 4px }
+.log h3 { font-size: 1rem }
+.log .when { font: 0.78rem var(--mono); color: var(--muted) }
+.critique { background: var(--card); border-radius: 8px; padding: 14px 16px; display: grid; gap: 8px }
+.critique h3 { font-size: 1rem }
+.critique ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px }
+.who { font-weight: 500 }
+details summary { cursor: pointer; font-weight: 500 }
+
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px }
+.shot { margin: 0; display: grid; gap: 8px; align-content: start; min-width: 0 }
+.shot.wide { grid-column: span 2 }
+@media (max-width: 520px) { .shot.wide { grid-column: auto } }
+.shot img { width: 100%; max-height: 440px; object-fit: contain; object-position: top; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--card) }
+.shot figcaption { font-size: 13px; color: var(--muted); display: grid; gap: 3px }
+.shot figcaption b { color: var(--fg) }
+.shot .map { color: var(--fg) }
+.shot .nopic { display: none; font-size: 13px; padding: 24px 12px; border: 1px dashed var(--line); border-radius: 6px; color: var(--muted) }
+.shot.missing img { display: none } .shot.missing .nopic { display: block }
+
+/* ---------- The phone: newspapeRSS's own screens, in its own theme ---------- */
+.stage { display: grid; gap: 10px; justify-items: center; width: min(360px, 100%) }
+.phone { width: 100%; max-width: 360px; height: 720px; border-radius: 28px; border: 8px solid #0d0c0b; background: var(--bg); color: var(--fg); position: relative; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,.18); font-size: 14px; line-height: 1.4 }
+.phone .status { height: 22px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; font: 500 11px var(--sans); color: var(--muted) }
+.phone .screen { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative }
+.phone .bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 4px; min-height: 52px }
+.phone .bar .t { font: 700 20px var(--serif); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.phone .bar.big .t { font-size: 25px; padding-left: 12px }
+.phone .ib { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: none; border: 0; color: var(--fg); cursor: pointer; flex: none }
+.phone .ib svg { width: 22px; height: 22px }
+.phone .body { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 80px }
+.phone .nav { flex: none; height: 62px; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--card); align-items: center; text-align: center; font: 500 11px var(--sans) }
+.phone .nav span { display: grid; justify-items: center; gap: 2px; color: var(--muted) }
+.phone .nav span.on b { background: var(--card-hi) }
+.phone .nav b { display: grid; place-items: center; width: 52px; height: 26px; border-radius: 999px }
+.phone .nav svg { width: 18px; height: 18px }
+.phone .fab { position: absolute; right: 14px; bottom: 76px; background: var(--accent); color: var(--on-accent); border: 0; border-radius: 16px; padding: 14px 18px; font: 500 14px var(--sans); display: flex; gap: 8px; align-items: center; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,.25) }
+.phone .fab svg { width: 18px; height: 18px }
+.phone .row { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); cursor: default; text-align: left; width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; color: inherit; font: inherit }
+.phone [data-go], .phone [data-dlg], .phone [data-act] { cursor: pointer }
+.phone .row:hover[data-go] { background: var(--card) }
+.phone .row .main { flex: 1; min-width: 0; display: grid; gap: 1px }
+.phone .row .ti { font-size: 15px }
+.phone .row .su { font-size: 12.5px; color: var(--muted) }
+.phone .row .ic { width: 24px; height: 24px; color: var(--muted); flex: none }
+.phone .chev { width: 18px; height: 18px; color: var(--muted); flex: none }
+.phone .pad { padding: 4px 16px 12px; display: grid; gap: 2px }
+.phone .host { color: var(--muted); font-size: 13px }
+.phone .btns { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 16px 10px }
+.phone .ob { border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; background: none; color: var(--fg); font: 500 13px var(--sans); cursor: pointer }
+.phone .set { display: flex; gap: 10px; align-items: center; padding: 9px 16px }
+.phone .set .main { flex: 1; min-width: 0 }
+.phone .set .su { font-size: 12.5px; color: var(--muted) }
+.phone .tb { background: none; border: 0; color: var(--accent); font: 500 14px var(--sans); padding: 8px 6px; cursor: pointer; flex: none }
+.phone .sw { width: 46px; height: 26px; border-radius: 999px; border: 2px solid var(--line); position: relative; flex: none; cursor: pointer; background: none; padding: 0 }
+.phone .sw::after { content: ""; position: absolute; top: 4px; left: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--line); transition: all .15s }
+.phone .sw.on { background: var(--accent); border-color: var(--accent) }
+.phone .sw.on::after { left: 22px; top: 2px; width: 18px; height: 18px; background: var(--on-accent) }
+.phone .h2 { font: 700 21px var(--serif); padding: 16px 16px 4px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px }
+.phone .h3 { font: 600 13px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 14px 16px 6px }
+.phone .hint { font-size: 12.5px; color: var(--muted); padding: 0 16px 8px }
+.phone hr { border: 0; border-top: 1px solid var(--line-soft); margin: 10px 0 0 }
+.phone .art { display: flex; gap: 12px; padding: 10px 12px 10px 14px; border-bottom: 1px solid var(--line-soft); margin-left: 0 }
+.phone .art .mk { width: 22px; text-align: center; flex: none; font-size: 15px }
+.phone .art .main { flex: 1; min-width: 0 }
+.phone .art .ti { font-weight: 500; font-size: 14.5px }
+.phone .art .su { font-size: 12px; color: var(--muted) }
+.phone .art.read .ti { font-weight: 400; color: var(--muted) }
+.phone .star { width: 22px; height: 22px; color: var(--muted); flex: none }
+.phone .tag { font: 500 10.5px var(--sans); padding: 1px 6px; border-radius: 4px; background: var(--card-hi); color: var(--muted); letter-spacing: .02em; margin-left: 4px; vertical-align: 1px }
+.phone .mark { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 2px }
+.phone .stepper { display: flex; align-items: center; gap: 8px; padding: 0 16px 8px }
+.phone .stepper .ob { padding: 4px 14px; font-size: 16px }
+.phone .crumb { font-size: 12.5px; color: var(--muted); padding: 0 16px }
+.phone .crumb b { font-weight: 500; color: var(--accent); cursor: pointer }
+.phone .cb { width: 20px; height: 20px; border: 2px solid var(--line); border-radius: 3px; flex: none; display: grid; place-items: center; cursor: pointer; background: none; padding: 0; color: var(--on-accent) }
+.phone .cb.on { background: var(--accent); border-color: var(--accent) }
+.phone .cb.on::after { content: "✓"; font-size: 13px; line-height: 1 }
+.phone .rad { width: 20px; height: 20px; border: 2px solid var(--line); border-radius: 50%; flex: none; position: relative }
+.phone .rad.on { border-color: var(--accent) }
+.phone .rad.on::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent) }
+.phone .field { margin: 4px 0 6px; border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; font-size: 14px }
+.phone .field small { display: block; font-size: 11px; color: var(--muted) }
+.phone .select { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; font-size: 13.5px; cursor: pointer }
+.phone .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 18px; z-index: 3 }
+.phone .dlg { background: var(--card-hi); color: var(--fg); border-radius: 24px; padding: 22px 20px 12px; width: 100%; max-height: 92%; display: flex; flex-direction: column; gap: 10px }
+.phone .dlg .dt { font: 600 19px var(--serif) }
+.phone .dlg .db { overflow-y: auto; min-height: 0; display: grid; gap: 6px; font-size: 14px }
+.phone .dlg .db .su { font-size: 12.5px; color: var(--muted) }
+.phone .dlg .acts { display: flex; justify-content: flex-end; gap: 4px }
+.phone .opt { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; cursor: pointer }
+.phone .opt .main { flex: 1; min-width: 0 }
+.phone .snack { position: absolute; left: 10px; right: 10px; bottom: 74px; background: var(--fg); color: var(--bg); border-radius: 6px; padding: 12px 14px; font-size: 13px; z-index: 2; display: flex; gap: 10px; justify-content: space-between; align-items: center }
+.phone .snack b { color: var(--accent-soft); font-weight: 500 }
+.phone .menu { position: absolute; right: 8px; top: 46px; background: var(--card-hi); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.3); z-index: 3; padding: 6px 0; min-width: 220px }
+.phone .menu div { padding: 11px 16px; font-size: 14px; cursor: pointer }
+.phone .menu div:hover { background: var(--card) }
+.phone .menuscrim { position: absolute; inset: 0; z-index: 2 }
+.phone .note { margin: 8px 16px; padding: 10px 12px; border-radius: 8px; background: var(--card); font-size: 12.5px; color: var(--muted) }
+.phone .warn { color: var(--warn) }
+.phone .sec { display: flex; align-items: center; gap: 8px; padding: 14px 16px 6px; font: 600 13px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer; border: 0; background: none; width: 100%; text-align: left }
+.phone .sec .n { font-weight: 400; letter-spacing: 0; text-transform: none; margin-left: auto }
+.phone .seg { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; flex: none }
+.phone .seg button { border: 0; background: none; color: var(--fg); font: 500 12px var(--sans); padding: 6px 10px; cursor: pointer }
+.phone .seg button + button { border-left: 1px solid var(--line) }
+.phone .seg button.on, .phone .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--on-accent-soft) }
+.phone .insetgroup { border-left: 2px solid var(--line-soft); margin-left: 28px }
+.phone .foldbtn { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 50%; background: none; color: var(--fg); font-size: 16px; cursor: pointer; flex: none }
+.phone .row.inset { padding: 9px 12px 9px 14px }
+.phone .row.inset .ti { font-size: 14px }
+.phone .row.inset .su { font-size: 12px }
+.hot .phone [data-go], .hot .phone [data-dlg], .hot .phone [data-act] { outline: 2px dashed var(--accent); outline-offset: -2px }
+.stagebar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center }
+.stagebar button { font: 500 12px var(--sans); border: 1px solid var(--line-soft); background: var(--bg); color: var(--fg); padding: 4px 10px; border-radius: 999px; cursor: pointer }
+.stagebar button.on { background: var(--accent-soft); color: var(--on-accent-soft); border-color: transparent }
+.caption { font-size: 13px; color: var(--muted); text-align: center; max-width: 340px; min-height: 2.6em }
+/* ---------- added for this page: onboarding, choice cards, banners ---------- */
+.phone .h3 .n { font-weight: 400; letter-spacing: 0; text-transform: none }
+.phone .prog { height: 4px; background: var(--line-soft); margin: 6px 16px 0; border-radius: 2px; overflow: hidden }
+.phone .prog i { display: block; height: 100%; background: var(--accent) }
+.phone .stepof { font-size: 12px; color: var(--muted); padding: 6px 16px 0 }
+.phone .obt { font: 700 22px/1.2 var(--serif); padding: 10px 16px 4px }
+.phone .obp { padding: 0 16px 8px; font-size: 13.5px; color: var(--muted) }
+.phone .choice { margin: 8px 16px; width: calc(100% - 32px); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; cursor: pointer; background: none; color: inherit; font: inherit; text-align: left }
+.phone .choice:has(.rad.on) { border: 2px solid var(--accent); padding: 11px 13px }
+.phone .choice .main { flex: 1; min-width: 0; display: grid; gap: 2px }
+.phone .choice b { font-weight: 500; font-size: 15px }
+.phone .choice .su { font-size: 12.5px; color: var(--muted) }
+.phone .obbar { flex: none; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px 14px; border-top: 1px solid var(--line-soft) }
+.phone .fb { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 999px; padding: 10px 20px; font: 500 14px var(--sans); cursor: pointer }
+.phone .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 16px 10px }
+.phone .chip { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font: 500 12.5px var(--sans); background: none; color: var(--fg) }
+.phone .chip.on { background: var(--accent-soft); color: var(--on-accent-soft); border-color: transparent }
+.phone .chip.on::before { content: "✓ " }
+.phone .banner { margin: 6px 16px 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; display: grid; gap: 8px; font-size: 13px }
+.phone .banner .fb { justify-self: start; padding: 8px 16px; font-size: 13px }
+.phone .welcome { flex: 1; display: grid; align-content: center; justify-items: center; text-align: center; gap: 10px; padding: 24px }
+.phone .welcome .mast { font: 600 12px var(--sans); letter-spacing: .3em; text-transform: uppercase; border-bottom: 2px solid var(--fg); padding-bottom: 4px }
+.phone .welcome .big { font: 700 26px/1.2 var(--serif) }
+.phone .steps { padding: 4px 16px; display: grid; gap: 6px; font-size: 13.5px }
+.phone .steps .done { color: var(--muted) }
+.phone .slider { margin: 6px 16px 12px; height: 4px; background: var(--line-soft); position: relative; border-radius: 2px }
+.phone .slider i { position: absolute; left: 0; top: 0; bottom: 0; width: 30%; background: var(--accent) }
+.phone .slider b { position: absolute; left: 30%; top: -8px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; background: var(--accent) }
+.phone .tryit { font-style: italic; color: var(--muted); font-size: 12px }
+.phone .opt[data-go] { cursor: pointer }
+.phone .ib.add { width: auto; padding: 0 10px; border-radius: 999px; font: 500 13px var(--sans); color: var(--accent) }
+.phone .optrow { display: flex; gap: 12px; align-items: flex-start; padding: 10px 16px; width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer }
+.phone .dlg .optrow { padding: 8px 0 }
+.compare td:first-child { font-weight: 500 }
+.decided { border: 2px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 8px }
+.build { counter-reset: b; display: grid; gap: 16px }
+.build article { border-top: 2px solid var(--line); padding-top: 10px; display: grid; gap: 6px }
+.build dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 0.92rem }
+.build dt { font-weight: 500; color: var(--muted) }
+.build dd { margin: 0; max-width: 72ch }
+@media (max-width: 520px) { .build dl { grid-template-columns: minmax(0, 1fr) } .build dd { margin-bottom: 6px } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <span class="kicker">newspapeRSS · design exploration · Oct 2026</span>
+    <h1>Server or phone</h1>
+    <p class="dek">Two ways to use the app, never mixed: with an RSS server (tt-rss today, FreshRSS or Miniflux later) as the source of truth, or with the phone fetching feeds itself. Extras (the reading list, curated lists) live on the phone in both. Competitors, clickable proposals, persona critiques, and a build order. Every feed, host and account here is made up, except well-known public feeds from the starter packs.</p>
+    <p class="dek">Written version: <a href="../server-mode.md">server-mode.md</a>. Earlier work: <a href="../ttrss-backend/index.html">tt-rss in newspapeRSS</a>.</p>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <main id="tabsBody">
+
+<section class="tab" id="plan" data-label="Plan &amp; log">
+  <div class="lede">
+    <h2>Plan and log</h2>
+    <p>One question per cycle, each ending with something to look at. No app code changes; this page and <code>docs/research/server-mode.md</code> are the output.</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>#</th><th>Cycle</th><th>Output</th><th>State</th></tr></thead>
+    <tbody id="planRows"></tbody>
+  </table></div>
+  <h2>Log</h2>
+  <div class="log" id="log"></div>
+</section>
+
+<section class="tab" id="competitors" data-label="Competitors">
+  <div class="lede">
+    <h2>How readers with server support set themselves up</h2>
+    <p class="dek">Cycle 1. Four questions: what the first run asks, whether local and server accounts mix, where "add feed" goes when signed in, and how you switch accounts or move feeds. <b>Sourced</b> claims link to the page they come from. <b>Memory</b> marks what comes from what I know of the apps and couldn't confirm on the web this cycle; treat those as likely, not certain. "?" means unknown.</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Product</th><th>First run</th><th>Local and server mixed?</th><th>Add feed, signed in</th><th>Switching, moving feeds</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://github.com/readrops/Readrops">Readrops</a> (Android)</td><td>Pick an account type: local, FreshRSS, Nextcloud News, Fever, Google Reader API (types sourced; that it's the first screen is <b>memory</b>)</td><td>Multi-account (sourced), one account on screen at a time (<b>memory</b>)</td><td>The current account</td><td>Switch in the drawer (<b>memory</b>); OPML import and export (sourced)</td></tr>
+      <tr><td><a href="https://gigazine.net/gsc_news/en/20260510-read-you">Read You</a> (Android)</td><td>Starts on a local account named "Read You" (sourced)</td><td>No: accounts are separate; "tap the account name to switch" (sourced)</td><td>"+" into the current account, in a group you pick (sourced)</td><td>Settings › Add an account; OPML import and export (<a href="https://github.com/Ashinch/ReadYou">README</a>)</td></tr>
+      <tr><td><a href="https://github.com/jocmp/capyreader">Capy Reader</a> (Android)</td><td>"Add account": Local, Feedbin, FreshRSS, Miniflux (<a href="https://manual.homefree.host/apps/freshrss-capy/">setup guide</a>)</td><td>No: one account at a time (<b>memory</b>)</td><td>The server, into its categories (<a href="../ttrss-backend/index.html#competitors">earlier research</a>)</td><td>Sign out, then add another account (<b>memory</b>)</td></tr>
+      <tr><td><a href="https://alternativeto.net/software/feedme/about/">FeedMe</a> (Android)</td><td>Choose a service, or local RSS (<b>memory</b>)</td><td>"Multiple account support" (sourced); each account its own list (<b>memory</b>)</td><td>The account's service (<b>memory</b>)</td><td>OPML import and export (sourced)</td></tr>
+      <tr><td><a href="https://netnewswire.com/help/mac/5.1/en/on-my-mac.html">NetNewsWire</a> (Mac, iOS)</td><td>Ships with one local "On My Mac/iPhone" account; others added in Settings › Accounts (sourced)</td><td><b>Side by side</b>, but one sidebar section per account, never one merged list</td><td><b>You pick the account and folder</b> (<a href="https://netnewswire.com/help/mac/5.1/en/adding-feeds.html">help</a>)</td><td>Copy or drag feeds between accounts (<a href="https://netnewswire.blog/2019/05/31/netnewswire-a.html">blog</a>)</td></tr>
+      <tr><td><a href="https://alternativeto.net/news/2024/9/reeder-launches-new-major-version-with-unified-rss-video-podcasts-and-social-feeds">Reeder</a> (2024, Apple)</td><td>No account question: subscriptions sync by iCloud (sourced)</td><td>n/a: one store</td><td>iCloud</td><td>Reeder Classic kept the service accounts (Feedbin, Inoreader, FreshRSS…) (<a href="https://reederapp.com/classic">sourced</a>)</td></tr>
+      <tr><td><a href="https://github.com/yang991178/fluent-reader/wiki/Support">Fluent Reader</a> (desktop)</td><td>Local by default; connect one service in settings (sourced)</td><td><b>The service wins</b>: on connecting, "local articles will be removed while custom rules and preferences will be kept" for sources with the same URL (sourced)</td><td>?</td><td>?</td></tr>
+      <tr><td><a href="https://f-droid.org/en/packages/com.nononsenseapps.feeder/">Feeder</a> (Android, contrast)</td><td>Nothing to choose: "no account registration of any kind" (sourced)</td><td>n/a: local only</td><td>The phone</td><td>OPML import and export (sourced); syncs only between its own installs (<b>memory</b>)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="split" style="grid-template-columns: 1fr 1fr">
+    <div class="notes">
+      <h3>What they do</h3>
+      <ul>
+        <li><b>One account at a time is the Android norm</b> (Read You, Readrops, Capy). You choose up front or in Settings, and the list shows that account.</li>
+        <li><b>Nobody merges local and server feeds into one list.</b> NetNewsWire allows both at once, but as separate sections.</li>
+        <li><b>When the two overlap, the server wins</b> (Fluent Reader), and the app's own settings for the feed are kept.</li>
+        <li><b>Add goes to the current account.</b> Only NetNewsWire asks which account, because it has several at once.</li>
+        <li><b>Moving between accounts is OPML</b> nearly everywhere. Only NetNewsWire moves feeds inside the app.</li>
+        <li><b>A local-only app says nothing about servers</b> (Feeder): no account words anywhere.</li>
+      </ul>
+    </div>
+    <div class="notes">
+      <h3>What it means here</h3>
+      <ul>
+        <li>The owner's two setups are what the field already does. The mixed screen built in cycles 77–79 is the odd one out.</li>
+        <li><b>Pick the setup once, in onboarding, and change it in Settings</b>, like Capy and Readrops. Don't guess it from what's connected.</li>
+        <li><b>With a server, Add subscribes on the server.</b> Only the category is asked, since there's only one account.</li>
+        <li><b>A one-tap "move your phone feeds" would be ahead of the field.</b> It's worth it: the people who need it already have both today.</li>
+        <li><b>Carry paper settings by address</b> (Fluent Reader). When a feed moves, its article text, cap and left-out choice come with it.</li>
+        <li><b>Without a server, Sources looks like Feeder:</b> no tt-rss row, no server words.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="notes">
+    <h3>What the server APIs allow (from the <a href="https://tt-rss.org/docs/API-Reference.html">tt-rss API reference</a> and earlier research)</h3>
+    <ul>
+      <li><b>tt-rss:</b> <code>subscribeToFeed(feed_url, category_id)</code> (category 0 is Uncategorized), <code>unsubscribeFeed(feed_id)</code>, <code>getCategories</code>. There's no call to create a category or import OPML. The status codes subscribe returns (already subscribed, added, invalid address, no feed found, several feeds found, couldn't download) are from memory of tt-rss's source, not the reference page.</li>
+      <li><b>Google Reader API</b> (FreshRSS, Miniflux, Inoreader): <code>subscription/edit</code> adds a feed and sets its label. Adding a label that doesn't exist creates it, so categories can be made from the app.</li>
+      <li><b>FreshRSS and Miniflux give each feed one category</b>; Inoreader allows several folders (<b>memory</b>). A list grouped by category must put a feed under one heading only.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="tab" id="today" data-label="Today (mixed)">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycle 2 · baseline</span>
+      <h2>Sources today: both at once</h2>
+      <p>Phone feeds first, then tt-rss as one row at the end. Its feeds sit inset under it, folded until opened, and lines say "Also on this phone" and "Also in your tt-rss". Built in cycles 77–79. This is the mixed screen that goes.</p>
+      <h3>What goes, and why</h3>
+      <ul>
+        <li><b>The inset list and its fold button</b> (and the <code>feedsShown</code> setting): with a server, its feeds are the main list, not a footnote.</li>
+        <li><b>The duplicate lines:</b> once one setup is chosen, a feed is either on the server or on the phone.</li>
+        <li><b>"Add tt-rss account" in the ⋮ menu:</b> the setup choice moves to onboarding and Settings.</li>
+        <li><b>"tt-rss always last" on Sources.</b> The paper's order doesn't change: phone sources still take their turns first.</li>
+      </ul>
+      <p class="kicker">Built from SourcesScreen and SourcesViewModel on this branch. Feed names are made up or from the starter packs.</p>
+    </div>
+    <div class="stage" data-flow="today"></div>
+  </div>
+</section>
+
+<section class="tab" id="onboard" data-label="Onboarding">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">O-A v3 · recommended</span></span>
+      <h2>O-A. The question is its own step</h2>
+      <p>After "Where do you read?", one step asks <b>"Where do your sites come from?"</b>. Choosing <b>This phone</b> leads to today's sources step, minus "Connect tt-rss". Choosing <b>My own RSS server</b> leads to sign-in, then a summary of what was found, then the extras that stay on the phone. The step count updates once you've chosen ("Step 3 of 5" with a server, "of 4" without).</p>
+      <ul>
+        <li><b>Plain words.</b> "This phone finds and fetches them. Most people. Nothing to set up." and "My own RSS server". Under them: "Not sure? It's this phone."</li>
+        <li><b>A radio group with Next</b>, not cards that jump on tap. That's easier with TalkBack, and a mis-tap costs nothing.</li>
+        <li><b>Signing in shows what's there</b> ("58 feeds in 7 categories"), and the paper takes from all of them. Narrowing to one category waits for Settings, so onboarding asks one question fewer.</li>
+        <li><b>Extras with a server:</b> the reading list (with Pocket and Instapaper import) and curated lists. Saved links alone are still enough to finish.</li>
+        <li><b>Sign-in errors say what to fix:</b> "API access is off in tt-rss: Preferences › Enable API". "Use this phone instead" is on the same screen.</li>
+      </ul>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5 · the edges</h3><ul>
+          <li><span class="who">tt-rss owner (58 feeds):</span> sign-in fails for ordinary reasons: API access off, http vs https, a typo in the path. v2 said only "Couldn't sign in". <b>Fixed:</b> one message per cause, and the address field keeps what was typed.</li>
+          <li><span class="who">tt-rss owner:</span> going Back from the extras to the fork after signing in, then picking This phone, leaves an account nobody chose. <b>Fixed:</b> switching back at the fork signs out quietly, since nothing has been fetched yet.</li>
+          <li><span class="who">Kindle reader in their sixties:</span> five steps instead of four. <b>Accepted:</b> it's one tap, and the phone path stays at four.</li>
+          <li><span class="who">E-ink (Boox, Kindle):</span> the chosen card was shown by its fill colour, which turns grey on e-ink. <b>Fixed:</b> a thicker border and a filled radio.</li>
+          <li><span class="who">Owner:</span> v2 asked "Articles from: all or one category" during onboarding. <b>Cut:</b> the default is all; Settings has the rest.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">Kindle reader in their sixties:</span> "Do you use an RSS server?" is jargon, and I'd stop there. <b>Fixed:</b> "Where do your sites come from?", with the phone first, labelled "Most people", and "Not sure? It's this phone."</li>
+          <li><span class="who">FreshRSS user:</span> only tt-rss is mentioned, so I'd think the app isn't for me. <b>Fixed:</b> one plain line on the server choice and the sign-in screen: "FreshRSS and Miniflux are coming". Not a disabled option, which TalkBack reads as broken.</li>
+          <li><span class="who">Pocket refugee (Kobo):</span> on the server path, where's my Pocket import? <b>Fixed:</b> it's on the extras step, and saved links count as a source.</li>
+          <li><span class="who">TalkBack:</span> cards that jump on tap give no chance to hear both first. <b>Fixed:</b> a radio group, then Next.</li>
+          <li><span class="who">No server, 8 feeds:</span> fine: one extra tap, and nothing about servers afterwards.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="oa"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill">O-B v2 · dropped</span></span>
+      <h2>O-B. No question; a server button on the sources step</h2>
+      <p>The sources step stays as it is, with <b>"I use an RSS server (tt-rss)"</b> as its first button. Tapping it swaps the step for sign-in and a server summary. People who never tap it are in the phone setup without being asked.</p>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5 · verdict: drop</h3><ul>
+          <li><span class="who">Owner (decided default):</span> the choice should be explicit. In O-B the phone setup happens by not tapping something.</li>
+          <li><span class="who">Code:</span> v2's "clear the picks" rule needs state that O-A never needs, and the step has two layouts to test.</li>
+          <li><span class="who">Kindle reader:</span> O-B was better for me: no question. <b>Kept in O-A:</b> the plain wording, and "Not sure? It's this phone."</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">tt-rss owner:</span> v1 put the button at the bottom, under the starter packs. I ticked two packs, then signed in, and I'm mixed again. <b>Fixed in v2:</b> the button goes first, and choosing it clears the step's picks, saying so.</li>
+          <li><span class="who">TalkBack:</span> the button came after about 25 chips. <b>Fixed:</b> first on the step.</li>
+          <li><span class="who">Kindle reader:</span> no question I don't understand. Liked.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="ob"></div>
+  </div>
+</section>
+
+<section class="tab" id="p1" data-label="P1 · By category">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">P1 v3 · recommended</span></span>
+      <h2>P1. Sources with a server: the server's categories, open</h2>
+      <p>Top row: the account (host, how many feeds are in the paper), opening its settings. Then <b>On this phone</b>: the reading list and curated lists, and any phone feeds not yet moved. Then <b>From your tt-rss</b>: each category as a heading with its feeds A to Z, nothing folded. <b>Left out · 4</b> comes last.</p>
+      <ul>
+        <li><b>Nothing folds, nothing moves.</b> e-ink doesn't redraw, and TalkBack jumps by heading ("News, 9 feeds").</li>
+        <li><b>Only categories in the paper are listed.</b> With "Articles from: Essays &amp; ideas", the rest go into one row, "Not in your paper · 6 categories".</li>
+        <li><b>Uncategorized comes last.</b> With several labels (Inoreader), a feed is listed once, under its first.</li>
+        <li><b>The server down:</b> the list stays as last seen, and the top row says "Can't reach rss.example.org since 6:10 AM".</li>
+        <li><b>A feed's page</b> says "In your tt-rss · News". It has Leave out, Article text and Skip paid posts, and <b>Unsubscribe in tt-rss</b> in its ⋮ menu.</li>
+        <li><b>Add a site</b> subscribes on the server (see Adding a site).</li>
+      </ul>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>It's the server's own structure: the owner sees what tt-rss shows.</li><li>Static: the calmest on e-ink and with TalkBack.</li><li>No new data: publications already carry a category.</li></ul></div>
+        <div><h3>Against</h3><ul><li>58 rows and 7 headings to scroll.</li><li>Finding one feed by name means knowing its category.</li></ul></div>
+      </div>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5 · the code and the edges</h3><ul>
+          <li><span class="who">tt-rss owner:</span> with "Articles from: Essays &amp; ideas", v2 still listed 46 feeds as if they'd reach the paper. <b>Fixed:</b> they go into "Not in your paper", one row that opens a page.</li>
+          <li><span class="who">Code:</span> tt-rss puts category-less feeds in category 0, "Uncategorized"; Google Reader servers may give no label at all. <b>Fixed:</b> both under Uncategorized, last.</li>
+          <li><span class="who">tt-rss owner:</span> what does Sources say when the server is down? <b>Fixed:</b> the last-seen list stays, and the top row says so in words, with a warning mark, not red alone.</li>
+          <li><span class="who">Code:</span> tt-rss's feed list gives the last fetch, not the last post. <b>Kept honest:</b> a row's line uses the newest article seen here, and says nothing until there is one (the backlog's "Nothing new in 3 weeks" item).</li>
+          <li><span class="who">No server, 8 feeds:</span> checked that none of this shows without a server (see Without a server).</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">tt-rss owner:</span> it matches tt-rss's tree, and I scan by category. But in v1 the reading list came after 58 rows. <b>Fixed:</b> "On this phone" goes first; it's short. The paper already puts phone sources first, so the screen now matches the paper's order.</li>
+          <li><span class="who">FreshRSS user:</span> Inoreader-style folders can hold the same feed twice. <b>Fixed:</b> listed once, under its first label.</li>
+          <li><span class="who">TalkBack:</span> about 65 stops. <b>Fixed:</b> category names are real headings, read with their count, and left-out feeds are kept out of the categories.</li>
+          <li><span class="who">E-ink:</span> nothing folds, so nothing redraws. Good. Page-turn buttons scroll it fine.</li>
+          <li><span class="who">Boox owner:</span> the account row shows the host only; the username is on its page.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="p1"></div>
+  </div>
+</section>
+
+<section class="tab" id="p2" data-label="P2 · A–Z + filter">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill">P2 v2 · not recommended</span></span>
+      <h2>P2. One A–Z list, with a category filter</h2>
+      <p>The account row and On this phone, as in P1. Then <b>Showing: All categories ▾</b> and every feed A to Z, with its category in its line. The filter narrows the list to one category.</p>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Finding a feed by name is quick.</li><li>The paper has no sections, so an unsorted A–Z list matches it.</li></ul></div>
+        <div><h3>Against</h3><ul><li>A filter is state to remember, announce and redraw.</li><li>"Which of my news feeds have gone quiet?" needs the filter first.</li></ul></div>
+      </div>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5 · verdict</h3><ul>
+          <li><span class="who">Owner:</span> A–Z matches a paper without sections. True, but within each heading P1 is A–Z already.</li>
+          <li><span class="who">tt-rss owner:</span> what P2 really adds is finding a feed by name. Search does that better, and it's already in the backlog (F4).</li>
+          <li><span class="who">Code:</span> the filter has to survive rotation and leaving the screen, and changing it redraws the list. <b>Verdict:</b> not now. If an account grows past about 100 feeds, add search to P1.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">E-ink:</span> v1's chips wrapped to three lines, and each tap redrew the whole list. <b>Fixed:</b> one dropdown.</li>
+          <li><span class="who">TalkBack:</span> the filter's state wasn't announced. <b>Fixed:</b> "Showing News, 9 feeds".</li>
+          <li><span class="who">tt-rss owner:</span> faster to find "that one feed", worse for spotting dead ones by category.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="p2"></div>
+  </div>
+</section>
+
+<section class="tab" id="p3" data-label="P3 · Category pages">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill">P3 v2 · kept for big accounts</span></span>
+      <h2>P3. Categories as rows; each opens its feeds</h2>
+      <p>The account row and On this phone, then one row per category ("Tech · 8 feeds, 2 left out"). Each opens a page of its feeds, with that category's left-out feeds at the end. Sources fits on one screen.</p>
+      <div class="pros-cons">
+        <div><h3>For</h3><ul><li>Short: about ten rows, whatever the account's size.</li><li>Scales to FreshRSS accounts with hundreds of feeds.</li></ul></div>
+        <div><h3>Against</h3><ul><li>Two taps to any feed.</li><li>A new screen, and every change of page is a full e-ink refresh.</li></ul></div>
+      </div>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5 · verdict</h3><ul>
+          <li><span class="who">FreshRSS user (300 feeds):</span> only this one stays usable at my size.</li>
+          <li><span class="who">Code:</span> one new screen and its route, plus per-category left-out counts.</li>
+          <li><span class="who">Owner:</span> switching layouts by account size would be guessing, which the owner ruled out for the setup choice. <b>Verdict:</b> not now; revisit if someone shows up with 150+ feeds.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">tt-rss owner:</span> tidy, but a dead feed is hidden a level down. <b>Fixed:</b> the category row says "1 quiet for 3 weeks".</li>
+          <li><span class="who">TalkBack:</span> the shortest list to swipe. Liked.</li>
+          <li><span class="who">E-ink:</span> fewer scrolls, more full refreshes. A wash.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="p3"></div>
+  </div>
+</section>
+
+<section class="tab" id="noserver" data-label="Without a server">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">v2</span></span>
+      <h2>Sources without a server</h2>
+      <p>Today's list minus everything tt-rss: the reading list first, then feeds and curated lists in the reader's order. The ⋮ menu keeps OPML import and export and loses "Add tt-rss account". A feed's page is unchanged. Adding a source is today's dialog: paste an address, curated lists, or "Save this page to your reading list instead".</p>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5</h3><ul>
+          <li><span class="who">No server, 8 feeds:</span> if I get a server one day, where do I start? <b>Answer:</b> Settings › Where your feeds come from. Sources says nothing about servers.</li>
+          <li><span class="who">Code:</span> the paper's order is unchanged, since EditionBuilder only moved tt-rss last.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">No server, 8 feeds:</span> v1 had an "On this phone" heading over everything, which is meaningless when nothing else exists. <b>Fixed:</b> no headings at all, like Feeder.</li>
+          <li><span class="who">Kindle reader in their sixties:</span> "Add tt-rss account" in the menu was a word I'd never need. <b>Gone</b>, to Settings.</li>
+          <li><span class="who">TalkBack, e-ink:</span> no changes from today.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="nos"></div>
+  </div>
+</section>
+
+<section class="tab" id="add" data-label="Adding a site">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">v2</span></span>
+      <h2>Adding a site with a server</h2>
+      <p><b>Add a site</b> asks for an address, as today. The phone finds the feed first, using the same feed finder as today, so tt-rss gets the feed's own address and never "several feeds found". Then <b>Subscribe in your tt-rss</b>, with a category (the last one used), and a snackbar once tt-rss has accepted it. The new row says "Waiting for tt-rss's first fetch".</p>
+      <h3>When it can't go on the server</h3>
+      <ul>
+        <li><b>The site has no feed:</b> "Save this page to your reading list". If the address is a curated list the app can read (Arts &amp; Letters Daily), "Add it as a curated list".</li>
+        <li><b>tt-rss can't fetch it</b> (some sites block servers, or the server is on a home network the site can't reach): "Fetch it from this phone instead", labelled as such under On this phone, or save the page. <i>The one exception to "never mixed"; an open question for the owner.</i></li>
+        <li><b>Already subscribed:</b> "Already in your tt-rss, in Science."</li>
+      </ul>
+      <p>With a server, the starter packs and OPML import are hidden: tt-rss imports OPML itself (Preferences › Feeds).</p>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5 · the code and the edges</h3><ul>
+          <li><span class="who">tt-rss owner:</span> some sites block datacenter addresses. My phone can read them, but tt-rss can't, and "save this page" keeps one article, not the site. <b>Added in v2:</b> "Fetch it from this phone instead", shown as an exception. Whether this counts as mixing is for the owner to decide.</li>
+          <li><span class="who">Code:</span> tt-rss subscribes synchronously, fetching the feed first, so a slow server takes a long time. <b>Fixed:</b> the request runs as work that outlives the dialog, and the result arrives as a snackbar or notification.</li>
+          <li><span class="who">Code:</span> Undo needs the new feed's id, which subscribe doesn't return. <b>Fixed:</b> refresh the feed list right after subscribing; Undo unsubscribes by the id found there.</li>
+          <li><span class="who">tt-rss owner:</span> starter packs in server mode would push five feeds into my tt-rss in one tap. <b>Cut:</b> hidden with a server; they're for people starting out.</li>
+          <li><span class="who">FreshRSS user (later):</span> Google Reader servers can make labels. <b>Noted:</b> "New category…" appears only for those.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">tt-rss owner:</span> I want a new category. tt-rss's API can't make one. <b>Fixed:</b> the picker says "To add a category, make it in tt-rss first", and remembers the last one used.</li>
+          <li><span class="who">Pocket refugee:</span> "save this page instead" is right for a site with no feed.</li>
+          <li><span class="who">TalkBack:</span> the category picker reads "Category, Science, button"; the progress line is a live region.</li>
+          <li><span class="who">E-ink:</span> "Asking tt-rss…" is stepped text, with no spinner.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="add"></div>
+  </div>
+</section>
+
+<section class="tab" id="switch" data-label="Switching">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">v2</span></span>
+      <h2>An existing user with both: move the phone feeds</h2>
+      <p>Someone with tt-rss and phone feeds today lands in the server setup. Their phone feeds stay under <b>On this phone</b>, still working, with one banner: <b>"8 feeds are fetched by this phone, not your tt-rss. Move them to tt-rss"</b>. Nothing moves without that tap.</p>
+      <ul>
+        <li><b>The move sheet:</b> the feeds, all ticked. Feeds already in tt-rss (matched by address) say "Already in your tt-rss: just removed here". One category for all, and "Their settings here come along".</li>
+        <li><b>Moving:</b> stepped text, "Moving 5 of 8 · Aeon". Then a snackbar: "Moved 8 feeds to tt-rss. 2 starred articles from them still go in your next edition."</li>
+        <li><b>What carries over</b>, by address: article text, cap, left out, Skip paid posts. Stars stay too: a moved feed waits, paused and hidden, until its starred and unsent articles are gone.</li>
+        <li><b>If tt-rss stops answering partway:</b> what moved stays moved, and the banner says "Moved 5 of 8. Move the other 3".</li>
+        <li><b>Not now:</b> the banner stays. It never becomes a notification or a badge.</li>
+      </ul>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5 · the code and the edges</h3><ul>
+          <li><span class="who">Code:</span> deleting a phone source cascades to its articles, starred ones included. <b>Fixed:</b> the source is paused and hidden, and deleted once nothing starred or unsent is left.</li>
+          <li><span class="who">Code:</span> a moved feed's posts arrive again from tt-rss. Already-delivered links are skipped (<code>delivered_urls</code>), and the builder drops duplicate links within an edition. Waiting duplicates can appear on the feed's page for a day; accepted.</li>
+          <li><span class="who">tt-rss owner:</span> if tt-rss dies partway, what's where? <b>Fixed:</b> each feed is moved on its own; the banner counts what's left.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4 · personas</h3><ul>
+          <li><span class="who">tt-rss owner (has both):</span> three of my phone feeds are already in tt-rss. Will their "Full page" setting survive? <b>Fixed:</b> the sheet says settings come along, and they do, by address.</li>
+          <li><span class="who">No server, 8 feeds, just got one:</span> the offer comes right after sign-in, and again as the banner. Neither nags.</li>
+          <li><span class="who">TalkBack:</span> progress was a bar. <b>Fixed:</b> a live line, "Moving 5 of 8".</li>
+          <li><span class="who">E-ink:</span> no spinner; the line changes once per feed.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="move"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">v2</span></span>
+      <h2>Getting a server: from the phone setup</h2>
+      <p>Settings › Where your feeds come from › <b>My own RSS server</b> leads to sign-in. Then: "Signed in. 58 feeds in 7 categories. Move your 8 phone feeds to tt-rss?", with <b>Move 8</b> and <b>Not now</b>. "Not now" leads to Sources with the banner.</p>
+    </div>
+    <div class="stage" data-flow="getsrv"></div>
+  </div>
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">v2</span></span>
+      <h2>Leaving a server: its feeds become phone feeds</h2>
+      <p>Settings › Where your feeds come from › <b>This phone</b> asks first:</p>
+      <ul>
+        <li><b>"Fetch your feeds on this phone instead?"</b> newspapeRSS signs out of tt-rss. Your 54 feeds in the paper become phone feeds, with their settings. The 4 left-out feeds stay out. Nothing changes in tt-rss, and read status stops syncing.</li>
+        <li>Choices: <b>Bring my 54 feeds</b> (the default) or <b>Start with none</b>.</li>
+        <li><b>Starred articles from tt-rss</b> go to the reading list, so they still reach the paper.</li>
+        <li>A warning when it matters: "Fetching 54 sites from the phone takes longer and uses more data."</li>
+      </ul>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5</h3><ul>
+          <li><span class="who">Code:</span> removing the tt-rss source cascades to its starred articles. <b>Fixed:</b> they go to the reading list first.</li>
+          <li><span class="who">Code:</span> articles delivered from tt-rss won't come back from the phone (<code>delivered_urls</code>). Waiting ones are dropped, and the phone's first fetch finds the recent ones again.</li>
+          <li><span class="who">Owner:</span> carrying feeds over is the biggest piece. <b>Build order:</b> leaving ships first as today's Remove, honestly worded. Carrying feeds over is its own later step (e).</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4</h3><ul>
+          <li><span class="who">tt-rss owner:</span> v1 said "Remove tt-rss" and nothing about what happens to my 54 feeds. <b>Fixed:</b> the dialog says it, with a choice.</li>
+          <li><span class="who">Kindle reader:</span> a phone with 54 feeds takes longer each morning. <b>Fixed:</b> the data and time warning.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="leave"></div>
+  </div>
+</section>
+
+<section class="tab" id="settings" data-label="Settings">
+  <div class="split">
+    <div class="notes">
+      <span class="kicker">Cycles 3–5 · <span class="pill v">v2</span></span>
+      <h2>Where the choice lives</h2>
+      <p>A new Settings row, <b>Where your feeds come from</b>, after E-reader &amp; delivery. Its summary says "Your tt-rss · rss.example.org" or "This phone". Its page holds the choice as two radio rows and, with a server, everything about the account that today sits on the tt-rss source's page: Articles from, Sync read status, Start fresh, Sign in again. The account row at the top of Sources opens the same page.</p>
+      <h3>What changing it says</h3>
+      <ul>
+        <li><b>Phone → server:</b> sign in, then "Move your 8 phone feeds to tt-rss?" (Move 8 / Not now). Phone feeds keep working until moved.</li>
+        <li><b>Server → phone:</b> the leaving dialog (see Switching).</li>
+        <li><b>A broken account</b> (password changed, server gone) shows on the row in red, as other Settings problems do: "Can't sign in to tt-rss. Tap to sign in again."</li>
+      </ul>
+      <div class="log">
+        <div class="critique"><h3>Round 2 · cycle 5</h3><ul>
+          <li><span class="who">Code:</span> the server setup with no account (sign-in never finished) needs a state. <b>Fixed:</b> Sources shows "Sign in to your tt-rss" with a button, and the Settings row is red.</li>
+          <li><span class="who">TalkBack:</span> picking the other radio applied at once in v1. <b>Fixed:</b> it opens the sign-in or leaving dialog, and nothing changes until that's confirmed.</li>
+        </ul></div>
+        <div class="critique"><h3>Round 1 · cycle 4</h3><ul>
+          <li><span class="who">Kindle reader:</span> v1 put the row first in Settings, for something I'll never change. <b>Fixed:</b> after delivery.</li>
+          <li><span class="who">tt-rss owner:</span> Articles from and Sync read status should be one tap from Sources. <b>Fixed:</b> the account row opens this page.</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="stage" data-flow="set"></div>
+  </div>
+</section>
+
+<section class="tab" id="compare" data-label="Compare &amp; recommend">
+  <div class="lede">
+    <span class="kicker">Cycles 6–7</span>
+    <h2>Compare and recommend</h2>
+  </div>
+  <div class="tablewrap"><table class="compare">
+    <thead><tr><th>With a server, Sources as…</th><th>P1 v3 · by category</th><th>P2 v2 · A–Z + filter</th><th>P3 v2 · category pages</th></tr></thead>
+    <tbody>
+      <tr><td>Rows for the 58-feed owner</td><td>~62 (54 feeds, headings, extras)</td><td>~58, plus the filter</td><td>~11</td></tr>
+      <tr><td>Taps to a feed's page</td><td class="y">1</td><td class="y">1 (2 with the filter)</td><td class="n">2</td></tr>
+      <tr><td>Matches the server's own structure</td><td class="y">Yes</td><td class="n">Only in each row's line</td><td class="y">Yes, a level down</td></tr>
+      <tr><td>Spotting a quiet feed</td><td class="y">On sight</td><td class="n">Filter first</td><td>On the category row, in words</td></tr>
+      <tr><td>e-ink</td><td class="y">Static; scroll only</td><td class="n">Filter redraws the list</td><td>Full refresh per page</td></tr>
+      <tr><td>TalkBack</td><td>Headings to jump by</td><td>The filter's state to announce</td><td class="y">Shortest</td></tr>
+      <tr><td>300-feed FreshRSS account</td><td class="n">Long</td><td class="n">Long</td><td class="y">Fine</td></tr>
+      <tr><td>New data or screens</td><td class="y">None new; "Not in your paper" reuses the left-out page</td><td>A filter state</td><td class="n">A category page and route</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tablewrap"><table class="compare">
+    <thead><tr><th>Onboarding</th><th>O-A v3 · its own step</th><th>O-B v2 · a button on the sources step</th></tr></thead>
+    <tbody>
+      <tr><td>The choice is explicit</td><td class="y">Yes</td><td class="n">The phone setup happens by default</td></tr>
+      <tr><td>Steps for the phone path</td><td>4 (one more tap)</td><td class="y">3</td></tr>
+      <tr><td>Risk of starting mixed</td><td class="y">None</td><td class="n">Needs a "clear the picks" rule</td></tr>
+      <tr><td>Jargon for a non-coder</td><td>One plain question, "Not sure? It's this phone."</td><td class="y">None</td></tr>
+    </tbody>
+  </table></div>
+  <div class="split">
+    <div class="notes">
+      <h3>Recommendation</h3>
+      <ul>
+        <li><b>Make the setup an explicit choice</b>: O-A in onboarding, and Settings › Where your feeds come from.</li>
+        <li><b>With a server, Sources is P1 v3:</b> the account row, On this phone (the reading list, curated lists, any phone feeds not moved yet), then the server's categories open, A to Z, with Uncategorized, Not in your paper and Left out last.</li>
+        <li><b>Without a server, Sources is today's list minus tt-rss:</b> no headings, no server words.</li>
+        <li><b>Add a site subscribes on the server</b> into a category, after the phone has found the feed. Fallbacks: the reading list, a curated list, and (owner to confirm) a labelled phone feed when tt-rss can't fetch the site.</li>
+        <li><b>One-tap move</b> of phone feeds to the server, settings carried by address, stars kept.</li>
+        <li><b>Leaving a server</b> ships first as today's Remove, honestly worded. Bringing the feeds along is a later step.</li>
+        <li><b>Not now:</b> P2 (search does its job better, later), P3 (only for 150+ feeds), O-B.</li>
+      </ul>
+      <div class="critique"><h3>Critique of this comparison · cycle 7 · and what changed</h3><ul>
+        <li><b>The P1 cost was rated "none" while it needs a "Not in your paper" page.</b> <b>Fixed:</b> it reuses the left-out page with a different filter; the table says so.</li>
+        <li><b>Build step (b) silently depended on (a)'s setting.</b> <b>Fixed:</b> the build order says each step's dependencies.</li>
+        <li><b>Default 2 had an edge:</b> an existing user whose tt-rss source is paused, or has every feed left out, mostly uses the phone, yet would land in the server setup. <b>Kept the rule</b> (a tt-rss account means the server setup; nothing moves) and listed it as an open question. It's rare, and the Settings switch is one tap.</li>
+        <li><b>"Leaving brings your feeds" was in the recommendation but in no build step.</b> <b>Fixed:</b> it's step (e), after tonight; tonight's leaving is today's Remove, worded honestly.</li>
+        <li><b>The comparison scored TalkBack for P1 without a concrete count.</b> <b>Fixed:</b> about 62 stops, but heading navigation gets to any category in at most 8.</li>
+        <li><b>The phone-fetch exception was presented as decided.</b> <b>Fixed:</b> it's an open question; step (c) ships the reading-list and curated-list fallbacks first.</li>
+      </ul></div>
+    </div>
+    <div class="stage" data-flow="rec"></div>
+  </div>
+  <div class="decided">
+    <h3>Decided for the owner (defaults; the critique kept all three)</h3>
+    <ul>
+      <li><b>The choice is explicit:</b> asked in onboarding and changeable in Settings, never guessed from what's connected.</li>
+      <li><b>An existing tt-rss user with phone feeds lands in the server setup</b>, with a one-tap "Move your N phone feeds to tt-rss". Nothing moves without that tap; until then the phone feeds keep working under On this phone. Migration rule: a tt-rss account exists → server setup; otherwise phone.</li>
+      <li><b>The reading list and curated lists stay on the phone in both setups</b>, under On this phone with a server, and in the plain list without.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="tab" id="build" data-label="Build order">
+  <div class="lede">
+    <span class="kicker">Cycle 8</span>
+    <h2>Build order for tonight</h2>
+    <p class="dek">Each step is small and ships on its own, in this order. The names of new settings and screens are suggestions.</p>
+  </div>
+  <div class="build">
+    <article><h3>(a) The explicit setup choice and the onboarding fork</h3><dl>
+      <dt>Screens</dt><dd>Onboarding: a new step, "Where do your sites come from?", between Device and Sources. The phone path is today's Sources step minus "Connect tt-rss". The server path is sign-in (the tt-rss form's fields, inline), "Found 58 feeds in 7 categories", then extras (the reading list with Pocket and Instapaper import, curated lists). Settings: a new page, "Where your feeds come from", after E-reader &amp; delivery. With a server, it holds the account's settings: Articles from, Sync read status, Start fresh, Sign in again, moved from the tt-rss source page. Phone → server opens sign-in. Server → phone opens a dialog that says what happens and then does today's Remove.</dd>
+      <dt>Data</dt><dd>A DataStore setting, <code>feedsFrom</code> = <code>PHONE</code> or <code>SERVER</code>, set once on upgrade (a tt-rss source exists → <code>SERVER</code>) and explicit from then on. The <code>Step</code> enum gains <code>FEEDS_FROM</code>. No Room change.</dd>
+      <dt>Removed</dt><dd>"Connect tt-rss" on the onboarding Sources step; "Add tt-rss account" in the Sources ⋮ menu.</dd>
+      <dt>Risks</dt><dd><code>SERVER</code> with no account (onboarding killed mid sign-in, sign-in failed) needs a "Sign in to your tt-rss" state. "Step N of M" changes with the path, for TalkBack. Upgrade migration tests. Going Back past sign-in to the phone choice must sign out.</dd>
+    </dl></article>
+    <article><h3>(b) Sources for a server (P1 v3)</h3><dl>
+      <dt>Screens</dt><dd>The Sources server variant. The account row (host, "54 feeds in your paper", or "Can't reach … since 6:10 AM") opens (a)'s Settings page. Then On this phone (the reading list, curated lists, phone feeds not yet moved). Then From your tt-rss: categories as real headings ("News, 9 feeds"), feeds A to Z, Uncategorized last, then Not in your paper (categories outside Articles from) and Left out · N, both on the existing left-out screen. A server feed's page says "In your tt-rss · News", with Unsubscribe in tt-rss in its ⋮ menu (optional; see open questions). Without a server: today's list minus tt-rss.</dd>
+      <dt>Data</dt><dd>Nothing new: <code>publications.category</code>, <code>listed</code> and <code>leftOut</code> already exist; <code>feedsFrom</code> comes from (a).</dd>
+      <dt>Removed</dt><dd>The inset list (<code>InsetFeed</code>, <code>InsetRow</code>, <code>InsetDivider</code>), the round fold button, the <code>feedsShown</code> setting and its <code>sources_feeds_shown</code> key, the "Also on this phone" and "Also in your tt-rss" lines (<code>FeedRow.alsoOnPhone</code>, <code>SourceRow.alsoInTtrss</code>), and "tt-rss always last" sorting in SourcesViewModel. Keep <code>sameFeed</code>: (d) uses it.</dd>
+      <dt>Risks</dt><dd>The paper's order (EditionBuilder puts tt-rss last) stays the same and now matches the screen; DESIGN.md's Sources section must be rewritten. Feeds with a blank category. TalkBack headings. A 60-row list on a Boox. Depends on (a).</dd>
+    </dl></article>
+    <article><h3>(c) Adding a site to the server, with fallbacks</h3><dl>
+      <dt>Screens</dt><dd>The Add dialog's server variant: paste an address; the phone finds the feed (today's finder, including "Which part of this site?"); then "Subscribe in your tt-rss" with a Category picker ("To add a category, make it in tt-rss first"); then "Asking tt-rss…" and a snackbar with Undo. Fallbacks: no feed → "Save this page to your reading list" (exists today) or "Add it as a curated list" when it matches one; tt-rss can't fetch it → save the page (and the phone-feed exception if the owner says yes); already subscribed → "Already in your tt-rss, in Science." With a server, the starter packs and OPML import and export are hidden.</dd>
+      <dt>Data</dt><dd><code>TtrssClient.subscribeToFeed(url, categoryId)</code> and <code>unsubscribeFeed(id)</code> in <code>:core</code>, with the status codes mapped to messages; <code>getCategories</code> exists. A DataStore <code>lastCategoryId</code>. After subscribing, run <code>FeedSync.listFeeds</code> so the row appears ("Waiting for tt-rss's first fetch"), which also gives Undo its feed id.</dd>
+      <dt>Removed</dt><dd>With a server: adding a phone feed from Add, starter packs, and the OPML menu items.</dd>
+      <dt>Risks</dt><dd>tt-rss fetches the feed before it answers, so a slow server can time out; run it as work that outlives the dialog. API level (subscribe needs 5+). The status codes are from memory of tt-rss's source; check them against a real server. Depends on (a) and (b).</dd>
+    </dl></article>
+    <article><h3>(d) Moving phone feeds to the server</h3><dl>
+      <dt>Screens</dt><dd>A banner under On this phone ("8 feeds are fetched by this phone, not your tt-rss" · Move them to tt-rss); a move sheet (feeds ticked, "Already in your tt-rss: just removed here", one Category, "Their settings here come along"); stepped progress ("Moving 5 of 8 · Aeon"); a snackbar at the end. The same offer right after sign-in in (a)'s phone → server path. A partial result: "Moved 5 of 8. Move the other 3".</dd>
+      <dt>Data</dt><dd>A Worker so the move outlives the screen. For each feed: if <code>sameFeed</code> matches a server feed, don't subscribe; otherwise subscribe into the chosen category. Refresh the feed list; copy the publication row (article text, cap, left out, Skip paid posts) from <code>(phoneSourceId, "")</code> to <code>(ttrssId, feedId)</code> in one transaction; pause the phone source and hide it; delete it once it has no starred, IN_EDITION or unsent articles. Pending moves are kept in DataStore (a set of source ids), so no Room change.</dd>
+      <dt>Removed</dt><dd>Nothing more; this is where <code>sameFeed</code> ends up.</dd>
+      <dt>Risks</dt><dd>Cascade deletes of starred articles if the source goes too early. Partial failure. The feed's posts arrive again from tt-rss: delivered links are skipped by <code>delivered_urls</code> and duplicates within an edition by URL, but waiting duplicates show for a day. Copying settings onto a server feed that already has its own. Depends on (a), (b) and (c)'s subscribe call.</dd>
+    </dl></article>
+    <article><h3>Later: (e) leaving brings the feeds along · Google Reader API</h3><dl>
+      <dt>(e)</dt><dd>"Bring my 54 feeds": a phone source per listed, not-left-out server feed, publication settings copied by address, starred tt-rss articles to the reading list, then sign out.</dd>
+      <dt>GReader</dt><dd>A second server kind behind the same setting; "New category…" in Add, since labels can be made there.</dd>
+    </dl></article>
+  </div>
+  <div class="notes">
+    <h3>Open questions for the owner</h3>
+    <ul>
+      <li><b>A site tt-rss can't fetch:</b> offer "Fetch it from this phone instead" (a labelled exception), or only the reading list and curated lists?</li>
+      <li><b>Unsubscribe in tt-rss</b> from a feed's page: allowed, or should the app only add?</li>
+      <li><b>A paused tt-rss account, or one with every feed left out,</b> at upgrade: the server setup anyway (the current rule), or the phone setup?</li>
+      <li><b>Starter packs with a server:</b> hidden (proposed), or subscribed on the server?</li>
+      <li><b>OPML with a server:</b> point to tt-rss's own import (proposed), or subscribe each feed from the app?</li>
+      <li><b>Which Google Reader server first</b>, FreshRSS or Miniflux? It decides how categories are tested.</li>
+    </ul>
+  </div>
+</section>
+
+  </main>
+</div>
+<script>
+/* ---------- icons (from the tt-rss page) ---------- */
+const I = {
+  back: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg>',
+  bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4 6.5 20.3l1-6.2L3 9.7l6.2-.9z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>',
+  today: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v16H4zm2 4v10h12V8zm2 2h4v3H8zm6 0h2v6h-2zm-6 4h4v2H8z"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h2v2H4zm4 0h12v2H8zM4 11h2v2H4zm4 0h12v2H8zm-4 5h2v2H4zm4 0h12v2H8z"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.6 4.6l1.9 1.5-2 3.4-2.3-.9a7 7 0 0 1-2 1.2l-.3 2.4h-4l-.3-2.4a7 7 0 0 1-2-1.2l-2.3.9-2-3.4 1.9-1.5a7 7 0 0 1 0-2.2L1.5 9.4l2-3.4 2.3.9a7 7 0 0 1 2-1.2L8.1 3.3h4l.3 2.4a7 7 0 0 1 2 1.2l2.3-.9 2 3.4-1.9 1.5a7 7 0 0 1 0 2.2z"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" fill="currentColor"><path d="M9 6l6 6-6 6-1.4-1.4L12.2 12 7.6 7.4z"/></svg>',
+  rss: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="18" r="2"/><path d="M4 10a10 10 0 0 1 10 10h-2.5A7.5 7.5 0 0 0 4 12.5zm0-6a16 16 0 0 1 16 16h-2.5A13.5 13.5 0 0 0 4 6.5z"/></svg>',
+};
+
+/* ---------- made-up data: a 58-feed tt-rss account (no one's real subscriptions) ---------- */
+const CATS = {
+  "Arts & music": ["Colour & Form", "The Listening Room", "Gallery Walk", "Liner Notes", "The Ink Well", "Studio Visit", "Small Press Review", "The Score"],
+  "Essays & ideas": ["A Working Library", "The Long Field", "Slow Thoughts", "Marginalia Weekly", "The Honest Ledger", "Second Drafts", "Footnotes & Asides", "The Quiet Reader", "Commonplace", "Open Questions", "The Patient Essay", "Notes from the Stacks"],
+  "News": ["Harbour Ledger · Local News", "The Bay Dispatch", "City Hall Notes", "Morning Wire", "Transit Watch", "The Courthouse Beat", "Weather & Tides", "Statehouse Report", "Neighbourhood Bulletin"],
+  "Newsletters": ["Writer Fuel", "Serial Field Notes", "Ask the Agent", "The Margins Letter", "Sunday Long Read", "Weekly Craft", "The Publishing Desk", "Five Good Things", "Letters from the Coast"],
+  "Science": ["Field Station", "The Tidepool", "Deep Time", "Lab Bench", "Night Sky Notes", "The Seed Bank"],
+  "Tech": ["Distributed Notes", "The Pragmatic Builder", "Small Tools", "Kernel Diaries", "Garbage Collection", "The Ops Log", "Plain Text Weekly", "Release Notes", "Data at Rest", "The Compiler"],
+  "Uncategorized": ["Someone's Blog", "Old Friend's Journal", "Recipes I Keep", "Garden Log"],
+};
+const CATNAMES = Object.keys(CATS); // A to Z, Uncategorized last
+const ALL = CATNAMES.flatMap(c => CATS[c].map(t => ({ t, c })));
+const LEFT = new Set(["Garbage Collection", "Release Notes", "Recipes I Keep", "Garden Log"]);
+const inPaper = fs => fs.filter(t => !LEFT.has(t)).sort();
+const az = (a, b) => a.t.localeCompare(b.t);
+const FRESH = ["Last new article today", "Last new article yesterday", "Last new article 3 days ago", "Last new article today", "Nothing new in 3 weeks"];
+const fresh = t => FRESH[t.length % 5];
+const esc = s => s.replace(/&(?!amp;)/g, "&amp;");
+// The phone setup: well-known public feeds from the starter packs.
+const PHONE = [["Aeon", "aeon.co"], ["Ars Technica", "arstechnica.com"], ["Atlas Obscura", "atlasobscura.com"], ["BBC News", "bbc.co.uk"], ["ProPublica", "propublica.org"], ["Quanta Magazine", "quantamagazine.org"], ["The Guardian: World", "theguardian.com"], ["The Marginalian", "themarginalian.org"]];
+const ARTS = [
+  ["●", "Council delays vote on the waterfront plan", "Sep 30 · Waiting, 6 days left"],
+  ["●", "Why the night bus keeps getting cut", "Sep 30 · Waiting, 6 days left"],
+  ["✓", "The ferry schedule, explained", "Sep 29 · Sent Wednesday", true],
+  ["○", "A school board weighs a new lottery", "Sep 28 · Read", true],
+];
+
+/* ---------- building blocks (from the tt-rss page, plus onboarding) ---------- */
+const H = {
+  bar: (t, o = {}) => `<div class="bar ${o.big ? "big" : ""}">${o.big ? "" : `<button class="ib" data-back aria-label="Back">${I.back}</button>`}<div class="t">${t}</div>${o.refresh ? `<button class="ib" aria-label="Refresh">${I.refresh}</button>` : ""}${o.nomenu ? "" : `<button class="ib" ${o.menu ? `data-act="menu:${o.menu}"` : ""} aria-label="More options">${I.more}</button>`}</div>`,
+  nav: (on = "src") => `<div class="nav"><span><b>${I.today}</b>Today</span><span class="${on === "src" ? "on" : ""}"><b>${I.list}</b>Sources</span><span class="${on === "set" ? "on" : ""}"><b>${I.gear}</b>Settings</span></div>`,
+  fab: (label, attrs) => `<button class="fab" ${attrs}>${I.plus} ${label}</button>`,
+  row: (ti, su, o = {}) => `<${o.go || o.dlg ? "button" : "div"} class="row" ${o.go ? `data-go="${o.go}"` : ""} ${o.dlg ? `data-dlg="${o.dlg}"` : ""}>${o.icon ? `<span class="ic">${o.icon}</span>` : ""}<span class="main"><span class="ti">${ti}</span>${su ? `<span class="su">${su}</span>` : ""}</span>${o.right ?? (o.go || o.dlg ? I.chev : "")}</${o.go || o.dlg ? "button" : "div"}>`,
+  set: (ti, su, act) => `<div class="set"><div class="main"><div>${ti}</div>${su ? `<div class="su">${su}</div>` : ""}</div>${act}</div>`,
+  tb: (label, attrs = "") => `<button class="tb" ${attrs}>${label}</button>`,
+  sw: (on, label = "Switch") => `<button class="sw ${on ? "on" : ""}" data-act="toggle" role="switch" aria-checked="${on}" aria-label="${label}"></button>`,
+  art: ([mk, ti, su, read]) => `<div class="art ${read ? "read" : ""}"><span class="mk">${mk}</span><div class="main"><div class="ti">${ti}</div><div class="su">${su}</div></div><span class="star">${I.star}</span></div>`,
+  dlg: (t, body, acts) => `<div class="scrim" data-close><div class="dlg" role="dialog" aria-label="${t}"><div class="dt">${t}</div><div class="db">${body}</div><div class="acts">${acts}</div></div></div>`,
+  opt: (label, sub, on) => `<div class="opt" data-act="pick" role="radio" aria-checked="${on}"><span class="rad ${on ? "on" : ""}"></span><span class="main">${label}${sub ? `<div class="su">${sub}</div>` : ""}</span></div>`,
+  cb: (label, on) => `<div class="opt" data-act="check"><span class="cb ${on ? "on" : ""}" role="checkbox" aria-checked="${on}"></span><span class="main">${label}</span></div>`,
+  close: (l = "Done") => `<button class="tb" data-close>${l}</button>`,
+  go: (l, go, cls = "ob") => `<button class="${cls}" data-go="${go}">${l}</button>`,
+  snack: (text, undo = true) => `<div class="snack" role="status"><span>${text}</span>${undo ? "<b>Undo</b>" : ""}</div>`,
+  field: (label, value) => `<div class="field"><small>${label}</small>${value}</div>`,
+};
+const withSnack = (html, text, undo) => text ? html.replace('<div class="nav">', H.snack(text, undo) + '<div class="nav">') : html;
+const choice = (to, title, sub, on = false) => `<button class="choice" data-act="pick" data-to="${to}" role="radio" aria-checked="${on}"><span class="rad ${on ? "on" : ""}"></span><span class="main"><b>${title}</b><span class="su">${sub}</span></span></button>`;
+const obStep = (n, of, title, lede, inner, next, label = "Next") => `<div class="stepof">Step ${n} of ${of}</div><div class="prog" role="progressbar" aria-label="Step ${n} of ${of}" aria-valuenow="${n}" aria-valuemax="${of}"><i style="width:${(n / of) * 100}%"></i></div><div class="body" style="padding-bottom:16px"><div class="obt">${title}</div>${lede ? `<div class="obp">${lede}</div>` : ""}${inner}</div><div class="obbar"><button class="tb" data-back>Back</button>${next.startsWith("<") ? next : `<button class="fb" data-go="${next}">${label}</button>`}</div>`;
+const PACKS = ["World news", "Science", "Technology", "Ideas &amp; essays", "Culture"];
+
+/* ---------- screens shared by several flows ---------- */
+const RL = () => H.row("Your reading list", "Links you share to newspapeRSS from any app", { icon: I.bookmark });
+const ALD = () => H.row("Arts &amp; Letters Daily", "Curated list · aldaily.com · New links today");
+const acctRow = (o = {}) => H.row("Tiny Tiny RSS", o.down ? `<span class="warn">⚠ Can't reach rss.example.org since 6:10 AM. Showing what it last listed.</span>` : o.only ? "rss.example.org · Articles from Essays &amp; ideas · 11 feeds" : "rss.example.org · 54 feeds in your paper", { icon: I.rss, go: "acct" });
+const phoneFeedRows = (sub = "Fetched by this phone") => PHONE.map(([t, h]) => H.row(t, `${h} · ${sub}`, { go: "pfeed" })).join("");
+const onPhone = (o = {}) => `<h3 class="h3" style="margin:0">On this phone</h3>${RL()}${o.noList ? "" : ALD()}${o.extra || ""}${o.phoneFeeds ? (o.partial
+  ? `<div class="banner" role="region" aria-label="Phone feeds"><div><b>Moved 5 of 8.</b> tt-rss stopped answering; the other 3 are still fetched by this phone.</div><button class="fb" data-dlg="movedlg">Move the other 3</button></div>${PHONE.slice(5).map(([t, h]) => H.row(t, `${h} · Fetched by this phone`, { go: "pfeed" })).join("")}`
+  : `<div class="banner" role="region" aria-label="Phone feeds"><div><b>8 feeds are fetched by this phone</b>, not your tt-rss. Move them so read status matches your other apps.</div><button class="fb" data-dlg="movedlg">Move them to tt-rss</button></div>${phoneFeedRows()}`) : ""}`;
+const catBlock = (c, o = {}) => {
+  let fs = inPaper(CATS[c]);
+  if (o.added && c === "Science") fs = [...fs, "Quanta Magazine"].sort();
+  return `<h3 class="h3" style="margin:0">${esc(c)}<span class="n"> · ${fs.length} feeds</span></h3>${fs.map(t => H.row(esc(t), t === "Quanta Magazine" && o.added ? "Waiting for tt-rss's first fetch" : fresh(t), { go: "feed" })).join("")}`;
+};
+const fromServer = (o = {}) => `<div class="h2">From your tt-rss</div>${(o.only ? ["Essays & ideas"] : CATNAMES).map(c => catBlock(c, o)).join("")}${o.only ? H.row("Not in your paper", "6 categories, 43 feeds outside Articles from", { go: "notin" }) : ""}${H.row("Left out · 4", "Feeds you've left out of the paper", { go: "left" })}`;
+const srvSources = (o = {}) => withSnack(H.bar("Sources", { big: true, refresh: true, menu: "srvmenu" }) +
+  `<div class="body">${acctRow(o)}${onPhone(o)}${o.body ? o.body(o) : fromServer(o)}</div>` + H.fab("Add a site", 'data-dlg="add"') + H.nav(), o.snack, o.undo);
+const srvFeedPage = (t = "Harbour Ledger · Local News", c = "News") => H.bar(t, { menu: "feedmenu" }) +
+  `<div class="body"><div class="crumb">In your tt-rss · category ${esc(c)}</div><div class="pad"><span class="host">harbourledger.example/feed</span><span>Last new article today</span><span class="host">Sends summaries: newspapeRSS fetches each article's page</span></div>
+  <div class="btns"><button class="ob" data-dlg="leave">Leave out</button><button class="ob" data-dlg="atext">Article text: Automatic</button></div>
+  ${H.set("Skip paid posts", "Leave out posts the site marks as for subscribers", H.sw(false, "Skip paid posts"))}
+  <hr><div class="h2">Recent articles · 12 <button class="tb">Select</button></div>${ARTS.map(H.art).join("")}</div>` + H.nav();
+const phoneFeedPage = (t = "Aeon", host = "aeon.co") => H.bar(t, { menu: "pfeedmenu" }) +
+  `<div class="body"><div class="pad"><span class="host">${host}</span><span>New articles today</span><span class="host">Sends full articles: no need to visit the site</span></div>
+  <div class="btns"><button class="ob">Pause</button><button class="ob" data-dlg="atext">Article text: Automatic</button></div>
+  ${H.set("1 article from this site, then more if there's room", "Your edition setting. Choose fewer or more to give this site a firm limit.", "")}<div class="stepper"><button class="ob" aria-label="Fewer">−</button><button class="ob" aria-label="More">+</button></div>
+  ${H.set("Skip paid posts", "", H.sw(false, "Skip paid posts"))}
+  <hr><div class="h2">Recent articles · 9 <button class="tb">Select</button></div>${H.art(["●", "The case for boredom", "Sep 30 · Waiting, 6 days left"])}${H.art(["✓", "What the stoics got wrong", "Sep 29 · Sent Wednesday", true])}</div>` + H.nav();
+const radioRow = (on, title, sub, attrs) => `<button class="optrow" ${attrs} role="radio" aria-checked="${on}"><span class="rad ${on ? "on" : ""}"></span><span class="main" style="flex:1"><span>${title}</span><span class="su" style="display:block">${sub}</span></span></button>`;
+const wherePage = (server, o = {}) => H.bar("Where your feeds come from", { nomenu: true }) +
+  `<div class="body"><div class="hint" style="padding-top:8px">Your sites come from one place. The reading list and curated lists are always on this phone.</div>
+  <div role="radiogroup" aria-label="Where your feeds come from">
+  ${radioRow(!server, "This phone", "newspapeRSS finds and fetches your sites itself", server ? 'data-dlg="leave2"' : "")}
+  ${radioRow(server, "My own RSS server", server ? "tt-rss · rss.example.org" : "tt-rss today. FreshRSS and Miniflux are coming.", server ? "" : 'data-go="signin2"')}</div>
+  ${server ? `<hr><div class="h3">Your tt-rss</div>
+  <div class="pad"><span class="host">rss.example.org</span>${o.broken ? `<span class="warn">⚠ Can't sign in: the password was refused.</span>` : "<span>Signed in as reader</span>"}<span class="host">Last checked today at 10:21 PM</span></div>
+  <div class="btns"><button class="ob">Sign in again</button></div>
+  ${H.set("Articles from", "All your unread articles", H.tb("Change", 'data-dlg="cats"'))}
+  ${H.set("Sync read status with tt-rss", "What you read or mark unread here or in tt-rss shows in both. Delivered articles count as read.", H.sw(true, "Sync read status with tt-rss"))}
+  ${H.set("Back after a break?", "Mark everything older than two weeks as read in tt-rss, and start from what's recent.", H.tb("Start fresh"))}` : ""}</div>` + H.nav("set");
+const settingsPage = (mode) => H.bar("Settings", { big: true, nomenu: true }) +
+  `<div class="body">${H.row("Your edition", "About 30 minutes · 1 per source · take turns", { go: "noop" })}${H.row("Schedule", "Ready by 6:30 AM, weekdays", { go: "noop" })}${H.row("E-reader &amp; delivery", "Kindle · emailed to your Kindle", { go: "noop" })}
+  ${H.row("Where your feeds come from", mode === "phone" ? "This phone" : mode === "broken" ? `<span class="warn">⚠ Can't sign in to tt-rss. Tap to sign in again.</span>` : "Your tt-rss · rss.example.org", { go: mode === "phone" ? "wherephone" : "acct" })}
+  ${H.row("Reading notes", "Off", { go: "noop" })}<div class="hint" style="padding-top:12px">newspapeRSS 0.42</div></div>` + H.nav("set");
+const noop = { label: "", note: "Not part of this question.", html: () => H.bar("Not mocked", { nomenu: true }) + `<div class="body"><div class="note">Not part of this question.</div></div>` + H.nav("set") };
+const nosSources = (o = {}) => withSnack(H.bar("Sources", { big: true, refresh: true, menu: "phmenu" }) +
+  `<div class="body">${RL()}${o.all ? ALL.filter(f => !LEFT.has(f.t)).sort(az).map(f => H.row(esc(f.t), `${fresh(f.t)}`, { go: "pfeed" })).join("") : PHONE.map(([t, h]) => H.row(t, `${h} · ${fresh(t)}`, { go: "pfeed" })).join("")}${ALD()}</div>` + H.fab("Add a source", 'data-dlg="padd"') + H.nav(), o.snack, false);
+
+/* dialogs used in several flows */
+const D = {
+  leave: { dialog: true, over: ["sources", "feed"], label: "Leave out", note: "Leave out: it stays in tt-rss, just not in the paper.", html: () => H.dlg("Leave out this feed?", `<div>Harbour Ledger stays in your tt-rss but stops coming to the paper, from the next edition. Its waiting articles here go too, except ones you starred.</div>`, H.close("Cancel") + H.close("Leave out")) },
+  atext: { dialog: true, over: ["sources", "feed"], label: "Article text", note: "", html: () => H.dlg("Article text", H.opt("Automatic", "Learned for this feed: settles after three days", true) + H.opt("Feed's text", "Use what the feed sends", false) + H.opt("Full page", "Always fetch the article's page", false), H.close("Cancel")) },
+  unsub: { dialog: true, over: ["sources", "feed"], label: "Unsubscribe", note: "Writes to the server: an open question for the owner.", html: () => H.dlg("Unsubscribe in tt-rss?", `<div>Harbour Ledger leaves your tt-rss, so your other reader apps lose it too. Starred articles from it still go in your next edition.</div>`, H.close("Cancel") + H.close("Unsubscribe")) },
+  cats: { dialog: true, over: ["sources", "acct"], label: "Articles from", note: "", html: () => H.dlg("Articles from", H.opt("All your unread articles", "", true) + CATNAMES.map(c => H.opt(esc(c), "", false)).join(""), H.close("Cancel")) },
+  leave2: { dialog: true, over: ["sources", "acct"], label: "Switch to this phone", note: "Says what happens before anything does.", html: () => H.dlg("Fetch your feeds on this phone instead?", `<div>newspapeRSS signs out of your tt-rss. Your 54 feeds in the paper become phone feeds, with their settings. The 4 left out stay out.</div><div class="su">Nothing changes in tt-rss. Read status stops syncing. Starred articles from tt-rss go to your reading list.</div>${H.opt("Bring my 54 feeds", "Fetching 54 sites from the phone takes longer and uses more data", true)}${H.opt("Start with none", "", false)}`, H.close("Cancel") + `<button class="tb" data-go="phoneafter">Switch</button>`) },
+  movedlg: { dialog: true, over: ["sources"], label: "Move sheet", note: "All ticked. Feeds already in tt-rss are just removed here. One category for all.", html: () => H.dlg("Move 8 feeds to tt-rss", `<div class="su">tt-rss will fetch them, and read status will match your other apps. Their settings here come along.</div>${PHONE.map(([t], i) => H.cb(`${t}${i < 3 ? '<div class="su">Already in your tt-rss: just removed here</div>' : ""}`, true)).join("")}<div class="su" style="margin-top:6px">Category for the new ones</div><button class="select" data-dlg="movecat" aria-label="Category, Uncategorized">Uncategorized <span>▾</span></button>`, H.close("Cancel") + `<button class="tb" data-go="moving">Move 8</button>`) },
+  movecat: { dialog: true, over: ["sources"], then: "movedlg", label: "Category", note: "tt-rss's API can't make categories.", html: () => H.dlg("Category", CATNAMES.map(c => H.opt(esc(c), "", c === "Uncategorized")).join("") + `<div class="su">To add a category, make it in tt-rss first.</div>`, H.close("Done")) },
+};
+const MOVING = { label: "Moving", note: "Stepped text, no spinner; a live region for TalkBack.", path: ["sources", "moving"], html: () => H.bar("Moving to tt-rss", { nomenu: true }) +
+  `<div class="body"><div class="steps" aria-live="polite">${PHONE.slice(0, 4).map(([t], i) => `<div class="done">✓ ${t} · ${i < 3 ? "already in tt-rss, removed here" : "subscribed"}</div>`).join("")}<div><b>Moving 5 of 8 · ProPublica</b></div><div class="su" style="color:var(--muted)">You can leave this screen; it carries on.</div></div>
+  <div class="note"><span class="tryit">Mockup: choose what happens.</span><div class="btns" style="padding:6px 0 0">${H.go("Finish", "done")}${H.go("tt-rss stops answering", "partial")}</div></div></div>` + H.nav() };
+const DONE = { label: "Moved", note: "Phone feeds gone; starred articles from them still go in.", path: ["done"], html: () => srvSources({ snack: "Moved 8 feeds to tt-rss. 2 starred articles from them still go in your next edition.", undo: false }) };
+const PARTIAL = { label: "Partly moved", note: "What moved stays moved; the banner counts the rest.", path: ["partial"], html: () => srvSources({ phoneFeeds: true, partial: true }) };
+
+/* ---------- flows ---------- */
+const FLOWS = {};
+
+FLOWS.today = { start: "sources", screens: {
+  sources: { label: "Sources", note: "Today: phone feeds, then tt-rss last with its feeds inset (shown open). Tap ▴ to fold.", html: () =>
+    H.bar("Sources", { big: true, refresh: true, menu: "todaymenu" }) + `<div class="body">${RL()}
+    ${H.row("Aeon", "aeon.co · New articles today<br>Also in your tt-rss", { go: "pfeed" })}${H.row("Quanta Magazine", "quantamagazine.org · New articles today", { go: "pfeed" })}${ALD()}
+    <div class="row"><span class="ic">${I.rss}</span><button class="main" data-go="acct" style="background:none;border:0;color:inherit;font:inherit;text-align:left;padding:0"><span class="ti">Tiny Tiny RSS</span><span class="su" style="display:block">55 feeds in your paper, 4 left out</span></button><button class="foldbtn" data-act="foldrow" aria-expanded="true" aria-label="Show its feeds">▴</button></div>
+    <div class="insetgroup">${[...ALL.filter(f => !LEFT.has(f.t)), { t: "Aeon" }].sort(az).map(f => `<button class="row inset" data-go="feed"><span class="main"><span class="ti">${esc(f.t)}</span>${f.t === "Aeon" ? '<span class="su">Also on this phone</span>' : ""}</span>${I.chev}</button>`).join("")}<button class="row inset" data-go="left"><span class="main"><span class="ti">Left out · 4</span></span>${I.chev}</button></div></div>` + H.fab("Add a source", "") + H.nav() },
+  acct: { label: "tt-rss page", note: "Today's account page: the account's settings.", path: ["sources", "acct"], html: () => wherePage(true).replace("Where your feeds come from", "Tiny Tiny RSS").replace(/<div class="hint"[\s\S]*?<\/div>\s*<div role="radiogroup"[\s\S]*?<\/div>\s*<hr><div class="h3">Your tt-rss<\/div>/, "") },
+  feed: { label: "An inset feed", note: "Each inset feed opens its page.", path: ["sources", "feed"], html: () => srvFeedPage() },
+  pfeed: { label: "A phone feed", note: "", path: ["sources", "pfeed"], html: () => phoneFeedPage() },
+  left: { label: "Left out", note: "", path: ["sources", "left"], html: () => H.bar("Left out", { nomenu: true }) + `<div class="body">${[...LEFT].map(t => H.row(esc(t), "Left out", { go: "feed" })).join("")}</div>` + H.nav() },
+  ...D, cats: { ...D.cats, over: ["sources", "acct"] }, leave2: { ...D.leave2 },
+  phoneafter: { label: "", note: "", html: () => nosSources() },
+}, menus: { todaymenu: [["Import from another reader (OPML)"], ["Export your sites (OPML)"], ["Add tt-rss account"]], feedmenu: [["Open in tt-rss"]], pfeedmenu: [["Remove source"]] },
+  chips: ["sources", "acct", "feed", "pfeed"] };
+
+/* Onboarding A: the question is its own step */
+const signinFields = () => `${H.field("Server address", "rss.example.org")}${H.field("Username", "reader")}${H.field("Password", "••••••••")}<div class="obp" style="padding:4px 0">In tt-rss, turn on <b>Preferences › Enable API</b> first.</div>`;
+const OA = {
+  welcome: { label: "Welcome", note: "Tap Get started.", html: () => `<div class="welcome"><div class="mast">newspapeRSS</div><div class="big">Your own newspaper, on your e-reader.</div><div class="obp">You pick the sites and the size. It arrives on schedule, and it ends.</div><button class="fb" data-go="device">Get started</button></div>` },
+  device: { label: "1 · Device", note: "Unchanged.", path: ["welcome", "device"], html: () => obStep(1, 4, "Where do you read?", "", `<div style="padding:0 16px">${["Kindle", "Kobo", "Boox", "PocketBook", "KOReader", "Just the file"].map((d, i) => H.opt(d, "", i === 0)).join("")}</div>`, "fork") },
+  fork: { label: "2 · The question", note: "Pick one, then Next. The step count changes with the answer.", path: ["welcome", "device", "fork"], html: () => obStep(2, 4, "Where do your sites come from?", "", `<div role="radiogroup" aria-label="Where your sites come from">${choice("phonesrc", "This phone finds and fetches them", "Most people. Nothing to set up.")}${choice("signin", "My own RSS server", "tt-rss today. FreshRSS and Miniflux are coming.")}</div><div class="obp" style="padding-top:6px">Not sure? It's this phone. You can change this later in Settings.</div>`, `<button class="fb" data-act="gosel">Next</button>`) },
+  phonesrc: { label: "3 · Phone: sources", note: "Today's step, without Connect tt-rss.", path: ["welcome", "device", "fork", "phonesrc"], html: () => obStep(3, 4, "Pick your sources", "Tap a pack, or paste a site you like.", `<div class="chips">${PACKS.map((p, i) => `<button class="chip ${i < 2 ? "on" : ""}" data-act="chip" aria-pressed="${i < 2}">${p}</button>`).join("")}</div><div style="padding:0 16px">${H.field("Paste a website", "example.com")}</div><div class="btns"><button class="ob">Import from another reader (OPML)</button><button class="ob">Import saved links (Pocket, Instapaper)</button></div>`, "size") },
+  signin: { label: "3 · Server: sign in", note: "Errors say what to fix; \"Use this phone instead\" goes back.", path: ["welcome", "device", "fork", "signin"], html: () => obStep(3, 5, "Sign in to your tt-rss", "FreshRSS and Miniflux are coming.", `<div style="padding:0 16px">${signinFields()}</div><div class="btns">${H.go("Use this phone instead", "phonesrc")}</div><div class="obp"><span class="tryit">Mockup:</span> <button class="tb" data-dlg="signfail">see a sign-in error</button></div>`, "signedin", "Sign in") },
+  signfail: { dialog: true, over: ["welcome", "device", "fork", "signin"], label: "Sign-in error", note: "One message per cause.", html: () => H.dlg("Couldn't sign in", `<div>API access is off in your tt-rss. Turn it on in tt-rss under Preferences › Enable API, then try again.</div>`, H.close("OK")) },
+  signedin: { label: "3 · Signed in", note: "What's there; the paper takes from all of it.", path: ["welcome", "device", "fork", "signin", "signedin"], html: () => obStep(3, 5, "Signed in", "", `<div class="note">rss.example.org · signed in as reader</div><div class="steps"><div><b>58 feeds</b> in 7 categories</div><div class="done">Your paper takes from all of them. To narrow it to one category, or leave feeds out, use Sources or Settings later.</div></div>`, "extras") },
+  extras: { label: "4 · Extras", note: "These stay on the phone in both setups.", path: ["welcome", "device", "fork", "signin", "signedin", "extras"], html: () => obStep(4, 5, "Also on this phone", "These stay on the phone, whatever your server does.", `${H.row("Your reading list", "Links you share from any app. Always on.", { icon: I.bookmark })}<div class="btns"><button class="ob">Import saved links (Pocket, Instapaper)</button></div><div class="h3">Curated lists</div><div style="padding:0 16px">${H.cb('Arts &amp; Letters Daily<div class="su">A few links a day to essays and reviews</div>', false)}</div>`, "size5") },
+  size: { label: "4 · Size (phone)", note: "Unchanged.", path: ["welcome", "device", "fork", "phonesrc", "size"], html: () => obStep(4, 4, "How much, and when?", "", sizeBody(), "nossrc", "Make my first edition") },
+  size5: { label: "5 · Size (server)", note: "Unchanged.", path: ["welcome", "device", "fork", "signin", "signedin", "extras", "size5"], html: () => obStep(5, 5, "How much, and when?", "", sizeBody(), "srvsrc", "Make my first edition") },
+  nossrc: { label: "", note: "The phone setup's Sources.", html: () => nosSources() },
+  srvsrc: { label: "", note: "The server setup's Sources (P1).", html: () => srvSources() },
+};
+const sizeBody = () => `${H.set("About 30 minutes", "", "")}<div class="slider" aria-hidden="true"><i></i><b></b></div>${H.set("A new edition every day", "", H.sw(true, "A new edition every day"))}${H.set("Ready by", "6:30 AM", H.tb("Change"))}`;
+FLOWS.oa = { start: "welcome", screens: OA, menus: { srvmenu: [["Where your feeds come from", "noop"]], phmenu: [["Import from another reader (OPML)"], ["Export your sites (OPML)"]] }, chips: ["welcome", "fork", "phonesrc", "signin", "signedin", "extras", "size5"] };
+
+
+/* Onboarding B: a button on the sources step */
+FLOWS.ob = { start: "obsrc", screens: {
+  obsrc: { label: "2 · Sources", note: "The server button comes first (v2). Tap it.", html: () => obStep(2, 3, "Pick your sources", "Tap a pack, or paste a site you like.", `<div class="btns"><button class="ob" data-go="obsignin">I use an RSS server (tt-rss)</button></div><div class="chips">${PACKS.map((p, i) => `<button class="chip ${i < 2 ? "on" : ""}" data-act="chip" aria-pressed="${i < 2}">${p}</button>`).join("")}</div><div style="padding:0 16px">${H.field("Paste a website", "example.com")}</div>`, "obsize") },
+  obsignin: { label: "Sign in", note: "Choosing a server clears the packs picked here, and says so.", path: ["obsrc", "obsignin"], html: () => obStep(2, 3, "Sign in to your tt-rss", "Your server's feeds replace the 2 packs you picked.", `<div style="padding:0 16px">${signinFields()}</div>`, "obsrv", "Sign in") },
+  obsrv: { label: "Server sources", note: "The same step, now in the server setup.", path: ["obsrc", "obsignin", "obsrv"], html: () => obStep(2, 3, "Your sources", "", `<div class="note">Your tt-rss · 58 feeds in 7 categories</div>${H.row("Your reading list", "Always on, on this phone", { icon: I.bookmark })}<div style="padding:0 16px">${H.cb("Arts &amp; Letters Daily", false)}</div><div class="btns">${H.go("Use this phone instead", "obsrc")}</div>`, "obsize") },
+  obsize: { label: "3 · Size", note: "", path: ["obsrc", "obsize"], html: () => obStep(3, 3, "How much, and when?", "", sizeBody(), "obsrc", "Make my first edition") },
+}, menus: {}, chips: ["obsrc", "obsignin", "obsrv"] };
+
+/* Sources with a server: shared screens for P1, P2, P3 */
+const srvCommon = (sources) => ({
+  sources,
+  feed: { label: "A feed", note: "Says where it lives; Unsubscribe in tt-rss is in ⋮.", path: ["sources", "feed"], html: () => srvFeedPage() },
+  acct: { label: "Account", note: "The same page as Settings › Where your feeds come from.", path: ["sources", "acct"], html: () => wherePage(true) },
+  left: { label: "Left out", note: "Left-out feeds, out of the way.", path: ["sources", "left"], html: () => H.bar("Left out", { nomenu: true }) + `<div class="body"><div class="hint" style="padding-top:8px">In your tt-rss, but not in the paper. Open one to bring it back.</div>${ALL.filter(f => LEFT.has(f.t)).map(f => H.row(esc(f.t), `Left out · ${esc(f.c)}`, { go: "feed" })).join("")}</div>` + H.nav() },
+  notin: { label: "Not in your paper", note: "The left-out page, filtered to categories outside Articles from.", path: ["only", "notin"], html: () => H.bar("Not in your paper", { nomenu: true }) + `<div class="body"><div class="hint" style="padding-top:8px">Your paper takes articles from Essays &amp; ideas only. Change it in <button class="tb" data-go="acct" style="padding:0">Articles from</button>.</div>${CATNAMES.filter(c => c !== "Essays & ideas").map(c => H.row(esc(c), `${CATS[c].length} feeds`)).join("")}</div>` + H.nav() },
+  pfeed: { label: "", note: "", path: ["sources", "pfeed"], html: () => phoneFeedPage() },
+  phoneafter: { label: "", note: "The phone setup, with the 54 feeds brought along.", path: ["phoneafter"], html: () => nosSources({ all: true, snack: "Now fetched by this phone: 54 feeds. 3 starred articles went to your reading list." }) },
+  noop,
+  padd: { dialog: true, over: ["phoneafter"], label: "", note: "", html: () => H.dlg("Add a source", `<div>Paste a website or feed address.</div>${H.field("Address", "example.com")}`, H.close("Cancel") + H.close("Add")) },
+  ...D,
+  ...ADD,
+});
+const srvMenus = { srvmenu: [["Where your feeds come from", "acct"]], feedmenu: [["Unsubscribe in tt-rss", "unsub"]], pfeedmenu: [["Remove source"]], phmenu: [["Import from another reader (OPML)"], ["Export your sites (OPML)"]] };
+
+/* Adding a site with a server */
+const ADD = {
+  add: { dialog: true, over: ["sources"], label: "Add", note: "Paste an address. Tap Add.", html: () => H.dlg("Add a site", `<div>Paste a website or feed address.</div>${H.field("Address", "quantamagazine.org")}<div class="su">It goes into your tt-rss, so your other reader apps get it too.</div>`, H.close("Cancel") + `<button class="tb" data-go="checking">Add</button>`) },
+  checking: { dialog: true, over: ["sources"], label: "Checking", note: "The phone finds the feed first. Pick an outcome.", html: () => H.dlg("Add a site", `<div aria-live="polite">Checking quantamagazine.org…</div><div class="tryit">Mockup: choose what the phone finds</div>${H.go("It has a feed", "subfound")}${H.go("No feed on the site", "nofeed")}${H.go("It's a curated list", "listsite")}`, H.close("Cancel")) },
+  subfound: { dialog: true, over: ["sources"], label: "Subscribe", note: "One account, so only the category is asked (the last one used).", html: () => H.dlg("Subscribe in your tt-rss", `<div><b>Quanta Magazine</b><div class="su">quantamagazine.org/feed · full articles</div></div><div class="su" style="margin-top:6px">Category</div><button class="select" data-dlg="subcat" aria-label="Category, Science">Science <span>▾</span></button><div class="su">To add a category, make it in tt-rss first.</div>`, H.close("Cancel") + `<button class="tb" data-go="subscribing">Subscribe</button>`) },
+  subcat: { dialog: true, over: ["sources"], then: "subfound", label: "Category", note: "", html: () => H.dlg("Category", CATNAMES.map(c => H.opt(esc(c), "", c === "Science")).join(""), H.close("Done")) },
+  subscribing: { dialog: true, over: ["sources"], label: "Asking tt-rss", note: "tt-rss fetches the feed before it answers. Pick what it says.", html: () => H.dlg("Subscribe in your tt-rss", `<div aria-live="polite">Asking tt-rss to subscribe…</div><div class="su">A slow server can take half a minute. You can close this; it carries on.</div><div class="tryit">Mockup: choose what tt-rss says</div>${H.go("Subscribed", "added")}${H.go("Couldn't download it", "srvfail")}${H.go("Already subscribed", "already")}`, H.close("Close")) },
+  added: { label: "Added", note: "In Science, waiting for tt-rss's first fetch. Undo unsubscribes.", path: ["added"], html: () => srvSources({ added: true, snack: "Subscribed in tt-rss. Its first articles come after tt-rss fetches it, usually within the hour.", undo: true }) },
+  nofeed: { dialog: true, over: ["sources"], label: "No feed", note: "Fallback: the reading list.", html: () => H.dlg("No feed on this site", `<div>quietpaper.example doesn't offer a feed, so tt-rss can't follow it.</div>${H.go("Save this page to your reading list", "savedrl")}`, H.close("Cancel")) },
+  listsite: { dialog: true, over: ["sources"], label: "A curated list", note: "Fallback: a curated list the app can read, on the phone.", html: () => H.dlg("A curated list", `<div>aldaily.com has no feed, but newspapeRSS can read its picks each day, on this phone.</div>${H.go("Add Arts &amp; Letters Daily", "listadded")}${H.go("Save this page to your reading list", "savedrl")}`, H.close("Cancel")) },
+  srvfail: { dialog: true, over: ["sources"], label: "tt-rss can't fetch", note: "The one exception to \"never mixed\": an open question.", html: () => H.dlg("tt-rss couldn't fetch it", `<div>tt-rss couldn't download quantamagazine.org/feed.</div><div class="su">Some sites block servers, or your server can't reach them.</div>${H.go("Fetch it from this phone instead", "phonefeed")}<div class="su">Listed under On this phone, marked as fetched here.</div>${H.go("Save this page to your reading list", "savedrl")}`, H.close("Cancel")) },
+  already: { dialog: true, over: ["sources"], label: "Already there", note: "", html: () => H.dlg("Already in your tt-rss", `<div>Quanta Magazine is in Science.</div>`, H.close("OK")) },
+  phonefeed: { label: "Fetched here", note: "The exception, labelled on its row.", path: ["phonefeed"], html: () => srvSources({ noList: true, extra: H.row("Quanta Magazine", "Fetched by this phone: tt-rss couldn't", { go: "pfeed" }), snack: "Quanta Magazine is fetched by this phone.", undo: true }) },
+  savedrl: { label: "Saved", note: "", path: ["savedrl"], html: () => srvSources({ noList: true, snack: "Saved to your reading list.", undo: true }) },
+  listadded: { label: "List added", note: "", path: ["listadded"], html: () => srvSources({ snack: "Added Arts &amp; Letters Daily, on this phone.", undo: true }) },
+};
+
+FLOWS.p1 = { start: "sources", screens: { ...srvCommon({ label: "Sources", note: "Account row, On this phone, then the server's categories, open. Tap a feed or the account row.", html: () => srvSources() }),
+  only: { label: "Articles from: one category", note: "Only Essays & ideas is in the paper; the rest go into one row.", path: ["only"], html: () => srvSources({ only: true }) },
+  down: { label: "Server down", note: "The last-seen list stays; the top row says so in words.", path: ["down"], html: () => srvSources({ down: true }) },
+}, menus: srvMenus, chips: ["sources", "only", "down", "feed", "acct", "left"] };
+FLOWS.p1.screens.notin.path = ["only", "notin"];
+FLOWS.oa.screens = { ...srvCommon({ label: "", note: "", html: () => srvSources() }), ...OA };
+
+const p2list = (cat) => `<div class="set"><div class="main"><div>Showing</div></div><button class="select" data-dlg="filter" style="min-width:160px" aria-label="Showing, ${cat ? esc(cat) : "all categories"}">${cat ? esc(cat) : "All categories"} <span>▾</span></button></div>${cat ? `<div class="hint" aria-live="polite">Showing ${esc(cat)}, ${inPaper(CATS[cat]).length} feeds</div>` : ""}${ALL.filter(f => !LEFT.has(f.t) && (!cat || f.c === cat)).sort(az).map(f => H.row(esc(f.t), `${esc(f.c)} · ${fresh(f.t)}`, { go: "feed" })).join("")}${H.row("Left out · 4", "Feeds you've left out of the paper", { go: "left" })}`;
+FLOWS.p2 = { start: "sources", screens: { ...srvCommon({ label: "Sources", note: "One A–Z list; the dropdown narrows it. Tap Showing.", html: () => srvSources({ body: () => `<div class="h2">From your tt-rss</div>${p2list()}` }) }),
+  filter: { dialog: true, over: ["sources"], label: "Filter", note: "One dropdown, not chips (v2).", html: () => H.dlg("Show", `<button class="optrow" data-go="sources"><span class="rad on"></span><span>All categories</span></button>${CATNAMES.map(c => `<button class="optrow" data-go="cat_${CATNAMES.indexOf(c)}"><span class="rad"></span><span>${esc(c)}</span></button>`).join("")}`, H.close("Cancel")) },
+  ...Object.fromEntries(CATNAMES.map((c, i) => [`cat_${i}`, { label: esc(c), note: "Filtered, and announced.", path: [`cat_${i}`], html: () => srvSources({ body: () => `<div class="h2">From your tt-rss</div>${p2list(c)}` }) }])),
+}, menus: srvMenus, chips: ["sources", "filter", "cat_2", "feed"] };
+
+const quiet = c => inPaper(CATS[c]).filter(t => fresh(t).startsWith("Nothing")).length;
+FLOWS.p3 = { start: "sources", screens: { ...srvCommon({ label: "Sources", note: "About ten rows. Each category opens its feeds.", html: () => srvSources({ body: () => `<div class="h2">From your tt-rss</div>${CATNAMES.map((c, i) => { const lo = CATS[c].filter(t => LEFT.has(t)).length, q = quiet(c); return H.row(esc(c), `${inPaper(CATS[c]).length} feeds${lo ? `, ${lo} left out` : ""}${q ? ` · ${q} quiet for 3 weeks` : ""}`, { go: `c_${i}` }); }).join("")}` }) }),
+  ...Object.fromEntries(CATNAMES.map((c, i) => [`c_${i}`, { label: esc(c), note: "A category's page: its feeds, then its left-out ones.", path: ["sources", `c_${i}`], html: () => H.bar(esc(c), { nomenu: true }) + `<div class="body"><div class="crumb">From your tt-rss</div>${inPaper(CATS[c]).map(t => H.row(esc(t), fresh(t), { go: "feed" })).join("")}${CATS[c].some(t => LEFT.has(t)) ? `<div class="h3">Left out</div>${CATS[c].filter(t => LEFT.has(t)).map(t => H.row(esc(t), "Left out", { go: "feed" })).join("")}` : ""}</div>` + H.nav() }])),
+}, menus: srvMenus, chips: ["sources", "c_5", "c_2", "feed"] };
+
+FLOWS.nos = { start: "sources", screens: {
+  sources: { label: "Sources", note: "No headings, no server words. ⋮ has OPML only.", html: () => nosSources() },
+  pfeed: { label: "A feed", note: "Unchanged.", path: ["sources", "pfeed"], html: () => phoneFeedPage() },
+  padd: { dialog: true, over: ["sources"], label: "Add a source", note: "Today's dialog.", html: () => H.dlg("Add a source", `<div>Paste a website or feed address.</div>${H.field("Address", "example.com")}<button class="tb" style="justify-self:start;padding-left:0">Save this page to your reading list instead</button>`, H.close("Cancel") + H.close("Add")) },
+  atext: { ...D.atext, over: ["sources", "pfeed"] },
+  settings: { label: "Settings", note: "The choice lives here.", path: ["settings"], html: () => settingsPage("phone") },
+  wherephone: { label: "Where from", note: "Choosing the server leads to sign-in.", path: ["settings", "wherephone"], html: () => wherePage(false) },
+  signin2: { label: "", note: "", path: ["settings", "wherephone", "signin2"], html: () => SIGNIN2() }, offer: { label: "", note: "", path: ["settings", "wherephone", "signin2", "offer"], html: () => OFFER() },
+  moving: MOVING, done: DONE, partial: PARTIAL, sources2: { label: "", note: "", path: ["sources2"], html: () => srvSources({ phoneFeeds: true }) }, noop,
+  movedlg: { ...D.movedlg, over: ["settings", "wherephone", "signin2", "offer"] }, movecat: { ...D.movecat, over: ["settings", "wherephone", "signin2", "offer"] },
+}, menus: srvMenus, chips: ["sources", "padd", "pfeed", "settings", "wherephone"] };
+
+FLOWS.add = { start: "sources", screens: { ...srvCommon({ label: "Sources", note: "Tap Add a site.", html: () => srvSources({ noList: true }) }) },
+  menus: srvMenus, chips: ["sources", "add", "subfound", "added", "nofeed", "listsite", "srvfail", "phonefeed"] };
+
+const SIGNIN2 = () => H.bar("Sign in to your tt-rss", { nomenu: true }) + `<div class="body"><div style="padding:8px 16px">${signinFields()}</div><div class="btns">${H.go("Sign in", "offer", "fb")}</div></div>` + H.nav("set");
+const OFFER = () => H.bar("Your tt-rss", { nomenu: true }) + `<div class="body"><div class="note">Signed in to rss.example.org. 58 feeds in 7 categories.</div><div class="banner"><div><b>Move your 8 phone feeds to tt-rss?</b></div><div class="su">tt-rss will fetch them, and read status will match your other apps. Their settings here come along. 3 are already in your tt-rss.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="fb" data-dlg="movedlg">Move 8</button>${H.go("Not now", "sources2")}</div></div></div>` + H.nav("set");
+
+FLOWS.move = { start: "sources", screens: { ...srvCommon({ label: "Sources", note: "An existing user with both: phone feeds under On this phone, one banner. Tap Move.", html: () => srvSources({ phoneFeeds: true }) }),
+  moving: MOVING, done: DONE, partial: PARTIAL,
+}, menus: srvMenus, chips: ["sources", "movedlg", "moving", "done", "partial"] };
+
+FLOWS.getsrv = { start: "settings", screens: {
+  settings: { label: "Settings", note: "The phone setup. Tap Where your feeds come from.", html: () => settingsPage("phone") },
+  wherephone: { label: "Where from", note: "Tap My own RSS server.", path: ["settings", "wherephone"], html: () => wherePage(false) },
+  signin2: { label: "Sign in", note: "", path: ["settings", "wherephone", "signin2"], html: SIGNIN2 },
+  offer: { label: "The offer", note: "Right after sign-in: Move 8, or Not now.", path: ["settings", "wherephone", "signin2", "offer"], html: OFFER },
+  sources2: { label: "Not now", note: "The phone feeds keep working; the banner stays.", path: ["sources2"], html: () => srvSources({ phoneFeeds: true }) },
+  movedlg: { ...D.movedlg, over: ["settings", "wherephone", "signin2", "offer"] }, movecat: { ...D.movecat, over: ["settings", "wherephone", "signin2", "offer"] },
+  moving: MOVING, done: DONE, partial: PARTIAL, noop, ...ADD,
+  acct: { label: "", note: "", html: () => wherePage(true) }, pfeed: { label: "", note: "", html: () => phoneFeedPage() }, feed: { label: "", note: "", html: () => srvFeedPage() }, left: { label: "", note: "", html: () => H.bar("Left out") + H.nav() },
+  ...D,
+}, menus: srvMenus, chips: ["settings", "wherephone", "signin2", "offer", "sources2"] };
+
+FLOWS.leave = { start: "acct", screens: { ...srvCommon({ label: "", note: "", html: () => srvSources() }),
+  acct: { label: "Where from", note: "Tap This phone.", html: () => wherePage(true) },
+  leave2: { ...D.leave2, over: ["acct"] },
+}, menus: srvMenus, chips: ["acct", "leave2", "phoneafter"] };
+
+FLOWS.set = { start: "settings", screens: { ...srvCommon({ label: "", note: "", html: () => srvSources() }),
+  settings: { label: "Settings", note: "A new row after delivery. Tap it.", html: () => settingsPage("server") },
+  broken: { label: "Broken account", note: "In red, like other Settings problems, and said in words.", path: ["broken"], html: () => settingsPage("broken") },
+  acct: { label: "Where from", note: "The choice, then the account's settings.", path: ["settings", "acct"], html: () => wherePage(true) },
+  brokenacct: { label: "", note: "", path: ["broken", "brokenacct"], html: () => wherePage(true, { broken: true }) },
+  leave2: { ...D.leave2, over: ["settings", "acct"] },
+  wherephone: { label: "Phone setup", note: "Without a server, the row says This phone.", path: ["wherephone"], html: () => wherePage(false) },
+  signin2: { label: "", note: "", path: ["wherephone", "signin2"], html: SIGNIN2 }, offer: { label: "", note: "", path: ["wherephone", "signin2", "offer"], html: OFFER },
+  sources2: { label: "", note: "", path: ["sources2"], html: () => srvSources({ phoneFeeds: true }) }, moving: MOVING, done: DONE, partial: PARTIAL,
+}, menus: srvMenus, chips: ["settings", "acct", "leave2", "broken", "wherephone"] };
+FLOWS.set.screens.broken.html = () => settingsPage("broken").replace('data-go="acct"', 'data-go="brokenacct"');
+
+/* The recommended path: onboarding fork → P1 Sources → add → move */
+FLOWS.rec = { start: "fork", screens: { ...OA, ...srvCommon({ label: "Sources", note: "P1 v3, with phone feeds still to move.", path: ["sources"], html: () => srvSources({ phoneFeeds: true }) }),
+  moving: MOVING, done: DONE, partial: PARTIAL,
+}, menus: srvMenus, chips: ["fork", "signin", "extras", "sources", "subfound", "movedlg", "acct"] };
+FLOWS.rec.screens.fork = { ...OA.fork, path: ["fork"] };
+FLOWS.rec.screens.size5 = { ...OA.size5, html: () => obStep(5, 5, "How much, and when?", "", sizeBody(), "sources", "Make my first edition") };
+FLOWS.rec.screens.signin = { ...OA.signin, path: ["fork", "signin"] };
+FLOWS.rec.screens.signedin = { ...OA.signedin, path: ["fork", "signin", "signedin"] };
+FLOWS.rec.screens.extras = { ...OA.extras, path: ["fork", "signin", "signedin", "extras"] };
+FLOWS.rec.screens.phonesrc = { ...OA.phonesrc, path: ["fork", "phonesrc"] };
+FLOWS.rec.screens.signfail = { ...OA.signfail, over: ["fork", "signin"] };
+
+/* ---------- engine (from the tt-rss page; adds gosel, foldrow and chip) ---------- */
+function mountPhone(stage) {
+  const flow = FLOWS[stage.dataset.flow];
+  stage.innerHTML = `<div class="phone"><div class="status"><span>10:21</span><span>▾ ▴ ▮</span></div><div class="screen"></div></div><div class="caption" aria-live="polite"></div><div class="stagebar"></div><label class="caption" style="min-height:0"><input type="checkbox" class="hl"> Show what's clickable</label>`;
+  const scr = stage.querySelector(".screen"), cap = stage.querySelectorAll(".caption")[0], bar = stage.querySelector(".stagebar");
+  let stack = [flow.start], overlay = null, menu = null;
+  function render() {
+    const base = flow.screens[stack[stack.length - 1]];
+    let html = base.html();
+    if (overlay) html += flow.screens[overlay].html();
+    if (menu) html += `<div class="menuscrim" data-act="closemenu"></div><div class="menu">${flow.menus[menu].map(([l, go]) => `<div ${go ? `data-go="${go}"` : 'data-act="closemenu"'}>${l}</div>`).join("")}</div>`;
+    scr.innerHTML = html;
+    const cur = overlay || stack[stack.length - 1];
+    cap.textContent = flow.screens[cur].note || "";
+    bar.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.s === cur));
+  }
+  bar.innerHTML = flow.chips.map(id => `<button data-s="${id}">${flow.screens[id].label}</button>`).join("");
+  bar.addEventListener("click", e => {
+    const id = e.target.dataset.s; if (!id) return;
+    const s = flow.screens[id];
+    if (s.dialog) { overlay = id; if (s.over) stack = s.over.slice(); } else { overlay = null; stack = s.path ? s.path.slice() : [flow.start, id].filter((v, i, a) => a.indexOf(v) === i); }
+    menu = null; render();
+  });
+  stage.querySelector(".hl").addEventListener("change", e => stage.classList.toggle("hot", e.target.checked));
+  scr.addEventListener("click", e => {
+    const t = e.target.closest("[data-go],[data-dlg],[data-back],[data-close],[data-act]");
+    if (!t) return;
+    if (t.matches(".scrim") && e.target !== t) return; // clicks inside a dialog don't close it
+    const missing = id => { if (flow.screens[id]) return false; cap.textContent = "Not mocked in this flow: see its own tab."; return true; };
+    if (t.dataset.go) { if (missing(t.dataset.go)) return; const s = flow.screens[t.dataset.go]; if (s.dialog) overlay = t.dataset.go; else { overlay = null; stack.push(t.dataset.go); } menu = null; }
+    else if (t.dataset.dlg) { if (missing(t.dataset.dlg)) return; overlay = t.dataset.dlg; }
+    else if (t.hasAttribute("data-back")) { overlay = null; if (stack.length > 1) stack.pop(); }
+    else if (t.hasAttribute("data-close")) { const s = overlay && flow.screens[overlay]; overlay = s && s.then ? s.then : null; if (s && s.thenGo) stack.push(s.thenGo); }
+    else {
+      const a = t.dataset.act;
+      if (a === "toggle") { t.classList.toggle("on"); t.setAttribute("aria-checked", t.classList.contains("on")); return; }
+      if (a === "check") { const c = t.querySelector(".cb"); c.classList.toggle("on"); c.setAttribute("aria-checked", c.classList.contains("on")); return; }
+      if (a === "chip") { t.classList.toggle("on"); t.setAttribute("aria-pressed", t.classList.contains("on")); return; }
+      if (a === "pick") { t.parentElement.querySelectorAll("[data-act=pick]").forEach(r => { r.querySelector(".rad").classList.toggle("on", r === t); r.setAttribute("aria-checked", r === t); }); return; }
+      if (a === "gosel") { const on = scr.querySelector(".choice .rad.on"); if (!on) { cap.textContent = "Choose one first."; return; } overlay = null; stack.push(on.closest(".choice").dataset.to); }
+      if (a === "foldrow") { const b = t.closest(".row").nextElementSibling; b.hidden = !b.hidden; t.setAttribute("aria-expanded", !b.hidden); t.textContent = b.hidden ? "▾" : "▴"; return; }
+      if (a.startsWith("menu:")) menu = a.slice(5);
+      if (a === "closemenu") menu = null;
+    }
+    render();
+  });
+  render();
+}
+
+/* ---------- plan and log ---------- */
+const PLAN = [
+  ["1", "Competitors: first run, mixing, add, switching", "Competitors tab", "done"],
+  ["2", "Baseline: Sources today, mixed", "Today (mixed) tab", "done"],
+  ["3", "Proposals v1: onboarding O-A and O-B; Sources with a server P1, P2, P3; without a server; adding; switching; Settings", "Every proposal tab", "done"],
+  ["4", "Critique round 1: personas", "O-A v2, O-B v2, P1 v2, P2 v2, P3 v2, the rest v2", "done"],
+  ["5", "Critique round 2: the code and the edges", "O-A v3 (O-B dropped), P1 v3, P2 and P3 verdicts, add and move v2", "done"],
+  ["6", "Compare and recommend", "Compare &amp; recommend tab", "done"],
+  ["7", "Critique of the comparison, and fixes", "Compare, final; open questions", "done"],
+  ["8", "Build order for tonight; the written version", "Build order tab; server-mode.md; a BACKLOG link", "done"],
+];
+const LOG = [
+  ["Cycle 8 · build order and write-up", "Split the recommendation into four steps that each ship alone: (a) the setup choice and the onboarding fork, (b) Sources for a server, (c) adding to the server with fallbacks, (d) moving phone feeds. Each step lists its screens, data, removals and risks. Wrote server-mode.md and linked it from the backlog.", "Leaving a server with its feeds, and the Google Reader API, go after tonight as (e) and later."],
+  ["Cycle 7 · critique of the comparison", "Read the comparison against every tab and the code (SourcesViewModel, EditionBuilder, the data model).", "Fixed: P1's cost counts the Not-in-your-paper page; the steps name their dependencies; leaving with feeds became its own step; the phone-fetch exception became an open question; the paused-account edge was noted and the default kept."],
+  ["Cycle 6 · compare and recommend", "Two tables: Sources with a server (P1, P2, P3), and onboarding (O-A, O-B).", "Recommended O-A v3 and P1 v3, today's list minus tt-rss without a server, add with fallbacks, and a one-tap move. P2 waits for search; P3 for very large accounts."],
+  ["Cycle 5 · critique round 2, the code and the edges", "Walked each proposal through the code paths it touches: cascading deletes of starred articles, delivered_urls, the builder's within-edition URL dedupe, tt-rss category 0, subscribe being synchronous, and Undo needing a feed id.", "O-B dropped (the choice must be explicit). P1 v3: only categories in the paper, server down in words. Move v2: a source waits paused until its starred articles are gone. Add v2: the phone-fetch exception. Leaving: starred tt-rss articles go to the reading list."],
+  ["Cycle 4 · critique round 1, personas", "The Kindle reader in their sixties, the Pocket refugee, a tt-rss owner with 58 feeds, a FreshRSS user, someone with no server and 8 feeds, a TalkBack user, and e-ink (Boox and Kindle) walked every flow.", "Plain wording for the question; On this phone moved above the server's feeds; a radio group with Next; P2's chips became a dropdown; P3 says which categories have quiet feeds; settings come along in the move sheet."],
+  ["Cycle 3 · proposals v1", "Clickable flows on the engine from the tt-rss page: two onboarding forks, three Sources layouts for a server, Sources without one, adding a site, three switching paths, and Settings.", "All on the same made-up 58-feed account and eight starter-pack feeds."],
+  ["Cycle 2 · baseline", "Mocked today's Sources from SourcesScreen and SourcesViewModel: phone feeds, then tt-rss last, its feeds inset and folded, and the duplicate lines.", "Listed what goes: the inset list, the fold setting, the duplicate lines, the ⋮ menu's tt-rss item."],
+  ["Cycle 1 · competitors", "Readrops, Read You, Capy Reader, FeedMe, NetNewsWire, Reeder, Fluent Reader, and Feeder as a contrast. Web sources where they could be found; claims from memory are marked.", "One account at a time is the Android norm; nobody merges local and server lists; the server wins on overlap (Fluent Reader); only NetNewsWire moves feeds in-app. That supports the owner's two setups."],
+];
+document.getElementById("planRows").innerHTML = PLAN.map(([n, c, o, s]) => `<tr><td>${n}</td><td>${c}</td><td>${o}</td><td><span class="pill">${s}</span></td></tr>`).join("");
+document.getElementById("log").innerHTML = LOG.map(([h, d, f]) => `<article><h3>${h}</h3><p style="margin:0">${d}</p><p style="margin:0;color:var(--muted)">${f}</p></article>`).join("");
+
+/* ---------- tabs ---------- */
+const tabs = [...document.querySelectorAll(".tab")], tl = document.getElementById("tabs");
+tl.innerHTML = tabs.map(t => `<button role="tab" data-t="${t.id}">${t.dataset.label}</button>`).join("");
+function show(id) {
+  if (!tabs.some(t => t.id === id)) id = "compare";
+  tabs.forEach(t => t.hidden = t.id !== id);
+  tl.querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === id));
+  const t = document.getElementById(id);
+  t.querySelectorAll(".stage[data-flow]").forEach(s => { if (!s.dataset.ready) { s.dataset.ready = 1; mountPhone(s); } });
+}
+tl.addEventListener("click", e => { const id = e.target.dataset.t; if (id) { show(id); history.replaceState(null, "", "#" + id); } });
+show(location.hash.slice(1) || "compare");
+</script>
+</body>
+</html>

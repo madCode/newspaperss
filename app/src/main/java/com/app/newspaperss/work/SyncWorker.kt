@@ -15,7 +15,10 @@ import java.util.concurrent.TimeUnit
 
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        (applicationContext as NewspaperssApp).container.feedSync.syncAll()
+        val container = (applicationContext as NewspaperssApp).container
+        container.feedSync.syncAll()
+        // Moved phone feeds go once their last starred article has been delivered.
+        container.feedMoves.tidy()
         return Result.success()
     }
 

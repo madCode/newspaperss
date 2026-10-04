@@ -1,31 +1,36 @@
 package com.app.newspaperss.edition
 
-import com.app.newspaperss.delivery.FolderDelivery
+import android.util.Log
+import androidx.room.withTransaction
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.edition.Candidate
-import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.core.edition.EditionPlanner
 import com.app.newspaperss.core.edition.EditionTitles
 import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
 import com.app.newspaperss.core.epub.EpubImage
-import com.app.newspaperss.core.notes.Reflection
-import com.app.newspaperss.core.plural
-import com.app.newspaperss.core.net.hostOf
 import com.app.newspaperss.core.epub.EpubWriter
+import com.app.newspaperss.core.extract.ArticleExtractor
+import com.app.newspaperss.core.extract.ContentMode
+import com.app.newspaperss.core.extract.FullTextCheck
+import com.app.newspaperss.core.extract.HtmlCleaner
+import com.app.newspaperss.core.images.ImageAllowance
 import com.app.newspaperss.core.images.ImageBudget
 import com.app.newspaperss.core.images.ImageRules
+import com.app.newspaperss.core.net.hostOf
+import com.app.newspaperss.core.notes.Reflection
+import com.app.newspaperss.core.plural
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.ArticleEntity
 import com.app.newspaperss.data.ArticleState
 import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
+import com.app.newspaperss.data.PublicationEntity
 import com.app.newspaperss.data.SourceEntity
 import com.app.newspaperss.data.SourceKind
-import android.util.Log
-import androidx.room.withTransaction
+import com.app.newspaperss.delivery.FolderDelivery
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -62,12 +67,19 @@ class EditionBuilder(
     private val clock: Clock = Clock.systemDefaultZone(),
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val imageBudgetBytes: Long = ImageRules.MAX_EDITION_BYTES,
+    /**
+     * Phone feeds moved to tt-rss: paused so they fetch nothing, but what they still hold, stars
+     * above all, goes in as if they weren't (see [com.app.newspaperss.data.FeedMoves]).
+     */
+    private val retiring: suspend () -> Set<Long> = { emptySet() },
     private val cover: (CoverInfo) -> EpubImage? = { null },
 ) {
     suspend fun build(settings: EditionSettings, dueAt: Instant? = null, onProgress: (done: Int) -> Unit = {}): BuildResult {
         failInterrupted()
         releaseUndelivered()
-        val sources = db.sources().all().filter { !it.paused }
+        // tt-rss last, after what's on the phone, as Sources lists them.
+        val moved = retiring()
+        val sources = db.sources().all().filter { !it.paused || it.id in moved }.sortedBy { it.kind == SourceKind.TTRSS }
         val sourcesById = sources.associateBy { it.id }
 
         // A timed edition is built ahead of its time; it's titled and dated for when it's due.
@@ -87,7 +99,8 @@ class EditionBuilder(
             // change made afterwards would be silently undone when they're marked IN_EDITION.
             // The same link from two sources goes in once, and a starred copy is the one kept.
             // A star is the reader asking for that article, even from a feed they left out.
-            val leftOut = db.sources().allLeftOut().map { publicationOf(it.sourceId, it.originId) }.toSet()
+            val publications = db.sources().allPublications()
+            val leftOut = publications.filter { it.leftOut }.map { publicationOf(it.sourceId, it.key) }.toSet()
             val articles = db.articles().candidates()
                 .filter { it.sourceId in sourcesById && (it.starredAt != null || publicationOf(it) !in leftOut) }
                 .sortedBy { it.starredAt == null }
@@ -96,7 +109,7 @@ class EditionBuilder(
                 db.editions().deleteEmpty(editionId)
                 BuildResult.NothingNew
             } else {
-                fill(editionId, title, now, sources, articles, settings, onProgress)
+                fill(editionId, title, now, sources, publications, articles, settings, onProgress)
             }
         } catch (e: CancellationException) {
             withContext(NonCancellable) { fail(editionId, STOPPED) }
@@ -114,6 +127,7 @@ class EditionBuilder(
         title: String,
         now: LocalDateTime,
         sources: List<SourceEntity>,
+        publications: List<PublicationEntity>,
         articles: List<ArticleEntity>,
         settings: EditionSettings,
         onProgress: (done: Int) -> Unit,
@@ -130,7 +144,7 @@ class EditionBuilder(
             candidates = articles.map { Candidate(it.id.toString(), publicationOf(it), it.published ?: it.discoveredAt, it.starredAt) },
             sourceOrder = publicationOrder,
             ordering = settings.ordering,
-            lastFeatured = db.editions().lastFeatured().associate { publicationOf(it.sourceId, it.originId) to it.createdAt },
+            lastFeatured = db.editions().lastFeatured().associate { publicationOf(it.sourceId, it.originId ?: PublicationEntity.OWN) to it.createdAt },
             // Delivered ones only: an edition that's never sent gives its articles back, and
             // mustn't move its sources' turns along either.
             rotation = db.editions().countDelivered(),
@@ -139,14 +153,15 @@ class EditionBuilder(
         val tried = mutableListOf<Long>()
         val allowance = ImageAllowance(imageBudgetBytes)
         fun minutesOf(c: ArticleContent) = ReadingTime.minutes(c.wordCount, settings.wordsPerMinute)
-        // tt-rss candidates are keyed by publication, so an account-wide cap wouldn't match any of them.
-        val caps = sources.filter { it.kind != SourceKind.TTRSS }.mapNotNull { s -> s.maxArticles?.let { s.id.toString() to it } }.toMap()
+        val caps = publications.mapNotNull { p -> p.maxArticles?.let { publicationOf(p.sourceId, p.key) to it } }.toMap()
         val rules = settings.rules.copy(sourceCaps = caps)
+        val texts = TextChoices(publications, clock.instant().atZone(zone).toLocalDate().toEpochDay())
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, rules, { minutesOf(it.second) }) { c ->
             val article = byId.getValue(c.id.toLong())
+            val source = sourcesById.getValue(article.sourceId)
             tried += article.id
             val result = try {
-                content.contentFor(article, sourcesById.getValue(article.sourceId), allowance)?.let { article to it }
+                content.contentFor(article, source, allowance, texts.choose(article, source))?.let { article to it }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -167,14 +182,12 @@ class EditionBuilder(
             return fail(editionId, "None of the articles could be read.")
         }
 
-        // Which articles made it is the planner's call; reading order is the reader's
-        // own: sections in the order they first appear, sources in list order within them.
-        val sectionOrder = sources.map { it.section }.distinct()
+        // Which articles made it is the planner's call; reading order is the reader's own:
+        // sources in list order, a tt-rss account's feeds in the order they were picked.
         val sourceIndex = sources.withIndex().associate { (i, s) -> s.id to i }
         val pickedPublications = picked.map { publicationOf(it.first) }.distinct()
         val arranged = picked.sortedWith(
             compareBy<Pair<ArticleEntity, ArticleContent>>(
-                { (a, _) -> sectionOrder.indexOf(sourcesById.getValue(a.sourceId).section) },
                 { (a, _) -> sourceIndex.getValue(a.sourceId) },
                 { (a, _) -> pickedPublications.indexOf(publicationOf(a)) },
             ),
@@ -202,9 +215,7 @@ class EditionBuilder(
             title = title,
             date = now.toLocalDate(),
             identifier = "urn:uuid:${UUID.randomUUID()}",
-            sections = withImages.groupBy { (a, _) -> sourcesById.getValue(a.sourceId).section }.map { (section, items) ->
-                EditionSection(section, items.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })
-            },
+            sections = listOf(EditionSection(null, withImages.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })),
             modified = clock.instant(),
             cover = coverImage,
             reflection = Reflection.forEdition(editionId),
@@ -300,10 +311,10 @@ class EditionBuilder(
         language = c.language,
     )
 
-    /** The planner's source for [a]: the publication it came from within an aggregator, else its source. */
-    private fun publicationOf(a: ArticleEntity) = publicationOf(a.sourceId, a.originId)
+    /** The planner's source for [a]: the publication it came from. */
+    private fun publicationOf(a: ArticleEntity) = publicationOf(a.sourceId, PublicationEntity.keyOf(a))
 
-    private fun publicationOf(sourceId: Long, originId: String?) = originId?.let { "$sourceId/$it" } ?: sourceId.toString()
+    private fun publicationOf(sourceId: Long, key: String) = if (key == PublicationEntity.OWN) sourceId.toString() else "$sourceId/$key"
 
     /** Where [a] came from: its source, or for a link post "Equator via Longreads". */
     private fun bylineOf(a: ArticleEntity, c: ArticleContent, source: SourceEntity): String {
@@ -327,4 +338,32 @@ class EditionBuilder(
         const val STOPPED = "Stopped before it was finished; its articles will be in the next edition."
         const val UNEXPECTED = "Something went wrong making this edition. Your articles are safe and will be in the next one."
     }
+}
+
+/**
+ * Each article's [TextChoice]: what its publication has learned, and whether it's one of the
+ * edition's [FullTextCheck.CHECKS_PER_EDITION] checks. Articles are fetched in plan order, so the
+ * checks go to the first long items from publications that are due, one per publication.
+ */
+private class TextChoices(publications: List<PublicationEntity>, private val today: Long) {
+    private val byKey = publications.associateBy { it.sourceId to it.key }
+    private val checked = mutableSetOf<Pair<Long, String>>()
+
+    fun choose(article: ArticleEntity, source: SourceEntity): TextChoice {
+        val key = source.id to PublicationEntity.keyOf(article)
+        val publication = byKey[key]
+        val skipPaid = publication?.skipPaidPosts == true
+        if (source.kind != SourceKind.FEED && source.kind != SourceKind.TTRSS) return TextChoice(skipPaid = skipPaid)
+        publication?.chosenMode?.let { return TextChoice(chosen = it, skipPaid = skipPaid) }
+        val mode = publication?.contentMode ?: ContentMode.AUTO
+        val check = checked.size < FullTextCheck.CHECKS_PER_EDITION && key !in checked && article.viaUrl == null &&
+            FullTextCheck.dueForCheck(mode, publication?.fullTextEvidence, publication?.checkedDay, today) && isLong(article)
+        if (check) checked += key
+        return TextChoice(publication?.contentMode, check, today, skipPaid = skipPaid)
+    }
+
+    // A short item, or one ending in "Read more", has its page fetched anyway; only a long one
+    // needs a check to find a teaser. Cleaned as the extractor cleans, so the two agree.
+    private fun isLong(article: ArticleEntity) =
+        article.feedHtml?.let { HtmlCleaner.clean(it, article.url, article.title) }?.let { it.wordCount >= ArticleExtractor.FULL_TEXT_WORDS && !it.teaser } == true
 }

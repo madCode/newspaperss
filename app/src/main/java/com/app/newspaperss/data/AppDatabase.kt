@@ -16,8 +16,8 @@ class Converters {
 }
 
 @Database(
-    entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class, LeftOutFeedEntity::class],
-    version = 6,
+    entities = [SourceEntity::class, ArticleEntity::class, EditionEntity::class, EditionArticleEntity::class, DeliveredUrlEntity::class, PublicationEntity::class],
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -105,7 +105,81 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Sources carry, publications write: a new table holds the settings about each
+         * publication's writing (what the text check learned, the article text the reader chose,
+         * the cap, leaving a tt-rss feed out, skipping paid posts) and what tt-rss's feed list says
+         * about it. They move off the source row, and the left-out table goes. Sections aren't
+         * kept: the paper has none.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `publications` (`sourceId` INTEGER NOT NULL, `key` TEXT NOT NULL, `contentMode` TEXT NOT NULL, " +
+                        "`fullTextEvidence` TEXT, `fullTextStreak` INTEGER NOT NULL, `fullTextDay` INTEGER, `checkedDay` INTEGER, `title` TEXT, " +
+                        "`leftOut` INTEGER NOT NULL DEFAULT 0, `chosenMode` TEXT, `maxArticles` INTEGER, `feedUrl` TEXT, `category` TEXT, " +
+                        "`listed` INTEGER NOT NULL DEFAULT 0, `skipPaidPosts` INTEGER NOT NULL DEFAULT 0, `outsideCategory` INTEGER NOT NULL DEFAULT 0, " +
+                        "`awaitingFirstFetch` INTEGER NOT NULL DEFAULT 0, " +
+                        "PRIMARY KEY(`sourceId`, `key`), FOREIGN KEY(`sourceId`) REFERENCES `sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                // What the check learned about a feed the reader left to it. With no checkedDay, a
+                // feed settled on its text has a long item checked against its page in the next edition.
+                db.execSQL(
+                    "INSERT INTO publications (sourceId, `key`, contentMode, fullTextEvidence, fullTextStreak, fullTextDay) " +
+                        "SELECT id, '', contentMode, fullTextEvidence, fullTextStreak, fullTextDay FROM sources " +
+                        "WHERE kind = 'FEED' AND contentModeChosen = 0 AND (contentMode != 'AUTO' OR fullTextEvidence IS NOT NULL)",
+                )
+                // The reader's chosen article text and cap. tt-rss never took a cap of its own: its
+                // feeds were capped one by one by the edition's number.
+                db.execSQL("UPDATE sources SET maxArticles = NULL WHERE kind = 'TTRSS'")
+                val chosen = "kind = 'FEED' AND contentModeChosen = 1 AND contentMode != 'AUTO'"
+                db.execSQL(
+                    "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +
+                        "SELECT id, '', 'AUTO', 0 FROM sources WHERE ($chosen) OR maxArticles IS NOT NULL",
+                )
+                db.execSQL(
+                    "UPDATE publications SET " +
+                        "chosenMode = (SELECT s.contentMode FROM sources s WHERE s.id = publications.sourceId AND s.$chosen), " +
+                        "maxArticles = (SELECT s.maxArticles FROM sources s WHERE s.id = publications.sourceId) " +
+                        "WHERE `key` = ''",
+                )
+                // Left-out tt-rss feeds.
+                db.execSQL(
+                    "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +
+                        "SELECT sourceId, originId, 'AUTO', 0 FROM left_out_feeds",
+                )
+                db.execSQL(
+                    "UPDATE publications SET leftOut = 1, title = (SELECT l.title FROM left_out_feeds l " +
+                        "WHERE l.sourceId = publications.sourceId AND l.originId = publications.`key`) " +
+                        "WHERE EXISTS (SELECT 1 FROM left_out_feeds l WHERE l.sourceId = publications.sourceId AND l.originId = publications.`key`)",
+                )
+                // Skipping paid posts. A tt-rss account's switch covered all its feeds; it goes to each
+                // one seen so far, and a feed first seen later starts with it off.
+                db.execSQL(
+                    "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +
+                        "SELECT id, '', 'AUTO', 0 FROM sources WHERE skipPaidPosts = 1 AND kind != 'TTRSS'",
+                )
+                db.execSQL(
+                    "INSERT OR IGNORE INTO publications (sourceId, `key`, contentMode, fullTextStreak) " +
+                        "SELECT DISTINCT a.sourceId, a.originId, 'AUTO', 0 FROM articles a JOIN sources s ON s.id = a.sourceId " +
+                        "WHERE s.kind = 'TTRSS' AND s.skipPaidPosts = 1 AND a.originId IS NOT NULL",
+                )
+                db.execSQL(
+                    "UPDATE publications SET skipPaidPosts = 1 WHERE sourceId IN (SELECT id FROM sources WHERE skipPaidPosts = 1) " +
+                        "AND (`key` != '' OR sourceId NOT IN (SELECT id FROM sources WHERE kind = 'TTRSS'))",
+                )
+                db.execSQL("DROP TABLE left_out_feeds")
+                db.execSQL("ALTER TABLE sources ADD COLUMN `feedsListedAt` INTEGER")
+                db.execSQL("UPDATE sources SET contentMode = 'AUTO' WHERE kind IN ('FEED', 'TTRSS')")
+                db.execSQL(
+                    "UPDATE sources SET contentModeChosen = 0, maxArticles = NULL, section = NULL, skipPaidPosts = 0, " +
+                        "fullTextEvidence = NULL, fullTextStreak = 0, fullTextDay = NULL",
+                )
+            }
+        }
+
         fun open(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, "newspaperss.db")
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
     }
 }

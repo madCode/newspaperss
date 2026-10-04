@@ -10,7 +10,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.ttrss.TtrssClient
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.util.Base64
 
 /** A tt-rss login. [apiUrl] is the API endpoint, as [TtrssClient.apiUrl] makes it. */
@@ -44,8 +46,12 @@ class TtrssAccountStore(private val store: DataStore<Preferences>, private val c
         val password = stringPreferencesKey("password_sealed")
     }
 
-    suspend fun load(): StoredAccount {
-        val p = store.data.first()
+    suspend fun load(): StoredAccount = read(store.data.first())
+
+    /** [load], again each time the account is saved or cleared. */
+    fun observe(): Flow<StoredAccount> = store.data.map(::read)
+
+    private fun read(p: Preferences): StoredAccount {
         val url = p[Keys.url] ?: return StoredAccount.None
         val sealed = p[Keys.password] ?: return StoredAccount.Locked
         val password = try {
@@ -56,6 +62,12 @@ class TtrssAccountStore(private val store: DataStore<Preferences>, private val c
             return StoredAccount.Locked
         }
         return StoredAccount.Ready(TtrssAccount(url, p[Keys.user] ?: "", password))
+    }
+
+    /** The saved address and username, which stay readable when the password can't be (Locked). */
+    suspend fun login(): Pair<String, String>? {
+        val p = store.data.first()
+        return p[Keys.url]?.let { it to (p[Keys.user] ?: "") }
     }
 
     suspend fun save(account: TtrssAccount) {

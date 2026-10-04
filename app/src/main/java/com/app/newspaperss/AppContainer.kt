@@ -8,13 +8,16 @@ import com.app.newspaperss.core.net.OkHttpHttpClient
 import com.app.newspaperss.data.AesGcmCipher
 import com.app.newspaperss.data.AppDatabase
 import com.app.newspaperss.data.EditionRepository
+import com.app.newspaperss.data.FeedMoves
 import com.app.newspaperss.data.FeedSync
 import com.app.newspaperss.data.ReadingListRepository
 import com.app.newspaperss.data.ReadingListTitles
 import com.app.newspaperss.data.SecretCipher
+import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.data.TtrssAccountStore
 import com.app.newspaperss.data.TtrssRepository
+import com.app.newspaperss.data.TtrssSubscriptions
 import com.app.newspaperss.edition.AndroidImageEncoder
 import com.app.newspaperss.edition.ArticleContentProvider
 import com.app.newspaperss.edition.CoverRenderer
@@ -27,6 +30,7 @@ import com.app.newspaperss.delivery.KindleSends
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
+import com.app.newspaperss.work.MoveFeedsWorker
 import com.app.newspaperss.work.NotesWorker
 import com.app.newspaperss.work.ReadingListTitleWorker
 import com.app.newspaperss.work.TtrssMarkReadWorker
@@ -40,11 +44,16 @@ class AppContainer(
     context: Context,
     val http: HttpClient = OkHttpHttpClient(OkHttpHttpClient.defaultClient(File(context.cacheDir, "http"))),
     val db: AppDatabase = AppDatabase.open(context),
-    content: ArticleContentProvider = SourceRepository(db).let { ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = it::markPaidOnly, onEvidence = it::recordFullText) },
+    content: ArticleContentProvider = SourceRepository(db).let { sources ->
+        ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly) { sourceId, originId, evidence, text ->
+            if (text.day != null) sources.recordFullText(sourceId, originId, evidence, text.check, text.day) else sources.recordFullText(sourceId, originId, evidence, text.check)
+        }
+    },
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
     fetchReadingListTitles: (articleIds: List<Long>) -> Unit = { ReadingListTitleWorker.enqueue(context, it) },
     saveNotes: (editionId: Long) -> Unit = { NotesWorker.enqueue(context, it) },
+    moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -59,11 +68,16 @@ class AppContainer(
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)
+    val ttrssSubscriptions = TtrssSubscriptions(ttrss, appScope)
+    val feedMoves = FeedMoves(context, db, ttrss, moveFeeds)
     val feedSync = FeedSync(db, http, ttrssAccounts = ttrssAccounts, onUntitled = fetchReadingListTitles)
-    val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render)
+    val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render, retiring = feedMoves::retiringIds)
     val settings = SettingsStore(context)
     val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))
     private val folderDelivery = FolderDelivery(context.contentResolver)
     val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier)
     val notesSaver = NotesSaver(settings, editions, editionNotes, folderDelivery, notifier)
+
+    /** See [SettingsStore.settleFeedsFrom]: a tt-rss source from before the choice means the server setup. */
+    suspend fun settleFeedsFrom() = settings.settleFeedsFrom { db.sources().ofKind(SourceKind.TTRSS).isNotEmpty() }
 }

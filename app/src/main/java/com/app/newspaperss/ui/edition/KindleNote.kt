@@ -12,9 +12,9 @@ import com.app.newspaperss.delivery.KindleSend
 
 private const val SENT = "Sent to Kindle. It can take a few minutes to show up in your library."
 private const val EMAILED = "Emailed to your Kindle. It can take a few minutes to arrive; it shows up by itself."
-private const val NOT_THERE = "Not there after an hour? Use ⋮ to mark it as not sent."
+private const val NOT_THERE = "Not there after 20 minutes? Use ⋮ to mark it as not sent."
 // TalkBack would read the glyph as "vertical ellipsis"; this names the button instead.
-private const val NOT_THERE_SPOKEN = "Not there after an hour? Use More options to mark it as not sent."
+private const val NOT_THERE_SPOKEN = "Not there after 20 minutes? Use More options to mark it as not sent."
 internal const val KINDLE_NOTE = "$SENT $NOT_THERE"
 internal const val KINDLE_EMAIL_NOTE = "$EMAILED $NOT_THERE"
 

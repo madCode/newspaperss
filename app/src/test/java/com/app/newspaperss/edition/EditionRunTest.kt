@@ -55,7 +55,7 @@ class EditionRunTest {
     private var clock = Instant.now()
     private val saved = mutableListOf<String>()
     private val run by lazy {
-        val content = ArticleContentProvider { a, _, _ -> ArticleContent(a.title, null, "<p>body</p>", 500) }
+        val content = ArticleContentProvider { a, _, _, _ -> ArticleContent(a.title, null, "<p>body</p>", 500) }
         EditionRun(
             settings, FeedSync(db, http), EditionBuilder(db, content, editions.editionsDir), editions,
             { file, uri, name, mime -> saved += "$uri/$name ($mime):${file.length() > 0}"; folderErrors[mime] }, notifier,
@@ -165,7 +165,7 @@ class EditionRunTest {
         SourceRepository(db).addFeed("https://example.com/feed", "Blog")
         http.page("https://example.com/feed", rss("Blog", "1" to "One"))
         val failing = EditionRun(
-            settings, FeedSync(db, http), EditionBuilder(db, { _, _, _ -> null }, editions.editionsDir), editions, { _, _, _, _ -> null }, notifier,
+            settings, FeedSync(db, http), EditionBuilder(db, { _, _, _, _ -> null }, editions.editionsDir), editions, { _, _, _, _ -> null }, notifier,
         )
         failing.run(scheduled = true)
         assertEquals(listOf("problem: None of the articles could be read."), notices)
