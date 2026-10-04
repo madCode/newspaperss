@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Modifier
@@ -239,6 +240,10 @@ internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: 
 private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, justify: Boolean, pageUrl: String, onPage: (url: String) -> Unit, modifier: Modifier) {
     // Read when a page is served, so pages reached by "Next" follow a change too.
     val style = remember { PageStyle(justify) }
+    // The client below is built once, but onPage can change after: Scaffold lays its content out
+    // after the screen composes, so the WebView can be built just before the screen recomposes
+    // for the finished load; the onPage it was built with writes to a link the screen no longer reads.
+    val currentOnPage by rememberUpdatedState(onPage)
     AndroidView(
         modifier = modifier,
         // Applied in place, so a new size keeps the reader's place in the article. A new alignment
@@ -279,7 +284,7 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
 
                     override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
                         if (url.startsWith(BOOK_ORIGIN)) style.page = url
-                        onPage(url)
+                        currentOnPage(url)
                     }
 
                     override fun onPageFinished(view: WebView, url: String) {
