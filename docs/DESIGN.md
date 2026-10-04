@@ -247,7 +247,7 @@ share for now (a direct Dropbox connection is in the backlog).
 **When is an edition delivered?** Saving it to your folder; choosing an app
 in the share sheet (Android reports the choice back, from the notification
 too); opening the mail app to email it to a Kindle; or opening it on a Boox. **I've sent it** covers any other route, and
-**Send again** is there if a send didn't arrive. An edition still "ready"
+**Send again** (in a sent edition's ⋮ menu) is there if a send didn't arrive. An edition still "ready"
 when the next one is built was never sent: it's marked not sent and its
 articles go back, keeping their stars, before the new one is planned.
 
@@ -255,14 +255,16 @@ articles go back, keeping their stars, before the new one is planned.
 Kindle, so for half an hour after a send the edition (on Today and its own
 page) says so: "Sent to Kindle. It can take a few minutes to show up in
 your library." after the Kindle app, or "Emailed to your Kindle. It can
-take a few minutes to arrive; it shows up by itself." after an email. Any
+take a few minutes to arrive; it shows up by itself." after an email. Both
+add "Not there after 20 minutes? Use ⋮ to mark it as not sent." (TalkBack
+reads ⋮ as "More options"). Any
 other delivery, or marking it as not sent, takes the note away. It's only
 remembered while the app is running.
 
 **A send that didn't arrive can be undone.** A failed Send to Kindle still
 counts as sent, because Android only reports the app you chose.
-**Didn't arrive? Mark as not sent** on a sent edition (while its file is
-still here) makes it ready to send again:
+**Didn't arrive? Mark as not sent**, in a sent edition's ⋮ menu (while its
+file is still here), asks first, then makes it ready to send again:
 - its articles go back into it, with the stars they went in with;
 - its links are no longer remembered as delivered;
 - its tt-rss articles are marked unread on the server again.
@@ -422,18 +424,29 @@ whose Kindle and KOReader answers ask for more on the same page).
 
 - **Today** (home): when the next edition is due, how many starred articles
   will go in the next one (only when some will), and the latest edition with
-  **Send**, **Open** and **I've sent it** (**Send again** and **Didn't
-  arrive? Mark as not sent** once delivered). The line under the buttons
+  **Send**, **Open** and **I've sent it**. The line under the buttons
   says what counts as sent: choosing an app, or, with email to a Kindle,
-  opening the mail app.
+  opening the mail app. Once it's sent, the card is about reading it:
+  - a Kindle reader gets **See what's inside**, then **Open Kindle** when
+    the Kindle app is on the phone;
+  - a reader who opens books here (Boox, PocketBook, KOReader, other) gets
+    **Open**, then **See what's inside**;
+  - a Kobo reader gets **See what's inside**.
+
+  **Send again** and **Didn't arrive? Mark as not sent** are rare, so they
+  sit in a ⋮ menu at the card's top right ("More options for" the
+  edition's title, for TalkBack).
+
   **Make an edition now** is the main button only before the first edition;
   after that it's a quiet **Make another edition**, since today's paper is
   done. A failed build or edition offers **Try again** after saying what
   went wrong. Earlier editions are listed below. Kindle and Kobo readers
   aren't offered **Open**, here or on an edition's page: it opens the book
   on the phone, and they get it by sending it.
-- **Edition:** the same buttons as Today's card, including **Mark as not sent**,
-  and its contents; tap an article to preview it as the e-reader
+- **Edition:** the same buttons as Today's card, less **See what's inside**
+  (this page is it), and its contents. Its ⋮ menu has **Send again** and
+  **Didn't arrive? Mark as not sent** once it's sent, above **Delete
+  edition**. Tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
   network), on top of Android's own font size. **Aa** in the top bar sets
   its text size (Small to Largest), the same size as Settings › Article

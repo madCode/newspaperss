@@ -112,7 +112,13 @@ class MainActivity : ComponentActivity() {
                         val readingList = viewModel { ReadingListViewModel(container.readingList) }
                         OnboardingScreen(vm, sources, readingList)
                     }
-                    true -> App(container, preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX, offerOpen = settings?.device.offersOpen, kindleEmail = settings?.kindleEmailTarget)
+                    true -> App(
+                        container,
+                        preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX,
+                        offerOpen = settings?.device.offersOpen,
+                        kindleReader = settings?.device == com.app.newspaperss.settings.Device.KINDLE,
+                        kindleEmail = settings?.kindleEmailTarget,
+                    )
                 }
             }
         }
@@ -120,7 +126,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean, kindleEmail: com.app.newspaperss.settings.KindleEmail?) {
+private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean, kindleReader: Boolean, kindleEmail: com.app.newspaperss.settings.KindleEmail?) {
     val nav = rememberNavController()
     val current by nav.currentBackStackEntryAsState()
     Scaffold(
@@ -170,6 +176,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                     vm,
                     preferOpen = preferOpen,
                     offerOpen = offerOpen,
+                    kindleReader = kindleReader,
                     kindleEmail = kindleEmail,
                     onBack = { nav.navigateUp() },
                     onReadArticle = { position -> nav.navigate("edition/$id/article/$position") { launchSingleTop = true } },

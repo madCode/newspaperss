@@ -143,6 +143,9 @@ object EditionIntents {
         return Intent.createChooser(send, "Save notes for “$title”")
     }
 
+    /** Starts the Kindle app, or null when it isn't installed (or can't be started). */
+    fun openKindle(context: Context): Intent? = context.packageManager.getLaunchIntentForPackage(KINDLE_PACKAGE)
+
     /** Opens the edition in whatever reading app handles EPUB, e.g. on a Boox. */
     fun open(context: Context, file: File): Intent =
         Intent(Intent.ACTION_VIEW).apply {

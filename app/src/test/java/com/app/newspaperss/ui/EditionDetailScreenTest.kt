@@ -49,6 +49,7 @@ import com.app.newspaperss.testutil.clearFileProviderCache
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.ui.edition.KINDLE_NOTE
+import com.app.newspaperss.ui.edition.MARK_NOT_SENT
 import com.app.newspaperss.ui.edition.EditionDetailViewModel
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
@@ -509,19 +510,28 @@ class EditionDetailScreenTest {
 
     private fun statusOf(id: Long) = runBlocking { db.editions().byId(id) }?.status
 
+    /** Mark as not sent from the menu, [options] being its button's description. */
+    private fun markNotSent(options: String) {
+        compose.onNodeWithContentDescription(options).performClick()
+        compose.onNodeWithText(MARK_NOT_SENT).performClick()
+        compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
+    }
+
+    private val todaysOptions = "More options for Tuesday Morning Edition"
+
     @Test
     fun aSentEditionThatNeverArrivedCanBeMarkedAsNotSentAfterAsking() {
         val (id, articles) = edition(EditionStatus.DELIVERED, listOf("A story"))
         show(id)
 
-        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText(MARK_NOT_SENT).performClick()
         compose.onNodeWithText("Mark “Tuesday Morning Edition” as not sent?").assertExists()
         compose.onNodeWithText("Cancel").performClick()
         compose.waitForIdle()
         assertEquals("cancelling changes nothing", EditionStatus.DELIVERED, statusOf(id))
 
-        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
-        compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
+        markNotSent("More options")
 
         idleUntil { statusOf(id) == EditionStatus.READY }
         assertEquals(ArticleState.IN_EDITION, runBlocking { db.articles().byId(articles[0]) }?.state)
@@ -533,7 +543,9 @@ class EditionDetailScreenTest {
     fun aSentEditionWhoseFileIsGoneCantBeMarkedAsNotSent() {
         val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"), withFile = false)
         show(id)
-        compose.onNodeWithText("Didn't arrive? Mark as not sent").assertDoesNotExist()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Send again").assertIsNotEnabled()
+        compose.onNodeWithText(MARK_NOT_SENT).assertDoesNotExist()
     }
 
     @Test
@@ -541,10 +553,9 @@ class EditionDetailScreenTest {
         val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"))
         val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(Settings(device = Device.KINDLE))) {}
         compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
-        waitFor("Didn't arrive? Mark as not sent")
+        waitFor("· sent")
 
-        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
-        compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
+        markNotSent(todaysOptions)
 
         idleUntil { statusOf(id) == EditionStatus.READY }
         waitFor("I've sent it")
@@ -556,15 +567,14 @@ class EditionDetailScreenTest {
         val kindle = MutableStateFlow(emptyMap<Long, KindleSend>())
         val vm = TodayViewModel(repo, flowOf(null), sentToKindle = kindle) {}
         compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
-        waitFor("Didn't arrive? Mark as not sent")
+        waitFor("· sent")
         compose.onNodeWithText(KINDLE_NOTE).assertDoesNotExist()
 
         kindle.value = mapOf(id to KindleSend.APP)
         waitFor(KINDLE_NOTE)
 
         // Marked as not sent, it's waiting to be sent again: the note would contradict that.
-        compose.onNodeWithText("Didn't arrive? Mark as not sent").performClick()
-        compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
+        markNotSent(todaysOptions)
         waitFor("I've sent it")
         compose.onNodeWithText(KINDLE_NOTE).assertDoesNotExist()
     }
