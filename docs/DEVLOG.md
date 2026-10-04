@@ -14,6 +14,11 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Day 6 · Sat 3 Oct
 
+### Cycle 91: ready to release
+- **From you:** do the code parts of the release review; keep the app ID `com.app.newspaperss`.
+- **Shipped:** a **Release** workflow: a `v*` tag that matches `versionName` builds the signed APK and the AAB for Google Play and attaches them to a draft GitHub release. The store listing in `fastlane/metadata/android/en-US/` (title, descriptions, the first changelog, six phone screenshots cropped to Play's 2:1 limit, and a 512×512 icon `ScreenshotTest` draws from the launcher icon's own layers). A privacy policy, `docs/PRIVACY.md`. `docs/RELEASING.md` for the signing secrets, each release, F-Droid and Play. A draft of F-Droid's metadata that only follows `v` tags, as `latest-debug` moves on every merge. README's setup steps describe the current onboarding.
+- **Left for you:** the signing key and its secrets, a 1024×500 feature graphic for Play, the Play forms and its 14-day closed test, and the F-Droid merge request.
+
 ### Cycle 90: categories that fold
 - **From you:** a line after a category's last feed; categories you can fold; and whether categories should be at the page's own heading level.
 - **Shipped:** yes, one level: with no "Your tt-rss" heading, categories and the page's own groups are siblings. Every group heading is now the same semibold serif in black, as Settings' are (rust was only on Sources, and rust is what you tap). Each group ends with a rule across the page; rows within it keep the shorter rule. A category's heading shows its count and an arrow, and tapping it folds the category to that one line; folded categories stay folded, kept by name in the settings ("" for Uncategorized). TalkBack hears "News, 9 feeds, Expanded".

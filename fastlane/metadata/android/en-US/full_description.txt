@@ -1,0 +1,30 @@
+newspapeRSS turns the sites and links you choose into a finite edition (say, about 30 minutes, every morning at 6:30) and delivers it as a clean EPUB to your Kindle, Kobo, Boox, PocketBook or KOReader device. No algorithm, no account, no endless feed: it arrives, it ends, you're done.
+
+<b>Pick what you read</b>
+• Starter packs of well-known sites, or paste any website and the app finds its feed.
+• Bring your list from another reader app as an OPML file.
+• Or use your own Tiny Tiny RSS server: your feeds stay there, and the paper is made from them.
+• Share any link to "Read in newspapeRSS" to save it for a later edition, or import your Pocket or Instapaper export.
+
+<b>A paper that ends</b>
+• Each edition fills a reading-time budget, taking turns between sites so no site drowns out the others.
+• When a site only sends summaries, the full article is fetched and cleaned for e-ink.
+• Set a "ready by" time and the paper is there when you wake.
+
+<b>A proper book</b>
+• A cover with the day's headlines, contents with reading times, bylines and a link to each original.
+• Images and comics sized for e-ink, footnotes that work, and an end page with a question to think about.
+• Preview any article in the app as your e-reader will show it.
+
+<b>Delivered your way</b>
+• Emailed straight to your Kindle, sent through the app of your choice, saved to a synced folder for KOReader, or opened on a Boox.
+• Articles are used up only once the edition is delivered. If one never arrives, mark it as not sent and its articles go back.
+
+<b>Calm by design</b>
+• No unread counts, no infinite timeline, no animations to smear on an e-ink screen.
+• Optional Markdown reading notes for Obsidian, Logseq or any notes app.
+
+<b>Private</b>
+No ads, no tracking, no account. Everything stays on your phone; the app only contacts the sites you read and, if you use one, your own tt-rss server.
+
+newspapeRSS is free and open source (MIT).

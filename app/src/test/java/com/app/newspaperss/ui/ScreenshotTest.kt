@@ -167,6 +167,21 @@ class ScreenshotTest {
         return bitmap
     }
 
+    /**
+     * The store listing's 512×512 icon (Play, and fastlane for F-Droid), drawn from the launcher
+     * icon's own layers so it can't drift from the app's. Full-bleed: the stores round it.
+     */
+    @Test
+    fun storeIcon() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        for (layer in listOf(com.app.newspaperss.R.drawable.ic_launcher_background, com.app.newspaperss.R.drawable.ic_launcher_foreground)) {
+            androidx.core.content.ContextCompat.getDrawable(context, layer)!!.apply { setBounds(0, 0, 512, 512); draw(canvas) }
+        }
+        File(out, "store-icon.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
     private fun onboarding() = OnboardingViewModel(store, SourceRepository(db), FeedFinder(FakeHttp())) {}
 
     @Test
