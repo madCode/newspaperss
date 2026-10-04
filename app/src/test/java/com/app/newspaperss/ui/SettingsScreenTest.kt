@@ -24,6 +24,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.longClick
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.edition.Ordering
@@ -260,6 +263,23 @@ class SettingsScreenTest {
     fun theBuildIsNamedAtTheBottomSoFeedbackCanSayWhichOne() {
         show()
         compose.onNodeWithText("newspapeRSS 0.1.0", substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun aLongPressCopiesTheBuildForABugReportAndATapDoesNot() {
+        show()
+        val clipboard = ApplicationProvider.getApplicationContext<android.content.Context>().getSystemService(android.content.ClipboardManager::class.java)
+        val version = compose.onNodeWithText("newspapeRSS 0.1.0", substring = true).performScrollTo()
+        val shown = version.fetchSemanticsNode().config[SemanticsProperties.Text].single().text
+
+        version.performTouchInput { click() }
+        compose.waitForIdle()
+        assertEquals(null, clipboard.primaryClip)
+
+        version.performTouchInput { longClick() }
+        compose.waitForIdle()
+        assertEquals(shown, clipboard.primaryClip!!.getItemAt(0).text.toString())
+        assertEquals("TalkBack offers it too", "copy version", version.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnLongClick].label)
     }
 
     @Test
