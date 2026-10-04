@@ -51,6 +51,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withContext
+import com.app.newspaperss.core.epub.EpubWriter
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Entities
@@ -82,13 +83,48 @@ internal fun articleLink(xhtml: String): ArticleLink? {
     return ArticleLink(doc.selectFirst("h1.article-title")?.text().orEmpty(), url)
 }
 
-/** [articleLink] of the book page at [url], or null if [url] isn't a page of the book. */
-internal fun pageLink(url: String, pages: EpubPages): ArticleLink? {
+/** A book page's heading, or null if it has none, and its [articleLink]. */
+internal data class BookPage(val title: String?, val link: ArticleLink?)
+
+/** The [BookPage] at [url], or null if [url] isn't a page of the book. */
+internal fun bookPage(url: String, pages: EpubPages): BookPage? {
     if (!url.startsWith(BOOK_ORIGIN)) return null
     val path = "OEBPS/" + url.removePrefix(BOOK_ORIGIN).substringBefore('#').substringBefore('?')
     if (EpubPages.mimeOf(path) != "application/xhtml+xml") return null
-    return pages.entry(path)?.toString(Charsets.UTF_8)?.let(::articleLink)
+    val xhtml = pages.entry(path)?.toString(Charsets.UTF_8) ?: return null
+    val title = Jsoup.parse(xhtml, "", Parser.xmlParser()).selectFirst("h1.article-title")?.text()?.ifEmpty { null }
+    return BookPage(title, articleLink(xhtml))
 }
+
+/** [articleLink] of the book page at [url], or null if [url] isn't a page of the book. */
+internal fun pageLink(url: String, pages: EpubPages): ArticleLink? = bookPage(url, pages)?.link
+
+// The book's own line, as EpubWriter writes it after a long article.
+private val BOOK_NEXT_LINE = Regex("<p class=\"article-nav\">.*?</p>\n?", RegexOption.DOT_MATCHES_ALL)
+
+/**
+ * [xhtml], the book's page at [href], ending in a line naming the next article, or after the last
+ * saying the paper ends. The book itself names the next article only after a long one, where an
+ * e-reader's page turn isn't enough; in the app, without it the way on is back through the
+ * contents. Read from the book's contents page, in its words. A page that isn't an article is
+ * returned as it is.
+ */
+internal fun withNextLine(xhtml: String, href: String, pages: EpubPages): String {
+    val contents = pages.entry("OEBPS/contents.xhtml")?.toString(Charsets.UTF_8) ?: return xhtml
+    val entries = Jsoup.parse(contents, "", Parser.xmlParser()).select("ol.contents li")
+    val at = entries.indexOfFirst { it.selectFirst("a[href]")?.attr("href") == href }
+    if (at < 0) return xhtml
+    val line = entries.getOrNull(at + 1)?.let { next ->
+        val link = next.selectFirst("a[href]") ?: return xhtml
+        // The entry's language, for a title in another script; "Next" stays the book's English.
+        val language = listOf("lang", "xml:lang", "dir").filter(next::hasAttr).joinToString("") { " $it=\"${escapeXml(next.attr(it))}\"" }
+        val meta = next.selectFirst(".meta")?.text()?.ifEmpty { null }?.let { " <span class=\"meta\">· ${escapeXml(it)}</span>" }.orEmpty()
+        "<p class=\"article-nav\"><a class=\"next\" href=\"${escapeXml(link.attr("href"))}\">Next: <span class=\"title\"$language>${escapeXml(link.text())}</span>$meta&#160;&#8594;</a></p>"
+    } ?: "<p class=\"article-nav\">${escapeXml(EpubWriter.END_TITLE)}.</p>"
+    return xhtml.replace(BOOK_NEXT_LINE, "").replaceFirst("</body>", "$line\n</body>")
+}
+
+private fun escapeXml(text: String) = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
 internal fun shareIntent(link: ArticleLink, fallbackTitle: String): Intent {
     val send = Intent(Intent.ACTION_SEND).apply {
@@ -122,7 +158,7 @@ fun ArticlePreviewScreen(
     val preview by produceState<Preview>(Preview.Loading, position) {
         val pages = withContext(Dispatchers.IO) { loadFile()?.let(::EpubPages) }
         try {
-            val xhtml = pages?.let { withContext(Dispatchers.IO) { it.article(position) } }
+            val xhtml = pages?.let { withContext(Dispatchers.IO) { it.article(position)?.let { page -> withNextLine(page, EpubPages.articleHref(position), it) } } }
             val link = xhtml?.let { withContext(Dispatchers.IO) { articleLink(it) } }
             // Set on the main thread: under a test's unconfined dispatcher the code after
             // withContext(IO) can resume on the IO thread, and the new state then touches views.
@@ -134,8 +170,10 @@ fun ArticlePreviewScreen(
             pages?.close()
         }
     }
-    // The page on screen can change under the preview: a long article ends in a "Next" link.
+    // The page on screen can change under the preview: every article ends in a "Next" link.
     var link by remember(preview) { mutableStateOf((preview as? Preview.Ready)?.link) }
+    var pageTitle by remember(preview) { mutableStateOf<String?>(null) }
+    val shownTitle = pageTitle ?: title
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf<Job?>(null) }
     val onPage = { url: String, pages: EpubPages ->
@@ -143,13 +181,14 @@ fun ArticlePreviewScreen(
         if (url.startsWith(BOOK_ORIGIN)) {
             reading?.cancel()
             reading = scope.launch {
-                val read = withContext(Dispatchers.IO) { pageLink(url, pages) }
+                val read = withContext(Dispatchers.IO) { bookPage(url, pages) }
                 // Set on the main thread, where a newer page cancels this read: resumed on the IO
                 // thread (as under a test's unconfined dispatcher), a read cancelled a moment too
                 // late could write its page's link over the newer one.
                 withContext(Dispatchers.Main.immediate) {
                     ensureActive()
-                    link = read
+                    link = read?.link
+                    pageTitle = read?.title
                 }
             }
         }
@@ -158,11 +197,11 @@ fun ArticlePreviewScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(shownTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                 actions = {
                     link?.let { l ->
-                        IconButton(onClick = { runCatching { context.startActivity(shareIntent(l, title)) } }) {
+                        IconButton(onClick = { runCatching { context.startActivity(shareIntent(l, shownTitle)) } }) {
                             Icon(Icons.Default.Share, contentDescription = "Share link")
                         }
                     }
@@ -231,7 +270,10 @@ internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: 
     val bytes = pages.entry(path) ?: return "text/plain" to ByteArray(0)
     val mime = EpubPages.mimeOf(path)
     // A page reached by a link in the book ("Next") comes this way, not through loadData.
-    if (mime == "application/xhtml+xml") return mime to forPreview(bytes.toString(Charsets.UTF_8), background, text, imageSizes(pages), justify).toByteArray()
+    if (mime == "application/xhtml+xml") {
+        val page = withNextLine(bytes.toString(Charsets.UTF_8), path.removePrefix("OEBPS/"), pages)
+        return mime to forPreview(page, background, text, imageSizes(pages), justify).toByteArray()
+    }
     return mime to bytes
 }
 
@@ -342,7 +384,9 @@ internal fun forPreview(xhtml: String, background: Int, text: Int, imageSize: (s
     // `start`, not `left`, so a right-to-left article lines up on its right; the book itself says
     // `left` only because Kindle doesn't know `start`.
     val align = if (justify) "" else " .article-body p { text-align: start; }"
-    val style = "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; } img.$FILL { width: 100%; }$align</style></head>"
+    // The Next line's whole width is the link, at least a finger tall; only the title is underlined.
+    val next = " p.article-nav a.next { display: block; padding: 0.7em 0; text-decoration: none; } p.article-nav a.next span.title { text-decoration: underline; }"
+    val style = "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; } img.$FILL { width: 100%; }$next$align</style></head>"
     return markLargeImages(xhtml, imageSize).replaceFirst("</head>", style)
 }
 

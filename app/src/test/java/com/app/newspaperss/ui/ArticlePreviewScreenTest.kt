@@ -30,6 +30,7 @@ import com.app.newspaperss.core.epub.EpubImage
 import com.app.newspaperss.ui.edition.bookResponse
 import com.app.newspaperss.ui.edition.BOOK_ORIGIN
 import com.app.newspaperss.ui.edition.pageLink
+import com.app.newspaperss.ui.edition.withNextLine
 import android.content.Intent
 import org.robolectric.Shadows.shadowOf
 import org.junit.Assert.assertTrue
@@ -355,7 +356,42 @@ class ArticlePreviewScreenTest {
         runCatching { idleUntil { polls[0]++; sharedLink().also { last = it }.second == "https://a.example/Two" } }
             .onFailure { throw AssertionError("Share still gave $last after ${polls[0]} polls", it) }
         assertEquals("Two" to "https://a.example/Two", sharedLink())
+        compose.onNodeWithText("Two").assertExists()
+        compose.onNodeWithText("One").assertDoesNotExist()
 
         EpubPages(file).use { pages -> assertEquals(null, pageLink(BOOK_ORIGIN + "style.css", pages)) }
+    }
+
+    @Test
+    fun everyArticleEndsInALineToTheNextAndTheLastSaysThePaperEnds() {
+        val file = tmp.newFile("next.epub")
+        val articles = listOf(
+            EditionArticle(title = "Short", sourceTitle = "S", url = "", bodyHtml = "<p>x</p>", minutes = 2.0),
+            EditionArticle(title = "Long & slow", sourceTitle = "S", url = "", bodyHtml = "<p>x</p>", minutes = 30.0),
+            EditionArticle(title = "שלום", sourceTitle = "T", url = "", bodyHtml = "<p>x</p>", minutes = 3.0, language = "he"),
+        )
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:5", listOf(EditionSection(null, articles))), it)
+        }
+        EpubPages(file).use { pages ->
+            fun served(position: Int) = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(position), pages, 0, 0, justify = true).second.toString(Charsets.UTF_8)
+            fun navLines(page: String) = Regex("<p class=\"article-nav\">.*?</p>").findAll(page).map { it.value }.toList()
+
+            val short = navLines(served(0))
+            assertEquals("a short article, which the book doesn't link on, gets one line", 1, short.size)
+            assertTrue(short.single(), short.single().contains("href=\"${EpubPages.articleHref(1)}\""))
+            assertTrue(short.single(), short.single().contains("Next: <span class=\"title\">Long &amp; slow</span>"))
+            assertTrue("with the minutes, and an arrow forward", short.single().contains("· S · 30 min") && short.single().contains("&#8594;"))
+
+            val long = navLines(served(1))
+            assertEquals("the book's own line after a long article is replaced, not doubled", 1, long.size)
+            assertTrue(long.single(), long.single().contains("<span class=\"title\" lang=\"he\" xml:lang=\"he\" dir=\"rtl\">שלום</span>"))
+
+            assertEquals(listOf("<p class=\"article-nav\">That's all for today.</p>"), navLines(served(2)))
+            assertTrue("the first page, loaded directly, gets it too", navLines(withNextLine(pages.article(1)!!, EpubPages.articleHref(1), pages)).single().contains("שלום"))
+
+            val contents = pages.entry("OEBPS/contents.xhtml")!!.toString(Charsets.UTF_8)
+            assertEquals("not an article: left as it is", contents, withNextLine(contents, "contents.xhtml", pages))
+        }
     }
 }

@@ -454,8 +454,12 @@ whose Kindle and KOReader answers ask for more on the same page).
   through Android's font size), paragraphs are left-aligned rather than
   justified, so a narrow screen doesn't open wide gaps between words; a
   change applies to the page on screen without losing the reader's place.
-  **Share** in the top bar sends the article's original link to Android's share sheet, for
-  the page on screen; it's hidden when an article has no web link. Large pictures that stand
+  Every article ends in the book's quiet "Next: *title* · *source* · *minutes* →" line,
+  short ones too (the book itself has it only after long ones), and the last in
+  "That's all for today." Tapping it opens the next article in place; the title and
+  **Share** follow the page on screen.
+  **Share** in the top bar sends the article's original link to Android's share sheet;
+  it's hidden when an article has no web link. Large pictures that stand
   alone fill the width (small ones keep their size), and the page can be
   pinched to zoom into a comic. **Notes** exports a Markdown file for a
   notes app: front matter
