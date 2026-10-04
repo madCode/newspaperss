@@ -150,6 +150,8 @@ class SourcesScreenTest {
     @Test
     fun aCuratedListIsAddedWithATapAndIsNotOfferedAgain() {
         compose.onNodeWithText("Add a source", useUnmergedTree = true).performClick()
+        // The lists on offer come from their own query, apart from the screen's.
+        waitFor("Three picks a day from essays and reviews")
         compose.onNodeWithText("Three picks a day from essays and reviews").assertIsDisplayed()
         compose.onNodeWithText("Arts & Letters Daily").performClick()
 

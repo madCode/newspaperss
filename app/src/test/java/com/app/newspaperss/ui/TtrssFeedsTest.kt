@@ -269,8 +269,8 @@ class TtrssFeedsTest {
         val vm = SourceDetailViewModel(repo, account, flowOf(1))
         var opened = false
         compose.setContent { NotInPaperScreen(vm, onBack = {}, onOpenAccount = { opened = true }) }
-        idleUntil { compose.waitForIdle(); visible("2 feeds: Deep Time (left out), Field Station") }
-        assertTrue(visible("Your paper takes articles from News only"))
+        // The list and the hint come from separate queries.
+        idleUntil { compose.waitForIdle(); visible("2 feeds: Deep Time (left out), Field Station") && visible("Your paper takes articles from News only") }
         compose.onNodeWithText("Change Articles from in Settings").performClick()
         assertTrue(opened)
     }

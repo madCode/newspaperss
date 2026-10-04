@@ -137,7 +137,9 @@ class ScreenshotTest {
      */
     private fun shoot(name: String, ready: () -> Boolean = { true }, act: () -> Unit = {}, dialog: Boolean = false, content: @Composable () -> Unit) {
         compose.setContent { NewspaperssTheme(content) }
-        idleUntil(condition = ready)
+        // Recomposing on each check: some screens only start loading part of what [ready] waits
+        // for once they're drawn (Sources' folded categories).
+        idleUntil { compose.waitForIdle(); ready() }
         compose.waitForIdle()
         act()
         compose.waitForIdle()
@@ -431,7 +433,7 @@ class ScreenshotTest {
         }
         runBlocking { store.update { it.copy(feedsFrom = FeedsFrom.PHONE) } }
         val vm = SourcesViewModel(repo, FeedFinder(FakeHttp()), settings = store) {}
-        shoot("06-sources", ready = { vm.screen.value?.rows?.isNotEmpty() == true }) { SourcesScreen(vm) }
+        shoot("06-sources", ready = { vm.screen.value?.rows?.isNotEmpty() == true && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     /** A source with a row in each state the design shows: waiting, starred, marked read, in an unsent edition, delivered (two days ago), got old. */
@@ -513,7 +515,7 @@ class ScreenshotTest {
     fun sourcesWithAServerFolded() {
         val vm = serverSources()
         runBlocking { store.update { it.copy(foldedCategories = setOf("News", "Science")) } }
-        shoot("08n-sources-server-folded", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true }) { SourcesScreen(vm) }
+        shoot("08n-sources-server-folded", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     @Test
@@ -632,7 +634,7 @@ class ScreenshotTest {
     @Test
     fun sourcesWithAServer() {
         val vm = serverSources()
-        shoot("08a-sources-server", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true }) { SourcesScreen(vm) }
+        shoot("08a-sources-server", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     /** The whole list, to its end: Uncategorized and Left out last. */
@@ -640,21 +642,21 @@ class ScreenshotTest {
     @Config(qualifiers = "w411dp-h2000dp-xxhdpi")
     fun sourcesWithAServerWhole() {
         val vm = serverSources()
-        shoot("08b-sources-server-whole", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true }) { SourcesScreen(vm) }
+        shoot("08b-sources-server-whole", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     @Test
     @Config(fontScale = 2f)
     fun sourcesWithAServerAtTwiceTheFontSize() {
         val vm = serverSources()
-        shoot("08f-sources-server-large-text", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true }) { SourcesScreen(vm) }
+        shoot("08f-sources-server-large-text", ready = { vm.screen.value?.server?.categories?.isNotEmpty() == true && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     @Test
     @Config(qualifiers = "w411dp-h1100dp-xxhdpi")
     fun sourcesWithAServerAndOneCategory() {
         val vm = serverSources(category = "Essays")
-        shoot("08j-sources-server-one-category", ready = { vm.screen.value?.server?.outside?.isNotEmpty() == true }) { SourcesScreen(vm) }
+        shoot("08j-sources-server-one-category", ready = { vm.screen.value?.server?.outside?.isNotEmpty() == true && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     @Test
@@ -672,14 +674,14 @@ class ScreenshotTest {
             val account = db.sources().ofKind(com.app.newspaperss.data.SourceKind.TTRSS).single().id
             db.sources().recordFailure(account, Instant.now().minusSeconds(3_600), "Couldn't reach tt-rss.")
         }
-        shoot("08l-sources-server-down", ready = { vm.screen.value?.server?.account?.lastError != null }) { SourcesScreen(vm) }
+        shoot("08l-sources-server-down", ready = { vm.screen.value?.server?.account?.lastError != null && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     @Test
     fun sourcesWithAServerPaused() {
         val vm = serverSources()
         runBlocking { db.sources().setPaused(db.sources().ofKind(com.app.newspaperss.data.SourceKind.TTRSS).single().id, true) }
-        shoot("08m-sources-server-paused", ready = { vm.screen.value?.server?.account?.paused == true }) { SourcesScreen(vm) }
+        shoot("08m-sources-server-paused", ready = { vm.screen.value?.server?.account?.paused == true && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     private fun feedPage(key: String): SourceDetailViewModel {

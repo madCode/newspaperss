@@ -574,7 +574,8 @@ class OnboardingTest {
         click("Next")
         idleUntil { compose.waitForIdle(); vm.state.value.step == Step.SOURCES }
         assertTrue(stepIs("Step 4 of 5"))
-        assertTrue("the imported sites are enough to go on", vm.state.value.canContinue)
+        // From the sources the step watches, which catch up with the import a moment later.
+        idleUntil { vm.state.value.canContinue }
 
         click("Back")
         assertEquals(Step.IMPORT, vm.state.value.step)
