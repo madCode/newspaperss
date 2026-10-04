@@ -648,7 +648,7 @@ whose Kindle and KOReader answers ask for more on the same page).
     sheet as Sources) or **Not now** (the banner on Sources stays). **I pick my own sites** asks first ("Pick your own sites instead?"), saying
     what happens: newspapeRSS signs out of tt-rss and removes it here, with
     its waiting and starred articles; nothing changes in tt-rss; its feeds
-    don't come along yet (add sites again, or import tt-rss's OPML export).
+    don't come along (export tt-rss's OPML and import it in Sources).
     Feeds moved to tt-rss and still kept for their stars become phone feeds
     again, and a move under way stops.
     With a server, the page also has the account: its address, who's

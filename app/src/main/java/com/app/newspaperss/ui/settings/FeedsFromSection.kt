@@ -190,7 +190,7 @@ private fun LeaveDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                         "starred ones too. Nothing changes in tt-rss itself, and read status stops syncing.",
                 )
                 Text(
-                    "Your tt-rss feeds won't come along yet: add your sites again in Sources, or export an OPML file from tt-rss and import it there.",
+                    "Your tt-rss feeds don't come along. To keep them, export an OPML file from tt-rss (Preferences › Feeds) and import it in Sources.",
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
