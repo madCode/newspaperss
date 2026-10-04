@@ -279,6 +279,7 @@ class SettingsScreenTest {
         version.performTouchInput { longClick() }
         compose.waitForIdle()
         assertEquals(shown, clipboard.primaryClip!!.getItemAt(0).text.toString())
+        assertEquals("said on screen, for e-readers with no clipboard notice", "Version copied", org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
         assertEquals("TalkBack offers it too", "copy version", version.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnLongClick].label)
     }
 
