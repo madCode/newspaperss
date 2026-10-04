@@ -1,0 +1,29 @@
+# Draft of metadata/com.app.newspaperss.yml for a merge request to
+# https://gitlab.com/fdroid/fdroiddata (see docs/RELEASING.md). Not read by
+# anything in this repository.
+Categories:
+  - Reading
+License: MIT
+AuthorName: madCode
+SourceCode: https://github.com/madCode/newspaperss
+IssueTracker: https://github.com/madCode/newspaperss/issues
+Changelog: https://github.com/madCode/newspaperss/releases
+
+AutoName: newspapeRSS
+
+RepoType: git
+Repo: https://github.com/madCode/newspaperss.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+# Only real releases: latest-debug is a tag too, moved on every merge to main.
+UpdateCheckMode: Tags ^v[0-9.]+$
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1

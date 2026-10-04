@@ -26,10 +26,11 @@ Setup takes a couple of minutes, in four steps:
    PocketBook, KOReader, or just the file. Each gets a tip on how editions
    reach it; KOReader asks for a folder that syncs to the device, and a
    Kindle can have editions emailed to its own address instead.
-2. **What do you like to read?** Pick sites from starter packs (News,
-   Science, Technology, Essays & ideas, Culture & curiosities), paste any
-   website, import an OPML file or connect tt-rss. Leaving Pocket or
-   Instapaper? Import your saved links; they're enough on their own.
+2. **Where do your feeds live now?** Pick sites yourself (starter packs of
+   News, Science, Technology, Essays & ideas, Culture & curiosities, or any
+   website), use your own Tiny Tiny RSS server, or bring your list from
+   another reader app as an OPML file. Leaving Pocket or Instapaper? Import
+   your saved links; they're enough on their own.
 3. **How big, how often?** About 10 to 90 minutes of reading, and whether a
    new edition should be ready by a set time every day.
 4. **Make my first edition.** It starts building right away, with its
@@ -96,6 +97,8 @@ Setup takes a couple of minutes, in four steps:
 - [Architecture](docs/ARCHITECTURE.md): how the code is built, with diagrams.
 - [Backlog](docs/BACKLOG.md): what's next, grouped by part of the app, and ideas not yet planned.
 - [Devlog](docs/DEVLOG.md): what changed each work cycle, and why.
+- [Releasing](docs/RELEASING.md): how a version reaches F-Droid and Google Play.
+- [Privacy policy](docs/PRIVACY.md): nothing is collected; everything stays on your phone.
 - Research: [persona audits](docs/research/personas.md) and
   [competitors](docs/research/competitors.md).
 
