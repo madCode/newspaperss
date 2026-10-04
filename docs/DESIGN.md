@@ -435,11 +435,14 @@ whose Kindle and KOReader answers ask for more on the same page).
 - **Edition:** the same buttons as Today's card, including **Mark as not sent**,
   and its contents; tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
-  network). **Aa** in the preview's top bar sets its text size (Small,
-  Default, Large, Larger), kept for next time, on top of Android's own font
-  size. **Share** beside it sends the article's original link to Android's
-  share sheet, for the page on screen; it's hidden when an article has no web
-  link. Large pictures that stand
+  network), on top of Android's own font size. **Aa** in the top bar sets
+  its text size (Small to Largest), the same size as Settings › Article
+  text size, so changing either changes both. At Larger and up (or as large
+  through Android's font size), paragraphs are left-aligned rather than
+  justified, so a narrow screen doesn't open wide gaps between words; a
+  change applies to the page on screen without losing the reader's place.
+  **Share** in the top bar sends the article's original link to Android's share sheet, for
+  the page on screen; it's hidden when an article has no web link. Large pictures that stand
   alone fill the width (small ones keep their size), and the page can be
   pinched to zoom into a comic. **Notes** exports a Markdown file for a
   notes app: front matter
@@ -602,6 +605,12 @@ whose Kindle and KOReader answers ask for more on the same page).
   - **Schedule:** on or off, the time and the days. With notifications off, a warning for every delivery:
     a shared or emailed edition's Send is in its notification, and a
     folder save that fails is only reported there.
+  - **Article text size** (its row names the size): how big articles are
+    in the app's preview, on top of Android's font size. A sample line
+    drawn at that size, then Small, Default, Large, Larger and Largest
+    (85% to 175%) as radio rows; the preview's **Aa** sets the same size.
+    The rest of the app follows Android's font size, and the EPUB the
+    e-reader's own settings.
   - **E-reader & delivery:** the e-reader in a dropdown at the top, then
     "How it gets there". They share a page because the e-reader decides
     which delivery options show: **Email it to your Kindle** (shown for a Kindle, or once

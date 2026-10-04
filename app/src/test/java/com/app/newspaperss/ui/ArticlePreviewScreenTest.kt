@@ -97,7 +97,7 @@ class ArticlePreviewScreenTest {
             // After the book's stylesheet, so it wins over the book's own body rule.
             assertTrue(opened.indexOf("stylesheet") in 0 until opened.indexOf(style))
             // The second article is reached by the first one's "Next" link, served page by page.
-            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, dark.first, dark.second).second.toString(Charsets.UTF_8)
+            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, dark.first, dark.second, justify = true).second.toString(Charsets.UTF_8)
             assertTrue(next.contains(style))
         }
     }
@@ -132,7 +132,7 @@ class ArticlePreviewScreenTest {
             val first = forPreview(pages.article(0)!!, 0, 0, imageSizes(pages))
             assertEquals("a headshot, a row of pictures and an inline one keep their size", listOf("images/strip.png"), filled(first))
             // A page reached by "Next": an article that is just the picture.
-            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, 0, 0).second.toString(Charsets.UTF_8)
+            val next = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(1), pages, 0, 0, justify = true).second.toString(Charsets.UTF_8)
             assertEquals(listOf("images/solo.png"), filled(next))
             assertTrue(next.contains("img.preview-fill { width: 100%; }"))
         }
@@ -147,15 +147,79 @@ class ArticlePreviewScreenTest {
         return file
     }
 
-    private fun webView(): WebView {
+    private fun findWebView(): WebView? {
         fun find(view: View): WebView? = view as? WebView ?: (view as? ViewGroup)?.let { group -> (0 until group.childCount).firstNotNullOfOrNull { find(group.getChildAt(it)) } }
+        return find(compose.activity.window.decorView)
+    }
+
+    private fun webView(): WebView {
         var found: WebView? = null
-        idleUntil { found = find(compose.activity.window.decorView); found != null }
+        idleUntil { found = findWebView(); found != null }
         return found!!
     }
 
+    private val leftAligned = ".article-body p { text-align: start; }"
+
     @Test
-    fun thePickedTextSizeIsAppliedAndKeptInPlace() {
+    fun theTextSizeFromSettingsIsAppliedInPlaceAndLeftAlignsFromLarger() {
+        val file = oneArticleEdition()
+        var size by mutableStateOf(PreviewTextSize.DEFAULT)
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size) }
+        val view = webView()
+        assertEquals(100, view.settings.textZoom)
+        assertFalse(shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
+
+        size = PreviewTextSize.LARGE
+        compose.waitForIdle()
+        assertEquals(120, view.settings.textZoom)
+        assertSame("the same page, so the reader keeps their place", view, webView())
+
+        size = PreviewTextSize.LARGEST
+        compose.waitForIdle()
+        assertSame("restyled in place, so Share still follows the page on screen", view, webView())
+        assertEquals(175, view.settings.textZoom)
+        assertTrue("justified text opens wide gaps at this size", shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
+
+        size = PreviewTextSize.DEFAULT
+        compose.waitForIdle()
+        assertSame(view, webView())
+        assertFalse(shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
+    }
+
+    @Test
+    fun aNewAlignmentRestylesThePageOnScreenNotTheFirst() {
+        val file = tmp.newFile("n.epub")
+        val articles = listOf("One", "Two").map {
+            EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 30.0)
+        }
+        file.outputStream().use {
+            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
+        }
+        var size by mutableStateOf(PreviewTextSize.DEFAULT)
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}, textSize = size) }
+        val view = webView()
+        val client = shadowOf(view).webViewClient
+        val first = BOOK_ORIGIN + EpubPages.articleHref(0)
+
+        // A real WebView reports the first page, loaded as data, as about:blank.
+        client.doUpdateVisitedHistory(view, "about:blank", false)
+        size = PreviewTextSize.LARGER
+        compose.waitForIdle()
+        assertEquals("the first page itself, not about:blank", first, shadowOf(view).lastLoadDataWithBaseURL.baseUrl)
+        assertTrue(shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
+
+        // "Next", then a footnote on that page: the page itself is served again, restyled.
+        val second = BOOK_ORIGIN + EpubPages.articleHref(1)
+        client.doUpdateVisitedHistory(view, second, false)
+        client.doUpdateVisitedHistory(view, "$second#a2-fn1", false)
+        size = PreviewTextSize.DEFAULT
+        compose.waitForIdle()
+        assertEquals(second, shadowOf(view).lastLoadedUrl)
+        assertSame(view, webView())
+    }
+
+    @Test
+    fun aSizePickedWithAaIsSavedAndMarked() {
         val file = oneArticleEdition()
         var size by mutableStateOf(PreviewTextSize.DEFAULT)
         val picked = mutableListOf<PreviewTextSize>()
@@ -163,19 +227,44 @@ class ArticlePreviewScreenTest {
             ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size, onTextSize = { picked += it; size = it })
         }
         val view = webView()
-        assertEquals(100, view.settings.textZoom)
 
         compose.onNodeWithContentDescription("Text size").performClick()
-        compose.onNodeWithText("Larger").performClick()
+        compose.onNodeWithText("Largest").performClick()
         compose.waitForIdle()
 
-        assertEquals(listOf(PreviewTextSize.LARGER), picked)
-        assertEquals(145, view.settings.textZoom)
+        assertEquals(listOf(PreviewTextSize.LARGEST), picked)
+        assertEquals(175, view.settings.textZoom)
         assertSame("the same page, so the reader keeps their place", view, webView())
         // The menu marks the current size.
         compose.onNodeWithContentDescription("Text size").performClick()
-        compose.onNode(hasText("Larger") and hasContentDescription("Current size")).assertExists()
+        compose.onNode(hasText("Largest") and hasContentDescription("Current size")).assertExists()
         compose.onNode(hasText("Default") and hasContentDescription("Current size")).assertDoesNotExist()
+    }
+
+    @Test
+    fun aPageReachedByNextIsAlignedLikeTheFirst() {
+        val file = oneArticleEdition()
+        EpubPages(file).use { pages ->
+            fun page(justify: Boolean) = bookResponse(BOOK_ORIGIN + EpubPages.articleHref(0), pages, 0, 0, justify).second.toString(Charsets.UTF_8)
+            assertTrue(page(justify = false).contains(leftAligned))
+            assertFalse(page(justify = true).contains(leftAligned))
+        }
+    }
+
+    @Test
+    fun thePageWaitsForTheStoredTextSizeRatherThanLayingOutTwice() {
+        val file = oneArticleEdition()
+        var size by mutableStateOf<PreviewTextSize?>(null)
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size) }
+        // Share shows once the article has been read: from then on only the size is missing.
+        idleUntil { compose.onAllNodes(hasContentDescription("Share link")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Opening…").assertExists()
+        assertEquals(null, findWebView())
+
+        size = PreviewTextSize.LARGEST
+        compose.waitForIdle()
+        assertEquals(175, webView().settings.textZoom)
+        compose.onNodeWithText("Opening…").assertDoesNotExist()
     }
 
     @Test
@@ -186,6 +275,7 @@ class ArticlePreviewScreenTest {
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}, textSize = size) }
         val view = webView()
         assertEquals(150, view.settings.textZoom)
+        assertTrue("as large as Larger, so left-aligned too", shadowOf(view).lastLoadDataWithBaseURL.data.contains(leftAligned))
 
         size = PreviewTextSize.LARGER
         compose.waitForIdle()
