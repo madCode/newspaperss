@@ -186,11 +186,11 @@ private fun LeaveDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "newspapeRSS signs out and deletes everything from tt-rss on this phone: its articles, starred ones too, " +
-                        "and your feeds' settings. Past editions stay. Nothing changes in tt-rss itself.",
+                    "newspapeRSS signs out and deletes all tt-rss data including articles, stars, and feed settings. " +
+                        "Past editions stay. Nothing changes in tt-rss itself.",
                 )
                 Text(
-                    "Your tt-rss feeds don't come along. To keep them, export an OPML file from tt-rss (Preferences › Feeds) and import it in Sources.",
+                    "To keep your feeds, export an OPML file from tt-rss (Preferences › Feeds) and import it in Sources.",
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
