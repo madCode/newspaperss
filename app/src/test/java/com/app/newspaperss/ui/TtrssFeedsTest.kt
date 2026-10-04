@@ -195,8 +195,9 @@ class TtrssFeedsTest {
         val vm = sources(FeedsFrom.SERVER)
         var settingsOpened = false
         compose.setContent { SourcesScreen(vm, onOpenAccount = { settingsOpened = true }) }
-        idleUntil { compose.waitForIdle(); visible("⚠ Couldn't reach tt-rss.") }
-        assertTrue("it says what's listed is from before", visible("Showing what it last listed.") && visible("Quarterly Review"))
+        // The banner draws at once; the list once the folded categories have been read.
+        idleUntil { compose.waitForIdle(); visible("⚠ Couldn't reach tt-rss.") && visible("Quarterly Review") }
+        assertTrue("it says what's listed is from before", visible("Showing what it last listed."))
         compose.onNodeWithContentDescription("Your tt-rss settings").performClick()
         assertTrue(settingsOpened)
 
