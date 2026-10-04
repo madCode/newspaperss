@@ -349,8 +349,12 @@ class ArticlePreviewScreenTest {
         assertEquals("One" to "https://a.example/One", sharedLink())
 
         client.doUpdateVisitedHistory(view, BOOK_ORIGIN + EpubPages.articleHref(1), false)
-        // The new page's link is read off the main thread.
-        idleUntil { sharedLink().second == "https://a.example/Two" }
+        // The new page's link is read off the main thread. This fails now and then in CI only, so
+        // a timeout says what Share last gave rather than just that it wasn't the second page's.
+        var last: Pair<String?, String?>? = null
+        val polls = intArrayOf(0)
+        runCatching { idleUntil { polls[0]++; sharedLink().also { last = it }.second == "https://a.example/Two" } }
+            .onFailure { throw AssertionError("Share still gave $last after ${polls[0]} polls", it) }
         assertEquals("Two" to "https://a.example/Two", sharedLink())
 
         EpubPages(file).use { pages -> assertEquals(null, pageLink(BOOK_ORIGIN + "style.css", pages)) }
