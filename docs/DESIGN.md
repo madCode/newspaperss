@@ -454,10 +454,10 @@ whose Kindle and KOReader answers ask for more on the same page).
   through Android's font size), paragraphs are left-aligned rather than
   justified, so a narrow screen doesn't open wide gaps between words; a
   change applies to the page on screen without losing the reader's place.
-  Every article ends in the book's quiet "Next: *title* · *source* · *minutes* →" line,
-  short ones too (the book itself has it only after long ones), and the last in
-  "That's all for today." Tapping it opens the next article in place; the title and
-  **Share** follow the page on screen.
+  Every article ends in a quiet "Next: *title* · *source* · *minutes* →" line like the
+  book's, short ones too (the book has it only after long ones, and without the arrow),
+  and the last in "That's all for today." The whole line is the link. It opens the next
+  article in place; the title and **Share** follow the page on screen.
   **Share** in the top bar sends the article's original link to Android's share sheet;
   it's hidden when an article has no web link. Large pictures that stand
   alone fill the width (small ones keep their size), and the page can be

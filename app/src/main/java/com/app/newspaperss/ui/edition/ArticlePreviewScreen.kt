@@ -96,9 +96,6 @@ internal fun bookPage(url: String, pages: EpubPages): BookPage? {
     return BookPage(title, articleLink(xhtml))
 }
 
-/** [articleLink] of the book page at [url], or null if [url] isn't a page of the book. */
-internal fun pageLink(url: String, pages: EpubPages): ArticleLink? = bookPage(url, pages)?.link
-
 // The book's own line, as EpubWriter writes it after a long article.
 private val BOOK_NEXT_LINE = Regex("<p class=\"article-nav\">.*?</p>\n?", RegexOption.DOT_MATCHES_ALL)
 
@@ -119,7 +116,7 @@ internal fun withNextLine(xhtml: String, href: String, pages: EpubPages): String
         // The entry's language, for a title in another script; "Next" stays the book's English.
         val language = listOf("lang", "xml:lang", "dir").filter(next::hasAttr).joinToString("") { " $it=\"${escapeXml(next.attr(it))}\"" }
         val meta = next.selectFirst(".meta")?.text()?.ifEmpty { null }?.let { " <span class=\"meta\">· ${escapeXml(it)}</span>" }.orEmpty()
-        "<p class=\"article-nav\"><a class=\"next\" href=\"${escapeXml(link.attr("href"))}\">Next: <span class=\"title\"$language>${escapeXml(link.text())}</span>$meta&#160;&#8594;</a></p>"
+        "<p class=\"article-nav\"><a class=\"next\" href=\"${escapeXml(link.attr("href"))}\">Next: <span class=\"title\"$language>${escapeXml(link.text())}</span>$meta<span aria-hidden=\"true\">&#160;&#8594;</span></a></p>"
     } ?: "<p class=\"article-nav\">${escapeXml(EpubWriter.END_TITLE)}.</p>"
     return xhtml.replace(BOOK_NEXT_LINE, "").replaceFirst("</body>", "$line\n</body>")
 }
@@ -384,8 +381,9 @@ internal fun forPreview(xhtml: String, background: Int, text: Int, imageSize: (s
     // `start`, not `left`, so a right-to-left article lines up on its right; the book itself says
     // `left` only because Kindle doesn't know `start`.
     val align = if (justify) "" else " .article-body p { text-align: start; }"
-    // The Next line's whole width is the link, at least a finger tall; only the title is underlined.
-    val next = " p.article-nav a.next { display: block; padding: 0.7em 0; text-decoration: none; } p.article-nav a.next span.title { text-decoration: underline; }"
+    // The Next line's whole width is the link, at least a finger tall at any text size; only the
+    // title is underlined.
+    val next = " p.article-nav a.next { display: block; box-sizing: border-box; min-height: 48px; padding: 0.7em 0; text-decoration: none; } p.article-nav a.next span.title { text-decoration: underline; }"
     val style = "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; } img.$FILL { width: 100%; }$next$align</style></head>"
     return markLargeImages(xhtml, imageSize).replaceFirst("</head>", style)
 }
