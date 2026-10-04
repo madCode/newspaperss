@@ -58,7 +58,7 @@ Setup takes a couple of minutes, in four steps:
   link for each video, footnotes that work, each article tagged with its
   language, and an end page with a question to think about. Preview any
   article in the app as your e-reader will show it, with a text size of
-  your choice and pinch to zoom on comics.
+  your choice (from the preview or Settings) and pinch to zoom on comics.
 - **Delivered your way.** Emailed straight to your Kindle (Send opens
   your mail app with everything filled in), a notification with a Send
   button (Kindle app, Dropbox for a Kobo, email), a synced folder

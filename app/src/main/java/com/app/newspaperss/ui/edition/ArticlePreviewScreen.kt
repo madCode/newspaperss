@@ -102,7 +102,9 @@ internal fun shareIntent(link: ArticleLink, fallbackTitle: String): Intent {
  * One article as the e-reader will show it, read straight out of the EPUB.
  *
  * @param loadFile the edition's file, or null if it's gone. Called off the main thread.
- * @param textSize the preview's text size; [onTextSize] is called when the reader picks another.
+ * @param textSize the preview's text size, on top of Android's font size; null until it's known,
+ *   and the page waits for it rather than being laid out twice. The same size as Settings' Article
+ *   text size: [onTextSize] is called when the reader picks another with Aa.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +113,7 @@ fun ArticlePreviewScreen(
     position: Int,
     title: String,
     onBack: () -> Unit,
-    textSize: PreviewTextSize = PreviewTextSize.DEFAULT,
+    textSize: PreviewTextSize? = PreviewTextSize.DEFAULT,
     onTextSize: (PreviewTextSize) -> Unit = {},
 ) {
     // Read in the background so the screen shows at once: reading a large edition during
@@ -163,24 +165,29 @@ fun ArticlePreviewScreen(
                             Icon(Icons.Default.Share, contentDescription = "Share link")
                         }
                     }
-                    TextSizeMenu(textSize, onTextSize)
+                    textSize?.let { TextSizeMenu(it, onTextSize) }
                 },
             )
         },
     ) { padding ->
-        when (val p = preview) {
-            // Words, not an animated bar, which smears on e-ink.
-            Preview.Loading -> Text("Opening…", Modifier.padding(padding).padding(24.dp))
-            Preview.Missing -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+        val p = preview
+        when {
+            p == Preview.Missing -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("This edition's file is gone, so the article can't be shown.")
             }
-            // Keyed: the WebView is built once, so a new article needs a new one.
-            is Preview.Ready -> key(p) {
+            // Words, not an animated bar, which smears on e-ink.
+            p !is Preview.Ready || textSize == null -> Text("Opening…", Modifier.padding(padding).padding(24.dp))
+            else -> {
                 val colors = MaterialTheme.colorScheme
                 // Setting textZoom replaces the WebView's own scaling by Android's font size, so apply
                 // that here: someone who reads with large system text gets it at "Default" too.
                 val textZoom = (textSize.percent * LocalDensity.current.fontScale).roundToInt()
-                BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, BOOK_ORIGIN + EpubPages.articleHref(position), { onPage(it, p.pages) }, Modifier.fillMaxSize().padding(padding))
+                val justify = justifies(textSize, textZoom)
+                // Keyed: the WebView is built once, so a new article needs a new one. A new size or
+                // alignment is applied to it in place.
+                key(p) {
+                    BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, justify, BOOK_ORIGIN + EpubPages.articleHref(position), { onPage(it, p.pages) }, Modifier.fillMaxSize().padding(padding))
+                }
             }
         }
     }
@@ -205,27 +212,54 @@ private fun TextSizeMenu(textSize: PreviewTextSize, onTextSize: (PreviewTextSize
 }
 
 /**
+ * Whether the preview justifies paragraphs, as the book does. At Larger and up, or the same size
+ * reached through Android's font size, a narrow phone fits a few words a line and justifying
+ * opens wide gaps between them, so paragraphs are left-aligned instead.
+ */
+internal fun justifies(textSize: PreviewTextSize, textZoom: Int): Boolean =
+    textSize < PreviewTextSize.LARGER && textZoom < PreviewTextSize.LARGER.percent
+
+/**
  * What the preview's WebView gets for [url]: a file from the book, or nothing at all. Anything
  * outside the book, and anything missing from it, gets an empty body rather than being passed on,
  * so an article's HTML can never reach the network (no tracking pixels, fonts or stylesheets).
  */
-internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: Int): Pair<String, ByteArray> {
+internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: Int, justify: Boolean): Pair<String, ByteArray> {
     if (!url.startsWith(BOOK_ORIGIN)) return "text/plain" to ByteArray(0)
     val path = "OEBPS/" + url.removePrefix(BOOK_ORIGIN).substringBefore('#').substringBefore('?')
     val bytes = pages.entry(path) ?: return "text/plain" to ByteArray(0)
     val mime = EpubPages.mimeOf(path)
     // A page reached by a link in the book ("Next") comes this way, not through loadData.
-    if (mime == "application/xhtml+xml") return mime to forPreview(bytes.toString(Charsets.UTF_8), background, text, imageSizes(pages)).toByteArray()
+    if (mime == "application/xhtml+xml") return mime to forPreview(bytes.toString(Charsets.UTF_8), background, text, imageSizes(pages), justify).toByteArray()
     return mime to bytes
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, pageUrl: String, onPage: (url: String) -> Unit, modifier: Modifier) {
+private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, justify: Boolean, pageUrl: String, onPage: (url: String) -> Unit, modifier: Modifier) {
+    // Read when a page is served, so pages reached by "Next" follow a change too.
+    val style = remember { PageStyle(justify) }
     AndroidView(
         modifier = modifier,
-        // Applied in place, so a new size keeps the reader's place in the article.
-        update = { it.settings.textZoom = textZoom },
+        // Applied in place, so a new size keeps the reader's place in the article. A new alignment
+        // is in the stylesheet, and scripts are off, so the page on screen is served again and
+        // scrolled back to where it was.
+        update = { view ->
+            view.settings.textZoom = textZoom
+            if (style.justify != justify) {
+                style.justify = justify
+                style.restoreAt = view.scrollY / (view.contentHeight * view.pageScale).coerceAtLeast(1f)
+                // The book's own record of the page, not view.url: the first page, loaded as data,
+                // reports about:blank there. Without its #footnote, so it's served again rather
+                // than scrolled to.
+                val onScreen = style.page?.substringBefore('#')
+                if (onScreen == null || onScreen == pageUrl) {
+                    view.loadDataWithBaseURL(pageUrl, forPreview(xhtml, background, text, imageSizes(pages), justify), "application/xhtml+xml", "utf-8", null)
+                } else {
+                    view.loadUrl(onScreen)
+                }
+            }
+        },
         factory = { context ->
             WebView(context).apply {
                 // Before the page loads too, so a dark screen doesn't flash white.
@@ -239,11 +273,21 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
                 settings.displayZoomControls = false
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse {
-                        val (mime, bytes) = bookResponse(request.url.toString(), pages, background, text)
+                        val (mime, bytes) = bookResponse(request.url.toString(), pages, background, text, style.justify)
                         return WebResourceResponse(mime, "utf-8", ByteArrayInputStream(bytes))
                     }
 
-                    override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) = onPage(url)
+                    override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+                        if (url.startsWith(BOOK_ORIGIN)) style.page = url
+                        onPage(url)
+                    }
+
+                    override fun onPageFinished(view: WebView, url: String) {
+                        val at = style.restoreAt ?: return
+                        style.restoreAt = null
+                        // After layout, when the page has its new height.
+                        view.post { view.scrollTo(0, (at * view.contentHeight * view.pageScale).roundToInt()) }
+                    }
 
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                         val url = request.url
@@ -258,11 +302,24 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
                 }
                 // The page's own address in the book, not the bare origin: its footnote links then
                 // resolve to this page, and the Share link follows the page on screen.
-                loadDataWithBaseURL(pageUrl, forPreview(xhtml, background, text, imageSizes(pages)), "application/xhtml+xml", "utf-8", null)
+                loadDataWithBaseURL(pageUrl, forPreview(xhtml, background, text, imageSizes(pages), justify), "application/xhtml+xml", "utf-8", null)
             }
         },
     )
 }
+
+/**
+ * The preview's stylesheet choice, the book page on screen (null until one reports itself), and
+ * where to scroll back to once a restyled page has loaded.
+ */
+private class PageStyle(var justify: Boolean) {
+    var page: String? = null
+    var restoreAt: Float? = null
+}
+
+/** Screen pixels per CSS pixel: the density, times any pinch-zoom. */
+@Suppress("DEPRECATION")
+private val WebView.pageScale: Float get() = scale
 
 /**
  * The book leaves side margins and colours to the e-reader's own settings, so the preview supplies
@@ -274,9 +331,13 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
  * middle. Small ones (a headshot, a logo, a row of icons) keep their size, as in the book.
  *
  * @param imageSize an image's width and height in pixels by its `src`, or null if unknown.
+ * @param justify false to left-align the article's paragraphs (see [justifies]).
  */
-internal fun forPreview(xhtml: String, background: Int, text: Int, imageSize: (src: String) -> Pair<Int, Int>? = { null }): String {
-    val style = "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; } img.$FILL { width: 100%; }</style></head>"
+internal fun forPreview(xhtml: String, background: Int, text: Int, imageSize: (src: String) -> Pair<Int, Int>? = { null }, justify: Boolean = true): String {
+    // `start`, not `left`, so a right-to-left article lines up on its right; the book itself says
+    // `left` only because Kindle doesn't know `start`.
+    val align = if (justify) "" else " .article-body p { text-align: start; }"
+    val style = "<style>body { margin: 0 5%; background: ${css(background)}; color: ${css(text)}; } img.$FILL { width: 100%; }$align</style></head>"
     return markLargeImages(xhtml, imageSize).replaceFirst("</head>", style)
 }
 

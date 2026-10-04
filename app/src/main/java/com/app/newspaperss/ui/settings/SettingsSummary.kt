@@ -24,6 +24,7 @@ data class Summary(val text: String, val problem: String? = null)
 enum class SettingsPage(val slug: String, val title: String) {
     EDITION("edition", "Your edition"),
     SCHEDULE("schedule", "Schedule"),
+    TEXT_SIZE("text-size", "Article text size"),
     // One page: the e-reader decides which delivery choices are offered.
     DELIVERY("delivery", "E-reader & delivery"),
     FEEDS("feeds", "Where your feeds live"),
@@ -76,6 +77,8 @@ object SettingsSummary {
         val text = listOfNotNull(s.device?.let(::shortName), how).joinToString(" · ")
         return Summary(text.replaceFirstChar { it.uppercase() }, problem)
     }
+
+    fun textSize(s: Settings): Summary = Summary(s.previewTextSize.label)
 
     fun notes(s: Settings, reachable: Boolean): Summary {
         val name = s.notesFolderName ?: "your folder"
