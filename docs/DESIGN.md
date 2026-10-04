@@ -646,9 +646,10 @@ whose Kindle and KOReader answers ask for more on the same page).
     phone feeds, the page offers the move at once: "Signed in. 58 feeds in
     7 categories. Move your 8 phone feeds to tt-rss?", **Move 8** (the same
     sheet as Sources) or **Not now** (the banner on Sources stays). **I pick my own sites** asks first ("Pick your own sites instead?"), saying
-    what happens: newspapeRSS signs out of tt-rss and removes it here, with
-    its waiting and starred articles; nothing changes in tt-rss; its feeds
-    don't come along yet (add sites again, or import tt-rss's OPML export).
+    what happens: newspapeRSS signs out and deletes all tt-rss data here
+    (articles, stars and feed settings); past editions stay; nothing
+    changes in tt-rss; the feeds don't come along, so it points to
+    tt-rss's OPML export, imported in Sources.
     Feeds moved to tt-rss and still kept for their stars become phone feeds
     again, and a move under way stops.
     With a server, the page also has the account: its address, who's

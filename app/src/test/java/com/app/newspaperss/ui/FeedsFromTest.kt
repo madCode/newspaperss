@@ -169,7 +169,7 @@ class FeedsFromTest {
         compose.onNodeWithText("I pick my own sites").performClick()
         waitFor("Pick your own sites instead?")
         compose.onNode(isDialog()).assertExists()
-        compose.onNodeWithText("won't come along yet", substring = true).assertExists()
+        compose.onNodeWithText("To keep your feeds", substring = true).assertExists()
         compose.onNodeWithText("Cancel").performClick()
         waitGone("Pick your own sites instead?")
         assertEquals("cancelling changes nothing", FeedsFrom.SERVER, runBlocking { store.current().feedsFrom })
