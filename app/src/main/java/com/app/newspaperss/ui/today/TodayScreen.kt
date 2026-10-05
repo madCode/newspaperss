@@ -45,10 +45,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.edition.EditionBuilder
@@ -130,7 +130,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 val hasFile = remember(latest.fileName, latest.status) { viewModel.fileOf(latest) != null }
                 LatestEdition(
                     latest,
-                    frontPage = state.frontPage,
+                    articles = state.latestArticles,
                     first = editions.size == 1,
                     saidAbove = saidAbove,
                     deviceName = state.deviceName,
@@ -262,7 +262,7 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeB
 @Composable
 private fun LatestEdition(
     edition: EditionEntity,
-    frontPage: FrontPage?,
+    articles: List<EditionArticleEntity>,
     first: Boolean,
     saidAbove: String?,
     deviceName: String,
@@ -301,7 +301,7 @@ private fun LatestEdition(
                 if (sent && hasFile) SentEditionMenu(edition.title, onSend, onNotSent, Modifier.offset(x = 12.dp, y = (-12).dp))
             }
             // Only for an edition that is or was on its way: a failed one's articles go back to wait.
-            if (frontPage != null && (edition.status == EditionStatus.READY || sent)) FrontPagePreview(frontPage)
+            if (edition.status == EditionStatus.READY || sent) Headlines(articles)
             when (edition.status) {
                 EditionStatus.READY -> {
                     if (first) {
@@ -356,46 +356,30 @@ private fun LatestEdition(
     }
 }
 
-/**
- * The edition's lead story over a hairline, then the next ones in the book's order. Plain rules
- * and type only: Today's masthead is the newspaper, and a second one on the card would compete.
- */
+/** The edition's first [SHOWN] articles in the book's order, as its contents page opens, and how many more. */
 @Composable
-private fun FrontPagePreview(page: FrontPage) {
-    HorizontalDivider(Modifier.padding(top = 12.dp, bottom = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+private fun Headlines(articles: List<EditionArticleEntity>) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val lead = page.lead
-    val why = when (page.why) {
-        FrontPage.Why.STARRED -> "You starred this"
-        FrontPage.Why.LONGEST -> "Longest read"
-        null -> null
-    }
-    val kicker = listOfNotNull(why, lead.sourceTitle, minutes(lead.minutes)).joinToString(" · ")
-    // The star is decoration, so TalkBack reads only the words.
-    Text(
-        if (page.why == FrontPage.Why.STARRED) "★ $kicker" else kicker,
-        style = MaterialTheme.typography.labelMedium,
-        color = muted,
-        modifier = Modifier.clearAndSetSemantics { contentDescription = kicker },
-    )
-    Text(
-        lead.title,
-        style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp, lineHeight = 24.sp),
-        maxLines = 3,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.padding(top = 2.dp),
-    )
-    page.next.forEach { article ->
+    articles.take(SHOWN).forEach { article ->
         Column(Modifier.padding(top = 10.dp)) {
-            Text(article.sourceTitle, style = MaterialTheme.typography.labelMedium, color = muted)
+            // The star is decoration, so TalkBack hears it in words.
+            Text(
+                if (article.starred) "★ ${article.sourceTitle}" else article.sourceTitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = muted,
+                modifier = Modifier.clearAndSetSemantics { contentDescription = if (article.starred) "Starred, ${article.sourceTitle}" else article.sourceTitle },
+            )
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(article.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Text(minutes(article.minutes), style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(start = 12.dp))
             }
         }
     }
-    if (page.more > 0) Text("and ${page.more} more", style = MaterialTheme.typography.bodyMedium, color = muted, modifier = Modifier.padding(top = 10.dp))
+    val more = articles.size - SHOWN
+    if (more > 0) Text("and $more more", style = MaterialTheme.typography.bodyMedium, color = muted, modifier = Modifier.padding(top = 10.dp))
 }
+
+private const val SHOWN = 3
 
 private fun minutes(m: Double) = "${m.roundToInt().coerceAtLeast(1)} min"
 

@@ -55,7 +55,8 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Boox: consider turning off ripples on e-ink (they cause partial refreshes); Boox's own refresh modes may make it moot
 
 ### Today
-- [ ] Today's card as the paper's front page *(you asked)*. The card now leads with your star or the longest read, then the next two. Explored further ([research/edition-card/](research/edition-card/index.html), open it in a browser):
+- [ ] Today's card as the paper's front page *(you asked)*. The card now shows its first three headlines in the book's order. Explored further ([research/edition-card/](research/edition-card/index.html), open it in a browser):
+  - F2c: a lead story (your star, otherwise the longest read) over the next two; built, then set aside for the plainer list, as the lead competed with the edition's title
   - G1: the card carries the newspaper styling (the edition's name between double rules, an issue number, "No. 42") and Today's masthead steps back to a plain bar or a small imprint, so there's one front page per screen
   - F4: the same card under today's masthead, where the two compete
   - the lead with its opening line (F3) or its picture (F7), which need more stored per edition

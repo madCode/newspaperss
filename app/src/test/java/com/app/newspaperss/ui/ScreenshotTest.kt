@@ -315,7 +315,7 @@ class ScreenshotTest {
         shoot("05-today", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
     }
 
-    /** Eight sample articles for an edition's card, the second one starred so it leads. */
+    /** Eight sample articles for an edition's card, the second one starred. */
     private fun sampleFrontPage(edition: Long) = listOf(
         "BBC News" to "Flooding forces thousands from their homes in northern Italy" to 3.0,
         "Quanta Magazine" to "The Mathematician Who Counted the Shapes of Knots" to 8.0,

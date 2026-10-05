@@ -26,10 +26,10 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** Today's card shows the latest edition's opening: a lead, the next two in order, and how many more. */
+/** Today's card shows the latest edition's first headlines, in the book's order, and how many more. */
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApp::class, qualifiers = "w411dp-h891dp")
-class TodayFrontPageTest {
+class TodayHeadlinesTest {
     @get:Rule(order = 0) val closeDb = closeAfter { db.close() }
     @get:Rule(order = 1) val tmp = TemporaryFolder()
     @get:Rule(order = 2) val compose = createComposeRule()
@@ -50,16 +50,16 @@ class TodayFrontPageTest {
     }
 
     @Test
-    fun aReadyEditionLeadsWithTheStarThenTheFirstTwoInOrder() {
-        today(EditionStatus.READY, starred = 3)
+    fun aReadyEditionShowsItsFirstThreeInOrderAndMarksTheStar() {
+        today(EditionStatus.READY, starred = 1)
 
-        // TalkBack hears the reason without the star glyph.
-        compose.onNodeWithContentDescription("You starred this · Source 3 · 4 min", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("Story 3").assertExists()
         compose.onNodeWithText("Story 0").assertExists()
         compose.onNodeWithText("Story 1").assertExists()
-        compose.onNodeWithText("Story 2").assertDoesNotExist()
+        compose.onNodeWithText("Story 2").assertExists()
+        compose.onNodeWithText("Story 3").assertDoesNotExist()
         compose.onNodeWithText("and 2 more").assertExists()
+        // TalkBack hears the star in words.
+        compose.onNodeWithContentDescription("Starred, Source 1", useUnmergedTree = true).assertExists()
     }
 
     @Test

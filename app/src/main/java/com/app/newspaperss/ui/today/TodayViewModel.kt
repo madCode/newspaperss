@@ -3,6 +3,7 @@ package com.app.newspaperss.ui.today
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
+import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.delivery.KindleSend
@@ -60,8 +61,8 @@ data class TodayState(
     val sentToKindle: Map<Long, KindleSend> = emptyMap(),
     /** Where Send emails editions, or null when it shares them. */
     val kindleEmail: KindleEmail? = null,
-    /** The latest edition's opening, or null when it has no articles. */
-    val frontPage: FrontPage? = null,
+    /** The latest edition's articles, in the book's order. */
+    val latestArticles: List<EditionArticleEntity> = emptyList(),
 )
 
 class TodayViewModel(
@@ -77,19 +78,19 @@ class TodayViewModel(
     // The latest edition's articles arrive with the list, so its card is drawn once, whole, rather
     // than growing a moment later: on e-ink that would be a second refresh.
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val editionsWithFront: Flow<Pair<List<EditionEntity>, FrontPage?>> = editions.observeAll().flatMapLatest { list ->
-        val latest = list.firstOrNull() ?: return@flatMapLatest flowOf(list to null)
+    private val editionsWithLatest: Flow<Pair<List<EditionEntity>, List<EditionArticleEntity>>> = editions.observeAll().flatMapLatest { list ->
+        val latest = list.firstOrNull() ?: return@flatMapLatest flowOf(list to emptyList())
         // edition_articles alone: a query joining articles would rerun on every write to them, as a sync makes.
-        editions.observeArticles(latest.id).map { list to FrontPage.of(it) }
+        editions.observeArticles(latest.id).map { list to it }
     }
 
-    private val editionsAndKindle = combine(editionsWithFront, sentToKindle, ::Pair)
+    private val editionsAndKindle = combine(editionsWithLatest, sentToKindle, ::Pair)
 
-    val state: StateFlow<TodayState> = combine(editionsAndKindle, work, settings, online, editions.observeStarredWaiting()) { (withFront, kindle), info, s, isOnline, starred ->
-        val (list, front) = withFront
+    val state: StateFlow<TodayState> = combine(editionsAndKindle, work, settings, online, editions.observeStarredWaiting()) { (withLatest, kindle), info, s, isOnline, starred ->
+        val (list, latestArticles) = withLatest
         TodayState(
             editions = list,
-            frontPage = front,
+            latestArticles = latestArticles,
             sentToKindle = kindle,
             build = buildStateOf(info, isOnline),
             next = nextEdition(s, now(), lastDue()),
