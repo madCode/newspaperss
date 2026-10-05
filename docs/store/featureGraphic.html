@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+html, body { margin: 0; }
+body { width: 1024px; height: 500px; overflow: hidden; background: #F7F4EC; color: #1C1B1A; font-family: 'Noto Serif', serif; }
+.wrap { position: relative; width: 1024px; height: 500px; display: flex; align-items: center; box-sizing: border-box; padding: 0 64px 0 80px; gap: 56px; }
+.text { flex: 1; min-width: 0; }
+.kicker { font-size: 15px; letter-spacing: 0.22em; text-transform: uppercase; color: #4A4740; margin: 0 0 14px; }
+.mark { font-size: 78px; font-weight: 700; line-height: 1; margin: 0; letter-spacing: -0.01em; }
+.mark span { color: #8C2F1B; }
+.rules { margin: 20px 0 22px; border-top: 3px solid #1C1B1A; border-bottom: 1px solid #1C1B1A; height: 4px; width: 100%; }
+.tag { font-size: 27px; line-height: 1.35; margin: 0; }
+.devices { font-family: 'Noto Serif', serif; font-style: italic; font-size: 18px; color: #4A4740; margin: 18px 0 0; }
+.reader { flex-shrink: 0; width: 300px; height: 404px; background: #2E2C29; border-radius: 22px; padding: 22px 20px 48px; box-sizing: border-box; box-shadow: 0 10px 28px rgba(28,27,26,0.18); }
+.screen { width: 100%; height: 100%; background: #ECEAE4; border-radius: 3px; padding: 20px 20px; box-sizing: border-box; color: #222; overflow: hidden; }
+.dateline { font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 6px; }
+.title { font-size: 22px; font-weight: 700; margin: 0 0 4px; line-height: 1.15; }
+.totals { font-size: 11px; font-style: italic; margin: 0 0 12px; }
+ol { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.3; }
+li { margin: 0 0 10px; }
+li small { display: block; font-size: 9.5px; letter-spacing: 0.03em; margin-top: 2px; color: #555; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="text">
+    <p class="kicker">Your morning edition</p>
+    <h1 class="mark">newspape<span>RSS</span></h1>
+    <div class="rules"></div>
+    <p class="tag">A finite newspaper from the sites you choose, delivered to your e-reader.</p>
+    <p class="devices">Kindle · Kobo · Boox · PocketBook · KOReader</p>
+  </div>
+  <div class="reader">
+    <div class="screen">
+      <p class="dateline">Tuesday, September 29</p>
+      <p class="title">In this edition</p>
+      <p class="totals">4 articles · about 28 min</p>
+      <ol>
+        <li>The quiet return of the night train<small>The Example Review · 4 min</small></li>
+        <li>What a century of weather records says about spring<small>The Example Review · 7 min</small></li>
+        <li>A short history of the paperback<small>The Example Review · 10 min</small></li>
+        <li>Why city trees are planted in pairs<small>The Example Review · 7 min</small></li>
+      </ol>
+    </div>
+  </div>
+</div>
+</body>
+</html>
