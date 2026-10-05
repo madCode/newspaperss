@@ -177,6 +177,14 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 360px)); gap: 14px; }
 .pair .cap2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
 .both .option { grid-column: 1 / -1; }
+.cl { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 7px; }
+.cl li { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline; min-width: 0; }
+.cl .h { font-family: var(--serif); font-size: 14.5px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cl .h2 { font-family: var(--serif); font-size: 14.5px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-width: 0; }
+.cl .s { font-family: var(--sans); font-size: 12px; color: var(--ink-soft); }
+.cl .m { font-size: 12px; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.runin { margin-top: 12px; font-family: var(--serif); font-size: 14.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.runin .dot { color: var(--ink-soft); padding: 0 4px; }
 .photo { aspect-ratio: 16 / 9; max-width: 100%; margin-top: 10px; filter: grayscale(1);
   background:
     radial-gradient(circle at 30% 45%, transparent 18%, #2a2a2a 19%, #2a2a2a 22%, transparent 23%),
@@ -206,6 +214,12 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
       <div class="seg"><button type="button" id="marks" aria-pressed="false">Mark what's new</button></div>
     </div>
   </header>
+
+  <section class="round">
+    <h2 class="section-h">Round 6: A, more compact</h2>
+    <p class="section-p">A keeps the book's order and every headline the same size, so nothing competes with the edition's title. These versions cut its height. The first is A as in round 1, without the "See what's inside" link, since the whole card opens the edition.</p>
+    <div class="grid" id="grid6"></div>
+  </section>
 
   <section class="round">
     <h2 class="section-h">Round 5: F2 without the heavy rule</h2>
@@ -480,6 +494,45 @@ const ROUND5 = [
   },
 ];
 
+const st = a => a.star ? "★ " : "";
+const ROUND6 = [
+  {
+    name: "A as in round 1", tag: "Three lines each",
+    card: () => `<div class="new">${headsList(ARTICLES.slice(0, 3))}${more(ARTICLES.length - 3)}</div>`,
+    idea: "Source over headline, time on the right; headlines wrap to two lines.",
+    good: ["Every story's source and time"],
+    watch: ["Up to three lines a story: about nine lines for three stories"],
+  },
+  {
+    name: "A1. One line each, source inline", tag: "Most compact",
+    card: () => `<ul class="cl new">${ARTICLES.slice(0, 3).map(a => `<li><span class="h">${st(a)}<span class="s">${esc(a.src)} · </span>${esc(a.h)}</span><span class="m">${mins(a.m)}</span></li>`).join("")}</ul>${more(ARTICLES.length - 3)}`,
+    idea: "Each story on one line: source, headline, time. Long headlines end in an ellipsis.",
+    good: ["Three stories in three lines, a third of A's height", "Reads like the contents page of the book"],
+    watch: ["Most headlines get cut off on a phone; the source eats the start of the line", "At large text sizes, little more than the source fits"],
+  },
+  {
+    name: "A2. Headlines only, two lines max", tag: "No sources",
+    card: () => `<ul class="cl new">${ARTICLES.slice(0, 3).map(a => `<li><span class="h2">${st(a)}${esc(a.h)}</span><span class="m">${mins(a.m)}</span></li>`).join("")}</ul>${more(ARTICLES.length - 3)}`,
+    idea: "Drop the source line; headlines wrap to two lines at most, time on the right.",
+    good: ["About a third shorter than A, and headlines stay whole", "The headline is what tells you what's in it"],
+    watch: ["You can't see who wrote what; \"Orbital Mechanics\" alone doesn't say xkcd"],
+  },
+  {
+    name: "A3. One line each, no sources", tag: "Compact, whole lines",
+    card: () => `<ul class="cl new">${ARTICLES.slice(0, 4).map(a => `<li><span class="h">${st(a)}${esc(a.h)}</span><span class="m">${mins(a.m)}</span></li>`).join("")}</ul>${more(ARTICLES.length - 4)}`,
+    idea: "One line per headline and no source, so four stories take less room than A's three.",
+    good: ["Shows four stories in four lines", "A tidy column of times on the right"],
+    watch: ["Long headlines are cut short", "No sources"],
+  },
+  {
+    name: "A4. Headlines run together", tag: "Paragraph",
+    card: () => `<div class="runin new">${ARTICLES.map(a => `${st(a)}${esc(a.h)}`).join('<span class="dot">·</span>')}</div>`,
+    idea: "Every headline in one paragraph, separated by dots and cut at three lines, like the teaser line on a paper's front page.",
+    good: ["Fixed height: three lines, however many articles", "Feels like skimming, not a list to work through"],
+    watch: ["Hard to tell where one headline ends; no times or sources", "TalkBack reads it as one long sentence"],
+  },
+];
+
 const ROUND1 = [
   {
     name: "Today's card", tag: "Now", now: true,
@@ -549,6 +602,7 @@ const option = (o, state) => `
 let currentState = "ready";
 function render(state) {
   currentState = state;
+  document.getElementById("grid6").innerHTML = ROUND6.map(o => option(o, state)).join("");
   document.getElementById("grid5").innerHTML = ROUND5.map(o => option(o, state)).join("");
   document.getElementById("grid4").innerHTML = ROUND4.map(o => option(o, state)).join("");
   document.getElementById("grid3").innerHTML = ROUND3.map(o => option(o, state)).join("");
