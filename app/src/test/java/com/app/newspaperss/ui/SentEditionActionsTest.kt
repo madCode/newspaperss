@@ -106,12 +106,13 @@ class SentEditionActionsTest {
 
     private fun button(text: String) = compose.onNode(hasText(text) and hasClickAction())
 
-    private val card get() = button("Tuesday Morning Edition")
+    private fun leftOf(first: String, second: String) =
+        button(first).fetchSemanticsNode().boundsInRoot.left < button(second).fetchSemanticsNode().boundsInRoot.left
 
     private fun statusOf(id: Long) = runBlocking { db.editions().byId(id) }?.status
 
     @Test
-    fun aKindleReadersSentCardOffersTheKindleAppAndOpensTheEditionWhenTapped() {
+    fun aKindleReadersSentCardLeadsWithWhatsInsideThenTheKindleApp() {
         installKindle()
         val id = edition(EditionStatus.DELIVERED)
         var opened: Long? = null
@@ -120,13 +121,24 @@ class SentEditionActionsTest {
         compose.onNodeWithText("Send again").assertDoesNotExist()
         compose.onNodeWithText(MARK_NOT_SENT).assertDoesNotExist()
         compose.onNodeWithText("Open").assertDoesNotExist()
-        compose.onNodeWithText("See what's inside").assertDoesNotExist()
+        assertTrue(leftOf("See what's inside", "Open Kindle"))
 
         button("Open Kindle").performClick()
         val started = shadowOf(app).nextStartedActivity
         assertEquals(EditionIntents.KINDLE_PACKAGE, started.component?.packageName ?: started.`package`)
 
-        card.performSemanticsAction(SemanticsActions.OnClick)
+        button("See what's inside").performClick()
+        assertEquals(id, opened)
+    }
+
+    @Test
+    fun tappingASentCardAnywhereOpensTheEdition() {
+        val id = edition(EditionStatus.DELIVERED)
+        var opened: Long? = null
+        today(Device.KOBO) { opened = it }
+
+        compose.onNode(hasText("Tuesday Morning Edition") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
+
         assertEquals(id, opened)
     }
 
@@ -135,6 +147,7 @@ class SentEditionActionsTest {
         edition(EditionStatus.DELIVERED)
         today(Device.KINDLE)
 
+        button("See what's inside").assertExists()
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
     }
 
@@ -166,21 +179,18 @@ class SentEditionActionsTest {
         edition(EditionStatus.DELIVERED)
         today(Device.BOOX)
 
-        button("Open").assertExists()
+        assertTrue(leftOf("Open", "See what's inside"))
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
         compose.onNodeWithText("Send again").assertDoesNotExist()
     }
 
     @Test
-    fun aKoboReadersSentCardHasNoButtonsButOpensTheEditionWhenTapped() {
+    fun aKoboReadersSentCardHasOnlyWhatsInside() {
         installKindle()
-        val id = edition(EditionStatus.DELIVERED)
-        var opened: Long? = null
-        today(Device.KOBO) { opened = it }
+        edition(EditionStatus.DELIVERED)
+        today(Device.KOBO)
 
-        card.performSemanticsAction(SemanticsActions.OnClick)
-        assertEquals(id, opened)
-        compose.onNodeWithText("See what's inside").assertDoesNotExist()
+        button("See what's inside").assertExists()
         compose.onNodeWithText("Open").assertDoesNotExist()
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
     }

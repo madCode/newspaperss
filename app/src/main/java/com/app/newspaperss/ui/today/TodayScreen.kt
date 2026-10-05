@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -287,6 +288,7 @@ private fun LatestEdition(
     ) {
         Column(Modifier.padding(16.dp)) {
             val sent = edition.status == EditionStatus.DELIVERED
+            val inside = edition.articleCount > 0
             Row {
                 Column(Modifier.weight(1f)) {
                     Text(edition.title, style = MaterialTheme.typography.headlineSmall)
@@ -299,6 +301,10 @@ private fun LatestEdition(
                 // the touch target stays 48dp.
                 // Without its book there's nothing to send or take back.
                 if (sent && hasFile) SentEditionMenu(edition.title, onSend, onNotSent, Modifier.offset(x = 12.dp, y = (-12).dp))
+            }
+            // The whole card opens the contents too, but nothing about a card says so. A sent edition has a button for it instead.
+            if (!sent && inside && edition.status != EditionStatus.BUILDING) {
+                TextButton(onClick = onDetails, contentPadding = PaddingValues(0.dp)) { Text("See what's inside") }
             }
             // Only for an edition that is or was on its way: a failed one's articles go back to wait.
             if (edition.status == EditionStatus.READY || sent) Headlines(articles)
@@ -337,11 +343,22 @@ private fun LatestEdition(
                 }
                 EditionStatus.DELIVERED -> {
                     sentToKindle?.let { KindleNote(it) }
-                    // What's next is reading it: in the Kindle app, or on the phone where it opens here.
-                    // The contents are the card itself, and sending again is rare, so it waits in the menu.
-                    when {
-                        kindleReader -> OpenKindleButton(Modifier.padding(top = 12.dp))
-                        offerOpen -> Button(onClick = onOpen, modifier = Modifier.padding(top = 12.dp)) { Text("Open") }
+                    // What's next is reading it: on the phone where it opens here, otherwise a look at
+                    // the contents. Sending again is rare, so it waits in the menu.
+                    // Spaced per button, so a row left empty (no Kindle app, nothing inside) takes no room.
+                    val top = Modifier.padding(top = 12.dp)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        when {
+                            kindleReader -> {
+                                if (inside) Button(onClick = onDetails, modifier = top) { Text("See what's inside") }
+                                OpenKindleButton(top)
+                            }
+                            offerOpen -> {
+                                Button(onClick = onOpen, modifier = top) { Text("Open") }
+                                if (inside) OutlinedButton(onClick = onDetails, modifier = top) { Text("See what's inside") }
+                            }
+                            inside -> Button(onClick = onDetails, modifier = top) { Text("See what's inside") }
+                        }
                     }
                 }
                 EditionStatus.FAILED -> {

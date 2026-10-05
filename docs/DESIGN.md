@@ -424,18 +424,22 @@ whose Kindle and KOReader answers ask for more on the same page).
 
 - **Today** (home): when the next edition is due, how many starred articles
   will go in the next one (only when some will), and the latest edition's
-  card. Tapping anywhere on the card opens the edition.
+  card. Tapping anywhere on the card opens the edition, as does its **See
+  what's inside**.
   - The card previews what's inside, as the book's contents page opens: the
     first three headlines in order, each with its source (★ if you starred
     it) and reading time, then "and N more". A failed edition shows none:
     its articles went back to wait.
-  - A ready edition has **Send**, **Open** and **I've sent it**. The line
+  - A ready edition has **See what's inside** under its title, then
+    **Send**, **Open** and **I've sent it**. The line
     under the buttons says what counts as sent: choosing an app, or, with
     email to a Kindle, opening the mail app.
-  - Once it's sent, the card is about reading it: a Kindle reader gets
-    **Open Kindle** when the Kindle app is on the phone, and a reader who
-    opens books here (Boox, PocketBook, KOReader, other) gets **Open**. A
-    Kobo reader gets no button: the card itself opens the contents.
+  - Once it's sent, the card is about reading it:
+    - a Kindle reader gets **See what's inside**, then **Open Kindle** when
+      the Kindle app is on the phone;
+    - a reader who opens books here (Boox, PocketBook, KOReader, other) gets
+      **Open**, then **See what's inside**;
+    - a Kobo reader gets **See what's inside**.
 
   **Send again** and **Didn't arrive? Mark as not sent** are rare, so they
   sit in a ⋮ menu at the card's top right ("More options for" the
@@ -447,7 +451,8 @@ whose Kindle and KOReader answers ask for more on the same page).
   went wrong. Earlier editions are listed below. Kindle and Kobo readers
   aren't offered **Open**, here or on an edition's page: it opens the book
   on the phone, and they get it by sending it.
-- **Edition:** the same buttons as Today's card, and its contents. Its ⋮ menu has **Send again** and
+- **Edition:** the same buttons as Today's card, less **See what's inside**
+  (this page is it), and its contents. Its ⋮ menu has **Send again** and
   **Didn't arrive? Mark as not sent** once it's sent, above **Delete
   edition**. Tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
