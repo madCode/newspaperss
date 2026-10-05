@@ -171,6 +171,12 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
 .lead-thin { margin-top: 12px; border-top: 1px solid var(--outline); padding-top: 10px; }
 .lead-plain .underlist, .lead-thin .underlist { border-top: 0; padding-top: 4px; }
 .lead-thin2 .underlist { border-top: 1px solid var(--outline); }
+/* Phones pinned to the app's day or night palette, whatever the page's own theme. */
+.phone.day { --newsprint: #F7F4EC; --ink: #1C1B1A; --ink-soft: #4A4740; --card: #E4DDCC; --outline: #948D80; --accent: #8C2F1B; --on-accent: #FFFFFF; --frame: #2B2926; color-scheme: light; color: var(--ink); }
+.phone.night { --newsprint: #161514; --ink: #E9E4D8; --ink-soft: #CBC5B8; --card: #363330; --outline: #7A746A; --accent: #E8A594; --on-accent: #3B0D02; --frame: #4A4641; color-scheme: dark; color: var(--ink); }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 360px)); gap: 14px; }
+.pair .cap2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
+.both .option { grid-column: 1 / -1; }
 .photo { aspect-ratio: 16 / 9; max-width: 100%; margin-top: 10px; filter: grayscale(1);
   background:
     radial-gradient(circle at 30% 45%, transparent 18%, #2a2a2a 19%, #2a2a2a 22%, transparent 23%),
@@ -191,6 +197,11 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
       <div class="seg" role="group" aria-label="Card state">
         <button type="button" id="st-ready" aria-pressed="true" data-state="ready">Ready to send</button>
         <button type="button" id="st-sent" aria-pressed="false" data-state="sent">Sent</button>
+      </div>
+      <div class="seg" role="group" aria-label="Phone theme">
+        <button type="button" data-theme-pick="day" aria-pressed="false">Day</button>
+        <button type="button" data-theme-pick="night" aria-pressed="false">Night</button>
+        <button type="button" data-theme-pick="both" aria-pressed="true">Both</button>
       </div>
       <div class="seg"><button type="button" id="marks" aria-pressed="false">Mark what's new</button></div>
     </div>
@@ -256,7 +267,8 @@ const more = n => `<div class="more">and ${n} more ›</div>`;
 const PICKED = ARTICLES.find(a => a.star) || ARTICLES.reduce((a, b) => (b.m > a.m ? b : a));
 const rest = lead => ARTICLES.filter(a => a !== lead);
 
-function shell(o, state) {
+let THEME = "both";
+function shell(o, state, theme = "") {
   const status = state === "ready" ? "ready to send" : "sent";
   const actions = state === "ready"
     ? `<div class="btns"><span class="btn fill">Send</span></div>
@@ -265,7 +277,7 @@ function shell(o, state) {
     : o.now ? `<div class="btns"><span class="btn fill">See what's inside</span></div>` : "";
   const top = o.top ? o.top(state) : `<div class="title">${TITLE}</div><div class="summary">${ARTICLES.length} articles · about ${TOTAL} min · ${status}</div>`;
   return `
-  <div class="phone" aria-hidden="true"><div class="screen">
+  <div class="phone ${theme}" aria-hidden="true"><div class="screen">
     ${o.mast ? o.mast(state) : `<div class="mast"><div class="name">newspapeRSS</div><hr><div class="date">Thursday, October 1, 2026</div><hr class="thin"></div>
     <div class="next">Next edition: tomorrow at 6:30</div>`}
     <div class="card ${o.cardClass || ""} ${o.now ? "" : "tap"}">
@@ -524,7 +536,9 @@ const ROUND1 = [
 const option = (o, state) => `
   <article class="option">
     <h2>${o.name} <span class="tag ${o.rec ? "rec" : ""}">${o.tag}</span></h2>
-    ${shell(o, state)}
+    ${THEME === "both"
+      ? `<div class="pair"><div><div class="cap2">Day</div>${shell(o, state, "day")}</div><div><div class="cap2">Night</div>${shell(o, state, "night")}</div></div>`
+      : shell(o, state, THEME)}
     <div class="notes">
       <p>${o.idea}</p>
       <div class="label">Good</div><ul>${o.good.map(g => `<li>${g}</li>`).join("")}</ul>
@@ -532,25 +546,39 @@ const option = (o, state) => `
     </div>
   </article>`;
 
+let currentState = "ready";
 function render(state) {
+  currentState = state;
   document.getElementById("grid5").innerHTML = ROUND5.map(o => option(o, state)).join("");
   document.getElementById("grid4").innerHTML = ROUND4.map(o => option(o, state)).join("");
   document.getElementById("grid3").innerHTML = ROUND3.map(o => option(o, state)).join("");
   document.getElementById("grid2").innerHTML = ROUND2.map(o => option(o, state)).join("");
   document.getElementById("grid1").innerHTML = ROUND1.map(o => option(o, state)).join("");
-  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.state === state)));
+  document.querySelectorAll(".seg button[data-state]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.state === state)));
   try { localStorage.setItem("cardState", state); } catch (e) {}
 }
-document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => render(b.dataset.state)));
+document.querySelectorAll(".seg button[data-state]").forEach(b => b.addEventListener("click", () => render(b.dataset.state)));
 const marks = document.getElementById("marks");
 marks.addEventListener("click", () => {
   const on = !document.body.classList.contains("marks");
   document.body.classList.toggle("marks", on);
   marks.setAttribute("aria-pressed", String(on));
 });
+document.querySelectorAll("[data-theme-pick]").forEach(b => b.addEventListener("click", () => {
+  THEME = b.dataset.themePick;
+  try { localStorage.setItem("phoneTheme", THEME); } catch (e) {}
+  applyTheme();
+}));
+function applyTheme() {
+  document.body.classList.toggle("both", THEME === "both");
+  document.querySelectorAll("[data-theme-pick]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.themePick === THEME)));
+  render(currentState);
+}
 let initial = "ready";
 try { initial = localStorage.getItem("cardState") === "sent" ? "sent" : "ready"; } catch (e) {}
-render(initial);
+try { const t = localStorage.getItem("phoneTheme"); if (t === "day" || t === "night" || t === "both") THEME = t; } catch (e) {}
+currentState = initial;
+applyTheme();
 </script>
 </body>
 </html>
