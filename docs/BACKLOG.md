@@ -55,6 +55,11 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Boox: consider turning off ripples on e-ink (they cause partial refreshes); Boox's own refresh modes may make it moot
 
 ### Today
+- [ ] Streamline the buttons on Today's card and the edition page across devices *(you asked)*. Each device gets its own mix today:
+  - Ready: Kindle and Kobo get **Send**; a Boox gets **Open** then **Send**; PocketBook, KOReader and other get **Send** then **Open**. All get **I've sent it** and a line on what counts as sent, worded three ways (choosing an app, opening the mail app for email to a Kindle, opening it here)
+  - Sent: Kindle gets **See what's inside** then **Open Kindle** (if the app is installed); Boox, PocketBook, KOReader and other get **Open** then **See what's inside**; Kobo gets **See what's inside**
+  - The edition page repeats these less **See what's inside**; **Send again** and **Mark as not sent** sit in ⋮ menus on both
+  - A reference point: the first build of the headline card had no **See what's inside** anywhere, since the whole card opens the edition. A sent card was then **Open Kindle** for a Kindle, **Open** for a Boox and others, and nothing for a Kobo. Round 7 of [research/edition-card/](research/edition-card/index.html) lays the states and devices side by side
 - [ ] Check in a few weeks: is a ready card fine without **See what's inside**? It was taken off once the card showed headlines and opened on a tap; a sent card keeps it. If it's missed, the mockups' round 7 has it back in place, or as a link line under the headlines *(you asked)*
 - [ ] Today's card as the paper's front page *(you asked)*. The card now shows its first three headlines in the book's order. Explored further ([research/edition-card/](research/edition-card/index.html), open it in a browser):
   - F2c: a lead story (your star, otherwise the longest read) over the next two; built, then set aside for the plainer list, as the lead competed with the edition's title
