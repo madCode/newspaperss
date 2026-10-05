@@ -127,6 +127,16 @@ class SentEditionActionsTest {
     }
 
     @Test
+    fun openKindleNeedsNoBook() {
+        installKindle()
+        val id = edition(EditionStatus.DELIVERED)
+        editionsDir.resolve("e.epub").delete()
+        today(Device.KINDLE, sentToKindle = mapOf(id to KindleSend.APP))
+
+        button("Open Kindle").assertIsEnabled()
+    }
+
+    @Test
     fun laterTheKindleAppMovesToTheMenu() {
         installKindle()
         edition(EditionStatus.DELIVERED)

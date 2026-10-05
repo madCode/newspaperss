@@ -2,6 +2,7 @@ package com.app.newspaperss.ui
 
 import android.app.Application
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -77,6 +78,14 @@ class TodayHeadlinesTest {
 
         // Merged into the card, TalkBack would read it before Send instead of just before Mark as sent.
         compose.onNodeWithText("Sent it another way?").assertHasNoClickAction()
+    }
+
+    @Test
+    fun aReadyCardWhoseFileIsGoneSaysWhySendIsOff() {
+        today(EditionStatus.READY)
+
+        compose.onNodeWithText("Send").assertIsNotEnabled()
+        compose.onNodeWithText("This edition's file has been deleted, so it can't be sent.").assertExists()
     }
 
     @Test

@@ -335,6 +335,15 @@ private fun LatestEdition(
                         )
                     }
                     choices.next?.let { NextStepButton(it, enabled = hasFile, onSend, onOpen, kindleApp, Modifier.padding(top = 12.dp)) }
+                    // Says why Send is greyed out, as the edition's page does.
+                    if (!hasFile) {
+                        Text(
+                            "This edition's file has been deleted, so it can't be sent.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp).semantics(mergeDescendants = true) {},
+                        )
+                    }
                     MarkAsSentLine(preferOpen, onSent, Modifier.padding(top = 4.dp))
                 }
                 EditionStatus.DELIVERED -> {

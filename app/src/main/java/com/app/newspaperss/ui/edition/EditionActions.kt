@@ -141,7 +141,8 @@ fun NextStepButton(
         NextStep.READ_NOW, NextStep.READ -> onOpen
         NextStep.OPEN_KINDLE -> { { startKindle(context, kindleApp) } }
     }
-    Button(onClick = onClick, enabled = enabled, modifier = modifier) { Text(step.label) }
+    // The Kindle app doesn't need the book, so it opens even when the file is gone.
+    Button(onClick = onClick, enabled = enabled || step == NextStep.OPEN_KINDLE, modifier = modifier) { Text(step.label) }
 }
 
 /** For a send this app can't see: one line, its answer a link-sized button beside it. */

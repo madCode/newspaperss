@@ -80,7 +80,7 @@ class Notifier(private val context: Context) : EditionNotifier {
                 .addExtras(bundleOf(EXTRA_EDITION to edition.id))
                 .setContentTitle("${edition.title} is ready")
                 .setContentText(summary(edition))
-                .addAction(0, if (openInstead) "Open" else "Send", action),
+                .addAction(0, if (openInstead) "Read now" else "Send", action),
         )
     }
 

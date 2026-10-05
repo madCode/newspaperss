@@ -665,7 +665,7 @@ whose Kindle and KOReader answers ask for more on the same page).
     **Start fresh**, and **Resume** if the account was paused.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
-    delivered, by share, folder or Open, in the background so a slow cloud folder
+    delivered, by share, folder or Read now, in the background so a slow cloud folder
     doesn't hold up delivery. A folder that refuses the file gets a notification;
     **Notes** on the edition still shares them. It can be the delivery folder too;
     changing one folder never drops the app's access to the other.
