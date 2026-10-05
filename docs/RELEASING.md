@@ -55,8 +55,10 @@ The store text and screenshots come from `fastlane/metadata/android/en-US/`.
 - **Signing:** turn on Play App Signing and upload the AAB from the draft
   release. The key in the secrets above becomes your upload key.
 - **The listing:** the same text and screenshots as `fastlane/`, the icon at
-  `fastlane/metadata/android/en-US/images/icon.png`, and a 1024×500 feature
-  graphic (not made yet).
+  `fastlane/metadata/android/en-US/images/icon.png`, and the 1024×500 feature
+  graphic at `images/featureGraphic.png` beside it. Its source is
+  [docs/store/featureGraphic.html](store/featureGraphic.html): open it in a
+  browser at 1024×500 and screenshot it to change it.
 - **Forms:** Data safety (nothing collected or shared), the content rating
   questionnaire, the target audience, and the privacy policy:
   https://github.com/madCode/newspaperss/blob/main/docs/PRIVACY.md
