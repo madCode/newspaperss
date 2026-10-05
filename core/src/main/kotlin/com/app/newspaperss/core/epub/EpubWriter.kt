@@ -24,7 +24,8 @@ object EpubWriter {
     private const val COVER = "cover.xhtml"
     private const val CONTENTS = "contents.xhtml"
     private const val END = "end.xhtml"
-    private const val END_TITLE = "That's all for today"
+    /** The closing page's heading; the app's preview ends the last article with it too. */
+    const val END_TITLE = "That's all for today"
     /** Articles at least this long are followed by a line naming the next one. */
     const val NEXT_AFTER_MINUTES = 5.0
     private const val COVER_IMAGE_ID = "cover-image"
