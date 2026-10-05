@@ -85,7 +85,7 @@ class EditionSentTest {
         runBlocking { assertTrue(editions.markNotSent(id)) }
         assertEquals(emptyMap<Long, KindleSend>(), runBlocking { recent.first() })
 
-        // Sent by hand ("I've sent it", or Open on a Boox): the note mustn't come back.
+        // Sent by hand (Mark as sent, or Read now on a Boox): the note mustn't come back.
         runBlocking { editions.markSent(id, EditionIntents.KINDLE_PACKAGE); editions.markNotSent(id); editions.markSent(id) }
         assertEquals(EditionStatus.DELIVERED, statusOf(id))
         assertEquals(emptyMap<Long, KindleSend>(), runBlocking { recent.first() })

@@ -214,7 +214,8 @@ class EditionDetailScreenTest {
     fun openingOnAPhoneDoesntCountAsDelivered() {
         val (onPhone, _) = edition(EditionStatus.READY, listOf("A story"))
         show(onPhone)
-        compose.onNodeWithText("Open").performClick()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Open on this phone").performClick()
         assertEquals(Intent.ACTION_VIEW, shadowOf(ApplicationProvider.getApplicationContext<Application>()).nextStartedActivity.action)
         assertEquals("a phone may just be previewing it", EditionStatus.READY, runBlocking { db.editions().byId(onPhone) }?.status)
     }
@@ -225,7 +226,8 @@ class EditionDetailScreenTest {
         val (id, _) = edition(EditionStatus.READY, listOf("A story"))
         show(id, offerOpen = Device.KINDLE.offersOpen)
         compose.onNodeWithText("Send").assertExists()
-        compose.onNodeWithText("Open").assertDoesNotExist()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Open on this phone").assertDoesNotExist()
     }
 
     @Test
@@ -242,7 +244,7 @@ class EditionDetailScreenTest {
         val (id, articles) = edition(EditionStatus.READY, listOf("A story"))
         show(id, preferOpen = true)
 
-        compose.onNodeWithText("Open").performClick()
+        compose.onNodeWithText("Read now").performClick()
 
         idleUntil { runBlocking { db.editions().byId(id) }?.status == EditionStatus.DELIVERED }
         assertEquals(ArticleState.DELIVERED, runBlocking { db.articles().byId(articles[0]) }?.state)
@@ -253,7 +255,7 @@ class EditionDetailScreenTest {
         val (id, articles) = edition(EditionStatus.READY, listOf("A story"))
         show(id)
 
-        compose.onNodeWithText("I've sent it").performClick()
+        compose.onNodeWithText("Mark as sent").performClick()
 
         waitFor("Sent")
         assertEquals(EditionStatus.DELIVERED, runBlocking { db.editions().byId(id) }?.status)
@@ -266,9 +268,10 @@ class EditionDetailScreenTest {
         show(id)
 
         compose.onNodeWithText("Send").assertIsNotEnabled()
-        compose.onNodeWithText("Open").assertIsNotEnabled()
         compose.onNodeWithText("has been deleted", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("I've sent it").assertIsEnabled()
+        compose.onNodeWithText("Mark as sent").assertIsEnabled()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Open on this phone").assertDoesNotExist()
     }
 
     @Test
@@ -537,7 +540,7 @@ class EditionDetailScreenTest {
 
         idleUntil { statusOf(id) == EditionStatus.READY }
         assertEquals(ArticleState.IN_EDITION, runBlocking { db.articles().byId(articles[0]) }?.state)
-        waitFor("I've sent it")
+        waitFor("Mark as sent")
         compose.onNodeWithText("Send").assertExists()
     }
 
@@ -546,7 +549,7 @@ class EditionDetailScreenTest {
         val (id, _) = edition(EditionStatus.DELIVERED, listOf("A story"), withFile = false)
         show(id)
         compose.onNodeWithContentDescription("More options").performClick()
-        compose.onNodeWithText("Send again").assertIsNotEnabled()
+        compose.onNodeWithText("Send again").assertDoesNotExist()
         compose.onNodeWithText(MARK_NOT_SENT).assertDoesNotExist()
     }
 
@@ -560,7 +563,7 @@ class EditionDetailScreenTest {
         markNotSent(todaysOptions)
 
         idleUntil { statusOf(id) == EditionStatus.READY }
-        waitFor("I've sent it")
+        waitFor("Mark as sent")
     }
 
     @Test
@@ -577,7 +580,7 @@ class EditionDetailScreenTest {
 
         // Marked as not sent, it's waiting to be sent again: the note would contradict that.
         markNotSent(todaysOptions)
-        waitFor("I've sent it")
+        waitFor("Mark as sent")
         compose.onNodeWithText(KINDLE_NOTE).assertDoesNotExist()
     }
 

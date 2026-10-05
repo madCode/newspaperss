@@ -72,11 +72,19 @@ class TodayHeadlinesTest {
     }
 
     @Test
-    fun whatCountsAsSentIsItsOwnTalkBackStopNotPartOfTheCard() {
+    fun sentItAnotherWayIsItsOwnTalkBackStopNotPartOfTheCard() {
         today(EditionStatus.READY)
 
-        // Merged into the card, TalkBack would read it before Send instead of between Send and I've sent it.
-        compose.onNodeWithText("counts as sent", substring = true).assertHasNoClickAction()
+        // Merged into the card, TalkBack would read it before Send instead of just before Mark as sent.
+        compose.onNodeWithText("Sent it another way?").assertHasNoClickAction()
+    }
+
+    @Test
+    fun aSentCardWithNoButtonEndsInALinkLine() {
+        today(EditionStatus.DELIVERED)
+
+        compose.onNodeWithText("and 2 more ›").assertExists()
+        compose.onNodeWithText("and 2 more").assertDoesNotExist()
     }
 
     @Test

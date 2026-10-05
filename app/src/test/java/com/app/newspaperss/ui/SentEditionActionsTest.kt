@@ -106,29 +106,36 @@ class SentEditionActionsTest {
 
     private fun button(text: String) = compose.onNode(hasText(text) and hasClickAction())
 
-    private fun leftOf(first: String, second: String) =
-        button(first).fetchSemanticsNode().boundsInRoot.left < button(second).fetchSemanticsNode().boundsInRoot.left
-
     private fun statusOf(id: Long) = runBlocking { db.editions().byId(id) }?.status
 
+    private fun startedPackage() = shadowOf(app).nextStartedActivity.let { it.component?.packageName ?: it.`package` }
+
+    private fun menu(vararg items: String) {
+        compose.onNodeWithContentDescription(options).performClick()
+        items.forEach { compose.onNodeWithText(it).assertExists() }
+    }
+
     @Test
-    fun aKindleReadersSentCardLeadsWithWhatsInsideThenTheKindleApp() {
+    fun justAfterASendAKindleReadersCardOffersTheKindleApp() {
         installKindle()
         val id = edition(EditionStatus.DELIVERED)
-        var opened: Long? = null
-        today(Device.KINDLE) { opened = it }
+        today(Device.KINDLE, sentToKindle = mapOf(id to KindleSend.APP))
 
-        compose.onNodeWithText("Send again").assertDoesNotExist()
-        compose.onNodeWithText(MARK_NOT_SENT).assertDoesNotExist()
-        compose.onNodeWithText("Open").assertDoesNotExist()
-        assertTrue(leftOf("See what's inside", "Open Kindle"))
-
+        compose.onNodeWithText("See what's inside").assertDoesNotExist()
         button("Open Kindle").performClick()
-        val started = shadowOf(app).nextStartedActivity
-        assertEquals(EditionIntents.KINDLE_PACKAGE, started.component?.packageName ?: started.`package`)
+        assertEquals(EditionIntents.KINDLE_PACKAGE, startedPackage())
+    }
 
-        button("See what's inside").performClick()
-        assertEquals(id, opened)
+    @Test
+    fun laterTheKindleAppMovesToTheMenu() {
+        installKindle()
+        edition(EditionStatus.DELIVERED)
+        today(Device.KINDLE)
+
+        compose.onNodeWithText("Open Kindle").assertDoesNotExist()
+        menu("Send again", MARK_NOT_SENT)
+        compose.onNodeWithText("Open the Kindle app").performClick()
+        assertEquals(EditionIntents.KINDLE_PACKAGE, startedPackage())
     }
 
     @Test
@@ -144,18 +151,19 @@ class SentEditionActionsTest {
 
     @Test
     fun withoutTheKindleAppThereIsNoOpenKindle() {
-        edition(EditionStatus.DELIVERED)
-        today(Device.KINDLE)
+        val id = edition(EditionStatus.DELIVERED)
+        today(Device.KINDLE, sentToKindle = mapOf(id to KindleSend.APP))
 
-        button("See what's inside").assertExists()
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
+        menu("Send again")
+        compose.onNodeWithText("Open the Kindle app").assertDoesNotExist()
     }
 
     @Test
     fun openKindleAfterTheAppWasRemovedSaysSoAndGoesAway() {
         installKindle()
-        edition(EditionStatus.DELIVERED)
-        today(Device.KINDLE)
+        val id = edition(EditionStatus.DELIVERED)
+        today(Device.KINDLE, sentToKindle = mapOf(id to KindleSend.APP))
         shadowOf(app.packageManager).deletePackage(EditionIntents.KINDLE_PACKAGE)
         // A real phone refuses to start a removed app.
         shadowOf(app).checkActivities(true)
@@ -175,24 +183,24 @@ class SentEditionActionsTest {
     }
 
     @Test
-    fun aBooxReadersSentCardLeadsWithOpen() {
+    fun aBooxReadersSentCardOffersRead() {
         edition(EditionStatus.DELIVERED)
         today(Device.BOOX)
 
-        assertTrue(leftOf("Open", "See what's inside"))
-        compose.onNodeWithText("Open Kindle").assertDoesNotExist()
+        button("Read").performClick()
+        assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity.action)
+        compose.onNodeWithText("See what's inside").assertDoesNotExist()
         compose.onNodeWithText("Send again").assertDoesNotExist()
     }
 
     @Test
-    fun aKoboReadersSentCardHasOnlyWhatsInside() {
+    fun aKoboReadersSentCardHasNoButtonAndEndsInALink() {
         installKindle()
         edition(EditionStatus.DELIVERED)
         today(Device.KOBO)
 
-        button("See what's inside").assertExists()
-        compose.onNodeWithText("Open").assertDoesNotExist()
-        compose.onNodeWithText("Open Kindle").assertDoesNotExist()
+        compose.onNodeWithText("See what's inside ›").assertExists()
+        listOf("Open", "Open Kindle", "Read", "See what's inside").forEach { compose.onNode(hasText(it) and hasClickAction()).assertDoesNotExist() }
     }
 
     @Test
@@ -209,16 +217,48 @@ class SentEditionActionsTest {
     }
 
     @Test
-    fun aReadyOrFailedCardKeepsItsButtonsAndHasNoMenu() {
+    fun aReadyCardHasOneButtonAndMarkAsSent() {
         val id = edition(EditionStatus.READY)
         today(Device.KINDLE)
         button("Send").assertExists()
-        compose.onNodeWithText("I've sent it").assertExists()
+        compose.onNodeWithText("I've sent it").assertDoesNotExist()
         compose.onNodeWithContentDescription(options).assertDoesNotExist()
 
-        runBlocking { db.editions().update(db.editions().byId(id)!!.copy(status = EditionStatus.FAILED, error = EditionBuilder.UNEXPECTED)) }
-        idleUntil { compose.waitForIdle(); compose.onAllNodes(hasText("Try again")).fetchSemanticsNodes().isNotEmpty() }
+        button("Mark as sent").performClick()
+        idleUntil { statusOf(id) == EditionStatus.DELIVERED }
+    }
+
+    @Test
+    fun aFailedCardHasNoMenu() {
+        edition(EditionStatus.FAILED, error = EditionBuilder.UNEXPECTED)
+        today(Device.KINDLE)
+        compose.onNodeWithText("Try again").assertExists()
         compose.onNodeWithContentDescription(options).assertDoesNotExist()
+    }
+
+    @Test
+    fun aPocketBookReaderCanStillOpenAReadyEditionOnThePhoneWithoutItCountingAsSent() {
+        val id = edition(EditionStatus.READY)
+        today(Device.POCKETBOOK)
+        compose.onNodeWithText("Open").assertDoesNotExist()
+
+        menu("Open on this phone")
+        compose.onNodeWithText("Open on this phone").performClick()
+
+        assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity.action)
+        assertEquals(EditionStatus.READY, statusOf(id))
+    }
+
+    @Test
+    fun aBooxReaderReadsNowAndThatCountsAsSent() {
+        val id = edition(EditionStatus.READY)
+        today(Device.BOOX)
+        compose.onNodeWithText("Read it another way?").assertExists()
+
+        button("Read now").performClick()
+
+        assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity.action)
+        idleUntil { statusOf(id) == EditionStatus.DELIVERED }
     }
 
     @Test
@@ -257,18 +297,19 @@ class SentEditionActionsTest {
     }
 
     @Test
-    fun aSentEditionsPageOffersAKindleReaderTheKindleApp() {
+    fun aSentEditionsPageKeepsTheKindleAppInItsMenu() {
         installKindle()
         page(edition(EditionStatus.DELIVERED), Device.KINDLE)
-        button("Open Kindle").assertExists()
-        compose.onNodeWithText("Open").assertDoesNotExist()
+        compose.onNodeWithText("Open Kindle").assertDoesNotExist()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Open the Kindle app").assertExists()
     }
 
     @Test
-    fun aSentEditionsPageOffersABooxReaderOpen() {
+    fun aSentEditionsPageOffersABooxReaderRead() {
         installKindle()
         page(edition(EditionStatus.DELIVERED), Device.BOOX)
-        button("Open").assertExists()
+        button("Read").assertExists()
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
     }
 }
