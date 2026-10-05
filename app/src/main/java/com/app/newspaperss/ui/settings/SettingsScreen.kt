@@ -1,17 +1,21 @@
 package com.app.newspaperss.ui.settings
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -61,6 +65,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -69,6 +74,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -119,11 +125,21 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpen: (SettingsPage) -> Unit)
             }
             val context = LocalContext.current
             val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
+            val line = "newspapeRSS $version"
+            val copy = {
+                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("newspapeRSS version", line))
+                // On every version: an e-reader's Android may show no clipboard notice of its own.
+                Toast.makeText(context, "Version copied", Toast.LENGTH_SHORT).show()
+            }
             Text(
-                "newspapeRSS $version",
+                line,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 16.dp),
+                // Long press only, for a bug report: a tap does nothing, so it isn't announced as a button.
+                modifier = Modifier
+                    .pointerInput(line) { detectTapGestures(onLongPress = { copy() }) }
+                    .semantics { onLongClick("copy version") { copy(); true } }
+                    .padding(vertical = 16.dp),
             )
         }
     }
