@@ -380,7 +380,7 @@ private fun FrontPagePreview(page: FrontPage) {
     )
     Text(
         lead.title,
-        style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp),
+        style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp, lineHeight = 24.sp),
         maxLines = 3,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.padding(top = 2.dp),
