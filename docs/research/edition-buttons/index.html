@@ -110,7 +110,7 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
   <section class="rules">
     <h2>The proposal in four rules</h2>
     <ul>
-      <li><b>One filled button per card:</b> the next step, named for where the edition goes ("Send to Kobo", "Read now").</li>
+      <li><b>One filled button per card:</b> the next step. That's <b>Send</b> for every device that sends; the name changes only where the action does: <b>Read now</b> on a Boox with the app on it, <b>Open Kindle</b> once sent.</li>
       <li><b>The card opens the contents.</b> No "See what's inside" button; a card with no button ends in a link, "and 5 more ›".</li>
       <li><b>Everything rare is in ⋮</b>, on every card: open on this phone, send another way, send again, mark as not sent.</li>
       <li><b>One short line replaces the paragraph and "I've sent it":</b> "Sent it another way? Mark as sent."</li>
@@ -123,14 +123,14 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
     <h2>Beyond the card</h2>
     <ul>
       <li><b>The edition page</b> gets the same button and the same ⋮ as the card, so the two screens never disagree. Its ⋮ adds Delete edition.</li>
-      <li><b>Boox:</b> the app checks whether it runs on a Boox (Android reports the maker as Onyx). On the Boox it offers Read now; on a phone it offers Send to Boox, so opening a copy on the phone can't mark an edition as sent when it never reached the Boox.</li>
+      <li><b>Boox:</b> the app checks whether it runs on a Boox (Android reports the maker as Onyx). On the Boox it offers Read now; on a phone it offers Send, so opening a copy on the phone can't mark an edition as sent when it never reached the Boox.</li>
       <li><b>Notifications</b> already carry one action per device (Send, or Open on a Boox); the same names would carry over.</li>
     </ul>
     <h2>To check before building</h2>
     <ul>
       <li>A ⋮ on a ready card is one more thing on every card. Most readers never open it.</li>
       <li>"Mark as sent" as a link in a sentence is easier to miss than today's button. Most sends are counted on their own, but it needs a TalkBack pass.</li>
-      <li>"Send to Kindle" with email to a Kindle opens the mail app, and without it opens the share sheet. The name holds either way; the line under it may need to say which.</li>
+      <li>Send doesn't say where the edition goes. If people are unsure, the line under it can name the route ("Goes to your Kobo through Dropbox") without making the button longer.</li>
     </ul>
   </section>
 </div>
@@ -154,13 +154,13 @@ const MARK_READ = `Read it another way? <a href="#" onclick="return false">Mark 
 const CASES = [
   { row: "Ready · Kindle", note: "Send emails it to the Kindle (or opens the share sheet). Open is left off: it would open the book on the phone.",
     now: { btns: [["fill", "Send"]], fine: SHARE_LINE, sent: true, menu: null },
-    pro: { btns: [["fill", "Send to Kindle"]], mark: MARK, menu: ["Open on this phone", "Send another way"] } },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone", "Send another way"] } },
   { row: "Ready · Kobo", note: "Send goes to Dropbox, which the Kobo syncs.",
     now: { btns: [["fill", "Send"]], fine: SHARE_LINE, sent: true, menu: null },
-    pro: { btns: [["fill", "Send to Kobo"]], mark: MARK, menu: ["Open on this phone", "Send another way"] } },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone", "Send another way"] } },
   { row: "Ready · PocketBook", note: "Send goes by email to the reader's @pbsync.com address.",
     now: { btns: [["fill", "Send"], ["out", "Open"]], fine: SHARE_LINE, sent: true, menu: null },
-    pro: { btns: [["fill", "Send to PocketBook"]], mark: MARK, menu: ["Open on this phone", "Send another way"] } },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone", "Send another way"] } },
   { row: "Ready · KOReader or something else", note: "Send is the share sheet or a folder; the reader decides where.",
     now: { btns: [["fill", "Send"], ["out", "Open"]], fine: SHARE_LINE, sent: true, menu: null },
     pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone"] } },
@@ -169,7 +169,7 @@ const CASES = [
     pro: { btns: [["fill", "Read now"]], mark: MARK_READ, menu: ["Send another way"] } },
   { row: "Ready · Boox, with the app on a phone", note: "Today this looks like the row above, so Open reads the book on the phone and counts it as sent.",
     now: { btns: [["fill", "Open"], ["out", "Send"]], fine: OPEN_LINE, sent: true, menu: null },
-    pro: { btns: [["fill", "Send to Boox"]], mark: MARK, menu: ["Open on this phone"] } },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone"] } },
   { row: "Sent · Kindle, with the Kindle app on the phone", note: "What's next is reading it in the Kindle app.",
     now: { status: "sent", btns: [["fill", "See what's inside"], ["out", "Open Kindle"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] },
     pro: { status: "sent", btns: [["fill", "Open Kindle"]], menu: ["Send again", "Mark as not sent", "Open on this phone"] } },
