@@ -377,7 +377,7 @@ private fun Headlines(articles: List<EditionArticleEntity>) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     articles.take(SHOWN).forEach { article ->
         Column(Modifier.padding(top = 10.dp)) {
-            // The star is decoration, so TalkBack hears it in words.
+            // TalkBack reads the star as "Starred", not the glyph.
             Text(
                 if (article.starred) "★ ${article.sourceTitle}" else article.sourceTitle,
                 style = MaterialTheme.typography.labelMedium,

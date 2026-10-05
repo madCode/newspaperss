@@ -307,7 +307,7 @@ class ScreenshotTest {
             val now = Instant.parse("2026-09-29T06:30:00Z")
             db.editions().insert(EditionEntity(title = "Monday Morning Edition", createdAt = now.minusSeconds(86_400), status = EditionStatus.DELIVERED, articleCount = 7, minutes = 31.0))
             val latest = db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = now, status = EditionStatus.READY, fileName = "x.epub", articleCount = 8, minutes = 33.4))
-            db.editions().insertArticles(sampleFrontPage(latest))
+            db.editions().insertArticles(sampleArticles(latest))
             val source = db.sources().insert(SourceEntity(url = "https://example.com/feed", title = "The Example Review"))
             (1..2).forEach { db.articles().insertIgnoring(ArticleEntity(sourceId = source, guid = "$it", url = "https://example.com/$it", title = "Starred $it", starredAt = now)) }
         }
@@ -316,7 +316,7 @@ class ScreenshotTest {
     }
 
     /** Eight sample articles for an edition's card, the second one starred. */
-    private fun sampleFrontPage(edition: Long) = listOf(
+    private fun sampleArticles(edition: Long) = listOf(
         "BBC News" to "Flooding forces thousands from their homes in northern Italy" to 3.0,
         "Quanta Magazine" to "The Mathematician Who Counted the Shapes of Knots" to 8.0,
         "Rest of World" to "Why Lagos's ride-hailing drivers built their own app" to 6.0,
@@ -344,7 +344,7 @@ class ScreenshotTest {
             val now = Instant.parse("2026-09-29T06:30:00Z")
             db.editions().insert(EditionEntity(title = "Monday Morning Edition", createdAt = now.minusSeconds(86_400), status = EditionStatus.DELIVERED, articleCount = 7, minutes = 31.0))
             db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = now, status = EditionStatus.DELIVERED, fileName = "x.epub", articleCount = 8, minutes = 33.4, deliveredAt = now))
-                .also { db.editions().insertArticles(sampleFrontPage(it)) }
+                .also { db.editions().insertArticles(sampleArticles(it)) }
         }
         val sent = if (kindleNote) mapOf(latest to KindleSend.APP) else emptyMap()
         val vm = TodayViewModel(EditionRepository(db, files), flowOf(null), settings = flowOf(Settings(device = device)), sentToKindle = flowOf(sent)) {}

@@ -37,12 +37,13 @@ class TodayHeadlinesTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java).allowMainThreadQueries().build()
 
-    private fun today(status: EditionStatus, starred: Int? = null) {
+    private fun today(status: EditionStatus, starred: Int? = null, count: Int = 5) {
         val vm = TodayViewModel(EditionRepository(db, tmp.newFolder()), flowOf(null)) {}
         runBlocking {
-            val id = db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = status, articleCount = 5, minutes = 20.0))
+            val id = db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = status, articleCount = count, minutes = 4.0 * count))
+            // Last first, so the card's order can only come from the positions.
             db.editions().insertArticles(
-                (0 until 5).map { EditionArticleEntity(editionId = id, articleId = null, position = it, title = "Story $it", sourceTitle = "Source $it", minutes = 4.0, starred = it == starred) },
+                (count - 1 downTo 0).map { EditionArticleEntity(editionId = id, articleId = null, position = it, title = "Story $it", sourceTitle = "Source $it", minutes = 4.0, starred = it == starred) },
             )
         }
         compose.setContent { TodayScreen(vm) }
@@ -60,6 +61,14 @@ class TodayHeadlinesTest {
         compose.onNodeWithText("and 2 more").assertExists()
         // TalkBack hears the star in words.
         compose.onNodeWithContentDescription("Starred, Source 1", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun aShortEditionShowsEveryHeadlineAndNoMore() {
+        today(EditionStatus.READY, count = 3)
+
+        compose.onNodeWithText("Story 2").assertExists()
+        compose.onNodeWithText("more", substring = true).assertDoesNotExist()
     }
 
     @Test
