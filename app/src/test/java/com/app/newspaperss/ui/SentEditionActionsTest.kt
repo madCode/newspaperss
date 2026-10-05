@@ -3,6 +3,7 @@ package com.app.newspaperss.ui
 import android.app.Application
 import android.content.Intent
 import android.content.IntentFilter
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasClickAction
@@ -11,6 +12,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -126,6 +128,17 @@ class SentEditionActionsTest {
         assertEquals(EditionIntents.KINDLE_PACKAGE, started.component?.packageName ?: started.`package`)
 
         button("See what's inside").performClick()
+        assertEquals(id, opened)
+    }
+
+    @Test
+    fun tappingASentCardAnywhereOpensTheEdition() {
+        val id = edition(EditionStatus.DELIVERED)
+        var opened: Long? = null
+        today(Device.KOBO) { opened = it }
+
+        compose.onNode(hasText("Tuesday Morning Edition") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
+
         assertEquals(id, opened)
     }
 

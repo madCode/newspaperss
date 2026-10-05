@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -43,9 +44,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.edition.EditionBuilder
@@ -127,6 +131,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 val hasFile = remember(latest.fileName, latest.status) { viewModel.fileOf(latest) != null }
                 LatestEdition(
                     latest,
+                    articles = state.latestArticles,
                     first = editions.size == 1,
                     saidAbove = saidAbove,
                     deviceName = state.deviceName,
@@ -258,6 +263,7 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeB
 @Composable
 private fun LatestEdition(
     edition: EditionEntity,
+    articles: List<EditionArticleEntity>,
     first: Boolean,
     saidAbove: String?,
     deviceName: String,
@@ -274,13 +280,17 @@ private fun LatestEdition(
     onSent: () -> Unit,
     onNotSent: () -> Unit,
 ) {
-    // An outline as well as the tint, which is almost white on e-ink.
-    Card(Modifier.fillMaxWidth().padding(top = 16.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+    // An outline as well as the tint, which is almost white on e-ink. The whole card opens the
+    // edition; the buttons inside it take their own taps.
+    Card(
+        Modifier.fillMaxWidth().padding(top = 16.dp).clip(CardDefaults.shape).clickable(onClickLabel = "See what's inside", onClick = onDetails),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
         Column(Modifier.padding(16.dp)) {
             val sent = edition.status == EditionStatus.DELIVERED
             val inside = edition.articleCount > 0
             Row {
-                Column(Modifier.weight(1f).clickable(onClickLabel = "See what's inside", onClick = onDetails)) {
+                Column(Modifier.weight(1f)) {
                     Text(edition.title, style = MaterialTheme.typography.headlineSmall)
                     // An empty failed edition's summary is just "Not sent", which its error already says.
                     if (!(edition.status == EditionStatus.FAILED && edition.articleCount == 0 && edition.error != null && edition.error != saidAbove)) {
@@ -292,10 +302,10 @@ private fun LatestEdition(
                 // Without its book there's nothing to send or take back.
                 if (sent && hasFile) SentEditionMenu(edition.title, onSend, onNotSent, Modifier.offset(x = 12.dp, y = (-12).dp))
             }
-            // The title opens the contents too, but nothing about it says so. A sent edition has a button for it instead.
-            if (!sent && inside && edition.status != EditionStatus.BUILDING) {
-                TextButton(onClick = onDetails, contentPadding = PaddingValues(0.dp)) { Text("See what's inside") }
-            }
+            // Only for an edition that is or was on its way: a failed one's articles go back to wait.
+            // A ready card has no See what's inside: its headlines show what's in it, and Send is
+            // what's next. The card itself opens the contents.
+            if (edition.status == EditionStatus.READY || sent) Headlines(articles)
             when (edition.status) {
                 EditionStatus.READY -> {
                     if (first) {
@@ -322,7 +332,9 @@ private fun LatestEdition(
                             else -> "Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back."
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 12.dp),
+                        // Its own TalkBack stop, between Send and its answer, I've sent it, rather
+                        // than merged into the card, which TalkBack reads before any button.
+                        modifier = Modifier.padding(top = 12.dp).semantics(mergeDescendants = true) {},
                     )
                     // No start padding, so it lines up with the text above rather than sitting indented.
                     TextButton(onClick = onSent, contentPadding = PaddingValues(end = 12.dp)) { Text("I've sent it") }
@@ -349,7 +361,8 @@ private fun LatestEdition(
                 }
                 EditionStatus.FAILED -> {
                     val error = edition.error ?: "This edition couldn't be made."
-                    if (error != saidAbove) Text(error, color = failureColor(edition.error), modifier = Modifier.padding(top = 8.dp))
+                    // Its own stop too, so it's read just before Try again.
+                    if (error != saidAbove) Text(error, color = failureColor(edition.error), modifier = Modifier.padding(top = 8.dp).semantics(mergeDescendants = true) {})
                     OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") }
                 }
                 EditionStatus.BUILDING, EditionStatus.DELETED -> {}
@@ -357,6 +370,33 @@ private fun LatestEdition(
         }
     }
 }
+
+/** The edition's first [SHOWN] articles in the book's order, as its contents page opens, and how many more. */
+@Composable
+private fun Headlines(articles: List<EditionArticleEntity>) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    articles.take(SHOWN).forEach { article ->
+        Column(Modifier.padding(top = 10.dp)) {
+            // TalkBack reads the star as "Starred", not the glyph.
+            Text(
+                if (article.starred) "★ ${article.sourceTitle}" else article.sourceTitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = muted,
+                modifier = Modifier.clearAndSetSemantics { contentDescription = if (article.starred) "Starred, ${article.sourceTitle}" else article.sourceTitle },
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(article.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(minutes(article.minutes), style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(start = 12.dp))
+            }
+        }
+    }
+    val more = articles.size - SHOWN
+    if (more > 0) Text("and $more more", style = MaterialTheme.typography.bodyMedium, color = muted, modifier = Modifier.padding(top = 10.dp))
+}
+
+private const val SHOWN = 3
+
+private fun minutes(m: Double) = "${m.roundToInt().coerceAtLeast(1)} min"
 
 /** Send again and Mark as not sent for a sent edition whose book is still here, both rare. */
 @Composable

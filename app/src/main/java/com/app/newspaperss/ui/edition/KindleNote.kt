@@ -28,6 +28,7 @@ fun KindleNote(how: KindleSend) {
     Text(
         "$first $NOT_THERE",
         style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(top = 12.dp).semantics { contentDescription = "$first $NOT_THERE_SPOKEN" },
+        // Its own TalkBack stop even inside Today's clickable card, which would otherwise fold it into the card.
+        modifier = Modifier.padding(top = 12.dp).semantics(mergeDescendants = true) { contentDescription = "$first $NOT_THERE_SPOKEN" },
     )
 }

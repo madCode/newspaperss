@@ -5,6 +5,7 @@ import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.Device
 import android.app.Application
 import android.content.Intent
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -25,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -494,7 +496,7 @@ class EditionDetailScreenTest {
     }
 
     @Test
-    fun seeWhatsInsideOnTodayOpensTheLatestEdition() {
+    fun tappingTodaysReadyCardOpensTheLatestEdition() {
         val latest = runBlocking {
             db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.READY, articleCount = 5, minutes = 30.0))
         }
@@ -503,8 +505,8 @@ class EditionDetailScreenTest {
         compose.setContent { TodayScreen(vm, onOpenEdition = { opened = it }) }
         idleUntil { vm.state.value.editions?.size == 1 }
 
-        compose.onNodeWithText("See what's inside").performClick()
-
+        compose.onNodeWithText("See what's inside").assertDoesNotExist()
+        compose.onNode(hasText("Tuesday Morning Edition") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(latest, opened)
     }
 

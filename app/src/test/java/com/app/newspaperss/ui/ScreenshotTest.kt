@@ -306,12 +306,27 @@ class ScreenshotTest {
         runBlocking {
             val now = Instant.parse("2026-09-29T06:30:00Z")
             db.editions().insert(EditionEntity(title = "Monday Morning Edition", createdAt = now.minusSeconds(86_400), status = EditionStatus.DELIVERED, articleCount = 7, minutes = 31.0))
-            db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = now, status = EditionStatus.READY, fileName = "x.epub", articleCount = 8, minutes = 33.4))
+            val latest = db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = now, status = EditionStatus.READY, fileName = "x.epub", articleCount = 8, minutes = 33.4))
+            db.editions().insertArticles(sampleArticles(latest))
             val source = db.sources().insert(SourceEntity(url = "https://example.com/feed", title = "The Example Review"))
             (1..2).forEach { db.articles().insertIgnoring(ArticleEntity(sourceId = source, guid = "$it", url = "https://example.com/$it", title = "Starred $it", starredAt = now)) }
         }
         val vm = TodayViewModel(EditionRepository(db, tmp.newFolder()), flowOf(null)) {}
         shoot("05-today", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
+    }
+
+    /** Eight sample articles for an edition's card, the second one starred. */
+    private fun sampleArticles(edition: Long) = listOf(
+        "BBC News" to "Flooding forces thousands from their homes in northern Italy" to 3.0,
+        "Quanta Magazine" to "The Mathematician Who Counted the Shapes of Knots" to 8.0,
+        "Rest of World" to "Why Lagos's ride-hailing drivers built their own app" to 6.0,
+        "Nautilus" to "What do octopuses dream about?" to 5.0,
+        "ProPublica" to "The hidden cost of hospital price lists" to 6.0,
+        "The Verge" to "A week with the e-reader that wants to be a notebook" to 2.0,
+        "xkcd" to "Orbital Mechanics" to 1.0,
+        "Ars Technica" to "Webb spots water vapour around a young star" to 2.4,
+    ).mapIndexed { i, (sourceAndTitle, minutes) ->
+        EditionArticleEntity(editionId = edition, articleId = null, position = i, title = sourceAndTitle.second, sourceTitle = sourceAndTitle.first, minutes = minutes, starred = i == 1)
     }
 
     private fun installKindle() = installApp(
@@ -329,6 +344,7 @@ class ScreenshotTest {
             val now = Instant.parse("2026-09-29T06:30:00Z")
             db.editions().insert(EditionEntity(title = "Monday Morning Edition", createdAt = now.minusSeconds(86_400), status = EditionStatus.DELIVERED, articleCount = 7, minutes = 31.0))
             db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = now, status = EditionStatus.DELIVERED, fileName = "x.epub", articleCount = 8, minutes = 33.4, deliveredAt = now))
+                .also { db.editions().insertArticles(sampleArticles(it)) }
         }
         val sent = if (kindleNote) mapOf(latest to KindleSend.APP) else emptyMap()
         val vm = TodayViewModel(EditionRepository(db, files), flowOf(null), settings = flowOf(Settings(device = device)), sentToKindle = flowOf(sent)) {}
