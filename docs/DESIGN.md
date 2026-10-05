@@ -424,14 +424,12 @@ whose Kindle and KOReader answers ask for more on the same page).
 
 - **Today** (home): when the next edition is due, how many starred articles
   will go in the next one (only when some will), and the latest edition's
-  card. Tapping anywhere on the card opens the edition, as does its **See
-  what's inside**.
+  card. Tapping anywhere on the card opens the edition.
   - The card previews what's inside, as the book's contents page opens: the
     first three headlines in order, each with its source (★ if you starred
     it) and reading time, then "and N more". A failed edition shows none:
     its articles went back to wait.
-  - A ready edition has **See what's inside** under its title, then
-    **Send**, **Open** and **I've sent it**. The line
+  - A ready edition has **Send**, **Open** and **I've sent it**. The line
     under the buttons says what counts as sent: choosing an app, or, with
     email to a Kindle, opening the mail app.
   - Once it's sent, the card is about reading it:

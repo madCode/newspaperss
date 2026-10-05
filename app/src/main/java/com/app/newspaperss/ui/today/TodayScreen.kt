@@ -302,11 +302,9 @@ private fun LatestEdition(
                 // Without its book there's nothing to send or take back.
                 if (sent && hasFile) SentEditionMenu(edition.title, onSend, onNotSent, Modifier.offset(x = 12.dp, y = (-12).dp))
             }
-            // The whole card opens the contents too, but nothing about a card says so. A sent edition has a button for it instead.
-            if (!sent && inside && edition.status != EditionStatus.BUILDING) {
-                TextButton(onClick = onDetails, contentPadding = PaddingValues(0.dp)) { Text("See what's inside") }
-            }
             // Only for an edition that is or was on its way: a failed one's articles go back to wait.
+            // A ready card has no See what's inside: its headlines show what's in it, and Send is
+            // what's next. The card itself opens the contents.
             if (edition.status == EditionStatus.READY || sent) Headlines(articles)
             when (edition.status) {
                 EditionStatus.READY -> {

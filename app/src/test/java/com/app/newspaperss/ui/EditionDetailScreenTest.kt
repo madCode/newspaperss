@@ -496,7 +496,7 @@ class EditionDetailScreenTest {
     }
 
     @Test
-    fun seeWhatsInsideOnTodayOpensTheLatestEdition() {
+    fun tappingTodaysReadyCardOpensTheLatestEdition() {
         val latest = runBlocking {
             db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", status = EditionStatus.READY, articleCount = 5, minutes = 30.0))
         }
@@ -505,10 +505,7 @@ class EditionDetailScreenTest {
         compose.setContent { TodayScreen(vm, onOpenEdition = { opened = it }) }
         idleUntil { vm.state.value.editions?.size == 1 }
 
-        compose.onNodeWithText("See what's inside").performClick()
-        assertEquals(latest, opened)
-
-        opened = null
+        compose.onNodeWithText("See what's inside").assertDoesNotExist()
         compose.onNode(hasText("Tuesday Morning Edition") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(latest, opened)
     }
