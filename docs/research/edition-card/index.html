@@ -185,6 +185,15 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
 .cl .m { font-size: 12px; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .runin { margin-top: 12px; font-family: var(--serif); font-size: 14.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .runin .dot { color: var(--ink-soft); padding: 0 4px; }
+.matrix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 16px; align-items: start; }
+.matrix .colh { font-family: var(--serif); font-weight: 700; font-size: 1.05rem; }
+.matrix .colh small { display: block; font-family: var(--sans); font-weight: 400; font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.matrix .rowh { grid-column: 1 / -1; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); border-top: 1px solid var(--outline); padding-top: 12px; margin-top: 8px; }
+.mini { background: var(--newsprint); color: var(--ink); padding: 10px; border-radius: 10px; min-width: 0; }
+.mini .card { margin-top: 0; }
+.mini .menu { float: right; font-size: 20px; line-height: 1; color: var(--ink); margin: -2px -4px 0 8px; }
+.morelink { color: var(--accent); font-weight: 500; font-size: 13.5px; margin-top: 10px; }
+@media (max-width: 760px) { .matrix { grid-template-columns: minmax(0, 1fr); } .matrix .colh { display: none; } .mini::before { content: attr(data-col); display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px; } }
 .photo { aspect-ratio: 16 / 9; max-width: 100%; margin-top: 10px; filter: grayscale(1);
   background:
     radial-gradient(circle at 30% 45%, transparent 18%, #2a2a2a 19%, #2a2a2a 22%, transparent 23%),
@@ -214,6 +223,12 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
       <div class="seg"><button type="button" id="marks" aria-pressed="false">Mark what's new</button></div>
     </div>
   </header>
+
+  <section class="round">
+    <h2 class="section-h">Round 7: showing that the card opens</h2>
+    <p class="section-p">A's card, as built, in each state a reader meets, three ways. <b>Now</b>: the whole card opens the edition, and nothing says so. <b>Link line</b>: the card still opens, and its last line is a link in the accent colour ("and 5 more ›", or "See what's inside ›" when all the headlines already show). <b>Button back</b>: "See what's inside" where it was before this change. The Day / Night switch above picks the colours (Both shows day).</p>
+    <div class="matrix" id="matrix"></div>
+  </section>
 
   <section class="round">
     <h2 class="section-h">Round 6: A, more compact</h2>
@@ -533,6 +548,61 @@ const ROUND6 = [
   },
 ];
 
+// Round 7: one card per state, device and treatment.
+const CASES = [
+  { row: "Ready to send · Kindle or Kobo", status: "ready", device: "kindle", n: 8 },
+  { row: "Ready to send · Boox (reads it on this device)", status: "ready", device: "boox", n: 8 },
+  { row: "Sent · Kindle, with the Kindle app on the phone", status: "sent", device: "kindle", n: 8 },
+  { row: "Sent · Boox, PocketBook, KOReader", status: "sent", device: "boox", n: 8 },
+  { row: "Sent · Kobo", status: "sent", device: "kobo", n: 8 },
+  { row: "Sent · Kobo, a short edition of three articles", status: "sent", device: "kobo", n: 3 },
+];
+const TREATMENTS = [
+  { key: "now", name: "Now", sub: "The card opens; nothing says so" },
+  { key: "link", name: "Link line", sub: "Last line links, in the accent colour" },
+  { key: "button", name: "Button back", sub: "\"See what's inside\" as before" },
+];
+function miniCard(c, t) {
+  const list = ARTICLES.slice(0, c.n);
+  const shown = list.slice(0, 3);
+  const extra = list.length - shown.length;
+  const heads = `<ul class="heads">${shown.map(a => `<li><span class="src">${st(a)}${esc(a.src)}</span><span class="h">${esc(a.h)}</span><span class="m">${mins(a.m)}</span></li>`).join("")}</ul>`;
+  let tail = "";
+  if (t === "link") tail = `<div class="morelink">${extra > 0 ? `and ${extra} more ›` : "See what's inside ›"}</div>`;
+  else if (extra > 0) tail = `<div class="more">and ${extra} more</div>`;
+  const total = list.reduce((x, a) => x + a.m, 0);
+  const sent = c.status === "sent";
+  const summary = `${list.length} articles · about ${total} min · ${sent ? "sent" : "ready to send"}`;
+  let actions = "";
+  if (!sent) {
+    const btns = c.device === "boox"
+      ? `<span class="btn fill">Open</span><span class="btn out">Send</span>`
+      : `<span class="btn fill">Send</span>`;
+    const fine = c.device === "boox"
+      ? "Opening it here counts as sent. Read it another way? Tell us so these articles don't come back."
+      : "Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back.";
+    actions = `<div class="btns">${btns}</div><div class="fine">${fine}</div><span class="tbtn">I've sent it</span>`;
+  } else {
+    const inside = t === "button";
+    let btns = "";
+    if (c.device === "kindle") btns = (inside ? `<span class="btn fill">See what's inside</span>` : "") + `<span class="btn out">Open Kindle</span>`;
+    else if (c.device === "boox") btns = `<span class="btn fill">Open</span>` + (inside ? `<span class="btn out">See what's inside</span>` : "");
+    else if (inside) btns = `<span class="btn fill">See what's inside</span>`;
+    actions = btns ? `<div class="btns">${btns}</div>` : "";
+  }
+  const readyLink = t === "button" && !sent ? `<span class="tbtn" style="padding:4px 0 0">See what's inside</span>` : "";
+  return `<div class="card tap">${sent ? `<span class="menu" aria-hidden="true">⋮</span>` : ""}<div class="title" style="font-size:19px">${TITLE}</div><div class="summary">${summary}</div>${readyLink}${heads}${tail}${actions}</div>`;
+}
+function renderMatrix() {
+  const theme = THEME === "night" ? "night" : "day";
+  let html = TREATMENTS.map(t => `<div class="colh">${t.name}<small>${t.sub}</small></div>`).join("");
+  for (const c of CASES) {
+    html += `<div class="rowh">${c.row}</div>`;
+    html += TREATMENTS.map(t => `<div class="mini phone ${theme}" style="border:0" data-col="${t.name}" aria-hidden="true">${miniCard(c, t.key)}</div>`).join("");
+  }
+  document.getElementById("matrix").innerHTML = html;
+}
+
 const ROUND1 = [
   {
     name: "Today's card", tag: "Now", now: true,
@@ -602,6 +672,7 @@ const option = (o, state) => `
 let currentState = "ready";
 function render(state) {
   currentState = state;
+  renderMatrix();
   document.getElementById("grid6").innerHTML = ROUND6.map(o => option(o, state)).join("");
   document.getElementById("grid5").innerHTML = ROUND5.map(o => option(o, state)).join("");
   document.getElementById("grid4").innerHTML = ROUND4.map(o => option(o, state)).join("");
