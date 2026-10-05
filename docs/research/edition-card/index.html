@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edition Card Previews</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;600;700&family=Roboto:wght@400;500&display=swap">
+<style>
+/* Layout: a row of phone frames showing Today, each with its notes underneath. Colors are the app's own Theme.kt. */
+:root {
+  --page: #E9E4D8;
+  --newsprint: #F7F4EC;
+  --ink: #1C1B1A;
+  --ink-soft: #4A4740;
+  --card: #EFEADD;
+  --outline: #948D80;
+  --accent: #8C2F1B;
+  --on-accent: #FFFFFF;
+  --cover-bg: #FFFFFF;
+  --cover-ink: #000000;
+  --frame: #2B2926;
+  --serif: "Noto Serif", Georgia, "Times New Roman", serif;
+  --sans: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0E0D0C; --newsprint: #161514; --ink: #E9E4D8; --ink-soft: #CBC5B8; --card: #211F1D;
+  --outline: #7A746A; --accent: #E8A594; --on-accent: #3B0D02; --frame: #3A3733; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --page: #0E0D0C; --newsprint: #161514; --ink: #E9E4D8; --ink-soft: #CBC5B8; --card: #211F1D;
+  --outline: #7A746A; --accent: #E8A594; --on-accent: #3B0D02; --frame: #3A3733; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--ink); font-family: var(--sans); margin: 0; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 64px; }
+header.page { max-width: 68ch; display: grid; gap: 10px; margin-bottom: 28px; }
+header.page h1 { font-family: var(--serif); font-size: 2rem; margin: 0; text-wrap: balance; }
+header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size: 15px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; font-size: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--outline); border-radius: 999px; overflow: hidden; }
+.seg button { font: inherit; background: none; color: var(--ink); border: 0; padding: 6px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--newsprint); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 40px 28px; }
+.option { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.option h2 { font-family: var(--serif); font-size: 1.2rem; margin: 0; display: flex; gap: 10px; align-items: baseline; }
+.option h2 .tag { font-family: var(--sans); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+.option h2 .rec { color: var(--accent); }
+.notes { font-size: 14px; line-height: 1.5; display: grid; gap: 6px; min-width: 0; }
+.notes p { margin: 0; }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.notes .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+
+/* The phone */
+.phone { width: 100%; max-width: 360px; border: 10px solid var(--frame); border-radius: 28px; background: var(--newsprint); overflow: hidden; }
+.screen { padding: 16px 18px 22px; min-height: 560px; }
+.mast { text-align: center; margin-bottom: 12px; }
+.mast .name { font-family: var(--serif); font-weight: 700; font-size: 28px; line-height: 1.1; }
+.mast hr { border: 0; border-top: 2px solid var(--ink); margin: 4px 0; }
+.mast hr.thin { border-top-width: 1px; border-color: var(--outline); }
+.mast .date { font-size: 13px; font-weight: 500; }
+.next { text-align: center; font-size: 13.5px; margin-bottom: 4px; }
+
+.card { margin-top: 12px; background: var(--card); border: 1px solid var(--outline); border-radius: 12px; padding: 16px; }
+.card .title { font-family: var(--serif); font-weight: 700; font-size: 21px; line-height: 1.25; margin: 0; }
+.card .summary { font-size: 13.5px; margin-top: 4px; color: var(--ink); }
+.tbtn { color: var(--accent); font-weight: 500; font-size: 13.5px; padding: 8px 0; display: inline-block; }
+.btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn { font-size: 13.5px; font-weight: 500; padding: 9px 20px; border-radius: 999px; }
+.btn.fill { background: var(--accent); color: var(--on-accent); }
+.btn.out { border: 1px solid var(--outline); color: var(--accent); }
+.fine { font-size: 12px; line-height: 1.45; color: var(--ink-soft); margin-top: 12px; }
+.another { text-align: center; margin-top: 10px; }
+.earlier { font-family: var(--serif); font-size: 16px; margin-top: 22px; padding-bottom: 6px; }
+.row { border-bottom: 1px solid var(--outline); padding: 10px 0; }
+.row .t { font-family: var(--serif); font-size: 15px; }
+.row .s { font-size: 12px; color: var(--ink-soft); }
+.marks .new { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 4px; }
+
+/* A: headlines */
+.heads { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 9px; }
+.heads li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
+.heads .src { grid-column: 1 / -1; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); }
+.heads .h { font-family: var(--serif); font-size: 14.5px; line-height: 1.3; }
+.heads .m { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; align-self: end; white-space: nowrap; }
+.more { font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
+
+/* B: sources line */
+.sources { font-size: 13.5px; line-height: 1.45; margin-top: 10px; }
+.sources b { font-weight: 500; }
+
+/* C: front page */
+.fp { margin-top: 12px; border-top: 2px solid var(--ink); padding-top: 10px; }
+.fp .lead-src { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); }
+.fp .lead { font-family: var(--serif); font-weight: 700; font-size: 18px; line-height: 1.25; margin: 2px 0 2px; text-wrap: balance; }
+.fp .lead-m { font-size: 12px; color: var(--ink-soft); }
+.fp .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; margin-top: 10px; border-top: 1px solid var(--outline); padding-top: 8px; }
+.fp .cols div { font-family: var(--serif); font-size: 13px; line-height: 1.3; }
+.fp .cols div + div { border-left: 1px solid var(--outline); padding-left: 14px; }
+.fp .cols small { display: block; font-family: var(--sans); font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 2px; }
+
+/* D: cover thumbnail, drawn like CoverRenderer's JPEG */
+.withcover { display: grid; grid-template-columns: 92px 1fr; gap: 14px; align-items: start; }
+.cover { background: var(--cover-bg); color: var(--cover-ink); aspect-ratio: 2 / 3; border: 1px solid var(--outline); padding: 6px 6px 5px; display: flex; flex-direction: column; font-family: var(--serif); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.cover .cm { font-weight: 700; font-size: 9.5px; text-align: center; border-bottom: 2.5px solid var(--cover-ink); padding-bottom: 2px; }
+.cover .cr { border-top: 1px solid var(--cover-ink); margin-top: 1.5px; }
+.cover .wd { text-align: center; font-weight: 700; font-size: 5.5px; letter-spacing: .2em; margin-top: 4px; }
+.cover .dy { text-align: center; font-weight: 700; font-size: 15px; line-height: 1.05; }
+.cover .hl { border-top: 1px solid var(--cover-ink); margin-top: 3px; padding-top: 3px; display: grid; gap: 3px; font-size: 5.5px; line-height: 1.25; flex: 1; overflow: hidden; }
+.cover .hl b { display: block; font-size: 4.5px; letter-spacing: .08em; font-weight: 400; }
+.cover .ft { border-top: 1px solid var(--cover-ink); font-size: 5px; text-align: center; padding-top: 2px; }
+
+/* E: folded contents */
+.fold { margin-top: 10px; border-top: 1px solid var(--outline); }
+.fold .toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; font-size: 13.5px; font-weight: 500; color: var(--accent); }
+.fold .toggle span:last-child { font-size: 12px; }
+.toc { list-style: none; margin: 0; padding: 0 0 4px; counter-reset: n; }
+.toc li { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 6px 0; border-top: 1px dotted var(--outline); font-size: 13px; line-height: 1.3; }
+.toc li .h { font-family: var(--serif); }
+.toc li .h small { display: block; font-family: var(--sans); font-size: 11px; color: var(--ink-soft); }
+.toc li .m { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.star { color: var(--ink); }
+
+.footer { margin-top: 40px; max-width: 68ch; font-size: 14px; line-height: 1.55; display: grid; gap: 8px; }
+.footer h2 { font-family: var(--serif); font-size: 1.25rem; margin: 0; }
+.footer p { margin: 0; }
+@media (max-width: 420px) { .screen { min-height: 0; } }
+/* Round 2 */
+.section-h { font-family: var(--serif); font-size: 1.5rem; margin: 8px 0 6px; }
+.section-p { max-width: 68ch; margin: 0 0 22px; line-height: 1.55; color: var(--ink-soft); font-size: 15px; }
+.round { margin-bottom: 56px; }
+.kick { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); }
+.kick .why { color: var(--accent); }
+.lead2 { font-family: var(--serif); font-weight: 700; font-size: 18px; line-height: 1.25; margin: 2px 0; text-wrap: balance; }
+.dek { font-family: var(--serif); font-size: 13.5px; line-height: 1.4; color: var(--ink-soft); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.underlist { list-style: none; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--outline); display: grid; gap: 7px; }
+.underlist li { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; }
+.underlist .src { grid-column: 1 / -1; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); }
+.underlist .h { font-family: var(--serif); font-size: 14px; line-height: 1.3; }
+.underlist .m { font-size: 12px; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; align-self: end; }
+.index { margin-top: 10px; border: 1px solid var(--ink); padding: 8px 10px; }
+.index .ih { font-family: var(--serif); font-weight: 700; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; text-align: center; border-bottom: 1px solid var(--ink); padding-bottom: 4px; margin-bottom: 4px; }
+.index .ir { display: flex; align-items: baseline; gap: 4px; font-size: 13px; padding: 2px 0; }
+.index .ir .dots { flex: 1; border-bottom: 1px dotted var(--outline); transform: translateY(-3px); min-width: 12px; }
+.index .ir .n { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 12px; }
+.paper-card .nameplate { text-align: center; border-top: 3px double var(--ink); border-bottom: 3px double var(--ink); padding: 6px 0 4px; }
+.paper-card .nameplate .title { font-size: 19px; }
+.paper-card .folio { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .04em; color: var(--ink-soft); border-bottom: 1px solid var(--ink); padding: 4px 0; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+.four { display: grid; grid-template-columns: 1fr 1fr; margin-top: 12px; border-top: 2px solid var(--ink); }
+.four div { padding: 8px 0 8px; font-family: var(--serif); font-size: 13.5px; line-height: 1.3; border-bottom: 1px solid var(--outline); min-width: 0; }
+.four div:nth-child(odd) { padding-right: 10px; border-right: 1px solid var(--outline); }
+.four div:nth-child(even) { padding-left: 10px; }
+.four small { display: block; font-family: var(--sans); font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 2px; }
+.card.tap { cursor: pointer; }
+.card.tap:hover { background: color-mix(in srgb, var(--card) 88%, var(--ink)); }
+.card.tap:active { background: color-mix(in srgb, var(--card) 80%, var(--ink)); }
+.tapnote { font-size: 13px; color: var(--ink-soft); margin: -10px 0 18px; }
+.appbar { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--outline); margin-bottom: 6px; }
+.appbar .name { font-family: var(--serif); font-weight: 700; font-size: 19px; }
+.appbar .nx { font-size: 12px; color: var(--ink-soft); text-align: right; }
+.mast .folio2 { font-size: 13px; font-weight: 500; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.mast .folio2 .no { font-variant-numeric: tabular-nums; }
+.m3bar { font-size: 22px; padding: 6px 0 14px; }
+.nextline { font-size: 13.5px; color: var(--ink-soft); }
+.imprint { text-align: center; display: grid; gap: 2px; margin-bottom: 4px; }
+.imprint .w { font-family: var(--serif); font-size: 11.5px; letter-spacing: .32em; text-transform: uppercase; }
+.paper-card .kicker-brand { text-align: center; font-family: var(--serif); font-size: 10.5px; letter-spacing: .28em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 5px; }
+.lead-plain { margin-top: 14px; }
+.lead-thin { margin-top: 12px; border-top: 1px solid var(--outline); padding-top: 10px; }
+.lead-plain .underlist, .lead-thin .underlist { border-top: 0; padding-top: 4px; }
+.lead-thin2 .underlist { border-top: 1px solid var(--outline); }
+.photo { aspect-ratio: 16 / 9; max-width: 100%; margin-top: 10px; filter: grayscale(1);
+  background:
+    radial-gradient(circle at 30% 45%, transparent 18%, #2a2a2a 19%, #2a2a2a 22%, transparent 23%),
+    radial-gradient(circle at 55% 55%, transparent 20%, #444 21%, #444 24%, transparent 25%),
+    radial-gradient(circle at 70% 40%, transparent 14%, #333 15%, #333 18%, transparent 19%),
+    linear-gradient(160deg, #d8d8d8, #9a9a9a); border: 1px solid var(--outline); }
+.cap { font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="page">
+    <h1>What's in today's paper, on Today</h1>
+    <p>Mockups of the latest edition's card on Today, showing what's inside. The edition and headlines are sample data. Turn on "Mark what's new" to outline what each option adds to the card.</p>
+    <div class="controls">
+      <span>Card state:</span>
+      <div class="seg" role="group" aria-label="Card state">
+        <button type="button" id="st-ready" aria-pressed="true" data-state="ready">Ready to send</button>
+        <button type="button" id="st-sent" aria-pressed="false" data-state="sent">Sent</button>
+      </div>
+      <div class="seg"><button type="button" id="marks" aria-pressed="false">Mark what's new</button></div>
+    </div>
+  </header>
+
+  <section class="round">
+    <h2 class="section-h">Round 5: F2 without the heavy rule</h2>
+    <p class="section-p">F2 under today's masthead, but without the heavy black rule that echoes the masthead's own. The card's border already sets it apart, so the inside can be quieter.</p>
+    <div class="grid" id="grid5"></div>
+  </section>
+
+  <section class="round">
+    <h2 class="section-h">Round 4: G1's top line</h2>
+    <p class="section-p">G1's card, with four different tops for the screen. Round 3's G1 is first. In each, the edition is the only bold serif title on the screen, or the brand moves into it.</p>
+    <div class="grid" id="grid4"></div>
+  </section>
+
+  <section class="round">
+    <h2 class="section-h">Round 3: one newspaper per screen</h2>
+    <p class="section-p">F4's look, with the lead chosen by F2's rule (your star, otherwise the longest read), without two front pages fighting on one screen. G1 makes the app's header quiet so the card can be the paper. G2 turns the app's masthead into the edition's nameplate, so the card needs none. F4 and F2 are shown with the same lead for comparison.</p>
+    <div class="grid" id="grid3"></div>
+  </section>
+
+  <section class="round">
+    <h2 class="section-h">Round 2: front pages</h2>
+    <p class="section-p">Variations on C, the small front page. Each tries a different answer to C's two problems: the lead story is only whichever article came first, and two narrow columns wrap badly at large text sizes. A, the current favourite, is first for comparison.</p>
+    <p class="tapnote">The whole card opens the edition in the app; tap or hover one to see it respond. Buttons inside the card keep their own jobs.</p>
+    <div class="grid" id="grid2"></div>
+  </section>
+
+  <section class="round">
+    <h2 class="section-h">Round 1</h2>
+    <p class="section-p">The first five options, beside the card as it is now.</p>
+    <div class="grid" id="grid1"></div>
+  </section>
+
+  <section class="footer">
+    <h2>Where this landed</h2>
+    <p><b>Built: F2c</b> (round 5). The card under Today's masthead leads with your star, otherwise the longest read, over one hairline, then the next two articles and "and N more". The whole card opens the edition.</p>
+    <p><b>For later: G1</b> (rounds 3 and 4). The card carries the newspaper styling (the edition's name between double rules, an issue number) and Today's masthead steps back to a plain bar (H1) or a small imprint (H3), so there's one front page per screen. F4 is the same card under today's masthead, where the two compete. F3 (the lead's opening line) and F7 (its picture) need more stored per edition.</p>
+  </section>
+</div>
+
+<script>
+// Sample edition: well-known public feeds, invented headlines and opening lines.
+const ARTICLES = [
+  { src: "BBC News", h: "Flooding forces thousands from their homes in northern Italy", m: 3, dek: "Rivers burst their banks across Emilia-Romagna after three days of rain." },
+  { src: "Quanta Magazine", h: "The Mathematician Who Counted the Shapes of Knots", m: 8, star: true, dek: "For forty years, nobody could say how many ways a loop of string can tangle. Then a retired schoolteacher wrote a program." },
+  { src: "Rest of World", h: "Why Lagos's ride-hailing drivers built their own app", m: 6 },
+  { src: "Nautilus", h: "What do octopuses dream about?", m: 5 },
+  { src: "ProPublica", h: "The hidden cost of hospital price lists", m: 6 },
+  { src: "The Verge", h: "A week with the e-reader that wants to be a notebook", m: 2 },
+  { src: "xkcd", h: "Orbital Mechanics", m: 1 },
+];
+const TITLE = "Thursday Morning Edition, Oct 1";
+const TOTAL = ARTICLES.reduce((a, b) => a + b.m, 0);
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const mins = m => `${m} min`;
+const star = a => a.star ? "★ " : "";
+// Plain text: the whole card opens the edition, so this needn't be a link of its own.
+const more = n => `<div class="more">and ${n} more ›</div>`;
+// The lead by F2's rule: the first starred article, otherwise the longest read.
+const PICKED = ARTICLES.find(a => a.star) || ARTICLES.reduce((a, b) => (b.m > a.m ? b : a));
+const rest = lead => ARTICLES.filter(a => a !== lead);
+
+function shell(o, state) {
+  const status = state === "ready" ? "ready to send" : "sent";
+  const actions = state === "ready"
+    ? `<div class="btns"><span class="btn fill">Send</span></div>
+       <div class="fine">Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back.</div>
+       <span class="tbtn">I've sent it</span>`
+    : o.now ? `<div class="btns"><span class="btn fill">See what's inside</span></div>` : "";
+  const top = o.top ? o.top(state) : `<div class="title">${TITLE}</div><div class="summary">${ARTICLES.length} articles · about ${TOTAL} min · ${status}</div>`;
+  return `
+  <div class="phone" aria-hidden="true"><div class="screen">
+    ${o.mast ? o.mast(state) : `<div class="mast"><div class="name">newspapeRSS</div><hr><div class="date">Thursday, October 1, 2026</div><hr class="thin"></div>
+    <div class="next">Next edition: tomorrow at 6:30</div>`}
+    <div class="card ${o.cardClass || ""} ${o.now ? "" : "tap"}">
+      ${top}
+      ${o.card(state)}
+      ${actions}
+    </div>
+    ${state === "ready" ? "" : `<div class="another"><span class="tbtn">Make another edition</span></div>`}
+    <div class="earlier">Earlier editions</div>
+    <div class="row"><div class="t">Wednesday Morning Edition, Sep 30</div><div class="s">6 articles · about 29 min · sent</div></div>
+  </div></div>`;
+}
+
+const seeInside = s => s === "ready" ? `<span class="tbtn">See what's inside</span>` : "";
+const headsList = (list, cls = "heads") => `<ul class="${cls}">${list.map(a =>
+  `<li><span class="src">${star(a)}${esc(a.src)}</span><span class="h">${esc(a.h)}</span><span class="m">${mins(a.m)}</span></li>`).join("")}</ul>`;
+const leadBlock = (a, why) => `<div class="kick">${why ? `<span class="why">${why}</span> · ` : star(a)}${esc(a.src)} · ${mins(a.m)}</div><div class="lead2">${esc(a.h)}</div>`;
+
+const OPTION_A = {
+  name: "A. First three headlines", tag: "Favourite", rec: true,
+  card: () => `<div class="new">${headsList(ARTICLES.slice(0, 3))}${more(ARTICLES.length - 3)}</div>`,
+  idea: "The opening of the contents page, cut after three. \"and 4 more\" opens the edition.",
+  good: ["Enough to decide whether to send it now", "Plain text: sharp on e-ink, one TalkBack stop per headline"],
+  watch: ["About 150dp taller; earlier editions start lower"],
+};
+
+const ROUND2 = [
+  OPTION_A,
+  {
+    name: "F1. A lead over a list", tag: "Front page, simplest",
+    card: () => `<div class="fp new" style="margin-top:12px">${leadBlock(ARTICLES[0])}${headsList(ARTICLES.slice(1, 3), "underlist")}${more(ARTICLES.length - 3)}</div>`,
+    idea: "A with the first headline promoted: bigger type over a rule, the next two as A's list.",
+    good: ["Front-page feel with A's single column: nothing to wrap", "Same TalkBack order and stops as A", "Little more code than A"],
+    watch: ["The lead is still just the first article (see F2)"],
+  },
+  {
+    name: "F2. Your star leads", tag: "Front page, earned lead",
+    card: () => `<div class="fp new" style="margin-top:12px">${leadBlock(PICKED, PICKED.star ? "★ You starred this" : "Longest read")}${headsList(rest(PICKED).slice(0, 2), "underlist")}${more(ARTICLES.length - 3)}</div>`,
+    idea: "F1, but the lead is chosen: an article you starred, otherwise the edition's longest read. The kicker says why it leads.",
+    good: ["The big type means something you can see", "Echoes the star's promise: \"put this in my next edition\""],
+    watch: ["Out of book order: the lead may be article 2 or 5, so the card and the contents disagree", "With two stars, which one? (Oldest star, as the planner does)"],
+  },
+  {
+    name: "F3. A lead with its opening line", tag: "Front page, standfirst",
+    card: () => `<div class="fp new" style="margin-top:12px">${leadBlock(PICKED, PICKED.star ? "★ You starred this" : "")}<div class="dek">${esc(PICKED.dek)}</div>${headsList(rest(PICKED).slice(0, 2), "underlist")}${more(ARTICLES.length - 3)}</div>`,
+    idea: "Like F2, plus the article's first sentence under the lead, capped at two lines, as a paper's standfirst.",
+    good: ["The only option that says what a story is about, not just its headline", "Helps most with vague headlines (\"Orbital Mechanics\")"],
+    watch: ["Needs the opening line stored with the edition: a database change", "Feeds' first sentences are often junk (\"In this week's issue…\"), so it needs a fallback"],
+  },
+  {
+    name: "F4. The card as a little newspaper", tag: "Front page, nameplate",
+    cardClass: "paper-card",
+    top: s => `<div class="nameplate new"><div class="title">${TITLE.replace(", Oct 1", "")}</div></div>
+      <div class="folio new"><span>No. 42</span><span>Oct 1, 2026</span><span>${ARTICLES.length} articles · ${TOTAL} min</span></div>
+      <div class="summary" style="margin-top:0">${s === "ready" ? "Ready to send" : "Sent"}</div>`,
+    card: () => `<div class="new" style="margin-top:8px">${leadBlock(ARTICLES[0])}${headsList(ARTICLES.slice(1, 3), "underlist")}${more(ARTICLES.length - 3)}</div>`,
+    idea: "The whole card dressed as a front page: the edition's name between double rules, a folio line with the issue number, then F1's lead and list.",
+    good: ["The most like holding a paper", "The issue number (how many editions you've made) is a small reward for the habit"],
+    watch: ["Double rules and the folio are decoration on a screen whose job is \"tap Send\"", "Thin double rules can break up on e-ink"],
+  },
+  {
+    name: "F5. Four up, no lead", tag: "Front page, equal weight",
+    card: () => `<div class="four new">${ARTICLES.slice(0, 4).map(a => `<div><small>${star(a)}${esc(a.src)}</small>${esc(a.h)}</div>`).join("")}</div>${more(ARTICLES.length - 4)}`,
+    idea: "Four headlines in a two-by-two grid with column rules. No headline is bigger, since no one ranked them.",
+    good: ["Honest: the app doesn't pick favourites", "Shows four stories in about the height of A's three"],
+    watch: ["The same narrow columns as C, so large text wraps to many lines", "No minutes: there isn't room"],
+  },
+  {
+    name: "F6. A lead and an index", tag: "Front page, \"Inside\" box",
+    card: () => `<div class="new" style="margin-top:12px">${leadBlock(PICKED, PICKED.star ? "★ You starred this" : "")}
+      <div class="index"><div class="ih">Inside</div>${rest(PICKED).map(a => `<div class="ir"><span>${esc(a.src)}</span><span class="dots"></span><span class="n">${mins(a.m)}</span></div>`).join("")}</div></div>`,
+    idea: "One headline, then a paper's \"Inside\" box: every other source with its reading time, joined by dotted leaders.",
+    good: ["Accounts for the whole edition without six more headlines", "Reads like a real front page's index"],
+    watch: ["Sources, not stories, for everything but the lead", "Tallest at seven articles; a 60-minute paper needs a cut-off"],
+  },
+  {
+    name: "F7. A lead with its picture", tag: "Front page, photo",
+    card: () => `<div class="new" style="margin-top:12px"><div class="photo" role="img" aria-label="Sample picture"></div><div class="cap">Sample picture</div>${leadBlock(PICKED, PICKED.star ? "★ You starred this" : "")}${headsList(rest(PICKED).slice(0, 2), "underlist")}${more(ARTICLES.length - 3)}</div>`,
+    idea: "F2 with the lead article's first picture above it, in greyscale like the book.",
+    good: ["The most inviting on a colour phone"],
+    watch: ["Needs a picture saved and resized for every edition", "Photos smear on e-ink, and comics or charts crop badly at 16:9", "Many articles have no picture, so the card changes shape day to day"],
+  },
+];
+
+const status = s => s === "ready" ? "ready to send" : "sent";
+const leadAndList = () => `${leadBlock(PICKED, PICKED.star ? "★ You starred this" : "Longest read")}${headsList(rest(PICKED).slice(0, 2), "underlist")}${more(ARTICLES.length - 3)}`;
+const ROUND3 = [
+  {
+    name: "F4 with the chosen lead", tag: "Two front pages",
+    cardClass: "paper-card",
+    top: s => `<div class="nameplate new"><div class="title">${TITLE.replace(", Oct 1", "")}</div></div>
+      <div class="folio new"><span>No. 42</span><span>Oct 1, 2026</span><span>${ARTICLES.length} articles · ${TOTAL} min</span></div>
+      <div class="summary" style="margin-top:0">${s === "ready" ? "Ready to send" : "Sent"}</div>`,
+    card: () => `<div class="new" style="margin-top:8px">${leadAndList()}</div>`,
+    idea: "Round 2's F4, leading with your star. The problem in one picture: a masthead, then a second one just under it, and the date twice.",
+    good: ["The card is unmistakably an edition"],
+    watch: ["Two sets of heavy rules a few centimetres apart", "The date appears twice"],
+  },
+  {
+    name: "G1. The card is the front page", tag: "Quiet header",
+    mast: () => `<div class="appbar new"><span class="name">newspapeRSS</span><span class="nx">Next edition<br>tomorrow at 6:30</span></div>`,
+    cardClass: "paper-card",
+    top: s => `<div class="nameplate"><div class="title">${TITLE.replace(", Oct 1", "")}</div></div>
+      <div class="folio"><span>No. 42</span><span>Thursday, Oct 1</span><span>${TOTAL} min</span></div>
+      <div class="summary" style="margin-top:0">${ARTICLES.length} articles · ${status(s)}</div>`,
+    card: () => `<div style="margin-top:8px">${leadAndList()}</div>`,
+    idea: "Today's big masthead shrinks to a plain app bar, and the edition gets all the newspaper styling. Each edition is its own front page; the app is just where it sits.",
+    good: ["One front page per screen, and it's the one that changes every day", "Frees about 60dp at the top for the card", "The date lives in one place: the edition"],
+    watch: ["With no edition yet (first run, or one being made) the screen loses its newspaper feel until one arrives", "Changes the look of the app's home, not just the card"],
+  },
+  {
+    name: "G2. The masthead is the nameplate", tag: "Merged",
+    mast: s => `<div class="mast"><div class="name">newspapeRSS</div><hr><div class="folio2 new"><span class="no">No. 42</span><span>·</span><span>Thursday Morning Edition</span><span>·</span><span>Oct 1</span></div><hr class="thin"></div>
+      <div class="next">Next edition: tomorrow at 6:30</div>`,
+    top: s => `<div class="summary new" style="margin-top:0">${ARTICLES.length} articles · about ${TOTAL} min · ${status(s)}</div>`,
+    card: () => `<div style="margin-top:10px">${leadAndList()}</div>`,
+    idea: "The app's masthead keeps its rules, but its date line becomes the latest edition's name and number. The card under it is that edition's front page, so it drops its own title.",
+    good: ["Keeps today's masthead and still reads as one front page", "The least extra chrome: the card is all headlines"],
+    watch: ["The masthead changes with each edition and falls back to the plain date when there's none", "A sent edition from yesterday names yesterday in today's masthead", "The card has no title of its own, so it relies on its position under the masthead"],
+  },
+  {
+    name: "F2. Your star leads, plain card", tag: "For comparison",
+    card: () => `<div class="fp new" style="margin-top:12px">${leadAndList()}</div>`,
+    idea: "The same lead and list in today's plain card, under today's masthead.",
+    good: ["The smallest change that still leads with your star"],
+    watch: ["Less of F4's sense of an issue"],
+  },
+];
+
+const g1Top = (brand) => s => `${brand ? `<div class="kicker-brand">newspapeRSS</div>` : ""}<div class="nameplate"><div class="title">${TITLE.replace(", Oct 1", "")}</div></div>
+      <div class="folio"><span>No. 42</span><span>Thursday, Oct 1</span><span>${TOTAL} min</span></div>
+      <div class="summary" style="margin-top:0">${ARTICLES.length} articles · ${status(s)}</div>`;
+const g1 = (o) => ({ cardClass: "paper-card", top: g1Top(o.brand), card: () => `<div style="margin-top:8px">${leadAndList()}</div>`, ...o });
+const ROUND4 = [
+  g1({
+    name: "G1 as in round 3", tag: "Shrunk masthead",
+    mast: () => `<div class="appbar new"><span class="name">newspapeRSS</span><span class="nx">Next edition<br>tomorrow at 6:30</span></div>`,
+    idea: "A small bold serif wordmark over a rule, with the next edition split to the right.",
+    good: ["Keeps the name on screen"],
+    watch: ["Two bold serif titles stacked: the wordmark and the edition's", "Three rules within a few millimetres", "Left-and-right split reads like a website header"],
+  }),
+  g1({
+    name: "H1. Like the other tabs", tag: "Consistent",
+    mast: () => `<div class="m3bar new">NewspapeRSS</div><div class="nextline new">Next edition: tomorrow at 6:30</div>`,
+    idea: "The app's name as a plain top-bar title, styled like Sources and Settings, with the next edition as a quiet line under it.",
+    good: ["Every tab's bar looks the same; the edition is the one thing styled as a paper", "Keeps the app's name on its home screen", "Plain sans title can't compete with the nameplate", "No rules above the card"],
+    watch: ["The other tabs' titles name the screen; this one names the app"],
+  }),
+  g1({
+    name: "H2. No top line at all", tag: "Card first",
+    mast: () => `<div class="nextline new" style="text-align:center;padding-top:4px">Next edition: tomorrow at 6:30</div>`,
+    idea: "Only the next edition's time, then straight into the card.",
+    good: ["The edition is the first thing you see", "Most room for the card: Send sits highest"],
+    watch: ["Abrupt on the first run, before there's an edition: the screen needs its own welcome there", "No name anywhere"],
+  }),
+  g1({
+    name: "H3. A small imprint", tag: "Publisher line",
+    mast: () => `<div class="imprint new"><span class="w">newspapeRSS</span><span class="nextline">Next edition: tomorrow at 6:30</span></div>`,
+    idea: "The name in small spaced capitals, centred, with no rule: the way a publisher's name sits quietly above a paper.",
+    good: ["Keeps the name, but as a whisper, not a second masthead", "Still centred like the edition under it"],
+    watch: ["Small spaced capitals are faint on e-ink; it needs real weight", "Close to decoration: does it need to be there?"],
+  }),
+  g1({
+    name: "H4. The name inside the nameplate", tag: "Brand on the paper", brand: true,
+    mast: () => `<div class="nextline new" style="text-align:center;padding-top:4px">Next edition: tomorrow at 6:30</div>`,
+    idea: "No header; the app's name becomes a small line over the edition's own nameplate, as a paper prints its publisher.",
+    good: ["The name is on the paper, where it means \"your newspapeRSS\"", "One title block on the whole screen"],
+    watch: ["Repeats on every edition card, which earlier editions don't show", "Same first-run question as H2"],
+  }),
+];
+
+const ROUND5 = [
+  {
+    name: "F2 as in round 3", tag: "Heavy rule",
+    card: () => `<div class="fp" style="margin-top:12px">${leadAndList()}</div>`,
+    idea: "A 2px black rule over the lead, the same as the one under the masthead.",
+    good: ["Sets the lead off clearly"],
+    watch: ["Reads as a second masthead rule a few centimetres below the first"],
+  },
+  {
+    name: "F2b. Space, no rules", tag: "Quietest",
+    card: () => `<div class="lead-plain">${leadAndList()}</div>`,
+    idea: "No rules inside the card at all. The lead stands out by its size, and the list sits a little closer under it.",
+    good: ["Nothing echoes the masthead", "Fewest lines to redraw on e-ink"],
+    watch: ["Title, summary and lead run together a little; the bigger headline has to do all the work"],
+  },
+  {
+    name: "F2c. One hairline", tag: "Middle",
+    card: () => `<div class="lead-thin">${leadAndList()}</div>`,
+    idea: "A single thin grey line between the summary and the lead, in the card's own border colour, and none under the lead.",
+    good: ["Separates \"about the edition\" from \"what's in it\"", "Same weight as the card's border, so it belongs to the card, not the masthead"],
+    watch: ["Barely different from F2b on e-ink"],
+  },
+  {
+    name: "F2d. Hairlines both sides", tag: "Most structure",
+    card: () => `<div class="lead-thin lead-thin2">${leadAndList()}</div>`,
+    idea: "Thin grey lines above and below the lead, setting it off as its own block.",
+    good: ["The lead is clearly the lead"],
+    watch: ["More lines, and the lead block starts to look like a box inside a box"],
+  },
+];
+
+const ROUND1 = [
+  {
+    name: "Today's card", tag: "Now", now: true,
+    card: s => seeInside(s),
+    idea: "The title and one summary line. What's inside is a tap away on the edition's page.",
+    good: ["Short, so earlier editions stay in view"],
+    watch: ["Nothing says what you'd be sending"],
+  },
+  OPTION_A,
+  {
+    name: "B. Sources in one line", tag: "Lightest",
+    card: s => `<div class="sources new">From <b>BBC News</b>, <b>Quanta Magazine</b>, <b>Rest of World</b>, <b>Nautilus</b> and 3 more</div>${seeInside(s)}`,
+    idea: "Who's in this edition, not what. One or two lines.",
+    good: ["Barely changes the card's height"],
+    watch: ["Sources you read daily say little about today's paper"],
+  },
+  {
+    name: "C. A small front page", tag: "Most newspaper",
+    card: () => {
+      const [lead, b, c] = ARTICLES;
+      return `<div class="fp new">${leadBlock(lead)}
+        <div class="cols"><div><small>${esc(b.src)}</small>${esc(b.h)}</div><div><small>${esc(c.src)}</small>${esc(c.h)}</div></div>
+        ${more(ARTICLES.length - 3)}</div>`;
+    },
+    idea: "The first article as the lead story, the next two in columns under it.",
+    good: ["The strongest sense of \"today's paper\""],
+    watch: ["The lead is just whichever came first", "Narrow columns wrap badly at large font sizes"],
+  },
+  {
+    name: "D. The cover beside the title", tag: "Most visual",
+    card: s => `<div class="withcover" style="margin-top:12px"><div class="cover new">
+        <div class="cm">newspapeRSS</div><div class="cr"></div>
+        <div class="wd">THURSDAY</div><div class="dy">Oct 1</div>
+        <div class="hl">${ARTICLES.slice(0, 4).map(a => `<div><b>${esc(a.src.toUpperCase())}</b>${esc(a.h)}</div>`).join("")}</div>
+        <div class="ft">${ARTICLES.length} articles · ${TOTAL} min</div></div>
+        <div style="font-size:13px;line-height:1.45;color:var(--ink-soft)">The same cover your e-reader shows in its library.${s === "ready" ? `<br><span class="tbtn">See what's inside</span>` : ""}</div></div>`,
+    idea: "The generated EPUB cover as a thumbnail.",
+    good: ["Ties the phone to the device"],
+    watch: ["Needs the cover saved as its own file", "At this size the headlines are unreadable"],
+  },
+  {
+    name: "E. The whole contents, folded", tag: "Most complete",
+    card: s => `<div class="fold new">
+        <div class="toggle"><span>${s === "ready" ? "Hide contents" : "Show contents"}</span><span>${s === "ready" ? "▲" : "▼"}</span></div>
+        ${s === "ready" ? `<ol class="toc">${ARTICLES.map(a =>
+          `<li><span class="h"><small>${star(a)}${esc(a.src)}</small>${esc(a.h)}</span><span class="m">${mins(a.m)}</span></li>`).join("")}</ol>` : ""}
+      </div>`,
+    idea: "Every article, folded away; shown open on the ready card and closed on the sent one.",
+    good: ["Nothing hidden behind another screen"],
+    watch: ["Open, it pushes Send off the first screen", "Repeats the edition's own page"],
+  },
+];
+
+const option = (o, state) => `
+  <article class="option">
+    <h2>${o.name} <span class="tag ${o.rec ? "rec" : ""}">${o.tag}</span></h2>
+    ${shell(o, state)}
+    <div class="notes">
+      <p>${o.idea}</p>
+      <div class="label">Good</div><ul>${o.good.map(g => `<li>${g}</li>`).join("")}</ul>
+      <div class="label">Watch out</div><ul>${o.watch.map(g => `<li>${g}</li>`).join("")}</ul>
+    </div>
+  </article>`;
+
+function render(state) {
+  document.getElementById("grid5").innerHTML = ROUND5.map(o => option(o, state)).join("");
+  document.getElementById("grid4").innerHTML = ROUND4.map(o => option(o, state)).join("");
+  document.getElementById("grid3").innerHTML = ROUND3.map(o => option(o, state)).join("");
+  document.getElementById("grid2").innerHTML = ROUND2.map(o => option(o, state)).join("");
+  document.getElementById("grid1").innerHTML = ROUND1.map(o => option(o, state)).join("");
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.state === state)));
+  try { localStorage.setItem("cardState", state); } catch (e) {}
+}
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => render(b.dataset.state)));
+const marks = document.getElementById("marks");
+marks.addEventListener("click", () => {
+  const on = !document.body.classList.contains("marks");
+  document.body.classList.toggle("marks", on);
+  marks.setAttribute("aria-pressed", String(on));
+});
+let initial = "ready";
+try { initial = localStorage.getItem("cardState") === "sent" ? "sent" : "ready"; } catch (e) {}
+render(initial);
+</script>
+</body>
+</html>

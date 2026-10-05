@@ -104,13 +104,12 @@ class SentEditionActionsTest {
 
     private fun button(text: String) = compose.onNode(hasText(text) and hasClickAction())
 
-    private fun leftOf(first: String, second: String) =
-        button(first).fetchSemanticsNode().boundsInRoot.left < button(second).fetchSemanticsNode().boundsInRoot.left
+    private val card get() = button("Tuesday Morning Edition")
 
     private fun statusOf(id: Long) = runBlocking { db.editions().byId(id) }?.status
 
     @Test
-    fun aKindleReadersSentCardLeadsWithWhatsInsideThenTheKindleApp() {
+    fun aKindleReadersSentCardOffersTheKindleAppAndOpensTheEditionWhenTapped() {
         installKindle()
         val id = edition(EditionStatus.DELIVERED)
         var opened: Long? = null
@@ -119,13 +118,13 @@ class SentEditionActionsTest {
         compose.onNodeWithText("Send again").assertDoesNotExist()
         compose.onNodeWithText(MARK_NOT_SENT).assertDoesNotExist()
         compose.onNodeWithText("Open").assertDoesNotExist()
-        assertTrue(leftOf("See what's inside", "Open Kindle"))
+        compose.onNodeWithText("See what's inside").assertDoesNotExist()
 
         button("Open Kindle").performClick()
         val started = shadowOf(app).nextStartedActivity
         assertEquals(EditionIntents.KINDLE_PACKAGE, started.component?.packageName ?: started.`package`)
 
-        button("See what's inside").performClick()
+        card.performClick()
         assertEquals(id, opened)
     }
 
@@ -134,7 +133,6 @@ class SentEditionActionsTest {
         edition(EditionStatus.DELIVERED)
         today(Device.KINDLE)
 
-        button("See what's inside").assertExists()
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
     }
 
@@ -166,18 +164,21 @@ class SentEditionActionsTest {
         edition(EditionStatus.DELIVERED)
         today(Device.BOOX)
 
-        assertTrue(leftOf("Open", "See what's inside"))
+        button("Open").assertExists()
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
         compose.onNodeWithText("Send again").assertDoesNotExist()
     }
 
     @Test
-    fun aKoboReadersSentCardHasOnlyWhatsInside() {
+    fun aKoboReadersSentCardHasNoButtonsButOpensTheEditionWhenTapped() {
         installKindle()
-        edition(EditionStatus.DELIVERED)
-        today(Device.KOBO)
+        val id = edition(EditionStatus.DELIVERED)
+        var opened: Long? = null
+        today(Device.KOBO) { opened = it }
 
-        button("See what's inside").assertExists()
+        card.performClick()
+        assertEquals(id, opened)
+        compose.onNodeWithText("See what's inside").assertDoesNotExist()
         compose.onNodeWithText("Open").assertDoesNotExist()
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
     }

@@ -54,6 +54,13 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] An edition released because another was made by hand keeps its Ready notification (with Send) until the next timed one replaces it
 - [ ] Boox: consider turning off ripples on e-ink (they cause partial refreshes); Boox's own refresh modes may make it moot
 
+### Today
+- [ ] Today's card as the paper's front page *(you asked)*. The card now leads with your star or the longest read, then the next two. Explored further ([research/edition-card/](research/edition-card/index.html), open it in a browser):
+  - G1: the card carries the newspaper styling (the edition's name between double rules, an issue number, "No. 42") and Today's masthead steps back to a plain bar or a small imprint, so there's one front page per screen
+  - F4: the same card under today's masthead, where the two compete
+  - the lead with its opening line (F3) or its picture (F7), which need more stored per edition
+  - Live with the current card first; the masthead's date could go either way, since the edition's title has it
+
 ### Reading list
 - [ ] Saved links that can never be read (a PDF, a video, a page over 5 MB, a 410) wait silently forever. Show them in the reading list as unreadable, with the reason and a way to open or remove them. Not as "couldn't fetch" pages in the edition: they cost no reading time, so a backlog of them could fill one
 - [ ] Links saved before database version 2 with a title never get a reading time (no backfill)

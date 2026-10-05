@@ -17,7 +17,10 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +60,8 @@ data class TodayState(
     val sentToKindle: Map<Long, KindleSend> = emptyMap(),
     /** Where Send emails editions, or null when it shares them. */
     val kindleEmail: KindleEmail? = null,
+    /** The latest edition's opening, or null when it has no articles. */
+    val frontPage: FrontPage? = null,
 )
 
 class TodayViewModel(
@@ -69,11 +74,21 @@ class TodayViewModel(
     sentToKindle: Flow<Map<Long, KindleSend>> = flowOf(emptyMap()),
     private val startBuild: () -> Unit,
 ) : ViewModel() {
-    private val editionsAndKindle = combine(editions.observeAll(), sentToKindle, ::Pair)
+    // The latest edition's articles arrive with the list, so its card is drawn once, whole, rather
+    // than growing a moment later: on e-ink that would be a second refresh.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val editionsWithFront: Flow<Pair<List<EditionEntity>, FrontPage?>> = editions.observeAll().flatMapLatest { list ->
+        val latest = list.firstOrNull() ?: return@flatMapLatest flowOf(list to null)
+        editions.observeContents(latest.id).map { contents -> list to FrontPage.of(contents.map { it.entry }) }
+    }
 
-    val state: StateFlow<TodayState> = combine(editionsAndKindle, work, settings, online, editions.observeStarredWaiting()) { (list, kindle), info, s, isOnline, starred ->
+    private val editionsAndKindle = combine(editionsWithFront, sentToKindle, ::Pair)
+
+    val state: StateFlow<TodayState> = combine(editionsAndKindle, work, settings, online, editions.observeStarredWaiting()) { (withFront, kindle), info, s, isOnline, starred ->
+        val (list, front) = withFront
         TodayState(
             editions = list,
+            frontPage = front,
             sentToKindle = kindle,
             build = buildStateOf(info, isOnline),
             next = nextEdition(s, now(), lastDue()),

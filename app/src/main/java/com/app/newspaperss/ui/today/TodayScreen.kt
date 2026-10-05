@@ -8,7 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +43,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -127,6 +130,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 val hasFile = remember(latest.fileName, latest.status) { viewModel.fileOf(latest) != null }
                 LatestEdition(
                     latest,
+                    frontPage = state.frontPage,
                     first = editions.size == 1,
                     saidAbove = saidAbove,
                     deviceName = state.deviceName,
@@ -258,6 +262,7 @@ private fun BuildPanel(build: BuildState, announcer: BuildAnnouncer, make: MakeB
 @Composable
 private fun LatestEdition(
     edition: EditionEntity,
+    frontPage: FrontPage?,
     first: Boolean,
     saidAbove: String?,
     deviceName: String,
@@ -274,13 +279,16 @@ private fun LatestEdition(
     onSent: () -> Unit,
     onNotSent: () -> Unit,
 ) {
-    // An outline as well as the tint, which is almost white on e-ink.
-    Card(Modifier.fillMaxWidth().padding(top = 16.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+    // An outline as well as the tint, which is almost white on e-ink. The whole card opens the
+    // edition; the buttons inside it take their own taps.
+    Card(
+        Modifier.fillMaxWidth().padding(top = 16.dp).clip(CardDefaults.shape).clickable(onClickLabel = "See what's inside", onClick = onDetails),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
         Column(Modifier.padding(16.dp)) {
             val sent = edition.status == EditionStatus.DELIVERED
-            val inside = edition.articleCount > 0
             Row {
-                Column(Modifier.weight(1f).clickable(onClickLabel = "See what's inside", onClick = onDetails)) {
+                Column(Modifier.weight(1f)) {
                     Text(edition.title, style = MaterialTheme.typography.headlineSmall)
                     // An empty failed edition's summary is just "Not sent", which its error already says.
                     if (!(edition.status == EditionStatus.FAILED && edition.articleCount == 0 && edition.error != null && edition.error != saidAbove)) {
@@ -292,10 +300,8 @@ private fun LatestEdition(
                 // Without its book there's nothing to send or take back.
                 if (sent && hasFile) SentEditionMenu(edition.title, onSend, onNotSent, Modifier.offset(x = 12.dp, y = (-12).dp))
             }
-            // The title opens the contents too, but nothing about it says so. A sent edition has a button for it instead.
-            if (!sent && inside && edition.status != EditionStatus.BUILDING) {
-                TextButton(onClick = onDetails, contentPadding = PaddingValues(0.dp)) { Text("See what's inside") }
-            }
+            // Only for an edition that is or was on its way: a failed one's articles go back to wait.
+            if (frontPage != null && (edition.status == EditionStatus.READY || sent)) FrontPagePreview(frontPage)
             when (edition.status) {
                 EditionStatus.READY -> {
                     if (first) {
@@ -329,22 +335,11 @@ private fun LatestEdition(
                 }
                 EditionStatus.DELIVERED -> {
                     sentToKindle?.let { KindleNote(it) }
-                    // What's next is reading it: on the phone where it opens here, otherwise a look at
-                    // the contents. Sending again is rare, so it waits in the menu.
-                    // Spaced per button, so a row left empty (no Kindle app, nothing inside) takes no room.
-                    val top = Modifier.padding(top = 12.dp)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        when {
-                            kindleReader -> {
-                                if (inside) Button(onClick = onDetails, modifier = top) { Text("See what's inside") }
-                                OpenKindleButton(top)
-                            }
-                            offerOpen -> {
-                                Button(onClick = onOpen, modifier = top) { Text("Open") }
-                                if (inside) OutlinedButton(onClick = onDetails, modifier = top) { Text("See what's inside") }
-                            }
-                            inside -> Button(onClick = onDetails, modifier = top) { Text("See what's inside") }
-                        }
+                    // What's next is reading it: in the Kindle app, or on the phone where it opens here.
+                    // The contents are the card itself, and sending again is rare, so it waits in the menu.
+                    when {
+                        kindleReader -> OpenKindleButton(Modifier.padding(top = 12.dp))
+                        offerOpen -> Button(onClick = onOpen, modifier = Modifier.padding(top = 12.dp)) { Text("Open") }
                     }
                 }
                 EditionStatus.FAILED -> {
@@ -357,6 +352,49 @@ private fun LatestEdition(
         }
     }
 }
+
+/**
+ * The edition's lead story over a hairline, then the next ones in the book's order. Plain rules
+ * and type only: Today's masthead is the newspaper, and a second one on the card would compete.
+ */
+@Composable
+private fun FrontPagePreview(page: FrontPage) {
+    HorizontalDivider(Modifier.padding(top = 12.dp, bottom = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val lead = page.lead
+    val why = when (page.why) {
+        FrontPage.Why.STARRED -> "You starred this"
+        FrontPage.Why.LONGEST -> "Longest read"
+        null -> null
+    }
+    val kicker = listOfNotNull(why, lead.sourceTitle, minutes(lead.minutes)).joinToString(" · ")
+    // The star is decoration, so TalkBack reads only the words.
+    Text(
+        if (page.why == FrontPage.Why.STARRED) "★ $kicker" else kicker,
+        style = MaterialTheme.typography.labelMedium,
+        color = muted,
+        modifier = Modifier.clearAndSetSemantics { contentDescription = kicker },
+    )
+    Text(
+        lead.title,
+        style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp),
+        maxLines = 3,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(top = 2.dp),
+    )
+    page.next.forEach { article ->
+        Column(Modifier.padding(top = 10.dp)) {
+            Text(article.sourceTitle, style = MaterialTheme.typography.labelMedium, color = muted)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(article.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(minutes(article.minutes), style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(start = 12.dp))
+            }
+        }
+    }
+    if (page.more > 0) Text("and ${page.more} more", style = MaterialTheme.typography.bodyMedium, color = muted, modifier = Modifier.padding(top = 10.dp))
+}
+
+private fun minutes(m: Double) = "${m.roundToInt().coerceAtLeast(1)} min"
 
 /** Send again and Mark as not sent for a sent edition whose book is still here, both rare. */
 @Composable
