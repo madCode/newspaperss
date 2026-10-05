@@ -1,6 +1,7 @@
 package com.app.newspaperss.ui
 
 import android.app.Application
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -59,6 +60,14 @@ class TodayFrontPageTest {
         compose.onNodeWithText("Story 1").assertExists()
         compose.onNodeWithText("Story 2").assertDoesNotExist()
         compose.onNodeWithText("and 2 more").assertExists()
+    }
+
+    @Test
+    fun whatCountsAsSentIsItsOwnTalkBackStopNotPartOfTheCard() {
+        today(EditionStatus.READY)
+
+        // Merged into the card, TalkBack would read it before Send instead of between Send and I've sent it.
+        compose.onNodeWithText("counts as sent", substring = true).assertHasNoClickAction()
     }
 
     @Test

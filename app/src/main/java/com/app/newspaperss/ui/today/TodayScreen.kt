@@ -328,7 +328,9 @@ private fun LatestEdition(
                             else -> "Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back."
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 12.dp),
+                        // Its own TalkBack stop, between Send and its answer, I've sent it, rather
+                        // than merged into the card, which TalkBack reads before any button.
+                        modifier = Modifier.padding(top = 12.dp).semantics(mergeDescendants = true) {},
                     )
                     // No start padding, so it lines up with the text above rather than sitting indented.
                     TextButton(onClick = onSent, contentPadding = PaddingValues(end = 12.dp)) { Text("I've sent it") }
@@ -344,7 +346,8 @@ private fun LatestEdition(
                 }
                 EditionStatus.FAILED -> {
                     val error = edition.error ?: "This edition couldn't be made."
-                    if (error != saidAbove) Text(error, color = failureColor(edition.error), modifier = Modifier.padding(top = 8.dp))
+                    // Its own stop too, so it's read just before Try again.
+                    if (error != saidAbove) Text(error, color = failureColor(edition.error), modifier = Modifier.padding(top = 8.dp).semantics(mergeDescendants = true) {})
                     OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) { Text("Try again") }
                 }
                 EditionStatus.BUILDING, EditionStatus.DELETED -> {}

@@ -79,7 +79,8 @@ class TodayViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     private val editionsWithFront: Flow<Pair<List<EditionEntity>, FrontPage?>> = editions.observeAll().flatMapLatest { list ->
         val latest = list.firstOrNull() ?: return@flatMapLatest flowOf(list to null)
-        editions.observeContents(latest.id).map { contents -> list to FrontPage.of(contents.map { it.entry }) }
+        // edition_articles alone: a query joining articles would rerun on every write to them, as a sync makes.
+        editions.observeArticles(latest.id).map { list to FrontPage.of(it) }
     }
 
     private val editionsAndKindle = combine(editionsWithFront, sentToKindle, ::Pair)
