@@ -110,7 +110,7 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
   <section class="rules">
     <h2>The proposal in four rules</h2>
     <ul>
-      <li><b>At most one filled button per card:</b> the next step. That's <b>Send</b> for every device that sends; the name changes only where the action does: <b>Read now</b> and <b>Read</b> on a Boox, <b>Open Kindle</b> in the half hour after a send to a Kindle.</li>
+      <li><b>At most one filled button per card:</b> the next step. That's <b>Send</b> for every device that sends; the name changes only where the action does: <b>Read now</b> and <b>Read</b> on a Boox.</li>
       <li><b>The card opens the contents.</b> No "See what's inside" button; a card with no button ends in a link, "and 5 more ›".</li>
       <li><b>Everything rare is in ⋮</b>, shown when it has something: open on this phone (not for Kindle or Kobo), send another way, send again, mark as not sent, the Kindle app.</li>
       <li><b>One short line replaces the paragraph and "I've sent it":</b> "Sent it another way? Mark as sent."</li>
@@ -170,10 +170,7 @@ const CASES = [
   { row: "Ready · Boox, with the app on a phone (not built yet)", note: "Today this looks like the row above, so Open reads the book on the phone and counts it as sent. Telling the two apart is in the backlog.",
     now: { btns: [["fill", "Open"], ["out", "Send"]], fine: OPEN_LINE, sent: true, menu: null },
     pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone"] } },
-  { row: "Sent · Kindle, in the half hour after sending", note: "It may still be arriving, so the Kindle app is the button: a quick way to check.",
-    now: { status: "sent", btns: [["fill", "See what's inside"], ["out", "Open Kindle"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] },
-    pro: { status: "sent", btns: [["fill", "Open Kindle"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] } },
-  { row: "Sent · Kindle, later", note: "Most read on the Kindle itself, so the card has no button; the Kindle app moves to the menu.",
+  { row: "Sent · Kindle, with the Kindle app on the phone", note: "Most read on the Kindle itself, so the card has no button; the Kindle app is in the menu.",
     now: { status: "sent", btns: [["fill", "See what's inside"], ["out", "Open Kindle"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] },
     pro: { status: "sent", btns: [], link: true, menu: ["Send again", "Didn't arrive? Mark as not sent", "Open the Kindle app"] } },
   { row: "Sent · Boox, with the app on the Boox", note: "What's next is reading it, right here.",

@@ -19,10 +19,9 @@ class EditionChoicesTest {
         status: EditionStatus,
         reader: Reader,
         emailsKindle: Boolean = false,
-        justSent: Boolean = false,
         kindleApp: Boolean = true,
         hasFile: Boolean = true,
-    ) = editionChoices(status, reader.preferOpen, reader.offerOpen, reader.kindle, emailsKindle, justSent, kindleApp, hasFile)
+    ) = editionChoices(status, reader.preferOpen, reader.offerOpen, reader.kindle, emailsKindle, kindleApp, hasFile)
 
     @Test
     fun aReadyEditionHasOneButtonAndOpeningHereOnlyWhereThatMakesSense() {
@@ -37,10 +36,9 @@ class EditionChoicesTest {
     }
 
     @Test
-    fun openKindleIsTheButtonOnlyJustAfterASendAndOtherwiseInTheMenu() {
-        assertEquals(EditionChoices(NextStep.OPEN_KINDLE, listOf(SEND_AGAIN, MARK_NOT_SENT)), choices(EditionStatus.DELIVERED, Reader.KINDLE, justSent = true))
+    fun theKindleAppIsAlwaysInTheMenuNeverAButton() {
         assertEquals(EditionChoices(null, listOf(SEND_AGAIN, MARK_NOT_SENT, OPEN_KINDLE_APP)), choices(EditionStatus.DELIVERED, Reader.KINDLE))
-        assertEquals(EditionChoices(null, listOf(SEND_AGAIN, MARK_NOT_SENT)), choices(EditionStatus.DELIVERED, Reader.KINDLE, justSent = true, kindleApp = false))
+        assertEquals(EditionChoices(null, listOf(SEND_AGAIN, MARK_NOT_SENT)), choices(EditionStatus.DELIVERED, Reader.KINDLE, kindleApp = false))
     }
 
     @Test

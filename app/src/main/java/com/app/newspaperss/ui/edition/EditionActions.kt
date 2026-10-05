@@ -30,8 +30,6 @@ enum class NextStep(val label: String) {
     READ_NOW("Read now"),
     /** Sent by reading it here; reading it again. */
     READ("Read"),
-    /** Just sent to a Kindle: see that it has arrived. */
-    OPEN_KINDLE("Open Kindle"),
 }
 
 /** The rest, in the ⋮ menu of Today's card and of the edition's page. */
@@ -56,7 +54,6 @@ data class EditionChoices(val next: NextStep?, val more: List<MoreAction>)
  * @param offerOpen false for a Kindle or Kobo, whose reader gets it by sending it; opening it on
  *   the phone would only look like a way to read it.
  * @param emailsKindle Send opens the mail app to email it to a Kindle.
- * @param justSentToKindle in the half hour after a send to a Kindle, while it may not have arrived.
  */
 fun editionChoices(
     status: EditionStatus,
@@ -64,7 +61,6 @@ fun editionChoices(
     offerOpen: Boolean,
     kindleReader: Boolean,
     emailsKindle: Boolean,
-    justSentToKindle: Boolean,
     kindleAppInstalled: Boolean,
     hasFile: Boolean,
 ): EditionChoices {
@@ -77,22 +73,18 @@ fun editionChoices(
                 if (emailsKindle) add(MoreAction.SEND_ANOTHER_WAY)
             },
         )
+        // Everyone but a Boox reader reads it on their e-reader, so a sent edition's only button is
+        // Read on a Boox. Most Kindle readers do too, so the Kindle app waits in the menu.
         EditionStatus.DELIVERED -> {
-            val next = when {
-                preferOpen && hasFile -> NextStep.READ
-                // Most read on the Kindle itself; the app is worth a button only while checking it arrived.
-                kindleApp && justSentToKindle -> NextStep.OPEN_KINDLE
-                else -> null
-            }
             EditionChoices(
-                next = next,
+                next = if (preferOpen && hasFile) NextStep.READ else null,
                 more = buildList {
                     if (hasFile) {
                         add(MoreAction.SEND_AGAIN)
                         add(MoreAction.MARK_NOT_SENT)
                         if (offerOpen && !preferOpen) add(MoreAction.OPEN_HERE)
                     }
-                    if (kindleApp && next != NextStep.OPEN_KINDLE) add(MoreAction.OPEN_KINDLE_APP)
+                    if (kindleApp) add(MoreAction.OPEN_KINDLE_APP)
                 },
             )
         }
@@ -132,17 +124,13 @@ fun NextStepButton(
     enabled: Boolean,
     onSend: () -> Unit,
     onOpen: () -> Unit,
-    kindleApp: MutableState<Intent?>,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val onClick = when (step) {
         NextStep.SEND -> onSend
         NextStep.READ_NOW, NextStep.READ -> onOpen
-        NextStep.OPEN_KINDLE -> { { startKindle(context, kindleApp) } }
     }
-    // The Kindle app doesn't need the book, so it opens even when the file is gone.
-    Button(onClick = onClick, enabled = enabled || step == NextStep.OPEN_KINDLE, modifier = modifier) { Text(step.label) }
+    Button(onClick = onClick, enabled = enabled, modifier = modifier) { Text(step.label) }
 }
 
 /** For a send this app can't see: one line, its answer a link-sized button beside it. */

@@ -432,10 +432,8 @@ whose Kindle and KOReader answers ask for more on the same page).
   - Every card has at most one button, the next step:
     - ready: **Send**, or **Read now** on a Boox, where reading it is
       the delivery; under it, "Sent it another way? **Mark as sent**";
-    - sent: **Read** on a Boox, or **Open Kindle** for the half hour after a
-      send to a Kindle, while it may still be arriving. Everyone else reads
-      it on their e-reader, so the card has no button and its last line is
-      a link: "and 5 more ›".
+    - sent: **Read** on a Boox. Everyone else reads it on their e-reader,
+      so the card has no button and its last line is a link: "and 5 more ›".
   - The rest is in a ⋮ menu at the card's top right ("More options for" the
     edition's title, for TalkBack), shown only when it has something:
     **Open on this phone** (not for Kindle or Kobo, who get the book by

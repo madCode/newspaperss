@@ -289,7 +289,7 @@ private fun LatestEdition(
     val kindleApp = rememberKindleApp()
     val choices = editionChoices(
         edition.status, preferOpen, offerOpen, kindleReader, emailsKindle,
-        justSentToKindle = sentToKindle != null, kindleAppInstalled = kindleApp.value != null, hasFile = hasFile,
+        kindleAppInstalled = kindleApp.value != null, hasFile = hasFile,
     )
     // An outline as well as the tint, which is almost white on e-ink. The whole card opens the
     // edition; the buttons inside it take their own taps.
@@ -334,7 +334,7 @@ private fun LatestEdition(
                             modifier = Modifier.padding(top = 12.dp),
                         )
                     }
-                    choices.next?.let { NextStepButton(it, enabled = hasFile, onSend, onOpen, kindleApp, Modifier.padding(top = 12.dp)) }
+                    choices.next?.let { NextStepButton(it, enabled = hasFile, onSend, onOpen, Modifier.padding(top = 12.dp)) }
                     // Says why Send is greyed out, as the edition's page does.
                     if (!hasFile) {
                         Text(
@@ -348,9 +348,9 @@ private fun LatestEdition(
                 }
                 EditionStatus.DELIVERED -> {
                     sentToKindle?.let { KindleNote(it) }
-                    // What's next is reading it: here on a Boox, or in the Kindle app just after a send.
-                    // Everyone else reads it on their e-reader; sending again is rare, so it's in ⋮.
-                    choices.next?.let { NextStepButton(it, enabled = hasFile, onSend, onOpen, kindleApp, Modifier.padding(top = 12.dp)) }
+                    // What's next is reading it: here on a Boox. Everyone else reads it on their e-reader;
+                    // sending again and the Kindle app are rare, so they're in ⋮.
+                    choices.next?.let { NextStepButton(it, enabled = hasFile, onSend, onOpen, Modifier.padding(top = 12.dp)) }
                 }
                 EditionStatus.FAILED -> {
                     val error = edition.error ?: "This edition couldn't be made."

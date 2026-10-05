@@ -30,7 +30,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
@@ -128,7 +127,7 @@ fun EditionDetailScreen(
     val choices = detail?.edition?.let {
         editionChoices(
             it.status, preferOpen, offerOpen, kindleReader, emailsKindle,
-            justSentToKindle = sentToKindle != null, kindleAppInstalled = kindleApp.value != null, hasFile = detail?.file != null,
+            kindleAppInstalled = kindleApp.value != null, hasFile = detail?.file != null,
         )
     }
 
@@ -210,7 +209,6 @@ fun EditionDetailScreen(
                     sentToKindle = sentToKindle,
                     next = choices?.next,
                     preferOpen = preferOpen,
-                    kindleApp = kindleApp,
                     onSend = ::send,
                     onOpen = ::open,
                     onSent = viewModel::markSent,
@@ -261,7 +259,6 @@ private fun Header(
     sentToKindle: KindleSend?,
     next: NextStep?,
     preferOpen: Boolean,
-    kindleApp: MutableState<Intent?>,
     onSend: () -> Unit,
     onOpen: () -> Unit,
     onSent: () -> Unit,
@@ -279,7 +276,7 @@ private fun Header(
         }
         if (edition.status == EditionStatus.DELIVERED) sentToKindle?.let { KindleNote(it) }
         // The same button as Today's card; the rest is in the top bar's ⋮.
-        next?.let { NextStepButton(it, enabled = !fileMissing, onSend, onOpen, kindleApp, Modifier.padding(top = 12.dp)) }
+        next?.let { NextStepButton(it, enabled = !fileMissing, onSend, onOpen, Modifier.padding(top = 12.dp)) }
         if (fileMissing && (edition.status == EditionStatus.READY || edition.status == EditionStatus.DELIVERED)) {
             Text(
                 "This edition's file has been deleted, so it can't be sent or opened.",

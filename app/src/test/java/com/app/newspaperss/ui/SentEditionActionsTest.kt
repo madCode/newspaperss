@@ -116,36 +116,27 @@ class SentEditionActionsTest {
     }
 
     @Test
-    fun justAfterASendAKindleReadersCardOffersTheKindleApp() {
+    fun aKindleReadersSentCardHasTheKindleAppInItsMenuEvenJustAfterASend() {
         installKindle()
         val id = edition(EditionStatus.DELIVERED)
         today(Device.KINDLE, sentToKindle = mapOf(id to KindleSend.APP))
-
-        compose.onNodeWithText("See what's inside").assertDoesNotExist()
-        button("Open Kindle").performClick()
-        assertEquals(EditionIntents.KINDLE_PACKAGE, startedPackage())
-    }
-
-    @Test
-    fun openKindleNeedsNoBook() {
-        installKindle()
-        val id = edition(EditionStatus.DELIVERED)
-        editionsDir.resolve("e.epub").delete()
-        today(Device.KINDLE, sentToKindle = mapOf(id to KindleSend.APP))
-
-        button("Open Kindle").assertIsEnabled()
-    }
-
-    @Test
-    fun laterTheKindleAppMovesToTheMenu() {
-        installKindle()
-        edition(EditionStatus.DELIVERED)
-        today(Device.KINDLE)
 
         compose.onNodeWithText("Open Kindle").assertDoesNotExist()
+        compose.onNodeWithText("See what's inside").assertDoesNotExist()
         menu("Send again", MARK_NOT_SENT)
         compose.onNodeWithText("Open the Kindle app").performClick()
         assertEquals(EditionIntents.KINDLE_PACKAGE, startedPackage())
+    }
+
+    @Test
+    fun theKindleAppNeedsNoBook() {
+        installKindle()
+        edition(EditionStatus.DELIVERED)
+        editionsDir.resolve("e.epub").delete()
+        today(Device.KINDLE)
+
+        menu("Open the Kindle app")
+        compose.onNodeWithText("Send again").assertDoesNotExist()
     }
 
     @Test
@@ -160,28 +151,29 @@ class SentEditionActionsTest {
     }
 
     @Test
-    fun withoutTheKindleAppThereIsNoOpenKindle() {
-        val id = edition(EditionStatus.DELIVERED)
-        today(Device.KINDLE, sentToKindle = mapOf(id to KindleSend.APP))
+    fun withoutTheKindleAppItIsntOffered() {
+        edition(EditionStatus.DELIVERED)
+        today(Device.KINDLE)
 
-        compose.onNodeWithText("Open Kindle").assertDoesNotExist()
         menu("Send again")
         compose.onNodeWithText("Open the Kindle app").assertDoesNotExist()
     }
 
     @Test
-    fun openKindleAfterTheAppWasRemovedSaysSoAndGoesAway() {
+    fun theKindleAppAfterItWasRemovedSaysSoAndGoes() {
         installKindle()
-        val id = edition(EditionStatus.DELIVERED)
-        today(Device.KINDLE, sentToKindle = mapOf(id to KindleSend.APP))
+        edition(EditionStatus.DELIVERED)
+        today(Device.KINDLE)
         shadowOf(app.packageManager).deletePackage(EditionIntents.KINDLE_PACKAGE)
         // A real phone refuses to start a removed app.
         shadowOf(app).checkActivities(true)
 
-        button("Open Kindle").performClick()
+        menu("Open the Kindle app")
+        compose.onNodeWithText("Open the Kindle app").performClick()
 
         assertEquals("The Kindle app isn't on this phone any more.", ShadowToast.getTextOfLatestToast())
-        compose.onNodeWithText("Open Kindle").assertDoesNotExist()
+        compose.onNodeWithContentDescription(options).performClick()
+        compose.onNodeWithText("Open the Kindle app").assertDoesNotExist()
     }
 
     @Test
