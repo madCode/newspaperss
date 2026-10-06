@@ -15,6 +15,10 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
@@ -38,16 +42,54 @@ class KokoroInstall(val dir: File, manifest: () -> List<KokoroFile>) {
 
     fun file(path: String) = File(dir, path)
 
+    private val failures = File(dir, ".failures")
+    private val checking = File(dir, ".checking")
+
+    /** Files that matched the manifest and are still there. */
     @Synchronized
-    fun verifiedPaths(): Set<String> = if (verified.exists()) verified.readLines().toSet() else emptySet()
+    fun verifiedPaths(): Set<String> = if (verified.exists()) verified.readLines().filter { file(it).exists() }.toSet() else emptySet()
 
     @Synchronized
     fun markVerified(path: String) {
-        dir.mkdirs()
+        // Removed meanwhile: don't bring the folder back for one file.
+        if (!dir.exists()) return
         verified.appendText(path + "\n")
+        failures.delete()
     }
 
     val complete: Boolean get() = verifiedPaths().containsAll(files.map { it.path })
+
+    /**
+     * Counts a failed run and returns how many have failed since a file last arrived. Android's own
+     * stops (its time limit on work, Wi-Fi lost) aren't failures, so its run count can't be used.
+     */
+    @Synchronized
+    fun failed(): Int {
+        dir.mkdirs()
+        val count = (failures.takeIf { it.exists() }?.readText()?.toIntOrNull() ?: 0) + 1
+        failures.writeText(count.toString())
+        return count
+    }
+
+    @Synchronized
+    fun clearFailures() {
+        failures.delete()
+    }
+
+    /**
+     * Marks the speed check as under way, returning false if it already was: a check that took the
+     * app down (sherpa can abort in native code) isn't run again on the next start.
+     */
+    @Synchronized
+    fun startCheck(): Boolean {
+        dir.mkdirs()
+        return checking.createNewFile()
+    }
+
+    @Synchronized
+    fun endCheck() {
+        checking.delete()
+    }
 
     @Synchronized
     fun remove() {
@@ -77,6 +119,9 @@ class KokoroDownload(
     suspend fun run(onProgress: (got: Long, total: Long) -> Unit) = coroutineScope {
         val done = install.verifiedPaths()
         val got = AtomicLong(install.files.filter { it.path in done }.sumOf { it.size })
+        install.dir.mkdirs()
+        val needed = install.bytes - got.get()
+        if (install.dir.usableSpace < needed + SPARE) throw NoSpaceException(needed + SPARE)
         onProgress(got.get(), install.bytes)
         val lanes = Semaphore(LANES)
         install.files.filter { it.path !in done }
@@ -86,39 +131,62 @@ class KokoroDownload(
             .awaitAll()
     }
 
-    private suspend fun fetch(file: KokoroFile, got: AtomicLong, onProgress: (Long, Long) -> Unit) {
+    private suspend fun fetch(file: KokoroFile, got: AtomicLong, onProgress: (Long, Long) -> Unit) =
+        // A run cancelled while blocked in a read can still be writing when the next starts.
+        writing.computeIfAbsent(install.file(file.path).path) { Mutex() }.withLock { fetchAlone(file, got, onProgress) }
+
+    private suspend fun fetchAlone(file: KokoroFile, got: AtomicLong, onProgress: (Long, Long) -> Unit) {
         val target = install.file(file.path)
         target.parentFile?.mkdirs()
         val part = File(target.path + ".part")
-        var have = part.length().takeIf { it in 1..file.size } ?: 0L
+        val have = part.length().takeIf { it in 1..file.size } ?: 0L
         var digest = file.digest()
         if (have > 0) {
             part.inputStream().use { input -> feed(input, have) { buf, n -> digest.update(buf, 0, n) } }
             got.addAndGet(have)
         }
-        val request = Request.Builder().url(url(file)).apply { if (have > 0) header("Range", "bytes=$have-") }.build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("Hugging Face answered ${response.code} for ${file.path}")
-            if (have > 0 && response.code != HTTP_PARTIAL) {
-                // The whole file came back rather than the rest of it: start it again.
-                got.addAndGet(-have)
-                have = 0
-                digest = file.digest()
-            }
-            FileOutputStream(part, have > 0).use { out ->
-                feed(response.body.byteStream(), Long.MAX_VALUE) { buf, n ->
-                    out.write(buf, 0, n)
-                    digest.update(buf, 0, n)
-                    onProgress(got.addAndGet(n.toLong()), install.bytes)
-                }
-            }
-        }
+        // A part that's all there (stopped just before it was kept) is only checked.
+        if (have < file.size) download(file, part, have, digest, got, onProgress)?.let { digest = it }
         if (part.length() != file.size || !file.matches(digest)) {
             part.delete()
             throw DamagedException(file.path)
         }
         if (!part.renameTo(target)) throw IOException("Couldn't save ${file.path}")
         install.markVerified(file.path)
+    }
+
+    /** Fetches the rest of [file] into [part], returning a fresh digest if it had to start again. */
+    private suspend fun download(file: KokoroFile, part: File, had: Long, digest: java.security.MessageDigest, got: AtomicLong, onProgress: (Long, Long) -> Unit): java.security.MessageDigest? {
+        var have = had
+        var restarted: java.security.MessageDigest? = null
+        val request = Request.Builder().url(url(file)).apply { if (have > 0) header("Range", "bytes=$have-") }.build()
+        val call = client.newCall(request)
+        coroutineScope {
+            // Cancelling the work closes the connection, so a read waiting on it ends now, not at its timeout.
+            val watch = launch { try { awaitCancellation() } finally { call.cancel() } }
+            try {
+                call.execute().use { response ->
+                    if (!response.isSuccessful) throw IOException("Hugging Face answered ${response.code} for ${file.path}")
+                    if (have > 0 && response.code != HTTP_PARTIAL) {
+                        // The whole file came back rather than the rest of it: start it again.
+                        got.addAndGet(-have)
+                        have = 0
+                        restarted = file.digest()
+                    }
+                    val into = restarted ?: digest
+                    FileOutputStream(part, have > 0).use { out ->
+                        feed(response.body.byteStream(), Long.MAX_VALUE) { buf, n ->
+                            out.write(buf, 0, n)
+                            into.update(buf, 0, n)
+                            onProgress(got.addAndGet(n.toLong()), install.bytes)
+                        }
+                    }
+                }
+            } finally {
+                watch.cancel()
+            }
+        }
+        return restarted
     }
 
     private suspend fun feed(input: java.io.InputStream, limit: Long, use: (ByteArray, Int) -> Unit) {
@@ -139,7 +207,14 @@ class KokoroDownload(
     /** A file arrived, but not as the manifest says it should be. */
     class DamagedException(path: String) : IOException("$path arrived damaged")
 
+    class NoSpaceException(val bytes: Long) : IOException("Needs $bytes bytes free")
+
     companion object {
+        private val writing = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
+
+        /** Room left over: a full phone misbehaves in other ways. */
+        private const val SPARE = 50_000_000L
+
         const val BASE = "https://huggingface.co/csukuangfj/kokoro-multi-lang-v1_0/resolve/f7b96bb6bef5c5da4d3aa4f4e0498fbbf62dc78b"
         private const val LANES = 8
         private const val BUFFER = 64 * 1024

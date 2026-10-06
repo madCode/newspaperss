@@ -13,7 +13,10 @@ import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +37,10 @@ class SettingsViewModel(
     private val onChanged: (Settings) -> Unit,
 ) : ViewModel() {
     val settings: StateFlow<Settings?> = store.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Kokoro's download size, from its manifest: read off the main thread. */
+    val kokoroSize: StateFlow<Long?> = (podcast?.let { setup -> flow { emit(setup.size) }.flowOn(Dispatchers.IO) } ?: flowOf(null))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val kokoro: StateFlow<KokoroState?> = (podcast?.state ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

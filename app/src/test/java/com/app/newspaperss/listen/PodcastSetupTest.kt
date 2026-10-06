@@ -38,10 +38,12 @@ class PodcastSetupTest {
         var released = false
         override fun speak(text: String): Speech {
             clock += 18_000_000_000L
-            return Speech(FloatArray(15 * 24_000), 24_000)
+            return Speech(FloatArray(if (silent) 0 else 15 * 24_000), 24_000)
         }
         override fun release() { released = true }
     }
+
+    private var silent = false
 
     private fun setup(supported: Boolean = true) = PodcastSetup(
         install, store, work,
@@ -77,6 +79,9 @@ class PodcastSetupTest {
         assertEquals(KokoroState.Waiting(wifi = true), setup.state.first())
         work.value = info(WorkInfo.State.ENQUEUED, network = NetworkType.CONNECTED)
         assertEquals(KokoroState.Waiting(wifi = false), setup.state.first())
+        // Waiting after a failed try is a wait whatever the connection, not one for Wi-Fi.
+        work.value = WorkInfo(UUID.randomUUID(), WorkInfo.State.ENQUEUED, emptySet(), runAttemptCount = 2)
+        assertEquals(true, (setup.state.first() as KokoroState.Waiting).retrying)
         work.value = info(WorkInfo.State.RUNNING, progress = mapOf(PodcastSetup.GOT to 154_000_000L, PodcastSetup.TOTAL to 384_000_000L))
         assertEquals(KokoroState.Downloading(154_000_000L, 384_000_000L), setup.state.first())
         work.value = info(WorkInfo.State.RUNNING, progress = mapOf(PodcastSetup.PHASE to PodcastSetup.PHASE_CHECK))
@@ -98,6 +103,32 @@ class PodcastSetupTest {
         assertEquals(PodcastVoice.HEART, voiceUsed)
         work.value = info(WorkInfo.State.SUCCEEDED)
         assertEquals(KokoroState.Ready(1.8f.toDouble()), setup.state.first())
+    }
+
+    private fun check(setup: PodcastSetup) = runTest {
+        setup.downloadAndCheck(KokoroDownload(okhttp3.OkHttpClient(), install, "http://unused"), onProgress = { _, _ -> }, onChecking = {})
+    }
+
+    @Test
+    fun silenceIsntAPace() {
+        installed()
+        silent = true
+        val failed = runCatching { check(setup()) }.exceptionOrNull()
+        assertTrue(failed is IllegalStateException)
+        assertNull(kotlinx.coroutines.runBlocking { store.current().podcastPace })
+    }
+
+    @Test
+    fun aCheckThatTookTheAppDownIsntRunAgainUntilAskedAfresh() {
+        installed()
+        val setup = setup()
+        // As if the app died in the middle of the last check.
+        install.startCheck()
+        assertTrue(runCatching { check(setup) }.exceptionOrNull() is IllegalStateException)
+        assertNull(voiceUsed)
+        setup.download(mobileData = false)
+        check(setup)
+        assertEquals(PodcastVoice.HEART, voiceUsed)
     }
 
     @Test

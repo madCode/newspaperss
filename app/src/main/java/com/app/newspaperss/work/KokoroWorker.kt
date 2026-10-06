@@ -37,11 +37,20 @@ class KokoroWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             Result.success()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: KokoroDownload.DamagedException) {
-            if (runAttemptCount + 1 < DAMAGED_ATTEMPTS) Result.retry() else fail("Kokoro kept arriving damaged. Try again later.")
+        } catch (e: KokoroDownload.NoSpaceException) {
+            fail("Not enough space: Kokoro needs ${e.bytes / 1_000_000} MB free. Free some up, then try again.")
         } catch (e: IOException) {
-            // A dropped connection or Hugging Face out for a while: what's arrived is kept.
-            if (runAttemptCount + 1 < ATTEMPTS) Result.retry() else fail("Couldn't download Kokoro. Check your connection and try again.")
+            // A dropped connection, Hugging Face out for a while, or a file damaged on the way: what's
+            // arrived is kept. Only failures count; Android stopping the work (its time limit, Wi-Fi
+            // lost) doesn't, so the run count can't be used.
+            // Stopping closes the connection, which ends the read with an IOException: not a failure.
+            if (isStopped) throw CancellationException("Stopped")
+            val failures = container.kokoroInstall.failed()
+            when {
+                failures < ATTEMPTS -> Result.retry()
+                e is KokoroDownload.DamagedException -> fail("Kokoro kept arriving damaged. Try again later.")
+                else -> fail("Couldn't download Kokoro. Check your connection and try again.")
+            }
         } catch (e: Exception) {
             fail("Kokoro couldn't start on this phone.")
         } catch (e: LinkageError) {
@@ -54,8 +63,8 @@ class KokoroWorker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     companion object {
         private const val UNIQUE = "kokoro"
-        private const val ATTEMPTS = 6
-        private const val DAMAGED_ATTEMPTS = 2
+        /** Failures in a row, with nothing arriving in between, before it gives up. */
+        internal const val ATTEMPTS = 6
 
         /** Wi-Fi only unless [mobileData]; asking again replaces a download waiting for Wi-Fi. */
         fun enqueue(context: Context, mobileData: Boolean) {

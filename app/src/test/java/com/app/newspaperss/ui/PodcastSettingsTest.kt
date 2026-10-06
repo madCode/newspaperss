@@ -163,6 +163,44 @@ class PodcastSettingsTest {
     }
 
     @Test
+    fun aFailureSaysWhyAndCanBeTriedAgain() {
+        on(ConnectivityManager.TYPE_WIFI)
+        show()
+        work.value = WorkInfo(UUID.randomUUID(), WorkInfo.State.FAILED, emptySet(), outputData = workDataOf(PodcastSetup.ERROR to "Kokoro couldn't start on this phone."))
+        waitFor("Kokoro couldn't start on this phone.")
+        compose.onNodeWithText("Try again").performClick()
+        assertEquals(listOf(false), started)
+    }
+
+    @Test
+    fun comingBackToADownloadedKokoroStillShowsWhatItCosts() {
+        // Checked while the reader was elsewhere: the verdict waits for them.
+        ready(2.5f)
+        show()
+        waitFor("This phone is slow at it, but it can")
+        waitFor("Your 30-minute paper takes about 2 hours to make here")
+        compose.onNodeWithText("Read live in this phone's voice").assertIsSelected()
+    }
+
+    @Test
+    fun choosingToReadLiveDuringTheDownloadStopsIt() {
+        on(ConnectivityManager.TYPE_WIFI)
+        show()
+        work.value = running(PodcastSetup.GOT to 1_000_000L, PodcastSetup.TOTAL to 384_077_374L)
+        waitFor("1 of 384 MB")
+        compose.onNodeWithText("Read live in this phone's voice").performClick()
+        assertEquals(1, stopped)
+    }
+
+    @Test
+    fun aRetryIsntWaitingForWifi() {
+        show()
+        work.value = WorkInfo(UUID.randomUUID(), WorkInfo.State.ENQUEUED, emptySet(), runAttemptCount = 1, constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build())
+        waitFor("Trying again shortly")
+        assertEquals(0, compose.onAllNodes(hasText("Waiting for Wi-Fi")).fetchSemanticsNodes().size)
+    }
+
+    @Test
     fun aThirtyTwoBitPhoneSeesWhyNot() {
         show(supported = false)
         waitFor("Kokoro needs a 64-bit phone")

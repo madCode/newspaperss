@@ -8,7 +8,9 @@ import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 
 /** Where getting Kokoro onto this phone stands, for Settings › Listening. */
 sealed interface KokoroState {
@@ -18,8 +20,11 @@ sealed interface KokoroState {
     /** Not downloaded, or part way and stopped. */
     data object Absent : KokoroState
 
-    /** Download asked for, waiting for Wi-Fi ([wifi]) or for any connection. */
-    data class Waiting(val wifi: Boolean) : KokoroState
+    /**
+     * Download asked for, waiting for Wi-Fi ([wifi]) or for any connection; or [retrying] after a
+     * failed try, which waits a while whatever the connection.
+     */
+    data class Waiting(val wifi: Boolean, val retrying: Boolean = false) : KokoroState
 
     data class Downloading(val got: Long, val total: Long) : KokoroState
 
@@ -47,9 +52,11 @@ class PodcastSetup(
     private val engine: (PodcastVoice) -> PodcastEngine,
     private val now: () -> Long = System::nanoTime,
 ) {
+    /** The download's size; reads the manifest, so not on the main thread. */
     val size: Long get() = install.bytes
 
-    val state: Flow<KokoroState> = combine(settings.settings, work) { s, info -> stateOf(s, info) }
+    // Off the main thread: each emission reads which files are in place.
+    val state: Flow<KokoroState> = combine(settings.settings, work) { s, info -> stateOf(s, info) }.flowOn(Dispatchers.IO)
 
     private fun stateOf(s: Settings, info: WorkInfo?): KokoroState {
         if (!supported) return KokoroState.Unsupported
@@ -59,8 +66,10 @@ class PodcastSetup(
             } else {
                 KokoroState.Downloading(info.progress.getLong(GOT, 0), info.progress.getLong(TOTAL, install.bytes))
             }
-            WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED ->
-                return KokoroState.Waiting(wifi = info.constraints.requiredNetworkType == NetworkType.UNMETERED)
+            WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> return KokoroState.Waiting(
+                wifi = info.constraints.requiredNetworkType == NetworkType.UNMETERED,
+                retrying = info.runAttemptCount > 0,
+            )
             else -> {}
         }
         val pace = s.podcastPace
@@ -70,7 +79,12 @@ class PodcastSetup(
     }
 
     /** Downloads Kokoro, on Wi-Fi only unless [mobileData], then checks it. */
-    fun download(mobileData: Boolean) = start(mobileData)
+    fun download(mobileData: Boolean) {
+        // Asked for afresh: earlier failures don't count against it.
+        install.clearFailures()
+        install.endCheck()
+        start(mobileData)
+    }
 
     /** Stops a download, keeping what's arrived for next time. */
     fun cancel() = stop()
@@ -89,26 +103,28 @@ class PodcastSetup(
      * suggests once the phone is warm.
      */
     suspend fun downloadAndCheck(download: KokoroDownload, onProgress: (got: Long, total: Long) -> Unit, onChecking: suspend () -> Unit) {
-        var shown = 0L
+        var shown = -1L
         download.run { got, total ->
-            // Every 64 KB would flood WorkManager's database with progress.
-            val t = now()
-            if (t - shown > PROGRESS_EVERY_NS || got == total) {
-                shown = t
+            // In whole percent: every 64 KB would flood WorkManager's database, and redraw an e-ink screen.
+            val percent = got * 100 / total.coerceAtLeast(1)
+            if (percent != shown) {
+                shown = percent
                 onProgress(got, total)
             }
         }
         onChecking()
-        val voice = settings.current().podcastVoice
-        val kokoro = engine(voice)
+        if (!install.startCheck()) throw IllegalStateException("The last check stopped the app")
+        val kokoro = engine(settings.current().podcastVoice)
         try {
             val started = now()
             val speech = kokoro.speak(SAMPLE)
+            check(speech.seconds > 0) { "Kokoro said nothing" }
             val pace = PodcastPace.fromSample((now() - started) / 1e9 / speech.seconds)
             settings.update { it.copy(podcastPace = pace.toFloat()) }
         } finally {
             kokoro.release()
         }
+        install.endCheck()
     }
 
     companion object {
@@ -118,7 +134,6 @@ class PodcastSetup(
         const val GOT = "got"
         const val TOTAL = "total"
         const val ERROR = "error"
-        private const val PROGRESS_EVERY_NS = 500_000_000L
 
         /** About 14 seconds of speech: long enough to time, short enough to wait for. */
         const val SAMPLE = "For forty years, nobody could say how many ways a loop of string can tangle. " +

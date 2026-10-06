@@ -71,7 +71,7 @@ class AppContainer(
     moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
     speaker: () -> Speaker = { SystemSpeaker(context) },
     private val connectListening: () -> Unit = { ListenService.connect(context) },
-    private val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
+    val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
     podcastEngine: (KokoroInstall, PodcastVoice) -> PodcastEngine = ::KokoroEngine,
     kokoroSupported: Boolean = KokoroInstall.supported,
 ) {

@@ -26,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,31 +49,25 @@ private val INDENT = 44.dp
 
 /**
  * Settings › Listening's two voices: live in the phone's voice, or a podcast in Kokoro's, made
- * ahead. Picking the podcast downloads Kokoro (asking first off Wi-Fi), checks how fast this
- * phone makes speech, and says what that means for the reader's paper before it's used.
+ * ahead. Picking the podcast downloads Kokoro (asking first off Wi-Fi) and checks how fast this
+ * phone makes speech. Downloaded but not in use, it says what that means for the reader's paper,
+ * however long ago the check finished, for them to take or leave.
  */
 @Composable
-internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState?, phoneVoice: String?, onGetPhoneVoice: () -> Unit) {
+internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState?, size: Long?, phoneVoice: String?, onGetPhoneVoice: () -> Unit) {
     val context = LocalContext.current
     var asking by rememberSaveable { mutableStateOf(false) }
-    var reviewing by rememberSaveable { mutableStateOf(false) }
-    // The check's result shows once, as it lands, for the reader to take or leave.
-    var checking by remember { mutableStateOf(false) }
     LaunchedEffect(kokoro) {
-        if (kokoro is KokoroState.Checking) checking = true
-        if (kokoro is KokoroState.Ready && checking) {
-            checking = false
-            reviewing = true
-        }
         if (kokoro !is KokoroState.Absent && kokoro !is KokoroState.Failed) asking = false
     }
     val busy = kokoro is KokoroState.Waiting || kokoro is KokoroState.Downloading || kokoro is KokoroState.Checking
-    val podcast = s.listenVoice == ListenVoice.PODCAST || asking || reviewing || busy
-    val size = vm.podcast?.size?.let { "${it / 1_000_000} MB" }.orEmpty()
+    val podcast = s.listenVoice == ListenVoice.PODCAST || asking || busy
+    val mb = size?.let { "${it / 1_000_000} MB" } ?: "a few hundred MB"
 
     fun pickPodcast() {
         when (kokoro) {
-            is KokoroState.Ready -> if (verdict(s, kokoro) == Verdict.TOO_SLOW) reviewing = true else vm.useKokoro()
+            // Too slow, its verdict is already showing, with Remove.
+            is KokoroState.Ready -> if (verdict(s, kokoro) != Verdict.TOO_SLOW) vm.useKokoro()
             KokoroState.Absent, is KokoroState.Failed -> if (onWifi(context)) vm.downloadKokoro(mobileData = false) else asking = true
             else -> {}
         }
@@ -87,7 +80,8 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
             detail = phoneVoice ?: "No voice on this phone",
             onSelect = {
                 asking = false
-                reviewing = false
+                // Choosing to read live while Kokoro downloads stops it; what's arrived is kept.
+                if (busy) vm.cancelKokoro()
                 vm.listenLive()
             },
             sample = if (phoneVoice != null) vm::hear else null,
@@ -102,7 +96,7 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
         VoiceOption(
             selected = podcast,
             title = "Make a podcast in a natural voice",
-            detail = if (unsupported) "Kokoro needs a 64-bit phone, and this one is 32-bit." else "Kokoro · made ahead while your phone charges · $size",
+            detail = if (unsupported) "Kokoro needs a 64-bit phone, and this one is 32-bit." else "Kokoro · made ahead while your phone charges · $mb",
             enabled = !unsupported,
             onSelect = ::pickPodcast,
             sample = if (unsupported) null else ({ playSample(context, sampleOf(s.podcastVoice)) }),
@@ -111,14 +105,18 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
 
     when {
         asking && (kokoro == KokoroState.Absent || kokoro is KokoroState.Failed) -> Step("You're not on Wi-Fi") {
-            Text("Kokoro is a one-time $size download. Use mobile data for it, or wait and download it when you're on Wi-Fi?")
+            Text("Kokoro is a one-time $mb download. Use mobile data for it, or wait and download it when you're on Wi-Fi?")
             Buttons {
                 OutlinedButton(onClick = { asking = false; vm.downloadKokoro(mobileData = false) }) { Text("Wait for Wi-Fi") }
                 Button(onClick = { asking = false; vm.downloadKokoro(mobileData = true) }) { Text("Use mobile data") }
             }
         }
+        kokoro is KokoroState.Waiting && kokoro.retrying -> Step("Trying again shortly") {
+            Text("The download stopped part way. It carries on by itself in a few minutes, keeping what's arrived.")
+            TextButton(onClick = vm::cancelKokoro) { Text("Cancel") }
+        }
         kokoro is KokoroState.Waiting -> Step(if (kokoro.wifi) "Waiting for Wi-Fi" else "Waiting for a connection") {
-            Text("Kokoro ($size) will download by itself${if (kokoro.wifi) " on the next Wi-Fi" else " once the phone is online"}.")
+            Text("Kokoro ($mb) will download by itself${if (kokoro.wifi) " on the next Wi-Fi" else " once the phone is online"}.")
             Buttons {
                 if (kokoro.wifi) OutlinedButton(onClick = { vm.downloadKokoro(mobileData = true) }) { Text("Use mobile data") }
                 TextButton(onClick = vm::cancelKokoro) { Text("Cancel") }
@@ -132,12 +130,12 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
         kokoro is KokoroState.Checking -> Step("Seeing how fast this phone is…") {
             Text("About 20 seconds. Kokoro is making a short paragraph.")
         }
-        kokoro is KokoroState.Failed && (podcast || s.listenVoice == ListenVoice.PODCAST) -> Step("Kokoro isn't set up") {
+        kokoro is KokoroState.Failed -> Step("Kokoro isn't set up") {
             Text(kokoro.message)
             Buttons { OutlinedButton(onClick = ::pickPodcast) { Text("Try again") } }
         }
-        kokoro is KokoroState.Ready && reviewing -> Verdict(s, kokoro, size, onUse = { reviewing = false; vm.useKokoro() }, onRemove = { reviewing = false; vm.removeKokoro() })
-        kokoro is KokoroState.Ready && s.listenVoice == ListenVoice.PODCAST -> Podcast(s, vm, kokoro, size)
+        kokoro is KokoroState.Ready && s.listenVoice == ListenVoice.PODCAST -> Podcast(s, vm, kokoro, mb)
+        kokoro is KokoroState.Ready -> Verdict(s, kokoro, mb, onUse = vm::useKokoro, onRemove = vm::removeKokoro)
     }
 }
 
@@ -164,8 +162,9 @@ private fun Step(title: String, content: @Composable () -> Unit) {
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth().padding(start = INDENT, top = 4.dp, bottom = 8.dp),
     ) {
-        Column(Modifier.padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Only the step is announced as it changes, not each megabyte under it.
+            Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             content()
         }
     }

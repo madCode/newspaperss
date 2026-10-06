@@ -110,13 +110,39 @@ class KokoroDownloadTest {
     }
 
     @Test
-    fun filesAlreadyCheckedArentFetchedAgain() {
+    fun onlyAFileThatsGoneIsFetchedAgain() {
         serve()
         download()
         served.clear()
         install.file("tokens.txt").delete()
         download()
-        assertEquals(emptyMap<String, Int>(), served)
+        assertEquals(mapOf("tokens.txt" to 1), served)
+        assertTrue(install.complete)
+    }
+
+    @Test
+    fun aPartThatArrivedWholeIsCheckedNotAskedForAgain() {
+        serve()
+        java.io.File(install.dir, "model.onnx.part").writeBytes(model)
+        download()
+        assertEquals(null, served["model.onnx"])
+        assertTrue(install.file("model.onnx").readBytes().contentEquals(model))
+    }
+
+    @Test
+    fun aFileFinishingAfterRemoveDoesntBringTheFolderBack() {
+        install.dir.deleteRecursively()
+        install.markVerified("tokens.txt")
+        assertFalse(install.dir.exists())
+    }
+
+    @Test
+    fun failuresCountUntilAFileArrives() {
+        serve()
+        assertEquals(1, install.failed())
+        assertEquals(2, install.failed())
+        download()
+        assertEquals(1, install.failed())
     }
 
     @Test
