@@ -76,7 +76,8 @@ class EditionBuilder(
     private val cover: (CoverInfo) -> EpubImage? = { null },
 ) {
     /**
-     * @param deadline past it, no more articles are fetched once there's at least one: the edition
+     * @param deadline past it (the clock includes the sync before the build), no more articles are
+     *   fetched once there's at least one: the edition
      *   goes out with what it has rather than WorkManager stopping the build at its time limit, to
      *   start it again from the top and run into the limit again.
      */
@@ -116,7 +117,7 @@ class EditionBuilder(
                 db.editions().deleteEmpty(editionId)
                 BuildResult.NothingNew
             } else {
-                fill(editionId, title, now, sources, publications, articles, settings, onProgress, deadline)
+                fill(editionId, title, now, zone, sources, publications, articles, settings, onProgress, deadline)
             }
         } catch (e: CancellationException) {
             withContext(NonCancellable) { fail(editionId, STOPPED) }
@@ -133,6 +134,7 @@ class EditionBuilder(
         editionId: Long,
         title: String,
         now: LocalDateTime,
+        zone: ZoneId,
         sources: List<SourceEntity>,
         publications: List<PublicationEntity>,
         articles: List<ArticleEntity>,
@@ -164,7 +166,7 @@ class EditionBuilder(
         fun minutesOf(c: ArticleContent) = ReadingTime.minutes(c.wordCount, settings.wordsPerMinute)
         val caps = publications.mapNotNull { p -> p.maxArticles?.let { publicationOf(p.sourceId, p.key) to it } }.toMap()
         val rules = settings.rules.copy(sourceCaps = caps)
-        val texts = TextChoices(publications, clock.instant().atZone(zone()).toLocalDate().toEpochDay())
+        val texts = TextChoices(publications, clock.instant().atZone(zone).toLocalDate().toEpochDay())
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, rules, { minutesOf(it.second) }) { c ->
             if (deadline != null && kept > 0 && !clock.instant().isBefore(deadline)) return@fill null
             val article = byId.getValue(c.id.toLong())
@@ -226,7 +228,7 @@ class EditionBuilder(
             title = title,
             date = now.toLocalDate(),
             identifier = "urn:uuid:${UUID.randomUUID()}",
-            sections = listOf(EditionSection(null, withImages.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })),
+            sections = listOf(EditionSection(null, withImages.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId), zone) })),
             modified = clock.instant(),
             cover = coverImage,
             reflection = Reflection.forEdition(editionId),
@@ -309,14 +311,14 @@ class EditionBuilder(
         return BuildResult.Failed(editionId, reason)
     }
 
-    private fun toEpub(a: ArticleEntity, c: ArticleContent, minutes: Double, source: SourceEntity) = EditionArticle(
+    private fun toEpub(a: ArticleEntity, c: ArticleContent, minutes: Double, source: SourceEntity, zone: ZoneId) = EditionArticle(
         title = c.title,
         sourceTitle = bylineOf(a, c, source),
         url = a.viaUrl?.takeIf { c.notTheStory } ?: a.url,
         bodyHtml = c.bodyHtml,
         minutes = minutes,
         author = c.author,
-        published = a.published?.atZone(zone())?.toLocalDate(),
+        published = a.published?.atZone(zone)?.toLocalDate(),
         note = c.note,
         images = c.images,
         language = c.language,

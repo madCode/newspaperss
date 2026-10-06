@@ -519,7 +519,15 @@ class TtrssRepository(
     private suspend fun update(articles: List<ArticleEntity>, read: Boolean, failed: String, call: suspend TtrssClient.(List<Long>) -> Unit): Boolean {
         if (articles.isEmpty()) return true
         val sourceIds = articles.map { it.sourceId }.distinct()
-        val account = accounts.ready()
+        // The store failing to read is tried again later; only no login at all asks to sign in.
+        val stored = try {
+            accounts.load()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return false
+        }
+        val account = (stored as? StoredAccount.Ready)?.account
         if (account == null) {
             sourceIds.forEach { db.sources().setServerNote(it, FeedSync.SIGN_IN_AGAIN) }
             return true
