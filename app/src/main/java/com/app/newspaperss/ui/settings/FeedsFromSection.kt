@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui.settings
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,7 +23,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,7 +50,7 @@ import com.app.newspaperss.ui.ttrss.TtrssSignInFields
 /** The sign-in form, in place of the page while it's open. */
 @Composable
 internal fun FeedsFromSignIn(vm: FeedsFromViewModel) {
-    val form by vm.form.collectAsState()
+    val form by vm.form.collectAsStateWithLifecycle()
     val f = form ?: return
     Text(
         "FreshRSS and Miniflux are coming.",
@@ -65,7 +65,7 @@ internal fun FeedsFromSignIn(vm: FeedsFromViewModel) {
 /** The choice as two radio rows and, with tt-rss, the account's own settings. */
 @Composable
 internal fun FeedsFromSection(vm: FeedsFromViewModel) {
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val s = state ?: return
     val server = s.choice == FeedsFrom.SERVER
     val source = s.ttrss.source
@@ -119,11 +119,11 @@ internal fun FeedsFromSection(vm: FeedsFromViewModel) {
     }
     OutlinedButton(onClick = vm::openSignIn, modifier = Modifier.padding(vertical = 4.dp)) { Text("Sign in again") }
     TtrssOptions(source, vm::openCategories, vm::setMarkRead)
-    val startingFresh by vm.startingFresh.collectAsState()
+    val startingFresh by vm.startingFresh.collectAsStateWithLifecycle()
     StartFresh(source, startingFresh, vm::startFresh)
-    val categories by vm.categories.collectAsState()
+    val categories by vm.categories.collectAsStateWithLifecycle()
     categories?.let { CategoryDialog(it, source.ttrssCategoryId, vm::chooseCategory, vm::closeCategories) }
-    val leaving by vm.leaving.collectAsState()
+    val leaving by vm.leaving.collectAsStateWithLifecycle()
     if (leaving) LeaveDialog(onConfirm = vm::leave, onDismiss = vm::cancelLeaving)
 }
 
@@ -131,8 +131,8 @@ internal fun FeedsFromSection(vm: FeedsFromViewModel) {
 @Composable
 private fun PhoneFeedsHere(vm: FeedsFromViewModel) {
     val mover = vm.mover ?: return
-    val offer by vm.offer.collectAsState()
-    val status by mover.status.collectAsState(initial = null)
+    val offer by vm.offer.collectAsStateWithLifecycle()
+    val status by mover.status.collectAsStateWithLifecycle(initialValue = null)
     when (val st = status) {
         is PhoneFeeds.Offer -> offer?.let { MoveOffer(st, it.found, onMove = vm::moveFromOffer, onNotNow = vm::notNow) }
         is PhoneFeeds.Moving -> Surface(
@@ -142,7 +142,7 @@ private fun PhoneFeedsHere(vm: FeedsFromViewModel) {
         ) { Column(Modifier.padding(16.dp)) { MoveProgress(st) } }
         else -> {}
     }
-    val sheet by mover.sheet.collectAsState()
+    val sheet by mover.sheet.collectAsStateWithLifecycle()
     sheet?.let { MoveSheetDialog(it, mover) }
 }
 
