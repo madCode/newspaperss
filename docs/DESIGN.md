@@ -242,7 +242,7 @@ the ones that both write mail and take an EPUB.
 
 Folders use Android's folder picker. Google Drive and Dropbox don't offer
 whole folders to other apps that way, so cloud delivery goes through a
-share for now (a direct Dropbox connection is in the backlog).
+share.
 
 **When is an edition delivered?** Saving it to your folder; choosing an app
 in the share sheet (Android reports the choice back, from the notification
@@ -308,9 +308,7 @@ phone restarts.
   saved links do, retried for two days; a bot-check page's title is never taken.
 - **Two setups, never mixed.** Your sites come from this phone, or from
   your own RSS server (tt-rss). The reading list and curated lists stay on
-  the phone in both. It's chosen in onboarding and changed in Settings;
-  someone who added tt-rss before the choice existed lands in the server
-  setup, anyone else on this phone.
+  the phone in both. It's chosen in onboarding and changed in Settings.
 - **tt-rss:** each sync takes up to five unread articles from every feed, so a
   feed that posts monthly isn't crowded out by busy ones. Articles are marked
   read on the server once delivered (and unread again if the edition is
@@ -628,7 +626,7 @@ whose Kindle and KOReader answers ask for more on the same page).
     - tt-rss refusing (it couldn't download or read the feed, an old
       server, a read-only account) says why in plain words, and offers
       **Save this page to your reading list** when the address typed was an
-      article. Fetching it from the phone instead is an open question.
+      article.
     - A site with no feed: "No feed on this site", with **Save this page to
       your reading list**, or **Add Arts & Letters Daily** when the site is
       one of the curated lists, which stay on the phone.
@@ -707,41 +705,3 @@ calm, with no badges, counts or endless animations, which smear on e-ink.
 ## 10. Architecture
 
 How the code is built, with diagrams, is in [ARCHITECTURE.md](ARCHITECTURE.md).
-
-```
-:core  (Kotlin/JVM, no Android)          :app  (Android, Compose)
-├─ feed/     parsing, feed discovery,    ├─ data/      Room database, repositories
-│            OPML, starter packs         ├─ settings/  DataStore settings
-├─ edition/  planner, titles, schedule   ├─ edition/   EditionBuilder, EditionRun, cover, notes
-├─ extract/  page and article            ├─ work/      background workers, the scheduler
-│            extraction, language        ├─ delivery/  share, folder, the sent callback
-├─ images/   image rules and budget      ├─ notify/    the "ready" notification
-├─ epub/     the EPUB writer             ├─ ui/        Compose screens and ViewModels
-│                                        └─ AppContainer (manual dependency injection)
-├─ lists/    curated-list scrapers
-├─ notes/    the Markdown notes file
-├─ ttrss/    the tt-rss API
-└─ net/      HttpClient (OkHttp)
-```
-
-- **`:core` is pure Kotlin,** so the planner, parser, extractor and EPUB
-  writer run as fast JVM tests.
-- **One activity, Jetpack Compose, ViewModels with StateFlow.**
-- **Room** holds sources, publications, articles and editions, with exported schemas
-  (`app/schemas`) and tested migrations. **DataStore** holds settings.
-- **WorkManager** runs the sync, the build, the timers, and what follows
-  delivery (marking tt-rss read, saving notes).
-- **Manual dependency injection** (`AppContainer`): the app is small enough
-  that Hilt isn't worth its machinery.
-- **Permissive dependencies only** (Apache/MIT): Readability4J, jsoup,
-  OkHttp, AndroidX. The open-source Android readers are GPL, so newspaperss
-  learns from them but copies no code.
-- **Tests:** JVM tests in `:core`; Robolectric and Compose UI tests in
-  `:app` against a real Room database. CI runs `./gradlew build` and Kover.
-  A daily scheduled job reads each curated list's live page, so a site redesign
-  fails there before it reaches a phone.
-- **License:** MIT.
-
-## 11. Open questions for the owner
-
-- **Name.** Shown as newspapeRSS; the repository stays newspaperss.

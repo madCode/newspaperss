@@ -20,22 +20,28 @@ who'd rather not set up Python, a server and a scheduler.
 
 ## Getting started
 
-Setup takes a couple of minutes, in four steps:
+Setup takes a couple of minutes, in four steps (five with a server or
+another reader app's list):
 
 1. **Where do you read?** Kindle, Kobo, Boox (or another Android e-reader),
    PocketBook, KOReader, or just the file. Each gets a tip on how editions
    reach it; KOReader asks for a folder that syncs to the device, and a
    Kindle can have editions emailed to its own address instead.
-2. **Where do your feeds live now?** Pick sites yourself (starter packs of
-   News, Science, Technology, Essays & ideas, Culture & curiosities, or any
-   website), use your own Tiny Tiny RSS server, or bring your list from
-   another reader app as an OPML file. Leaving Pocket or Instapaper? Import
-   your saved links; they're enough on their own.
-3. **How big, how often?** About 10 to 90 minutes of reading, and whether a
-   new edition should be ready by a set time every day.
-4. **Make my first edition.** It starts building right away, with its
-   progress on Today. Once it's ready, send it from there (or Read it on a
-   Boox); with a folder, it's saved there for you.
+2. **Where do your feeds live now?** Pick sites yourself, use your own Tiny
+   Tiny RSS server, or bring your list from another reader app as an OPML
+   file.
+3. **Your sites.** Starter packs of News, Science, Technology, Essays &
+   ideas, Culture & curiosities, or any website. With a server, sign in to
+   it instead; with an OPML file, import it first. Leaving Pocket or
+   Instapaper? Import your saved links; they're enough on their own.
+   - (**Also on this phone**, with a server.) Your reading list of shared
+     links, and curated lists, which stay on the phone whatever the server
+     does.
+4. **How big, how often?** About 10 to 90 minutes of reading, and whether a
+   new edition should be ready by a set time every day. **Make my first
+   edition** starts it right away, with its progress on Today. Once it's
+   ready, send it from there (or Read it on a Boox); with a folder, it's
+   saved there for you.
 
 ## What it does
 

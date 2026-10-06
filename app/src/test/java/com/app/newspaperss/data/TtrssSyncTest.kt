@@ -798,7 +798,7 @@ class TtrssSyncTest {
         sync.syncAll()
         val editionId = editionWith(source.id, "ttrss:10")
         var enqueued = false
-        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC)) { enqueued = true }.markDelivered(editionId)
+        EditionRepository(db, tmp.root, Clock.fixed(now, ZoneOffset.UTC), onTtrssChanged = { enqueued = true }).markDelivered(editionId)
 
         assertFalse(enqueued)
         assertTrue(ttrss.markRead(editionId))

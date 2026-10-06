@@ -55,6 +55,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -212,14 +213,19 @@ private fun TextBlock(block: Block.Text, current: Int?, onLayout: (TextLayoutRes
         Kind.PARAGRAPH, Kind.ITEM -> typography.bodyLarge
     }
     val tint = MaterialTheme.colorScheme.secondaryContainer
-    val ranges = sentenceRanges(block)
-    val text: AnnotatedString = buildAnnotatedString {
-        block.sentences.forEachIndexed { i, sentence ->
-            if (i > 0) append(' ')
-            // Underlined as well as tinted: on e-ink the tint is too faint to follow.
-            if (i == current) withStyle(SpanStyle(background = tint, textDecoration = TextDecoration.Underline)) { append(sentence) } else append(sentence)
+    val ranges = remember(block) { sentenceRanges(block) }
+    // Rebuilt only when this block's sentence changes, not for every sentence read elsewhere.
+    val text: AnnotatedString = remember(block, current, tint) {
+        buildAnnotatedString {
+            block.sentences.forEachIndexed { i, sentence ->
+                if (i > 0) append(' ')
+                // Underlined as well as tinted: on e-ink the tint is too faint to follow.
+                if (i == current) withStyle(SpanStyle(background = tint, textDecoration = TextDecoration.Underline)) { append(sentence) } else append(sentence)
+            }
         }
     }
+    // The gesture below lives as long as the block; the next article's equal block needs this one's tap.
+    val tap by rememberUpdatedState(onTap)
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val outer = Modifier.fillMaxWidth()
         .padding(
@@ -232,12 +238,12 @@ private fun TextBlock(block: Block.Text, current: Int?, onLayout: (TextLayoutRes
             detectTapGestures { offset ->
                 val at = layout?.getOffsetForPosition(offset) ?: return@detectTapGestures
                 val sentence = ranges.indexOfFirst { at <= it.last + 1 }
-                if (sentence >= 0) onTap(sentence)
+                if (sentence >= 0) tap(sentence)
             }
         }
         // For TalkBack, the paragraph is one stop that reads from its start.
         .semantics {
-            onClick(label = "Read from here") { onTap(0); true }
+            onClick(label = "Read from here") { tap(0); true }
             if (block.kind == Kind.TITLE || block.kind == Kind.HEADING) heading()
         }
     val prefix = if (block.kind == Kind.ITEM) "• " else ""

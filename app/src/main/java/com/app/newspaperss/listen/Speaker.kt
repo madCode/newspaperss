@@ -40,9 +40,10 @@ interface Speaker {
  * The phone's text-to-speech voice (Speech Services by Google on most phones). It starts
  * asynchronously; lines asked for before it's ready wait for it.
  *
- * An engine that failed to start, or dropped out (updated, or killed), is started again on the next
- * line asked for, so "try again" after fixing Android's text-to-speech settings works without
- * restarting the app.
+ * An engine that failed to start, or dropped out (updated, or killed), is started again for the
+ * next line spoken from a new place (play, a seek, a page turn), so "try again" after fixing
+ * Android's text-to-speech settings works without restarting the app. A queued line fails instead,
+ * so a broken engine shows an error rather than restarting over and over.
  */
 class SystemSpeaker(context: Context) : Speaker {
     override var listener: Speaker.Listener? = null
@@ -82,10 +83,15 @@ class SystemSpeaker(context: Context) : Speaker {
     }
 
     override fun speak(id: String, text: String, language: String?, rate: Float, flush: Boolean): Boolean {
-        if (failed) {
+        // Started afresh only for a line that starts speaking (not each line queued behind it),
+        // so an engine that keeps failing isn't rebound over and over.
+        if (failed && flush) {
             failed = false
             tts.shutdown()
             tts = connect()
+        } else if (failed) {
+            main.post { listener?.onError(id) }
+            return true
         }
         if (!ready) {
             waiting += {

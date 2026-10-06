@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToLong
 
 /**
@@ -26,7 +28,14 @@ class SessionPlayer(private val listen: ListenPlayer) : SimpleBasePlayer(Looper.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     init {
-        scope.launch { listen.state.collect { invalidateState() } }
+        // Not for every sentence while playing: the system advances the position itself from the
+        // speed. Paused, a move within the article (a tapped sentence, ↶) has to be told.
+        scope.launch {
+            listen.state.map {
+                listOf(it.editionId, it.pages, it.at.page, it.at.line.takeUnless { _ -> it.playing }, it.playing, it.loading, it.finished, it.speed, it.editionTitle)
+            }
+                .distinctUntilChanged().collect { invalidateState() }
+        }
     }
 
     override fun getState(): State {

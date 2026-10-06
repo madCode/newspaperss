@@ -21,8 +21,18 @@ data class ListenScript(val blocks: List<Block>, val language: String? = null) {
         }
     }
 
+    // Each line's start in seconds, and the whole at the end: asked for at every sentence.
+    private val starts: DoubleArray by lazy {
+        val out = DoubleArray(lines.size + 1)
+        lines.forEachIndexed { i, line -> out[i + 1] = out[i] + ListenTime.seconds(line.spoken) }
+        out
+    }
+
     /** About how long reading it aloud takes, at normal speed. */
-    val seconds: Double get() = lines.sumOf { ListenTime.seconds(it.spoken) }
+    val seconds: Double get() = starts.last()
+
+    /** About how long reading the lines before [line] takes. */
+    fun secondsBefore(line: Int): Double = starts[line.coerceIn(0, lines.size)]
 
     sealed interface Block {
         data class Text(val kind: Kind, val sentences: List<String>) : Block

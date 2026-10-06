@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.testutil.idleUntil
 import android.content.Intent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +29,7 @@ class ReadingListScreenTest {
     @get:Rule val compose = createComposeRule()
     private val app = ApplicationProvider.getApplicationContext<TestApp>()
 
-    private fun waitFor(text: String) = compose.waitUntil(5_000) {
+    private fun waitFor(text: String) = idleUntil {
         compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()
     }
 
@@ -89,7 +90,7 @@ class ReadingListScreenTest {
         compose.waitForIdle()
         assertEquals("settled on the way out", null, vm.removed.value)
 
-        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.isEmpty() }
+        idleUntil { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.isEmpty() }
     }
 
     @Test
@@ -103,8 +104,8 @@ class ReadingListScreenTest {
         compose.onNodeWithContentDescription("Remove One").performClick()
         // A second removal settles the first; leaving settles the second.
         compose.onNodeWithContentDescription("Remove Two").performClick()
-        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.map { it.title } == listOf("Two") }
+        idleUntil { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.map { it.title } == listOf("Two") }
         vm.commitRemove()
-        compose.waitUntil(5_000) { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.isEmpty() }
+        idleUntil { runBlocking { app.container.db.articles().allForSource(list.sourceId()) }.isEmpty() }
     }
 }

@@ -206,7 +206,7 @@ flowchart LR
     open["OpenEditionActivity / Open button (Boox)"] --> ms
     email["SendEditionActivity / Send button: mail app opened"] --> me
     me["markEmailedToKindle: only if still READY"] --> md
-    sent["I've sent it (Today, Edition)"] --> ms
+    sent["Mark as sent (Today, Edition)"] --> ms
     ms["markSent: only if still READY"] --> md
     md["markDelivered (one transaction)"]
     md --> arts["articles DELIVERED, stars cleared"]
@@ -272,6 +272,9 @@ flowchart LR
   the player's. It also asks for audio focus and pauses when headphones
   are unplugged. The app binds it (`ListenService.connect`) when Listen is
   first tapped, and Media3 makes it a foreground service while it plays.
+- When an edition's book is deleted (the edition, or old files pruned),
+  `EditionRepository`'s `onFileGone` tells the player, which lets the book
+  go if it's the one loaded; the player isn't made just to be told.
 - **`ListenProgress`** keeps where each of the ten most recent editions
   was left, and which were heard to the end, in SharedPreferences
   (`listening`).
@@ -284,7 +287,7 @@ twice.
 | Work | Started by | Unique name, policy | Notes |
 |---|---|---|---|
 | `EditionWorker` | "Make an edition", the timer | `edition-build`, KEEP | One build at a time. Needs a connection. A timed run that reaches no source retries twice (5, then 10 min). After 8 minutes it stops fetching and writes the edition with what it has, short of WorkManager's 10-minute limit. |
-| `EditionScheduler.Timer` | `EditionScheduler.reschedule` | `edition-schedule`, REPLACE / APPEND | One-off timer 30 min before the due time; it starts a build and arms the next timer. |
+| `EditionScheduler.Timer` | `EditionScheduler.reschedule` | `edition-schedule`, REPLACE (re-armed) / APPEND_OR_REPLACE (the next, from the running timer) | One-off timer 30 min before the due time; it starts a build and arms the next timer. |
 | `SyncWorker` (periodic) | App start | `sync-periodic-12h`, KEEP | Every 12 h, connected, battery not low. Only keeps the Sources screen fresh. |
 | `SyncWorker` (now) | Adding a source, refresh | `sync-now`, APPEND_OR_REPLACE | Appended so a new source isn't missed by a sync already running. |
 | `NotesWorker` | First delivery | `notes-<edition>`, KEEP | Saves the notes file to the notes folder. |
