@@ -73,11 +73,12 @@ class OkHttpHttpClient(
     override suspend fun postJson(url: String, body: String): HttpResponse =
         text(request(url, emptyMap()) { post(body.toRequestBody(JSON)) }, postClient)
 
-    private suspend fun text(request: Request, via: OkHttpClient = client): HttpResponse = via.newCall(request).await().use { r ->
-        withContext(Dispatchers.IO) {
+    // On IO throughout: closing a response it didn't read to the end reads the rest off the network.
+    private suspend fun text(request: Request, via: OkHttpClient = client): HttpResponse = withContext(Dispatchers.IO) {
+        via.newCall(request).await().use { r ->
             if (r.isRedirect) {
                 val location = r.header("Location")?.let { r.request.url.resolve(it)?.toString() } ?: r.request.url.toString()
-                return@withContext HttpResponse(r.code, location, r.header("Content-Type"), "")
+                return@use HttpResponse(r.code, location, r.header("Content-Type"), "")
             }
             val source = r.body.source()
             // Someone may paste a link to a video or a huge file; don't read it all into memory.
@@ -87,8 +88,8 @@ class OkHttpHttpClient(
         }
     }
 
-    override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = imageClient.newCall(request(url, headers)).await().use { r ->
-        withContext(Dispatchers.IO) {
+    override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = withContext(Dispatchers.IO) {
+        imageClient.newCall(request(url, headers)).await().use { r ->
             val source = r.body.source()
             if (source.request(MAX_IMAGE_BYTES + 1)) throw IOException("Too large for an image.")
             HttpBytes(r.code, r.header("Content-Type"), source.readByteArray())

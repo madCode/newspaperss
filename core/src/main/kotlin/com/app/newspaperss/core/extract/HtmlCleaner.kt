@@ -142,7 +142,7 @@ object HtmlCleaner {
             val scheme = resolved.scheme?.lowercase() ?: return null
             if (scheme !in schemes) return null
             // A host with an underscore parses as an authority without a host, and is still a site.
-            if (scheme != "mailto" && resolved.host.isNullOrEmpty() && resolved.rawAuthority.isNullOrEmpty()) return null
+            if (scheme != "mailto" && resolved.host.isNullOrEmpty() && resolved.rawAuthority?.matches(HOST_NAME) != true) return null
             resolved.toString()
         } catch (_: URISyntaxException) {
             null
@@ -815,6 +815,9 @@ object HtmlCleaner {
     private val URL_SAFE = ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" + "-._~:/?@!$&'()*+,;=").toSet()
     private val WEB_SCHEMES = setOf("http", "https")
     internal val LINK_SCHEMES = setOf("http", "https", "mailto")
+    // A host name java.net.URI won't call one (an underscore in it), but nothing else: not an
+    // encoded international name it couldn't convert, nor a user with no host.
+    private val HOST_NAME = Regex("[A-Za-z0-9._-]+(:\\d+)?")
     // scheme://[user@]host
     private val HOST = Regex("""^([A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@]*@)?)([^/?#:\[\]]+)""")
 }

@@ -454,4 +454,11 @@ class HtmlCleanerTest {
     fun outputIsXhtml() {
         assertEquals("<p>a<br />b &amp; c&#xa0;d</p><hr />", clean("<p>a<br>b &amp; c&nbsp;d</p><hr>"))
     }
+
+    @Test
+    fun aHostWithAnUnderscoreIsASiteButAnAuthorityWithNoHostIsnt() {
+        assertEquals("https://my_site.example/x", HtmlCleaner.absoluteUrl("https://my_site.example/x", ""))
+        assertEquals(null, HtmlCleaner.absoluteUrl("http://user@/x", ""))
+        assertEquals("https://xn--bcher-kva.example/x", HtmlCleaner.absoluteUrl("https://bücher.example/x", ""))
+    }
 }

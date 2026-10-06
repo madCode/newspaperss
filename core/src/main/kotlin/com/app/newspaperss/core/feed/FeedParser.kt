@@ -24,7 +24,12 @@ object FeedParser {
     // media:content, itunes:summary and the like share local names with the
     // elements read here, so only RSS/Atom's own namespaces count.
     private val FEED_NAMESPACES = setOf("", RSS1_NS, ATOM_NS)
-    private val ROOT = Regex("<(rss|feed|rdf:RDF)[\\s>]", RegexOption.IGNORE_CASE)
+    // The root element, prefixed or not (<rss>, <atom:feed>, <rdf:RDF>).
+    private val ROOT = Regex("<(?:[\\w-]+:)?(rss|feed|RDF)[\\s>]", RegexOption.IGNORE_CASE)
+    // <!ENTITY name "value">, or a parameter entity (<!ENTITY % name …>).
+    // A reference to another entity (&name;), not a character reference (&#160;).
+    private val ENTITY_REF = Regex("&[A-Za-z_:]")
+    private val ENTITY = Regex("<!ENTITY\\s+(%?)[^>]*?(\"[^\"]*\"|'[^']*'|>)", RegexOption.IGNORE_CASE)
     private const val MAX_PROLOG = 64 * 1024
 
     /**
@@ -44,11 +49,12 @@ object FeedParser {
     }
 
     private fun parseXml(text: String, feedUrl: String): Feed {
-        // A feed declaring its own entities is refused before parsing: nested ones can expand to
-        // gigabytes ("billion laughs"), and feeds have no use for them.
+        // Entities that expand into other entities are refused before parsing: nested, they can
+        // grow to gigabytes ("billion laughs"). Plain ones (an old CMS declaring &nbsp;) are read.
         val root = ROOT.find(text)?.range?.first ?: text.length
-        if (text.substring(0, minOf(root, MAX_PROLOG)).contains("<!ENTITY", ignoreCase = true)) {
-            throw FeedParseException("Not a readable feed: it declares entities of its own.")
+        val prolog = text.substring(0, minOf(root, MAX_PROLOG))
+        if (ENTITY.findAll(prolog).any { it.groupValues[1].isNotEmpty() || ENTITY_REF.containsMatchIn(it.groupValues[2]) || '%' in it.groupValues[2] }) {
+            throw FeedParseException("Not a readable feed: it declares entities made of other entities.")
         }
         val parser = XmlPullParserFactory.newInstance().apply { isNamespaceAware = true }.newPullParser()
         // Feeds often use HTML entities like &nbsp; that plain XML rejects;
