@@ -62,7 +62,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
@@ -72,6 +74,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -213,15 +216,18 @@ private fun TextBlock(block: Block.Text, current: Int?, onLayout: (TextLayoutRes
     val text: AnnotatedString = buildAnnotatedString {
         block.sentences.forEachIndexed { i, sentence ->
             if (i > 0) append(' ')
-            if (i == current) withStyle(SpanStyle(background = tint)) { append(sentence) } else append(sentence)
+            // Underlined as well as tinted: on e-ink the tint is too faint to follow.
+            if (i == current) withStyle(SpanStyle(background = tint, textDecoration = TextDecoration.Underline)) { append(sentence) } else append(sentence)
         }
     }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val modifier = Modifier.fillMaxWidth()
+    val outer = Modifier.fillMaxWidth()
         .padding(
             start = if (block.kind == Kind.QUOTE || block.kind == Kind.ITEM) 16.dp else 0.dp,
             bottom = if (block.kind == Kind.KICKER || block.kind == Kind.TITLE) 4.dp else 12.dp,
         )
+    // On the text itself, so a tap's offset is the text's own, not shifted by a list item's bullet.
+    val modifier = Modifier
         .pointerInput(block) {
             detectTapGestures { offset ->
                 val at = layout?.getOffsetForPosition(offset) ?: return@detectTapGestures
@@ -235,13 +241,9 @@ private fun TextBlock(block: Block.Text, current: Int?, onLayout: (TextLayoutRes
             if (block.kind == Kind.TITLE || block.kind == Kind.HEADING) heading()
         }
     val prefix = if (block.kind == Kind.ITEM) "• " else ""
-    if (prefix.isEmpty()) {
-        Text(text, modifier, style = style, onTextLayout = { layout = it; onLayout(it) })
-    } else {
-        Row(modifier) {
-            Text(prefix, style = style)
-            Text(text, style = style, onTextLayout = { layout = it; onLayout(it) })
-        }
+    Row(outer) {
+        if (prefix.isNotEmpty()) Text(prefix, style = style, modifier = Modifier.clearAndSetSemantics {})
+        Text(text, modifier.weight(1f), style = style, onTextLayout = { layout = it; onLayout(it) })
     }
 }
 
@@ -258,7 +260,8 @@ private fun ImageBlock(block: Block.Image, current: Boolean, player: ListenPlaye
     ) {
         bitmap?.let {
             val frame = if (current) Modifier.background(outline).padding(3.dp) else Modifier
-            Image(it, contentDescription = block.description ?: "An image", modifier = frame.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit)
+            // The caption under it says what it is.
+            Image(it, contentDescription = null, modifier = frame.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit)
         }
         val caption = block.description ?: "An image without a description"
         val captionStyle = MaterialTheme.typography.bodySmall
@@ -266,6 +269,7 @@ private fun ImageBlock(block: Block.Image, current: Boolean, player: ListenPlaye
             caption,
             style = captionStyle,
             modifier = Modifier.padding(top = 4.dp).then(if (current) Modifier.background(MaterialTheme.colorScheme.secondaryContainer) else Modifier),
+            textDecoration = if (current) TextDecoration.Underline else null,
         )
     }
 }
@@ -274,7 +278,7 @@ private fun ImageBlock(block: Block.Image, current: Boolean, player: ListenPlaye
 @Composable
 private fun MissingVoice(tag: String) {
     val context = LocalContext.current
-    val language = Locale.forLanguageTag(tag).getDisplayLanguage(Locale.getDefault()).ifEmpty { tag }
+    val language = Locale.forLanguageTag(tag).getDisplayLanguage(LocalConfiguration.current.locales[0]).ifEmpty { tag }
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
         Column(Modifier.padding(12.dp)) {
             Text("This article is in $language, and your phone has no $language voice, so it's read in your phone's own.", style = MaterialTheme.typography.bodyMedium)

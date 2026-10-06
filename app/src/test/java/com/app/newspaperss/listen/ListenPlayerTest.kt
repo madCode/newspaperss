@@ -237,15 +237,51 @@ class ListenPlayerTest {
     }
 
     @Test
-    fun aPageTheBookDoesntHaveIsPassedOver() {
+    fun aPageWithNothingToSayIsPassedOverButOneThatCantBeReadStops() {
         val holes = ListenPlayer(
             speaker, progress,
-            open = { ListenBook(it, "E", listOf(ListenPage("A", null, 1.0), ListenPage("B", null, 1.0)), read = { i -> if (i == 0) null else script("B one.") }) },
+            open = { ListenBook(it, "E", listOf(ListenPage("A", null, 1.0), ListenPage("B", null, 1.0), ListenPage("C", null, 1.0)), read = { i ->
+                when (i) { 0 -> ListenScript(emptyList()); 1 -> script("B one."); else -> null }
+            }) },
             scope = TestScope(UnconfinedTestDispatcher()),
         )
         holes.start(5)
         assertEquals(ListenPosition(1, 0), holes.state.value.at)
         assertEquals("B one.", speaker.queue.first().text)
+
+        // The file gone part way: it says so and keeps the place, not "heard to the end".
+        speaker.sayNext()
+        assertFalse(holes.state.value.playing)
+        assertFalse(holes.state.value.finished)
+        assertTrue(holes.state.value.error!!.contains("can't be read"))
+        assertFalse(progress.finished(5))
+        assertEquals(ListenPosition(1, 0), progress.get(5))
+    }
+
+    @Test
+    fun controlsTappedWhileTheNextArticleIsReadWaitForIt() {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val slow = ListenPlayer(
+            speaker, progress,
+            open = { ListenBook(it, "E", listOf(ListenPage("A", null, 1.0), ListenPage("B", null, 1.0)), read = { i ->
+                if (i == 1) gate.await()
+                if (i == 0) script("A one.", "A two.") else script("B one.", "B two.")
+            }) },
+            scope = TestScope(UnconfinedTestDispatcher()),
+        )
+        slow.start(6)
+        slow.next()
+        slow.pause()
+        slow.play()
+        slow.forward()
+        slow.back()
+        slow.setSpeed(1.5f)
+        // Nothing of the page being left is said meanwhile.
+        assertTrue(speaker.queue.isEmpty())
+        gate.complete(Unit)
+        assertEquals(ListenPosition(1, 0), slow.state.value.at)
+        assertEquals("B one.", speaker.queue.first().text)
+        assertEquals(1.5f, speaker.queue.first().rate)
     }
 
     @Test

@@ -94,8 +94,10 @@ data class ListenScript(val blocks: List<Block>, val language: String? = null) {
                     is Element -> when (val tag = node.normalName()) {
                         in SKIPPED -> {}
                         // A footnote's marker or its link back, which would be read as a stray
-                        // number or arrow: a short link within the page.
-                        "a" -> if (!(node.attr("href").startsWith("#") || node.attr("href").contains(".xhtml#")) || node.text().trim().length > FOOTNOTE_MARKER_MAX) {
+                        // number or arrow: a short link within the page, with no word in it.
+                        "a" -> if (!(node.attr("href").startsWith("#") || node.attr("href").contains(".xhtml#")) ||
+                            node.text().trim().length > FOOTNOTE_MARKER_MAX || node.text().any { it.isLetter() }
+                        ) {
                             for (child in node.childNodes()) visit(child, kind)
                         }
                         "br" -> pending.append(' ')

@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.media3.common.Player
@@ -40,9 +41,12 @@ class ListenService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         val listen = (application as NewspaperssApp).container.listen
+        // Its own action: PendingIntents that differ only in extras are one and the same, and
+        // this one would turn the edition notifications' taps into "open the player".
         val open = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN, MainActivity.OPEN_LISTENING).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            this, OPEN_REQUEST,
+            Intent(this, MainActivity::class.java).setAction(MainActivity.OPEN_LISTENING)
+                .putExtra(MainActivity.EXTRA_OPEN, MainActivity.OPEN_LISTENING).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         session = MediaSession.Builder(this, SessionPlayer(listen))
@@ -67,6 +71,8 @@ class ListenService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        // Without the service there's no notification, focus or headphone pause: don't play on.
+        (application as NewspaperssApp).container.listen.pause()
         focus?.release()
         session?.run {
             player.release()
@@ -85,10 +91,16 @@ class ListenService : MediaSessionService() {
             val app = context.applicationContext
             if (connected) return
             connected = true
-            MediaController.Builder(app, SessionToken(app, ComponentName(app, ListenService::class.java))).buildAsync()
+            MediaController.Builder(app, SessionToken(app, ComponentName(app, ListenService::class.java)))
+                // The service went (or never came): the next Listen binds it again.
+                .setListener(object : MediaController.Listener {
+                    override fun onDisconnected(controller: MediaController) { connected = false }
+                })
+                .buildAsync()
         }
 
         @Volatile private var connected = false
+        private const val OPEN_REQUEST = 1
     }
 }
 
@@ -100,6 +112,7 @@ private class AudioFocus(private val context: Context, private val listen: Liste
     private val audio = context.getSystemService(AudioManager::class.java)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var resumeOnGain = false
+    private var pausedAt = 0L
     private var held = false
 
     private val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
@@ -107,10 +120,20 @@ private class AudioFocus(private val context: Context, private val listen: Liste
         .setWillPauseWhenDucked(true)
         .setOnAudioFocusChangeListener { change ->
             when (change) {
-                AudioManager.AUDIOFOCUS_GAIN -> if (resumeOnGain) { resumeOnGain = false; listen.play() }
+                // Only after a short interruption: after a long one the service is no longer in the
+                // foreground, and starting again from the background with the screen off could be
+                // stopped part way; and the listener may have moved on.
+                AudioManager.AUDIOFOCUS_GAIN -> if (resumeOnGain) {
+                    resumeOnGain = false
+                    if (SystemClock.elapsedRealtime() - pausedAt < RESUME_WITHIN_MS) listen.play()
+                }
                 AudioManager.AUDIOFOCUS_LOSS -> { resumeOnGain = false; held = false; listen.pause() }
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK ->
-                    if (listen.state.value.playing) { resumeOnGain = true; listen.pause() }
+                    if (listen.state.value.playing) {
+                        resumeOnGain = true
+                        pausedAt = SystemClock.elapsedRealtime()
+                        listen.pause()
+                    }
             }
         }
         .build()
@@ -123,6 +146,8 @@ private class AudioFocus(private val context: Context, private val listen: Liste
         ContextCompat.registerReceiver(context, noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
         scope.launch {
             listen.state.map { it.playing }.distinctUntilChanged().collect { playing ->
+                // Played again by hand: a pause after this is the listener's, not the interruption's.
+                if (playing) resumeOnGain = false
                 if (playing && !held) {
                     held = audio.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
                     if (!held) listen.pause()
@@ -132,6 +157,10 @@ private class AudioFocus(private val context: Context, private val listen: Liste
                 }
             }
         }
+    }
+
+    private companion object {
+        const val RESUME_WITHIN_MS = 5 * 60_000L
     }
 
     fun release() {

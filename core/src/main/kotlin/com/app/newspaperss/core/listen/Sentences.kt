@@ -19,8 +19,11 @@ object Sentences {
         for (match in END.findAll(clean)) {
             val stop = match.range.last + 1
             if (stop >= clean.length) break
-            if (!startsSentence(clean, stop)) continue
-            if (match.value.first() == '.' && abbreviation(clean, match.range.first)) continue
+            // Chinese, Japanese and Hindi full stops end a sentence wherever they are: no space follows.
+            if (match.value.first() !in WIDE_ENDS) {
+                if (!startsSentence(clean, stop)) continue
+                if (match.value.first() == '.' && abbreviation(clean, match.range.first)) continue
+            }
             out += clean.substring(start, stop).trim()
             start = stop
         }
@@ -29,7 +32,8 @@ object Sentences {
     }
 
     // A sentence ends with . ! ? or …, then any closing quotes or brackets, then a space.
-    private val END = Regex("[.!?…]+[\"'”’)\\]]*(?=\\s)")
+    private val END = Regex("[.!?…]+[\"'”’)\\]]*(?=\\s)|[。！？।]+[”’」』）)]*")
+    private const val WIDE_ENDS = "。！？।"
     private val SPACE = Regex("\\s+")
 
     // What follows the space: a capital, a digit or an opening quote or bracket. "e.g. the" is
@@ -50,12 +54,14 @@ object Sentences {
         // An initial ("J. R. R. Tolkien") or dotted letters ("U.S.", "a.m.").
         if (word.length == 1 && word[0].isUpperCase()) return true
         if (word.contains('.') && word.split('.').all { it.length <= 1 }) return true
+        // "No. 5", but "I said no. Then…".
+        if (word.lowercase() == "no" || word.lowercase() == "nos") return text.getOrNull(dot + 2)?.isDigit() == true
         return word.lowercase() in ABBREVIATIONS
     }
 
     private val ABBREVIATIONS = setOf(
         "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "mt", "ft", "gen", "gov", "sen", "rep", "rev", "lt", "col", "capt", "sgt",
-        "vs", "etc", "inc", "ltd", "co", "corp", "no", "nos", "vol", "fig", "approx", "est", "dept", "univ",
+        "vs", "etc", "inc", "ltd", "co", "corp", "vol", "fig", "approx", "est", "dept", "univ",
         "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
     )
 
@@ -68,7 +74,7 @@ object Sentences {
         while (rest.length > MAX_LENGTH) {
             val window = rest.substring(0, MAX_LENGTH)
             val cut = listOf("; ", ", ", " ").firstNotNullOfOrNull { sep -> window.lastIndexOf(sep).takeIf { it > MAX_LENGTH / 2 }?.let { it + sep.length } }
-                ?: MAX_LENGTH
+                ?: MAX_LENGTH.let { if (rest[it - 1].isHighSurrogate()) it - 1 else it }
             out += rest.substring(0, cut).trim()
             rest = rest.substring(cut).trim()
         }

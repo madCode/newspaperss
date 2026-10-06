@@ -19,6 +19,7 @@ import com.app.newspaperss.testutil.idleUntil
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,10 +60,28 @@ class ListenServiceTest {
         assertFalse(player.state.value.playing)
         focus.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
         assertTrue(player.state.value.playing)
+        // Played and paused by hand during an interruption: the end of it doesn't override that.
+        focus.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        player.play()
+        player.pause()
+        idleUntil { true }
+        focus.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+        assertFalse(player.state.value.playing)
+        player.play()
+        idleUntil { true }
         focus.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
         assertFalse(player.state.value.playing)
         focus.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
         assertFalse(player.state.value.playing)
+        service.destroy()
+    }
+
+    @Test
+    fun theEditionNotificationsStillOpenTheAppNotThePlayer() {
+        val service = Robolectric.buildService(ListenService::class.java).create()
+        // The Notifier's tap, made after the player's notification exists.
+        val notification = android.app.PendingIntent.getActivity(app, 0, Intent(app, com.app.newspaperss.MainActivity::class.java), android.app.PendingIntent.FLAG_IMMUTABLE)
+        assertNull(shadowOf(notification).savedIntent.getStringExtra(com.app.newspaperss.MainActivity.EXTRA_OPEN))
         service.destroy()
     }
 

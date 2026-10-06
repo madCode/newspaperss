@@ -103,7 +103,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as NewspaperssApp).container
-        if (savedInstanceState == null) opening.value = intent?.getStringExtra(EXTRA_OPEN)
+        // Not when reopened from recents, which hands back the intent that first opened it.
+        if (savedInstanceState == null && intent?.flags?.and(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) {
+            opening.value = intent?.getStringExtra(EXTRA_OPEN)
+        }
         setContent {
             NewspaperssTheme {
                 val settings by container.settings.settings.collectAsState(initial = null)

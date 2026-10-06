@@ -125,10 +125,10 @@ class ListenScriptTest {
     @Test
     fun footnoteMarkersAreNotReadOut() {
         val script = ListenScript.parse(
-            book(article("<p>A claim.<sup><a href=\"#fn1\" id=\"r1\">1</a></sup> More, see <a href=\"https://example.com\">the paper</a>.</p><p id=\"fn1\"><a href=\"#r1\">1</a> The source.</p>"))
+            book(article("<p>A claim.<sup><a href=\"#fn1\" id=\"r1\">1</a></sup> More, see <a href=\"https://example.com\">the paper</a> and <a href=\"#notes\">here</a>.</p><p id=\"fn1\"><a href=\"#r1\">1</a> The source.</p>"))
                 .getValue("article-001.xhtml"),
         )
-        assertEquals(listOf("A claim.", "More, see the paper.", "The source."), script.lines.drop(3).map { it.spoken })
+        assertEquals(listOf("A claim.", "More, see the paper and here.", "The source."), script.lines.drop(3).map { it.spoken })
     }
 
     @Test

@@ -147,6 +147,7 @@ class ListenAppTest {
         var openedPlayer = 0
         compose.setContent { EditionDetailScreen(vm, onBack = {}, listening = listening, onOpenPlayer = { openedPlayer++ }) }
         // 6 minutes to read is 9 to hear.
+        idleUntil { compose.onAllNodesWithText("Listen · about 9 min").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Listen · about 9 min").performClick()
         idleUntil { compose.onAllNodesWithText("Finish Wednesday Morning Edition first?").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Finish Wednesday Morning Edition first?").assertIsDisplayed()

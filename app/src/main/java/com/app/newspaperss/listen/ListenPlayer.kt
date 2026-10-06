@@ -68,6 +68,9 @@ class ListenPlayer(
     private var queued = -1
     private var lineStartedAt = 0L
     private var errors = 0
+    /** A page is being read out of the book: until it is, the script and position are the old page's. */
+    private var turning = false
+    private var turns = 0
 
     init {
         speaker.listener = this
@@ -109,7 +112,8 @@ class ListenPlayer(
             return
         }
         _state.update { it.copy(playing = true, error = null) }
-        speakFrom(current.at.line)
+        // Mid-turn, the new page starts itself once it's read.
+        if (!turning) speakFrom(current.at.line)
     }
 
     fun pause() {
@@ -125,6 +129,7 @@ class ListenPlayer(
      */
     fun back() {
         val current = _state.value
+        if (turning) return
         val script = current.script ?: return
         val restart = current.playing && now() - lineStartedAt >= BACK_GRACE_MS
         val line = if (restart) current.at.line else current.at.line - 1
@@ -138,6 +143,7 @@ class ListenPlayer(
     /** ↷: the next sentence. */
     fun forward() {
         val current = _state.value
+        if (turning) return
         val script = current.script ?: return
         if (current.at.line < script.lines.lastIndex) goToLine(current.at.line + 1, script) else nextPage(current.playing)
     }
@@ -157,13 +163,13 @@ class ListenPlayer(
 
     fun setSpeed(speed: Float) {
         _state.update { it.copy(speed = speed) }
-        if (_state.value.playing) speakFrom(_state.value.at.line)
+        if (_state.value.playing && !turning) speakFrom(_state.value.at.line)
     }
 
     /** A picture on the page being read, for the screen. */
     suspend fun image(src: String): ByteArray? = book?.image(src)
 
-    /** Stops and lets the edition go, as when the lock screen's player is swiped away. */
+    /** Stops and lets the edition go. */
     fun stop() {
         silence()
         job?.cancel()
@@ -195,7 +201,16 @@ class ListenPlayer(
         job?.cancel()
         // Playing or not is decided now, so a pause while the page is read out of the book holds.
         _state.update { it.copy(playing = play) }
-        job = scope.launch { goTo(position) }
+        turning = true
+        val turn = ++turns
+        job = scope.launch {
+            try {
+                goTo(position)
+            } finally {
+                // A cancelled turn ends after the one that replaced it began.
+                if (turn == turns) turning = false
+            }
+        }
     }
 
     private suspend fun goTo(position: ListenPosition) {
@@ -203,8 +218,15 @@ class ListenPlayer(
         val page = position.page.coerceIn(0, opened.pages.lastIndex)
         val current = _state.value
         val script = if (page == current.at.page && current.script != null) current.script else opened.script(page)
-        if (script == null || script.lines.isEmpty()) {
-            // A page the book doesn't have (or with nothing to say) is passed over.
+        if (script == null) {
+            // The book can't be read (deleted or pruned before it was opened, or broken): say so,
+            // and keep the place, rather than pass over every page to "the end".
+            silence()
+            _state.update { it.copy(playing = false, error = "This edition's file can't be read, so it can't be read aloud.") }
+            return
+        }
+        if (script.lines.isEmpty()) {
+            // A page with nothing to say, like an article that's only a video, is passed over.
             if (page < opened.pages.lastIndex) goTo(ListenPosition(page + 1, 0)) else finish()
             return
         }

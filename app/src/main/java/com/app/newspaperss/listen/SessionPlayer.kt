@@ -35,7 +35,8 @@ class SessionPlayer(private val listen: ListenPlayer) : SimpleBasePlayer(Looper.
             .setAvailableCommands(COMMANDS)
             .setPlayWhenReady(s.playing, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
             .setPlaybackParameters(PlaybackParameters(s.speed))
-        if (s.pages.isEmpty()) return builder.setPlaybackState(if (s.loading) Player.STATE_BUFFERING else Player.STATE_IDLE).build()
+        // Media3 allows an empty playlist only when idle, so an edition still opening is idle too.
+        if (s.pages.isEmpty()) return builder.setPlaybackState(Player.STATE_IDLE).build()
         val items = s.pages.mapIndexed { index, page ->
             MediaItemData.Builder("page-$index")
                 .setMediaMetadata(

@@ -28,6 +28,19 @@ class SentencesTest {
     }
 
     @Test
+    fun noIsAWordUnlessANumberFollows() {
+        assertEquals(listOf("I said no.", "Then I left."), Sentences.split("I said no. Then I left."))
+        assertEquals(listOf("It was No. 5 on the list."), Sentences.split("It was No. 5 on the list."))
+    }
+
+    @Test
+    fun chineseJapaneseAndHindiSentencesEndAtTheirOwnFullStops() {
+        assertEquals(listOf("今日は晴れです。", "明日は雨です。"), Sentences.split("今日は晴れです。明日は雨です。"))
+        assertEquals(listOf("「行こう！」", "彼は言った。"), Sentences.split("「行こう！」彼は言った。"))
+        assertEquals(listOf("यह एक वाक्य है।", "यह दूसरा है।"), Sentences.split("यह एक वाक्य है। यह दूसरा है।"))
+    }
+
+    @Test
     fun aSentenceStartingWithANumberIsStillASentence() {
         assertEquals(listOf("It was late.", "2024 was worse."), Sentences.split("It was late. 2024 was worse."))
     }
@@ -46,5 +59,8 @@ class SentencesTest {
         assertTrue(parts.all { it.length <= Sentences.MAX_LENGTH })
         assertTrue(parts.dropLast(1).all { it.endsWith(",") })
         assertEquals(long, parts.joinToString(" "))
+        // With nowhere to pause, it's cut by length, but never through a character.
+        val emoji = "😀".repeat(Sentences.MAX_LENGTH)
+        assertTrue(Sentences.split(emoji).all { !it.first().isLowSurrogate() && !it.last().isHighSurrogate() })
     }
 }
