@@ -459,7 +459,9 @@ whose Kindle and KOReader answers ask for more on the same page).
   and the last in "That's all for today." The whole line is the link. It opens the next
   article in place; the title and **Share** follow the page on screen.
   **Share** in the top bar sends the article's original link to Android's share sheet;
-  it's hidden when an article has no web link. Large pictures that stand
+  it's hidden when an article has no web link. Selected text shared from the
+  page carries that link too, on its own line under the quote, with the
+  article's title as the subject. Large pictures that stand
   alone fill the width (small ones keep their size), and the page can be
   pinched to zoom into a comic. **Notes** exports a Markdown file for a
   notes app: front matter

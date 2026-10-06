@@ -223,7 +223,7 @@ fun ArticlePreviewScreen(
                 // Keyed: the WebView is built once, so a new article needs a new one. A new size or
                 // alignment is applied to it in place.
                 key(p) {
-                    BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, justify, BOOK_ORIGIN + EpubPages.articleHref(position), { onPage(it, p.pages) }, Modifier.fillMaxSize().padding(padding))
+                    BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, justify, BOOK_ORIGIN + EpubPages.articleHref(position), { onPage(it, p.pages) }, { link }, Modifier.fillMaxSize().padding(padding))
                 }
             }
         }
@@ -276,13 +276,26 @@ internal fun bookResponse(url: String, pages: EpubPages, background: Int, text: 
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int, textZoom: Int, justify: Boolean, pageUrl: String, onPage: (url: String) -> Unit, modifier: Modifier) {
+private fun BookView(
+    pages: EpubPages,
+    xhtml: String,
+    background: Int,
+    text: Int,
+    textZoom: Int,
+    justify: Boolean,
+    pageUrl: String,
+    onPage: (url: String) -> Unit,
+    /** The page on screen's original, added under shared selected text. */
+    source: () -> ArticleLink?,
+    modifier: Modifier,
+) {
     // Read when a page is served, so pages reached by "Next" follow a change too.
     val style = remember { PageStyle(justify) }
     // The client below is built once, but onPage can change after: Scaffold lays its content out
     // after the screen composes, so the WebView can be built just before the screen recomposes
     // for the finished load; the onPage it was built with writes to a link the screen no longer reads.
     val currentOnPage by rememberUpdatedState(onPage)
+    val currentSource by rememberUpdatedState(source)
     AndroidView(
         modifier = modifier,
         // Applied in place, so a new size keeps the reader's place in the article. A new alignment
@@ -305,7 +318,7 @@ private fun BookView(pages: EpubPages, xhtml: String, background: Int, text: Int
             }
         },
         factory = { context ->
-            WebView(context).apply {
+            WebView(QuoteShareContext(context) { currentSource() }).apply {
                 // Before the page loads too, so a dark screen doesn't flash white.
                 setBackgroundColor(background)
                 // The book has no scripts; keep the preview inert.

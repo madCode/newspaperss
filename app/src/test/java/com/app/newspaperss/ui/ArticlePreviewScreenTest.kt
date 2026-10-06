@@ -310,6 +310,24 @@ class ArticlePreviewScreenTest {
     }
 
     @Test
+    fun selectedTextSharedFromThePageSaysWhereItsFrom() {
+        val file = oneArticleEdition(url = "https://www.a.example/2026/a-story")
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "Shown title", onBack = {}) }
+        val view = webView()
+        idleUntil { compose.onAllNodes(hasContentDescription("Share link")).fetchSemanticsNodes().isNotEmpty() }
+
+        // What the WebView's selection menu does for Share: a share of just the text, started
+        // through the context the WebView was made with.
+        val quote = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "A line worth keeping.")
+        view.context.startActivity(Intent.createChooser(quote, "Share"))
+
+        @Suppress("DEPRECATION")
+        val send = shadowOf(compose.activity).nextStartedActivity.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
+        assertEquals("A line worth keeping.\n\nhttps://www.a.example/2026/a-story", send.getStringExtra(Intent.EXTRA_TEXT))
+        assertEquals("A story", send.getStringExtra(Intent.EXTRA_SUBJECT))
+    }
+
+    @Test
     fun anArticleWithoutAWebLinkHasNoShareButton() {
         val file = oneArticleEdition(url = "")
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}) }
