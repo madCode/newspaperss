@@ -24,7 +24,8 @@ class EditionFilesTest {
     @Test
     fun onlyTheNewestEditionsKeepTheirEpubsButAnUnsentOneKeepsItsWhateverItsAge() = runTest {
         val dir = tmp.newFolder("editions")
-        val repo = EditionRepository(db, dir)
+        val gone = mutableListOf<Long>()
+        val repo = EditionRepository(db, dir, onFileGone = { gone += it })
         suspend fun edition(day: Int, status: EditionStatus): Long {
             val name = "e$day.epub"
             dir.resolve(name).writeText("epub")
@@ -43,5 +44,22 @@ class EditionFilesTest {
         assertTrue("an unsent edition keeps its file", dir.resolve("e0.epub").exists())
         assertEquals("e0.epub", db.editions().byId(unsent)!!.fileName)
         kept.forEachIndexed { i, id -> assertEquals("e${i + 2}.epub", db.editions().byId(id)!!.fileName) }
+        assertEquals("Listen lets go of the pruned book only", listOf(oldest), gone)
+    }
+
+    @Test
+    fun deletingAnEditionTellsListenItsBookIsGone() = runTest {
+        val dir = tmp.newFolder("editions")
+        val gone = mutableListOf<Long>()
+        val repo = EditionRepository(db, dir, onFileGone = { gone += it })
+        dir.resolve("e.epub").writeText("epub")
+        val id = db.editions().insert(
+            EditionEntity(title = "Day", createdAt = Instant.parse("2026-09-01T06:00:00Z"), status = EditionStatus.DELIVERED, fileName = "e.epub"),
+        )
+
+        assertTrue(repo.delete(id))
+        assertFalse("deleting it again", repo.delete(id))
+
+        assertEquals(listOf(id), gone)
     }
 }

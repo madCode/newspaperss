@@ -817,7 +817,7 @@ class EditionBuilderTest {
     @Test
     fun deliveringAnEditionWithTtrssArticlesAsksForThemToBeMarkedRead() = runTest {
         val asked = mutableListOf<Long>()
-        val delivering = EditionRepository(db, tmp.root, clock) { asked += it }
+        val delivering = EditionRepository(db, tmp.root, clock, onTtrssChanged = { asked += it })
         source("a", "a1")
         val feedOnly = builder.build(EditionSettings()) as BuildResult.Built
         delivering.markDelivered(feedOnly.editionId)
@@ -831,7 +831,7 @@ class EditionBuilderTest {
 
     @Test
     fun aFailureToScheduleMarkReadDoesntUndoDelivery() = runTest {
-        val delivering = EditionRepository(db, tmp.root, clock) { throw IllegalStateException("WorkManager isn't initialised") }
+        val delivering = EditionRepository(db, tmp.root, clock, onTtrssChanged = { throw IllegalStateException("WorkManager isn't initialised") })
         ttrss("n1" to ("1" to "Example News"))
         val built = builder.build(EditionSettings()) as BuildResult.Built
         delivering.markDelivered(built.editionId)
@@ -943,7 +943,7 @@ class EditionBuilderTest {
     @Test
     fun markingAsNotSentAsksForItsTtrssArticlesToBeMarkedUnread() = runTest {
         val asked = mutableListOf<Long>()
-        val marking = EditionRepository(db, tmp.root, clock) { asked += it }
+        val marking = EditionRepository(db, tmp.root, clock, onTtrssChanged = { asked += it })
         source("a", "a1")
         val feedOnly = builder.build(EditionSettings()) as BuildResult.Built
         marking.markDelivered(feedOnly.editionId)
@@ -961,7 +961,7 @@ class EditionBuilderTest {
     @Test
     fun aFailureToScheduleMarkUnreadDoesntStopMarkingAsNotSent() = runTest {
         var failing = false
-        val marking = EditionRepository(db, tmp.root, clock) { if (failing) throw IllegalStateException("WorkManager isn't initialised") }
+        val marking = EditionRepository(db, tmp.root, clock, onTtrssChanged = { if (failing) throw IllegalStateException("WorkManager isn't initialised") })
         ttrss("n1" to ("1" to "Example News"))
         val built = builder.build(EditionSettings()) as BuildResult.Built
         marking.markDelivered(built.editionId)

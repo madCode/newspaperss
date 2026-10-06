@@ -34,6 +34,9 @@ another reader app's list):
    ideas, Culture & curiosities, or any website. With a server, sign in to
    it instead; with an OPML file, import it first. Leaving Pocket or
    Instapaper? Import your saved links; they're enough on their own.
+   - (**Also on this phone**, with a server.) Your reading list of shared
+     links, and curated lists, which stay on the phone whatever the server
+     does.
 4. **How big, how often?** About 10 to 90 minutes of reading, and whether a
    new edition should be ready by a set time every day. **Make my first
    edition** starts it right away, with its progress on Today. Once it's

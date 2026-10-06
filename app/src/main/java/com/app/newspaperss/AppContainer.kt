@@ -97,7 +97,7 @@ class AppContainer(
 
     /** Reading editions aloud. Made on first use: the voice takes a moment to start. */
     private val listenProgress = StoredListenProgress(context)
-    private val listenMade = lazy { ListenPlayer(speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope) }
+    private val listenMade: Lazy<ListenPlayer> = lazy { ListenPlayer(speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope) }
     val listen: ListenPlayer by listenMade
     val listening: Listening by lazy { Listening(listen, listenProgress, editions) { connectListening() } }
 
