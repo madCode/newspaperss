@@ -168,6 +168,7 @@ class ListenAppTest {
 
         player.next()
         player.pause()
+        idleUntil { compose.onAllNodesWithText("Resume · 3 min left").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Resume · 3 min left").assertIsDisplayed()
     }
 
