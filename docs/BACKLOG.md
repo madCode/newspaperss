@@ -73,6 +73,13 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] App: TalkBack walk-through of every screen (labels, headings, focus order), font scale at 200%, display size, touch targets ≥ 48dp, contrast in light and dark, e-ink readability, nothing carried by colour or animation alone. Confirm the new live regions with TalkBack on a device
 - [ ] Book: EPUB Accessibility 1.1 metadata (`schema:accessMode`, `accessibilityFeature`, `accessibilitySummary`), image alt text carried through, reading order checked with a screen reader
 - [ ] Tooling: Compose accessibility checks in the Robolectric tests, Accessibility Scanner on a device, Ace by DAISY on a live edition
+- [ ] Generate alt text for pictures that have none *(you asked)*. Many feeds' images arrive without a description, so a screen reader (and Listen, if it's built) says nothing or a file name. Do it when the edition is built, so the book gets it too, and on the phone, so nothing leaves it. Cheapest first, stopping at the first that gives something:
+  - The article's own alt text or caption (free, every phone). Never replace it
+  - Text in the picture, read with ML Kit text recognition (free, offline, every phone): for charts, screenshots and signs, "Image with text: …"
+  - ML Kit's on-device GenAI image description, on the newer phones that have it (free, no download for us). Check which phones and whether it's still in preview
+  - Otherwise just "An image"; never made up
+  - Not worth it: a downloaded vision model (hundreds of MB, slow) or a paid cloud model (an account, a cost, and the pictures leave the phone)
+  - Mark generated text as such
 
 ### Performance *(resources)*
 - [ ] A floor device: Android 8, 2 GB RAM, slow CPU and storage (a 2018 budget phone or an older Boox). Measure on an emulator with that profile how long a 30-minute edition takes, peak memory, whether timed editions still arrive under Doze, and whether long lists and the preview stay smooth; set budgets from the numbers *(you asked)*
@@ -232,7 +239,7 @@ The phone's voice reading an edition is built ([mockups](https://claude.ai/artif
 - **Save as audio:** the edition as a file with a chapter per article, for a podcast or audiobook app.
 - **To decide:** does hearing an edition to its end count as delivering it, as Read does on a Boox?
 
-### Cloud backup
+### Backup *(you asked)*
 Android's Auto Backup already copies the database and settings (sources, reading list, edition
 history) to the reader's Google account, within its 25 MB quota. Past EPUBs, the schedule timer and
 the tt-rss password are left out on purpose: the password is sealed by a key that never leaves the
@@ -243,6 +250,16 @@ phone. What's missing:
 - no manual copy: one "Export everything" file (sources as OPML, the reading list as the
   library's Markdown checklist, settings), for people without Google services or moving to another
   reader, and a matching import.
+
+The shape asked for: **Settings › Back up to a file** and **Restore from a file**, one file saved
+wherever the reader likes (Drive, Syncthing, a computer), holding everything the app knows:
+- sources with their per-source choices (left out, article text, caps, skip paid posts), the
+  reading list, stars, curated lists, the schedule and settings;
+- **past editions' EPUBs**, so the archive survives a new phone. They're what makes the file
+  large, so offer it as a choice ("include past editions, 84 MB") and say the size first;
+- never the tt-rss password: a restore asks to sign in again, as Auto Backup does.
+
+Restoring onto a phone that already has sources asks first whether to replace or merge.
 
 ### From the competitor research ([docs/research/competitors.md](research/competitors.md))
 - **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
