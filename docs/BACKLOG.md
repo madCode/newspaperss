@@ -231,7 +231,7 @@ An audiobook of your newspaper: listen to an edition on a walk, from the same fi
 - **Later:** export the edition as an audiobook file (M4B with a chapter per article) for podcast and audiobook apps. The EPUB could carry media overlays, but few e-readers play them.
 - **Open questions:** remember the position between sessions? Count listened articles as read for "bring back"?
 
-### Cloud backup
+### Backup *(you asked)*
 Android's Auto Backup already copies the database and settings (sources, reading list, edition
 history) to the reader's Google account, within its 25 MB quota. Past EPUBs, the schedule timer and
 the tt-rss password are left out on purpose: the password is sealed by a key that never leaves the
@@ -242,6 +242,16 @@ phone. What's missing:
 - no manual copy: one "Export everything" file (sources as OPML, the reading list as the
   library's Markdown checklist, settings), for people without Google services or moving to another
   reader, and a matching import.
+
+The shape asked for: **Settings › Back up to a file** and **Restore from a file**, one file saved
+wherever the reader likes (Drive, Syncthing, a computer), holding everything the app knows:
+- sources with their per-source choices (left out, article text, caps, skip paid posts), the
+  reading list, stars, curated lists, the schedule and settings;
+- **past editions' EPUBs**, so the archive survives a new phone. They're what makes the file
+  large, so offer it as a choice ("include past editions, 84 MB") and say the size first;
+- never the tt-rss password: a restore asks to sign in again, as Auto Backup does.
+
+Restoring onto a phone that already has sources asks first whether to replace or merge.
 
 ### From the competitor research ([docs/research/competitors.md](research/competitors.md))
 - **Kobo through Google Drive.** Kobo syncs a "Rakuten Kobo" Drive folder natively. Drive's SAF provider
