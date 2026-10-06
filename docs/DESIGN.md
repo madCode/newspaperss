@@ -246,7 +246,7 @@ share for now (a direct Dropbox connection is in the backlog).
 
 **When is an edition delivered?** Saving it to your folder; choosing an app
 in the share sheet (Android reports the choice back, from the notification
-too); opening the mail app to email it to a Kindle; or **Read now** on a Boox. **Mark as sent** covers any other route, and
+too); opening the mail app to email it to a Kindle; or **Read** on a Boox. **Mark as sent** covers any other route, and
 **Send again** (in a sent edition's ⋮ menu) is there if a send didn't arrive. An edition still "ready"
 when the next one is built was never sent: it's marked not sent and its
 articles go back, keeping their stars, before the new one is planned.
@@ -430,8 +430,8 @@ whose Kindle and KOReader answers ask for more on the same page).
     it) and reading time, then "and N more". A failed edition shows none:
     its articles went back to wait.
   - Every card has at most one button, the next step:
-    - ready: **Send**, or **Read now** on a Boox, where reading it is
-      the delivery; under it, "Sent it another way? **Mark as sent**";
+    - ready: **Send**, or **Read** on a Boox, where reading it the first
+      time is the delivery; under it, "Sent it another way? **Mark as sent**";
     - sent: **Read** on a Boox. Everyone else reads it on their e-reader,
       so the card has no button and its last line is a link: "and 5 more ›".
   - The rest is in a ⋮ menu at the card's top right ("More options for" the
@@ -663,7 +663,7 @@ whose Kindle and KOReader answers ask for more on the same page).
     **Start fresh**, and **Resume** if the account was paused.
   - **Reading notes:** "Save notes for each edition" asks for a folder (an Obsidian
     vault, say). Each edition's notes file is saved there once the edition is
-    delivered, by share, folder or Read now, in the background so a slow cloud folder
+    delivered, by share, folder or Read on a Boox, in the background so a slow cloud folder
     doesn't hold up delivery. A folder that refuses the file gets a notification;
     **Notes** on the edition still shares them. It can be the delivery folder too;
     changing one folder never drops the app's access to the other.

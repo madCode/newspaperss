@@ -328,7 +328,7 @@ private fun LatestEdition(
                 EditionStatus.READY -> {
                     if (first) {
                         Text(
-                            if (preferOpen) "Your first edition is ready. Tap Read now to start reading."
+                            if (preferOpen) "Your first edition is ready. Tap Read to start reading."
                             else "Your first edition is ready. Tap Send to put it on your $deviceName.",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(top = 12.dp),

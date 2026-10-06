@@ -27,7 +27,7 @@ class EditionChoicesTest {
     fun aReadyEditionHasOneButtonAndOpeningHereOnlyWhereThatMakesSense() {
         assertEquals(EditionChoices(NextStep.SEND, emptyList()), choices(EditionStatus.READY, Reader.KOBO))
         assertEquals(EditionChoices(NextStep.SEND, listOf(OPEN_HERE)), choices(EditionStatus.READY, Reader.POCKETBOOK))
-        assertEquals(EditionChoices(NextStep.READ_NOW, listOf(SEND)), choices(EditionStatus.READY, Reader.BOOX))
+        assertEquals(EditionChoices(NextStep.READ, listOf(SEND)), choices(EditionStatus.READY, Reader.BOOX))
     }
 
     @Test

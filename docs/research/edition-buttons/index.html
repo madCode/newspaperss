@@ -110,7 +110,7 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
   <section class="rules">
     <h2>The proposal in four rules</h2>
     <ul>
-      <li><b>At most one filled button per card:</b> the next step. That's <b>Send</b> for every device that sends; the name changes only where the action does: <b>Read now</b> and <b>Read</b> on a Boox.</li>
+      <li><b>At most one filled button per card:</b> the next step. That's <b>Send</b> for every device that sends; the name changes only where the action does: <b>Read</b> on a Boox, before and after it counts as sent.</li>
       <li><b>The card opens the contents.</b> No "See what's inside" button; a card with no button ends in a link, "and 5 more ›".</li>
       <li><b>Everything rare is in ⋮</b>, shown when it has something: open on this phone (not for Kindle or Kobo), send another way, send again, mark as not sent, the Kindle app.</li>
       <li><b>One short line replaces the paragraph and "I've sent it":</b> "Sent it another way? Mark as sent."</li>
@@ -123,7 +123,7 @@ header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size:
     <h2>Beyond the card</h2>
     <ul>
       <li><b>The edition page</b> gets the same button and the same ⋮ as the card, so the two screens never disagree. Its ⋮ adds Delete edition.</li>
-      <li><b>Boox:</b> the app checks whether it runs on a Boox (Android reports the maker as Onyx). On the Boox it offers Read now; on a phone it offers Send, so opening a copy on the phone can't mark an edition as sent when it never reached the Boox.</li>
+      <li><b>Boox:</b> the app checks whether it runs on a Boox (Android reports the maker as Onyx). On the Boox it offers Read; on a phone it offers Send, so opening a copy on the phone can't mark an edition as sent when it never reached the Boox.</li>
       <li><b>Notifications</b> already carry one action per device (Send, or Open on a Boox); the same names would carry over.</li>
     </ul>
     <h2>To check before building</h2>
@@ -166,7 +166,7 @@ const CASES = [
     pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone"] } },
   { row: "Ready · Boox, with the app on the Boox", note: "Reading it here is the delivery.",
     now: { btns: [["fill", "Open"], ["out", "Send"]], fine: OPEN_LINE, sent: true, menu: null },
-    pro: { btns: [["fill", "Read now"]], mark: MARK_READ, menu: ["Send another way"] } },
+    pro: { btns: [["fill", "Read"]], mark: MARK_READ, menu: ["Send another way"] } },
   { row: "Ready · Boox, with the app on a phone (not built yet)", note: "Today this looks like the row above, so Open reads the book on the phone and counts it as sent. Telling the two apart is in the backlog.",
     now: { btns: [["fill", "Open"], ["out", "Send"]], fine: OPEN_LINE, sent: true, menu: null },
     pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone"] } },

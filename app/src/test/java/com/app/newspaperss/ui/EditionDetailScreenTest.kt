@@ -244,7 +244,7 @@ class EditionDetailScreenTest {
         val (id, articles) = edition(EditionStatus.READY, listOf("A story"))
         show(id, preferOpen = true)
 
-        compose.onNodeWithText("Read now").performClick()
+        compose.onNodeWithText("Read").performClick()
 
         idleUntil { runBlocking { db.editions().byId(id) }?.status == EditionStatus.DELIVERED }
         assertEquals(ArticleState.DELIVERED, runBlocking { db.articles().byId(articles[0]) }?.state)

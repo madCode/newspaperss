@@ -252,12 +252,12 @@ class SentEditionActionsTest {
     }
 
     @Test
-    fun aBooxReaderReadsNowAndThatCountsAsSent() {
+    fun aBooxReaderReadsAndThatCountsAsSent() {
         val id = edition(EditionStatus.READY)
         today(Device.BOOX)
         compose.onNodeWithText("Read it another way?").assertExists()
 
-        button("Read now").performClick()
+        button("Read").performClick()
 
         assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity.action)
         idleUntil { statusOf(id) == EditionStatus.DELIVERED }

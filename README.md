@@ -63,7 +63,7 @@ Setup takes a couple of minutes, in four steps:
 - **Delivered your way.** Emailed straight to your Kindle (Send opens
   your mail app with everything filled in), a notification with a Send
   button (Kindle app, Dropbox for a Kobo, email), a synced folder
-  (KOReader), or Read now on a Boox. After a send with the Kindle app, the
+  (KOReader), or Read on a Boox. After a send with the Kindle app, the
   edition reminds you it can take a few minutes to show up. Articles are
   used up only once the edition is delivered: saved to your folder, sent
   through an app you pick, or read on a Boox. If one never arrives, mark

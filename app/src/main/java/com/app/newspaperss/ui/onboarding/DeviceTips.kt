@@ -15,7 +15,7 @@ object DeviceTips {
                 "is ready, tap Send, choose Dropbox and save it in Apps \u203a Rakuten Kobo. It appears on your Kobo " +
                 "when it syncs."
         Device.BOOX ->
-            "Install newspapeRSS on the Boox itself and tap Read now to read each edition in its reader, " +
+            "Install newspapeRSS on the Boox itself and tap Read to read each edition in its reader, " +
                 "or send editions over with BooxDrop."
         Device.POCKETBOOK ->
             "Tap Send, choose your email app and send to your @pbsync.com address (Send-to-PocketBook). " +

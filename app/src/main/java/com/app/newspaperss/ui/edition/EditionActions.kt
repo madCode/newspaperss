@@ -26,9 +26,10 @@ import com.app.newspaperss.delivery.EditionIntents
 /** An edition's one button: what to do with it next. */
 enum class NextStep(val label: String) {
     SEND("Send"),
-    /** Reading it on this device is how it's delivered (a Boox). */
-    READ_NOW("Read now"),
-    /** Sent by reading it here; reading it again. */
+    /**
+     * Reading it on this device (a Boox). The first time is how it's delivered; the reader
+     * doesn't need to know that, so it's Read before and after.
+     */
     READ("Read"),
 }
 
@@ -67,7 +68,7 @@ fun editionChoices(
     val kindleApp = kindleReader && kindleAppInstalled
     return when (status) {
         EditionStatus.READY -> EditionChoices(
-            next = if (preferOpen) NextStep.READ_NOW else NextStep.SEND,
+            next = if (preferOpen) NextStep.READ else NextStep.SEND,
             more = if (!hasFile) emptyList() else buildList {
                 if (preferOpen) add(MoreAction.SEND) else if (offerOpen) add(MoreAction.OPEN_HERE)
                 if (emailsKindle) add(MoreAction.SEND_ANOTHER_WAY)
@@ -128,7 +129,7 @@ fun NextStepButton(
 ) {
     val onClick = when (step) {
         NextStep.SEND -> onSend
-        NextStep.READ_NOW, NextStep.READ -> onOpen
+        NextStep.READ -> onOpen
     }
     Button(onClick = onClick, enabled = enabled, modifier = modifier) { Text(step.label) }
 }
