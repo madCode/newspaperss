@@ -311,7 +311,7 @@ fun MoveSheetDialog(sheet: MoveSheet, mover: PhoneFeedMover) {
                             Text(category.title, modifier = Modifier.padding(start = 12.dp))
                         }
                     }
-                    MutedLine("To add a category, make it in tt-rss first.")
+                    Muted("To add a category, make it in tt-rss first.")
                 }
             } else {
                 MoveSheetFeeds(sheet, mover::toggle, onPick = { picking = true })
@@ -345,7 +345,7 @@ private fun MoveSheetFeeds(sheet: MoveSheet, onToggle: (Long) -> Unit, onPick: (
                 Column(Modifier.padding(start = 12.dp)) {
                     Text(feed.title)
                     feed.already?.let { p ->
-                        MutedLine(if (p.outsideCategory) "Already in your tt-rss, outside your paper's category: just removed here" else "Already in your tt-rss: just removed here")
+                        Muted(if (p.outsideCategory) "Already in your tt-rss, outside your paper's category: just removed here" else "Already in your tt-rss: just removed here")
                     }
                 }
             }
@@ -373,7 +373,3 @@ private fun MoveSheetFeeds(sheet: MoveSheet, onToggle: (Long) -> Unit, onPick: (
     }
 }
 
-@Composable
-private fun MutedLine(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-}

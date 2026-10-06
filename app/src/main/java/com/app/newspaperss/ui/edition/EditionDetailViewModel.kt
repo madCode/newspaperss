@@ -84,12 +84,18 @@ class EditionDetailViewModel(
         viewModelScope.launch { editions.setStarred(articleId, starred) }
     }
 
-    /** Deletes this edition, then [onDeleted] (to leave the screen) if it was deleted. */
-    fun delete(onDeleted: () -> Unit) {
+    private val _deleted = MutableStateFlow(false)
+    /**
+     * True once [delete] has deleted it, for the screen to leave. A state, not a callback: the
+     * screen may have been recreated (a rotation) while it was deleting.
+     */
+    val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
+
+    fun delete() {
         viewModelScope.launch {
             if (editions.delete(id)) {
                 dismissNotification(id)
-                onDeleted()
+                _deleted.value = true
             }
         }
     }

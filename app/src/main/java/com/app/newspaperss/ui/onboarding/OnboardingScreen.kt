@@ -1,5 +1,8 @@
 package com.app.newspaperss.ui.onboarding
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.key
+import com.app.newspaperss.ui.components.keepFolderAccess
 import android.Manifest
 import android.app.TimePickerDialog
 import android.os.Build
@@ -50,7 +53,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,7 +88,7 @@ import kotlin.math.roundToInt
 @Composable
 /** @param sources offers importing an OPML file from another reader. */
 fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? = null, readingList: ReadingListViewModel? = null) {
-    val s by viewModel.state.collectAsState()
+    val s by viewModel.state.collectAsStateWithLifecycle()
     BackHandler(enabled = s.step != Step.WELCOME) { viewModel.back() }
     // Asked here, as the first edition is made, because a scheduled edition is only
     // announced by notification; the answer doesn't change what happens next.
@@ -106,7 +108,8 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
                     modifier = Modifier.fillMaxWidth().semantics { stateDescription = "Step ${s.stepNumber} of $of" },
                 )
             }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp)) {
+            // A scroll position per step: shared, the next step would open part way down, its title off screen.
+            Column(Modifier.weight(1f).verticalScroll(key(s.step) { rememberScrollState() }).padding(24.dp)) {
                 when (s.step) {
                     Step.WELCOME -> Welcome()
                     Step.DEVICE -> DeviceStep(s, viewModel)
@@ -139,7 +142,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
 
 @Composable
 private fun Title(text: String) =
-    Text(text, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 12.dp))
+    Text(text, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 12.dp).semantics { heading() })
 
 @Composable
 private fun Welcome() {
@@ -156,8 +159,7 @@ private fun Welcome() {
 private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
     val context = LocalContext.current
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
-        if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        if (uri != null && keepFolderAccess(context, uri)) {
             vm.chooseFolder(uri.toString(), FolderDelivery.displayName(context.contentResolver, uri))
         }
     }
@@ -288,8 +290,8 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel, sources: So
 @Composable
 private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sources: SourcesViewModel) {
     val context = LocalContext.current
-    val message by sources.message.collectAsState()
-    val rows by sources.rows.collectAsState()
+    val message by sources.message.collectAsStateWithLifecycle()
+    val rows by sources.rows.collectAsStateWithLifecycle()
     val count = rows?.size
     LaunchedEffect(count) {
         if (count != null && count != added) {
@@ -301,7 +303,7 @@ private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sourc
     val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) sources.importOpml(context.contentResolver, uri)
     }
-    Text("Already use a feed reader?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+    Text("Already use a feed reader?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Import an OPML file") }
     }
@@ -315,11 +317,11 @@ private fun FromAnotherReader(added: Int, onboarding: OnboardingViewModel, sourc
 @Composable
 private fun SavedLinks(saved: Int, readingList: ReadingListViewModel) {
     val context = LocalContext.current
-    val message by readingList.message.collectAsState()
+    val message by readingList.message.collectAsStateWithLifecycle()
     val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) readingList.import(context.contentResolver, uri)
     }
-    Text("Leaving Pocket or Instapaper?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+    Text("Leaving Pocket or Instapaper?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
     OutlinedButton(onClick = { importFile.launch(arrayOf("*/*")) }) { Text("Import your saved links") }
     // Both lines: the import's result, and whether that's enough to go on (archived links aren't).
     val waiting = if (saved > 0) "${plural(saved, "saved link")} waiting. That's enough to start; add sites too if you like." else null

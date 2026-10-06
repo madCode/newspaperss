@@ -1,5 +1,9 @@
 package com.app.newspaperss.ui.today
 
+import com.app.newspaperss.ui.edition.articlesAndMinutes
+import com.app.newspaperss.ui.edition.minutesLabel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.semantics.heading
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -33,7 +37,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,11 +66,10 @@ import com.app.newspaperss.ui.edition.startKindle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlin.math.roundToInt
 
 @Composable
 fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), onOpenEdition: (Long) -> Unit = {}) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     fun launch(intent: android.content.Intent): Boolean = try {
         context.startActivity(intent)
@@ -128,7 +130,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         if (latest != null) {
             item(key = "latest") {
                 // Ready before Send is tapped: the mail app has to open while the screen is still in front.
-                val emailBody by remember(latest.id) { viewModel.emailBody(latest.id) }.collectAsState(null)
+                val emailBody by remember(latest.id) { viewModel.emailBody(latest.id) }.collectAsStateWithLifecycle(null)
                 val hasFile = remember(latest.fileName, latest.status) { viewModel.fileOf(latest) != null }
                 LatestEdition(
                     latest,
@@ -174,7 +176,7 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                 Text(
                     "Earlier editions",
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp).semantics { heading() },
                 )
             }
             items(editions.drop(1), key = { it.id }) { edition ->
@@ -379,7 +381,7 @@ private fun Headlines(articles: List<EditionArticleEntity>, linkLast: Boolean) {
             )
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(article.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text(minutes(article.minutes), style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(start = 12.dp))
+                Text(minutesLabel(article.minutes), style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(start = 12.dp))
             }
         }
     }
@@ -404,7 +406,6 @@ private fun Headlines(articles: List<EditionArticleEntity>, linkLast: Boolean) {
 
 private const val SHOWN = 3
 
-private fun minutes(m: Double) = "${m.roundToInt().coerceAtLeast(1)} min"
 
 /** The card's rare actions; Mark as not sent asks first. */
 @Composable
@@ -444,8 +445,7 @@ internal fun summary(edition: EditionEntity): String {
         EditionStatus.DELETED -> "deleted"
     }
     if (edition.articleCount == 0) return status.replaceFirstChar { it.uppercase() }
-    val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"
-    return "$articles · about ${edition.minutes.roundToInt().coerceAtLeast(1)} min · $status"
+    return "${articlesAndMinutes(edition.articleCount, edition.minutes)} · $status"
 }
 
 /** Red for a failure; an edition that simply wasn't sent in time isn't one. */

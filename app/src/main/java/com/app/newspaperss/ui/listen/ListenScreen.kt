@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui.listen
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -48,7 +49,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -102,7 +102,7 @@ internal val SPEEDS = listOf(1f, 1.2f, 1.5f, 0.8f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListenScreen(player: ListenPlayer, onBack: () -> Unit) {
-    val state by player.state.collectAsState()
+    val state by player.state.collectAsStateWithLifecycle()
     var contents by remember { mutableStateOf(false) }
     val title = when {
         state.pages.isEmpty() -> "Listening"
