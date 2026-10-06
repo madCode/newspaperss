@@ -367,7 +367,10 @@ private fun BookView(
                         return true
                     }
                 }
-                setOnScrollChangeListener { v, _, y, _, _ -> place.at = y / ((v as WebView).contentHeight * v.pageScale).coerceAtLeast(1f) }
+                // Not while a reloaded page is still on its way back to where it was: it's at the top meanwhile.
+                setOnScrollChangeListener { v, _, y, _, _ ->
+                    if (style.restoreAt == null) place.at = y / ((v as WebView).contentHeight * v.pageScale).coerceAtLeast(1f)
+                }
                 // Back where it was, after the WebView was rebuilt.
                 if (place.at > 0f) style.restoreAt = place.at
                 val wasOn = place.page?.substringBefore('#')
