@@ -61,7 +61,7 @@ import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
 /**
- * @param preferOpen the reader reads on this device (a Boox), so opening an edition delivers it.
+ * @param preferOpen the reader reads on this device (see [com.app.newspaperss.settings.readsHere]), so opening an edition delivers it.
  * @param offerOpen false for a Kindle or Kobo, whose reader sends the book rather than opening it here.
  * @param kindleReader a sent edition offers to open the Kindle app, where it shows up.
  * @param kindleEmail Send emails the edition to this Kindle address rather than sharing it.

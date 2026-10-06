@@ -447,8 +447,9 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
     }
     DeliveryOption(
         selected = s.delivery == DeliveryMethod.SHARE,
-        title = "Send it myself",
-        detail = "Tap Send on each edition and choose an app: the Kindle app, Dropbox, email or any other.",
+        title = if (s.device == Device.HERE) "Read it myself" else "Send it myself",
+        detail = if (s.device == Device.HERE) "Tap Read on each edition to open it in your reading app; that counts as delivered."
+        else "Tap Send on each edition and choose an app: the Kindle app, Dropbox, email or any other.",
         onClick = vm::useShare,
     )
     // How to send to this e-reader with the share sheet: under the choice, where the reader is
@@ -468,7 +469,7 @@ private fun DeliverySection(s: AppSettings, vm: SettingsViewModel) {
         selected = s.delivery == DeliveryMethod.FOLDER,
         title = "Save to a folder",
         detail = when {
-            s.folderUri == null -> "Fully automatic, for KOReader and other readers that sync a folder on this phone (for example with Syncthing)."
+            s.folderUri == null -> "Fully automatic, for KOReader and other readers that sync a folder on this phone (for example with Syncthing), or a reading app here that watches one."
             !folderReachable -> "Can't reach ${s.folderName ?: "your folder"}. Tap to choose it again."
             else -> "Saved automatically to ${s.folderName ?: "your folder"}."
         },

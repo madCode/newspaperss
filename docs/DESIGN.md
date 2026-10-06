@@ -433,10 +433,10 @@ whose Kindle and KOReader answers ask for more on the same page).
     it) and reading time, then "and N more". A failed edition shows none:
     its articles went back to wait.
   - Every card has at most one button, the next step:
-    - ready: **Send**, or **Read** on this device or a Boox, where reading
-      it the first time is the delivery. Only with the app on the e-reader itself: a
-      Boox reader running it on their phone gets **Send**, as reading it
-      there wouldn't put it on the Boox. The app counts itself on an
+    - ready: **Send**, or **Read** where reading it here is the delivery:
+      with On this device (phone or e-reader), or Boox with the app on the
+      Boox itself. A Boox reader running it on their phone gets **Send**, as
+      reading it there wouldn't put it on the Boox. The app counts itself on an
       e-reader when its maker makes only e-ink devices (Onyx, which makes
       the Boox, Bigme, Mudita, Meebook, Boyue) or it can't make calls. A
       guess: a Hisense e-ink phone counts as a phone, a Wi-Fi tablet as

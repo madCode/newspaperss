@@ -51,7 +51,7 @@ data class EditionChoices(val next: NextStep?, val more: List<MoreAction>)
  * the rare rest in a menu. Without its book ([hasFile] false) there's nothing to send or open,
  * so only the Kindle app is left.
  *
- * @param preferOpen the reader reads on this device (a Boox), so reading it here delivers it.
+ * @param preferOpen the reader reads on this device (see [com.app.newspaperss.settings.readsHere]), so reading it here delivers it.
  * @param offerOpen false for a Kindle or Kobo, whose reader gets it by sending it; opening it on
  *   the phone would only look like a way to read it.
  * @param emailsKindle Send opens the mail app to email it to a Kindle.

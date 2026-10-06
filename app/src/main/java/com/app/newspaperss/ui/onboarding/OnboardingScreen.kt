@@ -87,6 +87,8 @@ import kotlin.math.roundToInt
 /** @param sources offers importing an OPML file from another reader. */
 fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? = null, readingList: ReadingListViewModel? = null) {
     val s by viewModel.state.collectAsState()
+    // Here, not in the device step, so the full list stays open after Next and Back.
+    var allDevices by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = s.step != Step.WELCOME) { viewModel.back() }
     // Asked here, as the first edition is made, because a scheduled edition is only
     // announced by notification; the answer doesn't change what happens next.
@@ -109,7 +111,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, sources: SourcesViewModel? 
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp)) {
                 when (s.step) {
                     Step.WELCOME -> Welcome()
-                    Step.DEVICE -> DeviceStep(s, viewModel)
+                    Step.DEVICE -> DeviceStep(s, viewModel, allDevices) { allDevices = true }
                     Step.FEEDS_FROM -> FeedsFromStep(s, viewModel)
                     Step.IMPORT -> ImportStep(s, viewModel)
                     Step.SOURCES -> SourcesStep(s, viewModel, sources, readingList)
@@ -153,7 +155,7 @@ private fun Welcome() {
 }
 
 @Composable
-private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
+private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel, allDevices: Boolean, onAllDevices: () -> Unit) {
     val context = LocalContext.current
     val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
@@ -163,14 +165,14 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
     }
     Title("Where do you read?")
     // On an e-reader the answer is almost always "right here": say so, with the list a tap away.
-    var showAll by rememberSaveable { mutableStateOf(!vm.onEReader || (s.device != null && s.device != Device.HERE)) }
+    val showAll = allDevices || !vm.onEReader || (s.device != null && s.device != Device.HERE)
     if (!showAll) {
         Text(
             "Right here, on this e-reader. Each edition opens in your reading app, and reading it counts as delivered.",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(top = 8.dp),
         )
-        TextButton(onClick = { showAll = true }, contentPadding = PaddingValues(end = 12.dp)) { Text("I read on another device") }
+        TextButton(onClick = onAllDevices, contentPadding = PaddingValues(end = 12.dp)) { Text("I read on another device") }
     } else Device.entries.forEach { device ->
         Row(
             Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.chooseDevice(device) }.padding(vertical = 10.dp),
