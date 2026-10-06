@@ -434,14 +434,16 @@ whose Kindle and KOReader answers ask for more on the same page).
       time is the delivery. Only with the app on the e-reader itself: a
       Boox reader running it on their phone gets **Send**, as reading it
       there wouldn't put it on the Boox. The app counts itself on an
-      e-reader when it's on a Boox (made by Onyx) or a device that can't
-      make calls; under it, "Sent it another way? **Mark as sent**";
-    - sent: **Read** on a Boox. Everyone else reads it on their e-reader,
+      e-reader when its maker makes only e-ink devices (Onyx, which makes
+      the Boox, Bigme, Mudita, Meebook, Boyue) or it can't make calls. A
+      guess: a Hisense e-ink phone counts as a phone, a Wi-Fi tablet as
+      an e-reader; under it, "Sent it another way? **Mark as sent**";
+    - sent: **Read** on a Boox, with the app on it. Everyone else reads it on their e-reader,
       so the card has no button and its last line is a link: "and 5 more ›".
   - The rest is in a ⋮ menu at the card's top right ("More options for" the
     edition's title, for TalkBack), shown only when it has something:
     **Open on this phone** (not for Kindle or Kobo, who get the book by
-    sending it), **Send** on a Boox, **Send another way** (the share sheet,
+    sending it), **Send** on a Boox with the app on it, **Send another way** (the share sheet,
     when Send emails a Kindle), and once sent **Send again**, **Didn't
     arrive? Mark as not sent** and **Open the Kindle app**.
 

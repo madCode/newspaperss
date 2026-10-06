@@ -31,10 +31,13 @@ class ThisDeviceTest {
     fun aPhoneIsNot() = assertFalse(on("Google", calls = true))
 
     @Test
-    fun anotherAndroidEReaderThatCantMakeCallsIs() = assertTrue(on("Bigme", calls = false))
+    fun anyDeviceThatCantMakeCallsIs() = assertTrue(on("Example", calls = false))
 
     @Test
-    fun aBooxIsOneEvenIfItReportsCalls() = assertTrue(on("Onyx", calls = true))
+    fun anEInkPhoneFromAnEInkMakerIs() {
+        assertTrue(on("Bigme", calls = true))
+        assertTrue(on("Mudita", calls = true))
+    }
 
     @Test
     fun readingHereNeedsBothABooxReaderAndTheEReader() {
