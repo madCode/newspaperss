@@ -3,11 +3,9 @@ package com.app.newspaperss.ui.edition
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,13 +18,11 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -116,6 +112,25 @@ fun EditionDetailScreen(
         }
     }
 
+    fun open() {
+        detail?.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() }
+    }
+
+    fun sendAnotherWay() {
+        val current = detail ?: return
+        val edition = current.edition ?: return
+        current.file?.let { EditionIntents.launchSend(context, it, edition.title, edition.id, kindleEmail = null) {} }
+    }
+
+    val kindleApp = rememberKindleApp()
+    val emailsKindle = kindleEmail?.let { remember(it) { EditionIntents.mailAppFor(context, it) } } != null
+    val choices = detail?.edition?.let {
+        editionChoices(
+            it.status, preferOpen, offerOpen, kindleReader, emailsKindle,
+            kindleAppInstalled = kindleApp.value != null, hasFile = detail?.file != null,
+        )
+    }
+
     var markingNotSent by rememberSaveable { mutableStateOf(false) }
     detail?.edition?.takeIf { markingNotSent }?.let { edition ->
         MarkNotSentDialog(edition.title, onDismiss = { markingNotSent = false }, onConfirm = viewModel::markNotSent)
@@ -158,11 +173,18 @@ fun EditionDetailScreen(
                         Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                                if (status == EditionStatus.DELIVERED) {
-                                    val hasFile = detail?.file != null
-                                    DropdownMenuItem(text = { Text("Send again") }, onClick = { menu = false; send() }, enabled = hasFile)
-                                    // Only while its book is still here to send again.
-                                    if (hasFile) DropdownMenuItem(text = { Text(MARK_NOT_SENT) }, onClick = { menu = false; markingNotSent = true })
+                                // The same as Today's card's menu, then Delete.
+                                choices?.more.orEmpty().forEach { action ->
+                                    DropdownMenuItem(text = { Text(action.label) }, onClick = {
+                                        menu = false
+                                        when (action) {
+                                            MoreAction.SEND, MoreAction.SEND_AGAIN -> send()
+                                            MoreAction.SEND_ANOTHER_WAY -> sendAnotherWay()
+                                            MoreAction.OPEN_HERE -> open()
+                                            MoreAction.OPEN_KINDLE_APP -> startKindle(context, kindleApp)
+                                            MoreAction.MARK_NOT_SENT -> markingNotSent = true
+                                        }
+                                    })
                                 }
                                 DropdownMenuItem(text = { Text("Delete edition") }, onClick = { menu = false; deleting = true })
                             }
@@ -185,11 +207,10 @@ fun EditionDetailScreen(
                     edition,
                     fileMissing = current.file == null,
                     sentToKindle = sentToKindle,
-                    kindleReader = kindleReader,
+                    next = choices?.next,
+                    preferOpen = preferOpen,
                     onSend = ::send,
-                    onOpen = if (offerOpen) {
-                        { current.file?.let { if (launch(EditionIntents.open(context, it)) && preferOpen) viewModel.markSent() } }
-                    } else null,
+                    onOpen = ::open,
                     onSent = viewModel::markSent,
                 )
             }
@@ -236,9 +257,10 @@ private fun Header(
     edition: EditionEntity,
     fileMissing: Boolean,
     sentToKindle: KindleSend?,
-    kindleReader: Boolean,
+    next: NextStep?,
+    preferOpen: Boolean,
     onSend: () -> Unit,
-    onOpen: (() -> Unit)?,
+    onOpen: () -> Unit,
     onSent: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -253,18 +275,8 @@ private fun Header(
             Text("$articles · about ${minutes(edition.minutes)} min", style = MaterialTheme.typography.bodyMedium)
         }
         if (edition.status == EditionStatus.DELIVERED) sentToKindle?.let { KindleNote(it) }
-        when (edition.status) {
-            EditionStatus.READY -> Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onSend, enabled = !fileMissing) { Text("Send") }
-                if (onOpen != null) OutlinedButton(onClick = onOpen, enabled = !fileMissing) { Text("Open") }
-            }
-            // As on Today's card, less what's inside, which is this page; Send again is in the menu.
-            EditionStatus.DELIVERED -> when {
-                kindleReader -> OpenKindleButton(Modifier.padding(top = 12.dp))
-                onOpen != null -> Button(onClick = onOpen, enabled = !fileMissing, modifier = Modifier.padding(top = 12.dp)) { Text("Open") }
-            }
-            else -> {}
-        }
+        // The same button as Today's card; the rest is in the top bar's ⋮.
+        next?.let { NextStepButton(it, enabled = !fileMissing, onSend, onOpen, Modifier.padding(top = 12.dp)) }
         if (fileMissing && (edition.status == EditionStatus.READY || edition.status == EditionStatus.DELIVERED)) {
             Text(
                 "This edition's file has been deleted, so it can't be sent or opened.",
@@ -273,14 +285,7 @@ private fun Header(
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
-        if (edition.status == EditionStatus.READY) {
-            Text(
-                "Once it's on your e-reader, tell us so these articles don't come back.",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-            TextButton(onClick = onSent) { Text("I've sent it") }
-        }
+        if (edition.status == EditionStatus.READY) MarkAsSentLine(preferOpen, onSent, Modifier.padding(top = 4.dp))
     }
 }
 

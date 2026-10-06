@@ -34,7 +34,7 @@ Setup takes a couple of minutes, in four steps:
 3. **How big, how often?** About 10 to 90 minutes of reading, and whether a
    new edition should be ready by a set time every day.
 4. **Make my first edition.** It starts building right away, with its
-   progress on Today. Once it's ready, send it from there (or Open it on a
+   progress on Today. Once it's ready, send it from there (or Read it on a
    Boox); with a folder, it's saved there for you.
 
 ## What it does
@@ -63,10 +63,10 @@ Setup takes a couple of minutes, in four steps:
 - **Delivered your way.** Emailed straight to your Kindle (Send opens
   your mail app with everything filled in), a notification with a Send
   button (Kindle app, Dropbox for a Kobo, email), a synced folder
-  (KOReader), or Open on a Boox. After a send with the Kindle app, the
+  (KOReader), or Read on a Boox. After a send with the Kindle app, the
   edition reminds you it can take a few minutes to show up. Articles are
   used up only once the edition is delivered: saved to your folder, sent
-  through an app you pick, or opened on a Boox. If one never arrives, mark
+  through an app you pick, or read on a Boox. If one never arrives, mark
   it as not sent and its articles go back.
 - **Star what you want next.** Star an article in a source's list, or one
   from an edition you didn't finish, and it goes first into the next

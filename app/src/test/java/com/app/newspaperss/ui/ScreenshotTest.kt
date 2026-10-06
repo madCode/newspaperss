@@ -311,7 +311,8 @@ class ScreenshotTest {
             val source = db.sources().insert(SourceEntity(url = "https://example.com/feed", title = "The Example Review"))
             (1..2).forEach { db.articles().insertIgnoring(ArticleEntity(sourceId = source, guid = "$it", url = "https://example.com/$it", title = "Starred $it", starredAt = now)) }
         }
-        val vm = TodayViewModel(EditionRepository(db, tmp.newFolder()), flowOf(null)) {}
+        val files = tmp.newFolder().apply { resolve("x.epub").writeText("epub") }
+        val vm = TodayViewModel(EditionRepository(db, files), flowOf(null)) {}
         shoot("05-today", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
     }
 

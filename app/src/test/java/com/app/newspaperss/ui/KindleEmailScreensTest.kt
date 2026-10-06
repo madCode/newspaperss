@@ -93,8 +93,7 @@ class KindleEmailScreensTest {
         val (id, article) = readyEdition()
         val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(settings), sentToKindle = kindleSends.recent) {}
         compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
-        waitFor("Send opens your mail app, ready to go. Opening it counts as sent.")
-        compose.onNodeWithText("I've sent it").assertExists()
+        waitFor("Mark as sent")
 
         compose.onNodeWithText("Send").performClick()
 
@@ -107,8 +106,25 @@ class KindleEmailScreensTest {
         compose.onNodeWithContentDescription("More options for Tuesday Morning Edition").performClick()
         compose.onNodeWithText(MARK_NOT_SENT).performClick()
         compose.onNode(hasText("Mark as not sent") and hasAnyAncestor(isDialog())).performClick()
-        waitFor("I've sent it")
+        waitFor("Mark as sent")
         compose.onNodeWithText(KINDLE_EMAIL_NOTE).assertDoesNotExist()
+    }
+
+    @Test
+    fun withTheMailAppTodaysMenuOffersTheShareSheetAsAnotherWay() {
+        installApp(app)
+        val (id, _) = readyEdition()
+        val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(settings), sentToKindle = kindleSends.recent) {}
+        compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
+        waitFor("Mark as sent")
+
+        compose.onNodeWithContentDescription("More options for Tuesday Morning Edition").performClick()
+        compose.onNodeWithText("Send another way").performClick()
+
+        idleUntil { shadowOf(app).peekNextStartedActivity() != null }
+        assertEquals(Intent.ACTION_CHOOSER, shadowOf(app).nextStartedActivity.action)
+        compose.waitForIdle()
+        assertEquals("counts once an app is chosen", EditionStatus.READY, statusOf(id))
     }
 
     @Test
@@ -116,10 +132,9 @@ class KindleEmailScreensTest {
         val (id, _) = readyEdition()
         val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(settings)) {}
         compose.setContent { TodayScreen(vm, onOpenEdition = {}) }
-        waitFor("I've sent it")
-        // Send will be the share sheet, so the line says what counts there.
-        compose.onNodeWithText("Choosing an app to send it with counts as sent", substring = true).assertExists()
-        compose.onNodeWithText("Send opens your mail app", substring = true).assertDoesNotExist()
+        waitFor("Mark as sent")
+        // Send is the share sheet already, so there's no other way to offer.
+        compose.onNodeWithContentDescription("More options for Tuesday Morning Edition").assertDoesNotExist()
 
         compose.onNodeWithText("Send").performClick()
 

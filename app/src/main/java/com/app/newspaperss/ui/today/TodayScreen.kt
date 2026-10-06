@@ -2,13 +2,10 @@ package com.app.newspaperss.ui.today
 
 import android.content.ActivityNotFoundException
 import android.widget.Toast
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,9 +53,13 @@ import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.delivery.EditionIntents
 import com.app.newspaperss.delivery.KindleSend
 import com.app.newspaperss.ui.edition.KindleNote
-import com.app.newspaperss.ui.edition.MARK_NOT_SENT
 import com.app.newspaperss.ui.edition.MarkNotSentDialog
-import com.app.newspaperss.ui.edition.OpenKindleButton
+import com.app.newspaperss.ui.edition.MarkAsSentLine
+import com.app.newspaperss.ui.edition.MoreAction
+import com.app.newspaperss.ui.edition.NextStepButton
+import com.app.newspaperss.ui.edition.editionChoices
+import com.app.newspaperss.ui.edition.rememberKindleApp
+import com.app.newspaperss.ui.edition.startKindle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -154,6 +155,9 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
                             // Reading here is how an edition reaches a Boox.
                             if (launch(EditionIntents.open(context, it)) && state.preferOpen) viewModel.markSent(latest)
                         }
+                    },
+                    onSendAnotherWay = {
+                        viewModel.fileOf(latest)?.let { EditionIntents.launchSend(context, it, latest.title, latest.id, kindleEmail = null) {} }
                     },
                     onSent = { viewModel.markSent(latest) },
                     onNotSent = { viewModel.markNotSent(latest.id) },
@@ -277,9 +281,16 @@ private fun LatestEdition(
     onDetails: () -> Unit,
     onSend: () -> Unit,
     onOpen: () -> Unit,
+    onSendAnotherWay: () -> Unit,
     onSent: () -> Unit,
     onNotSent: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val kindleApp = rememberKindleApp()
+    val choices = editionChoices(
+        edition.status, preferOpen, offerOpen, kindleReader, emailsKindle,
+        kindleAppInstalled = kindleApp.value != null, hasFile = hasFile,
+    )
     // An outline as well as the tint, which is almost white on e-ink. The whole card opens the
     // edition; the buttons inside it take their own taps.
     Card(
@@ -288,7 +299,6 @@ private fun LatestEdition(
     ) {
         Column(Modifier.padding(16.dp)) {
             val sent = edition.status == EditionStatus.DELIVERED
-            val inside = edition.articleCount > 0
             Row {
                 Column(Modifier.weight(1f)) {
                     Text(edition.title, style = MaterialTheme.typography.headlineSmall)
@@ -299,65 +309,48 @@ private fun LatestEdition(
                 }
                 // Pulled into the card's padding, so the glyph lines up with the card's edge while
                 // the touch target stays 48dp.
-                // Without its book there's nothing to send or take back.
-                if (sent && hasFile) SentEditionMenu(edition.title, onSend, onNotSent, Modifier.offset(x = 12.dp, y = (-12).dp))
+                if (choices.more.isNotEmpty()) {
+                    EditionMenu(edition.title, choices.more, Modifier.offset(x = 12.dp, y = (-12).dp), onNotSent) { action ->
+                        when (action) {
+                            MoreAction.SEND, MoreAction.SEND_AGAIN -> onSend()
+                            MoreAction.SEND_ANOTHER_WAY -> onSendAnotherWay()
+                            MoreAction.OPEN_HERE -> onOpen()
+                            MoreAction.OPEN_KINDLE_APP -> startKindle(context, kindleApp)
+                            MoreAction.MARK_NOT_SENT -> {}
+                        }
+                    }
+                }
             }
             // Only for an edition that is or was on its way: a failed one's articles go back to wait.
-            // A ready card has no See what's inside: its headlines show what's in it, and Send is
-            // what's next. The card itself opens the contents.
-            if (edition.status == EditionStatus.READY || sent) Headlines(articles)
+            // The card itself opens the contents; a card with no button says so in its last line.
+            if (edition.status == EditionStatus.READY || sent) Headlines(articles, linkLast = choices.next == null)
             when (edition.status) {
                 EditionStatus.READY -> {
                     if (first) {
                         Text(
-                            if (preferOpen) "Your first edition is ready. Tap Open to start reading."
+                            if (preferOpen) "Your first edition is ready. Tap Read to start reading."
                             else "Your first edition is ready. Tap Send to put it on your $deviceName.",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(top = 12.dp),
                         )
                     }
-                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (preferOpen) {
-                            Button(onClick = onOpen) { Text("Open") }
-                            OutlinedButton(onClick = onSend) { Text("Send") }
-                        } else {
-                            Button(onClick = onSend) { Text("Send") }
-                            if (offerOpen) OutlinedButton(onClick = onOpen) { Text("Open") }
-                        }
+                    choices.next?.let { NextStepButton(it, enabled = hasFile, onSend, onOpen, Modifier.padding(top = 12.dp)) }
+                    // Says why Send is greyed out, as the edition's page does.
+                    if (!hasFile) {
+                        Text(
+                            "This edition's file has been deleted, so it can't be sent.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp).semantics(mergeDescendants = true) {},
+                        )
                     }
-                    Text(
-                        when {
-                            preferOpen -> "Opening it here counts as sent. Read it another way? Tell us so these articles don't come back."
-                            emailsKindle -> "Send opens your mail app, ready to go. Opening it counts as sent. Sent it another way? Tell us so these articles don't come back."
-                            else -> "Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        // Its own TalkBack stop, between Send and its answer, I've sent it, rather
-                        // than merged into the card, which TalkBack reads before any button.
-                        modifier = Modifier.padding(top = 12.dp).semantics(mergeDescendants = true) {},
-                    )
-                    // No start padding, so it lines up with the text above rather than sitting indented.
-                    TextButton(onClick = onSent, contentPadding = PaddingValues(end = 12.dp)) { Text("I've sent it") }
+                    MarkAsSentLine(preferOpen, onSent, Modifier.padding(top = 4.dp))
                 }
                 EditionStatus.DELIVERED -> {
                     sentToKindle?.let { KindleNote(it) }
-                    // What's next is reading it: on the phone where it opens here, otherwise a look at
-                    // the contents. Sending again is rare, so it waits in the menu.
-                    // Spaced per button, so a row left empty (no Kindle app, nothing inside) takes no room.
-                    val top = Modifier.padding(top = 12.dp)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        when {
-                            kindleReader -> {
-                                if (inside) Button(onClick = onDetails, modifier = top) { Text("See what's inside") }
-                                OpenKindleButton(top)
-                            }
-                            offerOpen -> {
-                                Button(onClick = onOpen, modifier = top) { Text("Open") }
-                                if (inside) OutlinedButton(onClick = onDetails, modifier = top) { Text("See what's inside") }
-                            }
-                            inside -> Button(onClick = onDetails, modifier = top) { Text("See what's inside") }
-                        }
-                    }
+                    // What's next is reading it: here on a Boox. Everyone else reads it on their e-reader;
+                    // sending again and the Kindle app are rare, so they're in ⋮.
+                    choices.next?.let { NextStepButton(it, enabled = hasFile, onSend, onOpen, Modifier.padding(top = 12.dp)) }
                 }
                 EditionStatus.FAILED -> {
                     val error = edition.error ?: "This edition couldn't be made."
@@ -373,7 +366,7 @@ private fun LatestEdition(
 
 /** The edition's first [SHOWN] articles in the book's order, as its contents page opens, and how many more. */
 @Composable
-private fun Headlines(articles: List<EditionArticleEntity>) {
+private fun Headlines(articles: List<EditionArticleEntity>, linkLast: Boolean) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     articles.take(SHOWN).forEach { article ->
         Column(Modifier.padding(top = 10.dp)) {
@@ -391,24 +384,43 @@ private fun Headlines(articles: List<EditionArticleEntity>) {
         }
     }
     val more = articles.size - SHOWN
-    if (more > 0) Text("and $more more", style = MaterialTheme.typography.bodyMedium, color = muted, modifier = Modifier.padding(top = 10.dp))
+    // A card with no button ends in a link-coloured line, so the card's own tap has something to show it.
+    val last = when {
+        linkLast && more > 0 -> "and $more more ›"
+        linkLast && articles.isNotEmpty() -> "See what's inside ›"
+        more > 0 -> "and $more more"
+        else -> null
+    }
+    last?.let {
+        Text(
+            it,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (linkLast) MaterialTheme.colorScheme.primary else muted,
+            // TalkBack reads the words, not the arrow.
+            modifier = Modifier.padding(top = 10.dp).semantics { contentDescription = it.removeSuffix(" ›") },
+        )
+    }
 }
 
 private const val SHOWN = 3
 
 private fun minutes(m: Double) = "${m.roundToInt().coerceAtLeast(1)} min"
 
-/** Send again and Mark as not sent for a sent edition whose book is still here, both rare. */
+/** The card's rare actions; Mark as not sent asks first. */
 @Composable
-private fun SentEditionMenu(title: String, onSend: () -> Unit, onNotSent: () -> Unit, modifier: Modifier = Modifier) {
+private fun EditionMenu(title: String, actions: List<MoreAction>, modifier: Modifier, onNotSent: () -> Unit, onAction: (MoreAction) -> Unit) {
     var open by remember { mutableStateOf(false) }
     // Keyed by the edition: a newer one can take its place on Today while the dialog is open.
     var asking by rememberSaveable(title) { mutableStateOf(false) }
     Box(modifier) {
         IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, contentDescription = "More options for $title") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("Send again") }, onClick = { open = false; onSend() })
-            DropdownMenuItem(text = { Text(MARK_NOT_SENT) }, onClick = { open = false; asking = true })
+            actions.forEach { action ->
+                DropdownMenuItem(text = { Text(action.label) }, onClick = {
+                    open = false
+                    if (action == MoreAction.MARK_NOT_SENT) asking = true else onAction(action)
+                })
+            }
         }
     }
     if (asking) MarkNotSentDialog(title, onDismiss = { asking = false }, onConfirm = onNotSent)

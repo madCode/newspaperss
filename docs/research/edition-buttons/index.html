@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edition Buttons, Streamlined</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&family=Roboto:wght@400;500&display=swap">
+<style>
+/* Layout: one row per state and device, today's card beside the proposed one; the app's own Theme.kt colours. */
+:root {
+  --page: #E9E4D8;
+  --newsprint: #F7F4EC;
+  --ink: #1C1B1A;
+  --ink-soft: #4A4740;
+  --card: #E4DDCC;
+  --outline: #948D80;
+  --accent: #8C2F1B;
+  --on-accent: #FFFFFF;
+  --menu: #FFFDF7;
+  --serif: "Noto Serif", Georgia, "Times New Roman", serif;
+  --sans: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0E0D0C; --newsprint: #161514; --ink: #E9E4D8; --ink-soft: #CBC5B8; --card: #363330;
+  --outline: #7A746A; --accent: #E8A594; --on-accent: #3B0D02; --menu: #2B2926; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --page: #0E0D0C; --newsprint: #161514; --ink: #E9E4D8; --ink-soft: #CBC5B8; --card: #363330;
+  --outline: #7A746A; --accent: #E8A594; --on-accent: #3B0D02; --menu: #2B2926; color-scheme: dark;
+}
+.day { --newsprint: #F7F4EC; --ink: #1C1B1A; --ink-soft: #4A4740; --card: #E4DDCC; --outline: #948D80; --accent: #8C2F1B; --on-accent: #FFFFFF; --menu: #FFFDF7; color-scheme: light; }
+.night { --newsprint: #161514; --ink: #E9E4D8; --ink-soft: #CBC5B8; --card: #363330; --outline: #7A746A; --accent: #E8A594; --on-accent: #3B0D02; --menu: #2B2926; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--ink); font-family: var(--sans); margin: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 64px; }
+header.page { max-width: 68ch; display: grid; gap: 10px; margin-bottom: 24px; }
+h1 { font-family: var(--serif); font-size: 2rem; margin: 0; text-wrap: balance; }
+header.page p { margin: 0; line-height: 1.55; color: var(--ink-soft); font-size: 15px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--outline); border-radius: 999px; overflow: hidden; }
+.seg button { font: inherit; background: none; color: var(--ink); border: 0; padding: 6px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+.rules { background: var(--newsprint); border: 1px solid var(--outline); border-radius: 12px; padding: 16px 18px; display: grid; gap: 8px; margin-bottom: 28px; max-width: 76ch; }
+.rules h2 { font-family: var(--serif); font-size: 1.15rem; margin: 0; }
+.rules ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; line-height: 1.5; font-size: 14.5px; }
+
+.matrix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; align-items: start; }
+.colh { font-family: var(--serif); font-weight: 700; font-size: 1.1rem; }
+.colh small { display: block; font-family: var(--sans); font-weight: 400; font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.rowh { grid-column: 1 / -1; border-top: 1px solid var(--outline); padding-top: 14px; margin-top: 10px; display: grid; gap: 3px; }
+.rowh b { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+.rowh span { font-size: 14px; line-height: 1.45; max-width: 80ch; }
+.cell { background: var(--newsprint); color: var(--ink); padding: 12px; border-radius: 12px; min-width: 0; display: grid; gap: 8px; }
+
+.card { background: var(--card); border: 1px solid var(--outline); border-radius: 12px; padding: 14px; }
+.top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.title { font-family: var(--serif); font-weight: 700; font-size: 18px; line-height: 1.25; }
+.dots { font-size: 20px; line-height: 1; padding: 0 2px; }
+.summary { font-size: 13px; margin-top: 3px; }
+.heads { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+.heads li { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; }
+.heads .src { grid-column: 1 / -1; font-size: 11px; font-weight: 500; color: var(--ink-soft); }
+.heads .h { font-family: var(--serif); font-size: 13.5px; line-height: 1.3; }
+.heads .m { font-size: 11.5px; color: var(--ink-soft); align-self: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.more { font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; }
+.more.link { color: var(--accent); font-weight: 500; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.btn { font-size: 13px; font-weight: 500; padding: 8px 18px; border-radius: 999px; }
+.btn.fill { background: var(--accent); color: var(--on-accent); }
+.btn.out { border: 1px solid var(--outline); color: var(--accent); }
+.fine { font-size: 11.5px; line-height: 1.45; color: var(--ink-soft); margin-top: 10px; }
+.fine a, .tlink { color: var(--accent); font-weight: 500; text-decoration: none; }
+.tlink { display: inline-block; font-size: 13px; margin-top: 8px; }
+.menu { font-size: 12.5px; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.menu .k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.menu .it { background: var(--menu); border: 1px solid var(--outline); border-radius: 6px; padding: 2px 8px; color: var(--ink); }
+.menu.none { font-style: italic; }
+.count { font-size: 11.5px; color: var(--ink-soft); }
+
+.after { margin-top: 36px; max-width: 70ch; display: grid; gap: 10px; font-size: 14.5px; line-height: 1.55; }
+.after h2 { font-family: var(--serif); font-size: 1.25rem; margin: 0; }
+.after p { margin: 0; }
+.after ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+
+@media (max-width: 720px) {
+  .matrix { grid-template-columns: minmax(0, 1fr); }
+  .colh { display: none; }
+  .cell::before { content: attr(data-col); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="page">
+    <h1>Edition buttons, streamlined</h1>
+    <p>Today's edition card for every device and state, before and after the change that built this proposal. The edition and headlines are sample data. The ⋮ line under each card lists what that card's menu holds.</p>
+    <div class="controls">
+      <span>Colours:</span>
+      <div class="seg" role="group" aria-label="Colours">
+        <button type="button" data-theme-pick="day" aria-pressed="true">Day</button>
+        <button type="button" data-theme-pick="night" aria-pressed="false">Night</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="rules">
+    <h2>The proposal in four rules</h2>
+    <ul>
+      <li><b>At most one filled button per card:</b> the next step. That's <b>Send</b> for every device that sends; the name changes only where the action does: <b>Read</b> on a Boox, before and after it counts as sent.</li>
+      <li><b>The card opens the contents.</b> No "See what's inside" button; a card with no button ends in a link, "and 5 more ›".</li>
+      <li><b>Everything rare is in ⋮</b>, shown when it has something: open on this phone (not for Kindle or Kobo), send another way, send again, mark as not sent, the Kindle app.</li>
+      <li><b>One short line replaces the paragraph and "I've sent it":</b> "Sent it another way? Mark as sent."</li>
+    </ul>
+  </section>
+
+  <div class="matrix" id="matrix"></div>
+
+  <section class="after">
+    <h2>Beyond the card</h2>
+    <ul>
+      <li><b>The edition page</b> gets the same button and the same ⋮ as the card, so the two screens never disagree. Its ⋮ adds Delete edition.</li>
+      <li><b>Boox:</b> the app checks whether it runs on a Boox (Android reports the maker as Onyx). On the Boox it offers Read; on a phone it offers Send, so opening a copy on the phone can't mark an edition as sent when it never reached the Boox.</li>
+      <li><b>Notifications</b> already carry one action per device (Send, or Open on a Boox); the same names would carry over.</li>
+    </ul>
+    <h2>To check before building</h2>
+    <ul>
+      <li>A ⋮ on a ready card is one more thing on every card. Most readers never open it.</li>
+      <li>"Mark as sent" as a link in a sentence is easier to miss than today's button. Most sends are counted on their own, but it needs a TalkBack pass.</li>
+      <li>Send doesn't say where the edition goes. If people are unsure, the line under it can name the route ("Goes to your Kobo through Dropbox") without making the button longer.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+// Sample edition: well-known public feeds, invented headlines.
+const ARTICLES = [
+  { src: "BBC News", h: "Flooding forces thousands from their homes in northern Italy", m: 3 },
+  { src: "Quanta Magazine", h: "The Mathematician Who Counted the Shapes of Knots", m: 8, star: true },
+  { src: "Rest of World", h: "Why Lagos's ride-hailing drivers built their own app", m: 6 },
+];
+const MORE = 5;
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+const SHARE_LINE = "Choosing an app to send it with counts as sent. Sent it another way? Tell us so these articles don't come back.";
+const OPEN_LINE = "Opening it here counts as sent. Read it another way? Tell us so these articles don't come back.";
+const MARK = `Sent it another way? <a href="#" onclick="return false">Mark as sent</a>`;
+const MARK_READ = `Read it another way? <a href="#" onclick="return false">Mark as sent</a>`;
+
+// Each case: what the card shows now and as proposed.
+const CASES = [
+  { row: "Ready · Kindle, with email to the Kindle", note: "Send opens the mail app; the share sheet is the other way. Open is left off: it would open the book on the phone, and a Kindle reader gets it by sending it.",
+    now: { btns: [["fill", "Send"]], fine: SHARE_LINE, sent: true, menu: null },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Send another way"] } },
+  { row: "Ready · Kobo, or Kindle through the share sheet", note: "Send is the share sheet (Dropbox for a Kobo), so there's no other way to offer, and no menu.",
+    now: { btns: [["fill", "Send"]], fine: SHARE_LINE, sent: true, menu: null },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: null } },
+  { row: "Ready · PocketBook", note: "Send goes by email to the reader's @pbsync.com address.",
+    now: { btns: [["fill", "Send"], ["out", "Open"]], fine: SHARE_LINE, sent: true, menu: null },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone"] } },
+  { row: "Ready · KOReader or something else", note: "Send is the share sheet or a folder; the reader decides where.",
+    now: { btns: [["fill", "Send"], ["out", "Open"]], fine: SHARE_LINE, sent: true, menu: null },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone"] } },
+  { row: "Ready · Boox, with the app on the Boox", note: "Reading it here is the delivery.",
+    now: { btns: [["fill", "Open"], ["out", "Send"]], fine: OPEN_LINE, sent: true, menu: null },
+    pro: { btns: [["fill", "Read"]], mark: MARK_READ, menu: ["Send another way"] } },
+  { row: "Ready · Boox, with the app on a phone (not built yet)", note: "Today this looks like the row above, so Open reads the book on the phone and counts it as sent. Telling the two apart is in the backlog.",
+    now: { btns: [["fill", "Open"], ["out", "Send"]], fine: OPEN_LINE, sent: true, menu: null },
+    pro: { btns: [["fill", "Send"]], mark: MARK, menu: ["Open on this phone"] } },
+  { row: "Sent · Kindle, with the Kindle app on the phone", note: "Most read on the Kindle itself, so the card has no button; the Kindle app is in the menu.",
+    now: { status: "sent", btns: [["fill", "See what's inside"], ["out", "Open Kindle"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] },
+    pro: { status: "sent", btns: [], link: true, menu: ["Send again", "Didn't arrive? Mark as not sent", "Open the Kindle app"] } },
+  { row: "Sent · Boox, with the app on the Boox", note: "What's next is reading it, right here.",
+    now: { status: "sent", btns: [["fill", "Open"], ["out", "See what's inside"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] },
+    pro: { status: "sent", btns: [["fill", "Read"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] } },
+  { row: "Sent · Kobo", note: "Nothing to open on the phone; the book is on the e-reader.",
+    now: { status: "sent", btns: [["fill", "See what's inside"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] },
+    pro: { status: "sent", btns: [], link: true, menu: ["Send again", "Didn't arrive? Mark as not sent"] } },
+  { row: "Sent · PocketBook, KOReader or something else", note: "Open reads it on the phone, which most of these readers don't want once it's on the device.",
+    now: { status: "sent", btns: [["fill", "Open"], ["out", "See what's inside"]], menu: ["Send again", "Didn't arrive? Mark as not sent"] },
+    pro: { status: "sent", btns: [], link: true, menu: ["Send again", "Didn't arrive? Mark as not sent", "Open on this phone"] } },
+];
+
+function card(v) {
+  const sent = v.status === "sent";
+  const heads = `<ul class="heads">${ARTICLES.map(a => `<li><span class="src">${a.star ? "★ " : ""}${esc(a.src)}</span><span class="h">${esc(a.h)}</span><span class="m">${a.m} min</span></li>`).join("")}</ul>`;
+  const more = `<div class="more${v.link ? " link" : ""}">and ${MORE} more${v.link ? " ›" : ""}</div>`;
+  const btns = v.btns.length ? `<div class="btns">${v.btns.map(([k, t]) => `<span class="btn ${k}">${t}</span>`).join("")}</div>` : "";
+  const fine = v.fine ? `<div class="fine">${v.fine}</div>` : "";
+  const sentBtn = v.sent ? `<span class="tlink">I've sent it</span>` : "";
+  const mark = v.mark ? `<div class="fine">${v.mark}</div>` : "";
+  const dots = v.menu ? `<span class="dots" aria-hidden="true">⋮</span>` : "";
+  return `<div class="card"><div class="top"><div><div class="title">Thursday Morning Edition</div>
+    <div class="summary">8 articles · about 33 min · ${sent ? "sent" : "ready to send"}</div></div>${dots}</div>
+    ${heads}${more}${btns}${fine}${sentBtn}${mark}</div>`;
+}
+function menuLine(v) {
+  if (!v.menu) return `<div class="menu none"><span class="k">⋮</span> No menu on this card</div>`;
+  return `<div class="menu"><span class="k">⋮</span>${v.menu.map(m => `<span class="it">${esc(m)}</span>`).join("")}</div>`;
+}
+function tapCount(v) {
+  const n = v.btns.length + (v.sent ? 1 : 0) + (v.mark ? 1 : 0);
+  return `<div class="count">${n} ${n === 1 ? "thing" : "things"} to tap besides the card${v.menu ? `, plus ${v.menu.length} in ⋮` : ""}</div>`;
+}
+
+let THEME = "day";
+function render() {
+  let html = `<div class="colh">Now<small>As in the app today</small></div><div class="colh">Proposed<small>One button, the rest in ⋮</small></div>`;
+  for (const c of CASES) {
+    html += `<div class="rowh"><b>${esc(c.row)}</b><span>${esc(c.note)}</span></div>`;
+    html += `<div class="cell ${THEME}" data-col="Now">${card(c.now)}${menuLine(c.now)}${tapCount(c.now)}</div>`;
+    html += `<div class="cell ${THEME}" data-col="Proposed">${card(c.pro)}${menuLine(c.pro)}${tapCount(c.pro)}</div>`;
+  }
+  document.getElementById("matrix").innerHTML = html;
+  document.querySelectorAll("[data-theme-pick]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.themePick === THEME)));
+}
+document.querySelectorAll("[data-theme-pick]").forEach(b => b.addEventListener("click", () => {
+  THEME = b.dataset.themePick;
+  try { localStorage.setItem("cardTheme", THEME); } catch (e) {}
+  render();
+}));
+try { const t = localStorage.getItem("cardTheme"); if (t === "day" || t === "night") THEME = t; } catch (e) {}
+render();
+</script>
+</body>
+</html>
