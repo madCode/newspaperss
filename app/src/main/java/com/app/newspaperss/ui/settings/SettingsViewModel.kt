@@ -22,6 +22,8 @@ class SettingsViewModel(
     private val store: SettingsStore,
     /** The tt-rss account, for the "Where your feeds live" row. */
     ttrss: Flow<TtrssStatus> = flowOf(TtrssStatus.NONE),
+    /** Says a line in the phone's voice at a speed: Settings › Listening's sample. */
+    private val hear: (text: String, speed: Float) -> Unit = { _, _ -> },
     /** Called after every change so the edition timer follows the schedule. */
     private val onChanged: (Settings) -> Unit,
 ) : ViewModel() {
@@ -57,6 +59,15 @@ class SettingsViewModel(
         viewModelScope.launch { store.update { it.copy(previewTextSize = size) } }
     }
 
+    fun setListenSpeed(speed: Float) {
+        viewModelScope.launch { store.update { it.copy(listenSpeed = speed) } }
+    }
+
+    fun hear() {
+        val s = settings.value ?: return
+        hear(SAMPLE, s.listenSpeed)
+    }
+
     fun setMailApp(packageName: String?) {
         viewModelScope.launch { store.update { it.copy(mailApp = packageName) } }
     }
@@ -68,5 +79,6 @@ class SettingsViewModel(
         const val MIN_MINUTES = 5
         const val MAX_MINUTES = 120
         const val MAX_PER_SOURCE = 10
+        const val SAMPLE = "This is how your paper sounds, read aloud in your phone's voice."
     }
 }

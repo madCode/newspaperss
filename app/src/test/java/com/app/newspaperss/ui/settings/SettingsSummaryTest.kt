@@ -76,4 +76,11 @@ class SettingsSummaryTest {
         assertEquals(Summary("Saved to Vault"), SettingsSummary.notes(on, reachable = true))
         assertEquals("Can't reach Vault.", SettingsSummary.notes(on, reachable = false).problem)
     }
+
+    @Test
+    fun listeningNamesTheSpeedAndAPhoneWithoutAVoiceIsntAProblem() {
+        assertEquals(Summary("This phone's voice · 1.2×"), SettingsSummary.listening(Settings(listenSpeed = 1.2f), hasVoice = true))
+        // An e-reader without one, whose reader may never listen.
+        assertEquals(Summary("No voice on this phone"), SettingsSummary.listening(Settings(), hasVoice = false))
+    }
 }

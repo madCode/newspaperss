@@ -8,6 +8,7 @@ import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
+import com.app.newspaperss.ui.listen.speedLabel
 import java.time.DayOfWeek
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -25,6 +26,7 @@ enum class SettingsPage(val slug: String, val title: String) {
     EDITION("edition", "Your edition"),
     SCHEDULE("schedule", "Schedule"),
     TEXT_SIZE("text-size", "Article text size"),
+    LISTENING("listening", "Listening"),
     // One page: the e-reader decides which delivery choices are offered.
     DELIVERY("delivery", "E-reader & delivery"),
     FEEDS("feeds", "Where your feeds live"),
@@ -79,6 +81,13 @@ object SettingsSummary {
     }
 
     fun textSize(s: Settings): Summary = Summary(s.previewTextSize.label)
+
+    /**
+     * Not a problem without a voice: many e-readers have none, and their readers may never want
+     * Listen. The page says how to get one.
+     */
+    fun listening(s: Settings, hasVoice: Boolean): Summary =
+        Summary(if (hasVoice) "This phone's voice · ${speedLabel(s.listenSpeed)}" else "No voice on this phone")
 
     fun notes(s: Settings, reachable: Boolean): Summary {
         val name = s.notesFolderName ?: "your folder"

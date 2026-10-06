@@ -85,7 +85,7 @@ Setup takes a couple of minutes, in four steps:
   and it's on the article's text, the sentence being read tinted, its
   pictures in place; tap a sentence to hear it from there, or go back one.
   It remembers where you stopped, and offers to finish yesterday's paper
-  before today's.
+  before today's. Settings › Listening keeps your speed and has a sample.
 - **Calm by design.** No unread counts, no infinite timeline, no
   animations to smear on an e-ink screen.
 

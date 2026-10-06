@@ -4,7 +4,10 @@ import com.app.newspaperss.core.listen.ListenScript
 import com.app.newspaperss.core.listen.ListenScript.Block
 import com.app.newspaperss.core.listen.ListenScript.Kind
 import com.app.newspaperss.testutil.FakeSpeaker
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Assert.assertEquals
@@ -37,19 +40,15 @@ class ListenPlayerTest {
     private var clock = 0L
     private var opened = 0
     private var closed = 0
-    private val player = ListenPlayer(
-        speaker, progress,
-        open = { id ->
-            opened++
-            ListenBook(
-                id, "Thursday Morning Edition",
-                listOf(ListenPage("A", "Source A", 1.0), ListenPage("B", "Source B", 1.0), ListenPage("The end", null, 0.0, end = true)),
-                read = { pages.getOrNull(it) }, onClose = { closed++ },
-            )
-        },
-        scope = TestScope(UnconfinedTestDispatcher()),
-        now = { clock },
-    )
+    private val openBook: suspend (Long) -> ListenBook = { id ->
+        opened++
+        ListenBook(
+            id, "Thursday Morning Edition",
+            listOf(ListenPage("A", "Source A", 1.0), ListenPage("B", "Source B", 1.0), ListenPage("The end", null, 0.0, end = true)),
+            read = { pages.getOrNull(it) }, onClose = { closed++ },
+        )
+    }
+    private val player = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), now = { clock })
     private val state get() = player.state.value
 
     @Test
@@ -185,6 +184,51 @@ class ListenPlayerTest {
         player.setSpeed(1.5f)
         assertEquals(1.5f, speaker.queue.first().rate)
         assertEquals("A one.", speaker.queue.first().text)
+    }
+
+    @Test
+    fun theSpeedIsKeptInSettingsAndFollowedFromThere() {
+        val saved = MutableStateFlow(1.2f)
+        val kept = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), savedSpeed = saved, saveSpeed = { saved.value = it })
+        kept.start(7)
+        assertEquals(1.2f, speaker.queue.first().rate)
+
+        kept.setSpeed(1.5f)
+        assertEquals(1.5f, saved.value)
+
+        // Changed in Settings while it plays: from the sentence being read.
+        speaker.startNext()
+        saved.value = 0.8f
+        assertEquals(0.8f, kept.state.value.speed)
+        assertEquals("A one." to 0.8f, speaker.queue.first().let { it.text to it.rate })
+    }
+
+    @Test
+    fun aSpeedStillBeingSavedIsntUndoneByTheOneBeforeIt() {
+        val saved = MutableSharedFlow<Float>(replay = 1).apply { tryEmit(1f) }
+        val saving = CompletableDeferred<Unit>()
+        val kept = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), savedSpeed = saved, saveSpeed = { saving.await(); saved.emit(it) })
+        kept.start(7)
+        kept.setSpeed(1.5f)
+        // The store hands back what it had before the save landed.
+        saved.tryEmit(1f)
+        assertEquals(1.5f, kept.state.value.speed)
+        assertEquals(1.5f, speaker.queue.first().rate)
+        saving.complete(Unit)
+        assertEquals(1.5f, kept.state.value.speed)
+    }
+
+    @Test
+    fun theSampleIsSaidAtItsSpeedAndPausesTheEdition() {
+        player.start(7)
+        speaker.startNext()
+        player.sample("This is how it sounds.", 1.5f)
+        assertFalse(state.playing)
+        assertEquals(listOf("This is how it sounds." to 1.5f), speaker.queue.map { it.text to it.rate })
+        // Its start and end move nothing.
+        speaker.sayNext()
+        assertEquals(ListenPosition(0, 0), state.at)
+        assertFalse(state.playing)
     }
 
     @Test

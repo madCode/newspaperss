@@ -231,8 +231,7 @@ Many of the writers worth reading publish as newsletters. Two routes, from easy 
   let people point it at their own instance), and the inbox address is effectively a password.
 
 ### Listen: the paper as an audiobook
-The phone's voice reading an edition is built ([mockups](https://claude.ai/artifact/X9dZJi7XP3GxY85xjdLMXq)). Next:
-- **Settings › Listening:** the voice (with a sample) and a speed that's kept; a link to Android's text-to-speech settings.
+The phone's voice reading an edition, and Settings › Listening for it, are built ([mockups](https://claude.ai/artifact/X9dZJi7XP3GxY85xjdLMXq)). Next:
 - **Kokoro, a better voice to download** (about 120 MB, offline): its audio made with the edition, overnight, since phones read it at about real time; what isn't ready yet plays in the phone's voice. English only; other languages stay with the phone's voice.
 - **🔊 in the article preview**, starting the same player at that article.
 - **A sleep timer**, and a way in from Today's card.

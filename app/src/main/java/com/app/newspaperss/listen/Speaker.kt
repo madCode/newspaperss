@@ -42,7 +42,8 @@ interface Speaker {
  *
  * An engine that failed to start, or dropped out (updated, or killed), is started again on the next
  * line asked for, so "try again" after fixing Android's text-to-speech settings works without
- * restarting the app.
+ * restarting the app. So is one whose engine was changed in Android's settings, when it's next
+ * started or moved (a line that drops the queue), so the change is heard without restarting.
  */
 class SystemSpeaker(context: Context) : Speaker {
     override var listener: Speaker.Listener? = null
@@ -52,6 +53,8 @@ class SystemSpeaker(context: Context) : Speaker {
     private var failed = false
     private val waiting = mutableListOf<() -> Unit>()
     private var language: String? = null
+    /** The engine Android's settings named when this one started. */
+    private var engineName: String? = null
     private var tts: TextToSpeech = connect()
 
     private fun connect(): TextToSpeech {
@@ -70,6 +73,7 @@ class SystemSpeaker(context: Context) : Speaker {
                 queued.forEach { it() }
             }
         }
+        engineName = engine.defaultEngine
         engine.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String) { main.post { listener?.onStart(utteranceId) } }
@@ -82,7 +86,7 @@ class SystemSpeaker(context: Context) : Speaker {
     }
 
     override fun speak(id: String, text: String, language: String?, rate: Float, flush: Boolean): Boolean {
-        if (failed) {
+        if (failed || (flush && ready && tts.defaultEngine != engineName)) {
             failed = false
             tts.shutdown()
             tts = connect()

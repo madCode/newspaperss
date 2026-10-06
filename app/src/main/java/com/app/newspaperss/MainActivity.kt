@@ -306,5 +306,9 @@ private fun App(
 @Composable
 private fun settingsViewModel(container: AppContainer): SettingsViewModel {
     val context = LocalContext.current.applicationContext
-    return viewModel { SettingsViewModel(container.settings, container.ttrss.observeStatus()) { container.appScope.launch { EditionScheduler.reschedule(context, it) } } }
+    return viewModel {
+        SettingsViewModel(container.settings, container.ttrss.observeStatus(), hear = { text, speed -> container.listen.sample(text, speed) }) {
+            container.appScope.launch { EditionScheduler.reschedule(context, it) }
+        }
+    }
 }

@@ -484,7 +484,8 @@ whose Kindle and KOReader answers ask for more on the same page).
   - It reads a sentence at a time. ↶ goes back to the start of the
     sentence, or the one before if it has only just started; ↷ skips one;
     ⏮ ⏭ move by article (⏮ restarts the article after its first few
-    sentences). Speed steps through 1×, 1.2×, 1.5× and 0.8×.
+    sentences). Speed steps through 1×, 1.2×, 1.5× and 0.8×, and is kept:
+    it's the same speed as Settings › Listening.
   - The playing screen is the article's text, the sentence being read
     tinted, following the voice. Scrolling away stops it following, and
     "Back to where it's reading" returns. Tapping a sentence reads from
@@ -661,6 +662,14 @@ whose Kindle and KOReader answers ask for more on the same page).
     (85% to 175%) as radio rows; the preview's **Aa** sets the same size.
     The rest of the app follows Android's font size, and the EPUB the
     e-reader's own settings.
+  - **Listening** (its row says "This phone's voice · 1×", or "No voice on
+    this phone", which isn't shown as a problem: many e-readers have none):
+    the phone's text-to-speech engine by name with **Hear it**, a sample line
+    at the chosen speed (it pauses an edition that's playing); the speed as
+    radio rows, 0.8× to 1.5×, the same one the player's speed button sets;
+    and **Change the phone's voice**, which opens Android's text-to-speech
+    settings. A new engine chosen there is used from the next start or jump.
+    Without an engine the page says so and offers Speech Services by Google.
   - **E-reader & delivery:** the e-reader in a dropdown at the top, then
     "How it gets there". They share a page because the e-reader decides
     which delivery options show: **Email it to your Kindle** (shown for a Kindle, or once

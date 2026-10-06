@@ -45,6 +45,8 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
 class AppContainer(
@@ -90,7 +92,11 @@ class AppContainer(
     /** Reading editions aloud. Made on first use: the voice takes a moment to start. */
     private val listenProgress = StoredListenProgress(context)
     val listen: ListenPlayer by lazy {
-        ListenPlayer(speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope)
+        ListenPlayer(
+            speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope,
+            savedSpeed = settings.settings.map { it.listenSpeed }.distinctUntilChanged(),
+            saveSpeed = { speed -> settings.update { it.copy(listenSpeed = speed) } },
+        )
     }
     val listening: Listening by lazy { Listening(listen, listenProgress, editions) { connectListening() } }
 
