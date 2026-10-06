@@ -2,6 +2,7 @@ package com.app.newspaperss.ui.edition
 
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import java.util.Locale
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -457,4 +458,4 @@ internal fun imageSizes(pages: EpubPages): (String) -> Pair<Int, Int>? = { src -
     }
 }
 
-private fun css(argb: Int) = "#%06X".format(argb and 0xFFFFFF)
+private fun css(argb: Int) = "#%06X".format(Locale.ROOT, argb and 0xFFFFFF)

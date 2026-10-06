@@ -9,7 +9,8 @@ data class ChecklistItem(val url: String, val done: Boolean, val title: String? 
  * apps paste a link.
  */
 object MarkdownChecklist {
-    private val item = Regex("""^\s*[-*]\s\[([ xX])]\s+(.+?)\s*$""")
+    // Ends on a non-space rather than a lazy `.+?\s*$`, which backtracks quadratically on a long run of spaces.
+    private val item = Regex("""^\s*[-*]\s\[([ xX])]\s+(\S(?:.*\S)?)\s*$""")
     private val link = Regex("""^\[(.*)]\((\S+)\)$""")
 
     fun parse(text: String): List<ChecklistItem> = text.lineSequence().mapNotNull { line ->

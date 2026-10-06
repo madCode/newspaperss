@@ -11,10 +11,8 @@ data class Feed(
 /**
  * One entry from a feed.
  *
- * Parameters
- * ----------
- * guid: the feed's own id for the entry, or its url when it has none.
- * contentHtml: the fullest body the feed offers (content:encoded, Atom
+ * @param guid the feed's own id for the entry, or its url when it has none.
+ * @param contentHtml the fullest body the feed offers (content:encoded, Atom
  *   content, JSON Feed content_html), or its summary if that's all there is.
  */
 data class FeedItem(

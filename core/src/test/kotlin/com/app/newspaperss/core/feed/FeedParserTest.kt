@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.feed
 
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -173,5 +174,25 @@ class FeedParserTest {
         assertEquals(Instant.parse("2026-09-29T00:00:00Z"), FeedDates.parse("2026-09-29"))
         assertEquals(Instant.parse("2026-09-29T13:00:00Z"), FeedDates.parse("29 Sep 2026 06:00:00 PDT"))
         assertEquals(Instant.parse("2026-09-29T06:00:00Z"), FeedDates.parse("Tue, 29 Sep 26 06:00:00 +0000"))
+    }
+
+    @Test
+    fun aFeedDeclaringItsOwnEntitiesIsRefused() {
+        val bomb = "<?xml version=\"1.0\"?><!DOCTYPE rss [<!ENTITY a \"aaaaaaaaaa\"><!ENTITY b \"&a;&a;&a;&a;&a;\">]>" +
+            "<rss><channel><title>&b;</title></channel></rss>"
+        assertThrows(FeedParseException::class.java) { FeedParser.parse(bomb, "https://a.example/feed") }
+    }
+
+    @Test
+    fun aFeedDeclaringPlainEntitiesIsStillRead() {
+        val rss = "<?xml version=\"1.0\"?><!DOCTYPE rss [<!ENTITY nbsp \"&#160;\">]>" +
+            "<rss><channel><title>Old CMS</title><item><title>A</title><link>https://a.example/a</link></item></channel></rss>"
+        assertEquals("Old CMS", FeedParser.parse(rss, "https://a.example/feed").title)
+    }
+
+    @Test
+    fun anItemLinkJavasUriRefusesIsStillMadeAbsolute() {
+        val rss = "<rss><channel><title>T</title><item><title>Q</title><link>/search?q=a|b</link></item></channel></rss>"
+        assertEquals("https://a.example/search?q=a%7Cb", FeedParser.parse(rss, "https://a.example/feed").items.single().url)
     }
 }
