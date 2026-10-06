@@ -89,7 +89,12 @@ enum class ArticleState {
 @Entity(
     tableName = "articles",
     foreignKeys = [ForeignKey(entity = SourceEntity::class, parentColumns = ["id"], childColumns = ["sourceId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index(value = ["sourceId", "guid"], unique = true), Index("url"), Index("state")],
+    // sourceId with discoveredAt answers Sources' "last new" per source, and starredAt Today's count
+    // of stars waiting, without reading every article: both are watched, so they run on each write.
+    indices = [
+        Index(value = ["sourceId", "guid"], unique = true), Index("url"), Index("state"),
+        Index(value = ["sourceId", "discoveredAt"]), Index("starredAt"),
+    ],
 )
 data class ArticleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

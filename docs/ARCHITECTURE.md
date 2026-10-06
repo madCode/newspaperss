@@ -20,7 +20,7 @@ Two Gradle modules (`settings.gradle.kts`):
 flowchart TB
     subgraph app[":app (Android)"]
         ui["ui/: Compose screens + ViewModels"]
-        work["work/: WorkManager workers, EditionScheduler"]
+        work["work/: WorkManager workers, EditionScheduler,<br/>Connectivity (Today's online state)"]
         edition["edition/: EditionRun, EditionBuilder,<br/>ExtractorContentProvider, CoverRenderer"]
         data["data/: Room database, repositories, FeedSync"]
         delivery["delivery/: share, folder, sent callback"]
@@ -63,15 +63,17 @@ can't do without Android are passed in as interfaces:
 ## Wiring
 
 - **`AppContainer`** (`app/AppContainer.kt`) builds one of each service for
-  the app's lifetime, by hand: no Hilt or Dagger. Its constructor takes the
-  HTTP client, database and worker-enqueuing functions as parameters, so
-  tests can swap them.
+  the app's lifetime, by hand: no Hilt or Dagger. Its constructor takes what tests swap: the
+  HTTP client, database, cipher, worker-enqueuing functions and Listen's
+  voice and service binding. Its `appScope` runs work nobody waits on,
+  and logs a failure there rather than crashing.
 - **`NewspaperssApp`** (`app/NewspaperssApp.kt`) creates the container,
-  creates the notification channels, schedules the 12-hour sync and arms
-  the edition timer.
-- Everything else reaches services through
-  `(applicationContext as NewspaperssApp).container`: workers, receivers
-  and the small activities.
+  settles where the feeds live (`settleFeedsFrom`), resumes a feed move
+  left part way, creates the notification channels, schedules the 12-hour
+  sync and arms the edition timer.
+- Everything else reaches services through `context.container`
+  (`app/NewspaperssApp.kt`): workers, receivers, the listening service and
+  the small activities.
 - **Screens** are Jetpack Compose in one activity, `MainActivity`, with
   Navigation Compose. Each ViewModel is created with
   `viewModel { … }`, given the services it needs from the container, and
@@ -278,7 +280,7 @@ twice.
 
 | Work | Started by | Unique name, policy | Notes |
 |---|---|---|---|
-| `EditionWorker` | "Make an edition", the timer | `edition-build`, KEEP | One build at a time. Needs a connection. A timed run that reaches no source retries twice (5, then 10 min). |
+| `EditionWorker` | "Make an edition", the timer | `edition-build`, KEEP | One build at a time. Needs a connection. A timed run that reaches no source retries twice (5, then 10 min). After 8 minutes it stops fetching and writes the edition with what it has, short of WorkManager's 10-minute limit. |
 | `EditionScheduler.Timer` | `EditionScheduler.reschedule` | `edition-schedule`, REPLACE / APPEND | One-off timer 30 min before the due time; it starts a build and arms the next timer. |
 | `SyncWorker` (periodic) | App start | `sync-periodic-12h`, KEEP | Every 12 h, connected, battery not low. Only keeps the Sources screen fresh. |
 | `SyncWorker` (now) | Adding a source, refresh | `sync-now`, APPEND_OR_REPLACE | Appended so a new source isn't missed by a sync already running. |

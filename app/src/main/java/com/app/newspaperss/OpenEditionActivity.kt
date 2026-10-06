@@ -25,7 +25,7 @@ class OpenEditionActivity : Activity() {
         try {
             // Its own task: this one is excluded from Recents, and the book shouldn't be.
             startActivity(EditionIntents.open(this, file).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-            val container = (application as NewspaperssApp).container
+            val container = application.container
             container.appScope.launch { container.editions.markSent(id) }
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, "No reading app on this phone can open the edition.", Toast.LENGTH_LONG).show()

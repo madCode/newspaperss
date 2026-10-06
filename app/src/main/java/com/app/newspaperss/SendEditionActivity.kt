@@ -27,7 +27,7 @@ class SendEditionActivity : Activity() {
             return
         }
         val title = intent.getStringExtra(EXTRA_TITLE) ?: file.nameWithoutExtension
-        val container = (application as NewspaperssApp).container
+        val container = application.container
         container.appScope.launch {
             val email = container.settings.current().kindleEmailTarget
             val body = email?.let { container.editions.emailBody(id) }

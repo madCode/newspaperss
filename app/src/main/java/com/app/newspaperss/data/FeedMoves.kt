@@ -148,10 +148,10 @@ class FeedMoves(
                 continue
             }
             val answer = when (ttrss.login()) {
-                null -> TtrssRepository.MoveAnswer.Failed(FeedSync.SIGN_IN_AGAIN)
+                null -> TtrssRepository.MoveAnswer.Failed(FeedSync.SIGN_IN_AGAIN, stopsBatch = true)
                 login -> ttrss.feedAt(source.url)?.key?.toIntOrNull()?.let { TtrssRepository.MoveAnswer.In(it, already = true) }
                     ?: ttrss.subscribeForMove(source.url, category, login)
-                else -> TtrssRepository.MoveAnswer.Failed(TtrssRepository.SIGNED_IN_AGAIN)
+                else -> TtrssRepository.MoveAnswer.Failed(TtrssRepository.SIGNED_IN_AGAIN, stopsBatch = true)
             }
             edit(batch) { s ->
                 when (answer) {
@@ -159,10 +159,8 @@ class FeedMoves(
                         queued = s.queued - source.id,
                         subscribed = s.subscribed + Subscribed(source.id, answer.feedId, answer.already, source.paused),
                     )
-                    // tt-rss not answering, or the account gone: the rest would fail the same way,
-                    // each after its own wait, so they're given up together.
                     is TtrssRepository.MoveAnswer.Failed -> {
-                        val givenUp = if (answer.unreachable || answer.reason == FeedSync.SIGN_IN_AGAIN || answer.reason == TtrssRepository.SIGNED_IN_AGAIN) s.queued else setOf(source.id)
+                        val givenUp = if (answer.stopsBatch) s.queued else setOf(source.id)
                         s.copy(queued = s.queued - givenUp, failed = s.failed + givenUp.map { Failure(it, answer.reason) })
                     }
                 }

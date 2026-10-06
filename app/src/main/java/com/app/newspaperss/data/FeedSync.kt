@@ -111,15 +111,8 @@ class FeedSync(
                 client.unreadHeadlines(feedId = feed.id, limit = TTRSS_PER_FEED, newestFirst = true)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: TtrssException.LoginFailed) {
-                throw e
-            } catch (e: TtrssException.ApiDisabled) {
-                throw e
-            } catch (e: TtrssException.ApiError) {
-                if (e.code == "NOT_LOGGED_IN") throw e
-                failure = failure ?: e
-                emptyList()
             } catch (e: Exception) {
+                if (e is TtrssException && e.failsWholeAccount) throw e
                 failure = failure ?: e
                 emptyList()
             }
@@ -180,7 +173,7 @@ class FeedSync(
 
     private suspend fun syncTtrss(source: SourceEntity): Int? {
         val now = clock.instant()
-        val account = (ttrssAccounts?.load() as? StoredAccount.Ready)?.account
+        val account = ttrssAccounts?.ready()
         val error = if (account == null || account.apiUrl != source.url) {
             SIGN_IN_AGAIN
         } else {
@@ -189,7 +182,7 @@ class FeedSync(
                 val category = source.ttrssCategoryId
                 // A few from each feed rather than the newest 200 overall: busy news feeds would
                 // fill those 200, and a feed that posts monthly would never reach the paper.
-                val leftOut = db.sources().allLeftOut().filter { it.sourceId == source.id }.map { it.key }.toSet()
+                val leftOut = db.sources().leftOut(source.id).map { it.key }.toSet()
                 val withUnread = client.unreadFeeds(category).filter { it.unread > 0 }
                 // A feed with articles has been fetched, without waiting for tomorrow's feed list to say so.
                 db.sources().fetchedByServer(source.id, withUnread.map { it.id.toString() })
@@ -215,7 +208,7 @@ class FeedSync(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TtrssException) {
-                e.message ?: "tt-rss reported an error."
+                e.reason
             } catch (e: IOException) {
                 // The periodic sync, and every edition, tries again.
                 ttrssUnreachable(e) + if (tooSlow(e)) " It'll be tried again at the next sync." else ""

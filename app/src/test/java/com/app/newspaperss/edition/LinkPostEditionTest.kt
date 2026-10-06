@@ -42,7 +42,7 @@ class LinkPostEditionTest {
     private val sources = SourceRepository(db, clock)
     private val evidence = mutableListOf<FullTextEvidence>()
     private val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { _, _, e, _ -> e?.let { evidence += it } }
-    private val builder by lazy { EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC) }
+    private val builder by lazy { EditionBuilder(db, provider, tmp.root, clock, { ZoneOffset.UTC }) }
     private val editions by lazy { EditionRepository(db, tmp.root, clock) }
     private val sync = FeedSync(db, http, clock)
 

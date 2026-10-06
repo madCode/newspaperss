@@ -1,5 +1,7 @@
 package com.app.newspaperss.edition
 
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.data.EditionStatus
 import com.app.newspaperss.data.FeedSync
@@ -30,18 +32,16 @@ class EditionRun(
      *   get a "ready" notification; someone who tapped "Make one now" is
      *   already looking at it.
      * @param dueAt when a timed edition is due, which is what it's titled and dated for.
-     */
-    /**
+     * @param deadline when to stop fetching articles and write the edition with what it has.
      * @param finalAttempt false when the worker will retry an [BuildResult.Unreachable] timed run,
      *   so the reader isn't told of a failure that a retry minutes later may undo.
      */
     suspend fun run(
-        scheduled: Boolean, onSyncDone: () -> Unit = {}, onProgress: (Int) -> Unit = {}, dueAt: Instant? = null, finalAttempt: Boolean = true,
+        scheduled: Boolean, onProgress: (Int) -> Unit = {}, dueAt: Instant? = null, finalAttempt: Boolean = true, deadline: Instant? = null,
     ): BuildResult {
         val s = settings.current()
         val synced = sync.syncAll()
-        onSyncDone()
-        val built = builder.build(s.edition, dueAt, onProgress)
+        val built = builder.build(s.edition, dueAt, deadline, onProgress)
         // "Nothing new" when every source failed would hide the failure.
         val result = if (built == BuildResult.NothingNew && synced.sources > 0 && synced.failedSources == synced.sources) {
             BuildResult.Unreachable(synced.sources)
@@ -71,9 +71,14 @@ class EditionRun(
         val file = editions.fileOf(edition) ?: return
         val folderUri = s.folderUri
         if (s.delivery == DeliveryMethod.FOLDER && folderUri != null) {
-            val error = folder.deliver(file, folderUri, FolderDelivery.fileName(edition.title), EditionIntents.EPUB_MIME)
+            // Copied and marked delivered together: cancelled between the two (WorkManager's time
+            // limit, the network constraint lost), the book would be in the folder while the
+            // edition stayed unsent, and the next build would put the same articles in another.
+            val error = withContext(NonCancellable) {
+                folder.deliver(file, folderUri, FolderDelivery.fileName(edition.title), EditionIntents.EPUB_MIME)
+                    .also { if (it == null) editions.markDelivered(editionId) }
+            }
             if (error == null) {
-                editions.markDelivered(editionId)
                 // Deleted while its file was being copied: no news about an edition that's gone.
                 if (editions.byId(editionId)?.status != EditionStatus.DELIVERED) return
                 notifier.editionDelivered(edition, s.folderName ?: "your folder")

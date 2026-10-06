@@ -2,7 +2,6 @@ package com.app.newspaperss.data
 
 import com.app.newspaperss.core.ttrss.TtrssClient
 import com.app.newspaperss.core.ttrss.TtrssException
-import kotlinx.coroutines.CancellationException
 import java.io.IOException
 
 /**
@@ -33,16 +32,8 @@ internal suspend fun TtrssClient.readStates(refs: Collection<TtrssRef>): ReadSta
     for ((feed, articles) in byFeed) {
         val states = try {
             unreadStates(feed, sinceId = articles.minOf { it.second } - 1)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: TtrssException.LoginFailed) {
-            throw e
-        } catch (e: TtrssException.ApiDisabled) {
-            throw e
-        } catch (e: TtrssException.ApiError) {
-            if (e.code == "NOT_LOGGED_IN") throw e
-            continue
         } catch (e: TtrssException) {
+            if (e.failsWholeAccount) throw e
             continue
         } catch (e: IOException) {
             continue
@@ -61,3 +52,13 @@ internal suspend fun TtrssClient.readStates(refs: Collection<TtrssRef>): ReadSta
  */
 internal suspend fun TtrssClient.confirmed(refs: Collection<TtrssRef>, read: Boolean): List<String> =
     if (refs.isEmpty()) emptyList() else readStates(refs).confirmed(refs, read)
+
+/**
+ * A failure that's the whole account's, not one feed's: the login refused or lapsed, or the API
+ * turned off. A sync stops at one of these rather than going on to the next feed.
+ */
+internal val TtrssException.failsWholeAccount: Boolean
+    get() = this is TtrssException.LoginFailed || this is TtrssException.ApiDisabled || (this is TtrssException.ApiError && code == "NOT_LOGGED_IN")
+
+/** What tt-rss said went wrong, for the reader. */
+internal val TtrssException.reason: String get() = message ?: "tt-rss reported an error."

@@ -58,7 +58,7 @@ class EditionBuilderTest {
         if (a.guid in broken) throw IllegalStateException("parser crashed on ${a.url}")
         if (a.guid in unreadable) null else ArticleContent(a.title, null, "<p>${a.title} body</p>", wordCount = 2000)
     }
-    private val builder by lazy { EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) }
+    private val builder by lazy { EditionBuilder(db, content, tmp.root, clock, { ZoneOffset.UTC }) }
     private val editions by lazy { EditionRepository(db, tmp.root, clock) }
 
     private suspend fun source(name: String, vararg guids: String): Long {
@@ -95,7 +95,7 @@ class EditionBuilderTest {
     @Test
     fun aTimedEditionBuiltBeforeMidnightIsTitledForTheDayItsDue() = runTest {
         source("a", "a1")
-        val lateMonday = EditionBuilder(db, content, tmp.root, Clock.fixed(Instant.parse("2026-09-28T23:40:00Z"), ZoneOffset.UTC), ZoneOffset.UTC)
+        val lateMonday = EditionBuilder(db, content, tmp.root, Clock.fixed(Instant.parse("2026-09-28T23:40:00Z"), ZoneOffset.UTC), { ZoneOffset.UTC })
 
         val result = lateMonday.build(EditionSettings(), dueAt = Instant.parse("2026-09-29T00:10:00Z")) as BuildResult.Built
 
@@ -103,9 +103,23 @@ class EditionBuilderTest {
 
         // Send to Kindle drops a document whose title it has already seen.
         source("b", "b1")
-        val tuesdayEvening = EditionBuilder(db, content, tmp.root, Clock.fixed(Instant.parse("2026-09-29T20:00:00Z"), ZoneOffset.UTC), ZoneOffset.UTC)
+        val tuesdayEvening = EditionBuilder(db, content, tmp.root, Clock.fixed(Instant.parse("2026-09-29T20:00:00Z"), ZoneOffset.UTC), { ZoneOffset.UTC })
         val second = tuesdayEvening.build(EditionSettings()) as BuildResult.Built
         assertEquals("Tuesday Evening Edition, Sep 29 (2)", db.editions().byId(second.editionId)!!.title)
+    }
+
+    @Test
+    fun pastItsDeadlineABuildGoesOutWithWhatItHas() = runTest {
+        source("a", "a1")
+        source("b", "b1")
+        source("c", "c1")
+
+        // Past the deadline from the start: one article, so there's a paper, then no more fetching.
+        val result = builder.build(EditionSettings(minutes = 25, maxPerSource = 1, wordsPerMinute = 200), deadline = clock.instant()) as BuildResult.Built
+
+        assertEquals(1, db.editions().byId(result.editionId)!!.articleCount)
+        // The rest wait for the next edition.
+        assertEquals(2, db.articles().candidates().size)
     }
 
     @Test
@@ -221,7 +235,7 @@ class EditionBuilderTest {
         sources.setPaused(moved, true)
         val stillPaused = source("b", "b1")
         sources.setPaused(stillPaused, true)
-        val withMoved = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC, retiring = { setOf(moved) })
+        val withMoved = EditionBuilder(db, content, tmp.root, clock, { ZoneOffset.UTC }, retiring = { setOf(moved) })
 
         val built = withMoved.build(EditionSettings()) as BuildResult.Built
 
@@ -447,7 +461,7 @@ class EditionBuilderTest {
             }
             ArticleContent(a.title, null, "<p>${a.title}</p>", wordCount = 200)
         }
-        val built = EditionBuilder(db, meddling, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
+        val built = EditionBuilder(db, meddling, tmp.root, clock, { ZoneOffset.UTC }).build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
 
         assertEquals(MarkReadBatch(emptyList(), heldBack = 1), markedDuringBuild)
         assertEquals(false, unstarredDuringBuild)
@@ -563,7 +577,7 @@ class EditionBuilderTest {
     fun eachArticlesLanguageReachesTheBook() = runTest {
         source("a", "a1")
         val french = ArticleContentProvider { a, _, _, _ -> ArticleContent(a.title, null, "<p>Bonjour</p>", wordCount = 238, language = "fr") }
-        val built = EditionBuilder(db, french, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings()) as BuildResult.Built
+        val built = EditionBuilder(db, french, tmp.root, clock, { ZoneOffset.UTC }).build(EditionSettings()) as BuildResult.Built
 
         ZipFile(editions.fileOf(db.editions().byId(built.editionId)!!)!!).use { zip ->
             val chapter = String(zip.getInputStream(zip.getEntry("OEBPS/article-001.xhtml")).readBytes())
@@ -581,7 +595,7 @@ class EditionBuilderTest {
                 wordCount = 238, images = listOf(EpubImage(href, "image/jpeg", ByteArray(60))),
             )
         }
-        val built = EditionBuilder(db, withImage, tmp.root, clock, ZoneOffset.UTC, imageBudgetBytes = 100)
+        val built = EditionBuilder(db, withImage, tmp.root, clock, { ZoneOffset.UTC }, imageBudgetBytes = 100)
             .build(EditionSettings(maxPerSource = 5)) as BuildResult.Built
 
         val edition = db.editions().byId(built.editionId)!!
@@ -602,7 +616,7 @@ class EditionBuilderTest {
         source("c", "c1")
         val coverBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1)
         var drawn: CoverInfo? = null
-        val built = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) { info ->
+        val built = EditionBuilder(db, content, tmp.root, clock, { ZoneOffset.UTC }) { info ->
             drawn = info
             EpubImage("images/cover.jpg", "image/jpeg", coverBytes)
         }.build(EditionSettings(maxPerSource = 5, wordsPerMinute = 200)) as BuildResult.Built
@@ -624,7 +638,7 @@ class EditionBuilderTest {
     @Test
     fun aCoverThatFailsToDrawLeavesATextCoverInsteadOfFailingTheEdition() = runTest {
         source("a", "a1")
-        val built = EditionBuilder(db, content, tmp.root, clock, ZoneOffset.UTC) { error("no fonts") }
+        val built = EditionBuilder(db, content, tmp.root, clock, { ZoneOffset.UTC }) { error("no fonts") }
             .build(EditionSettings()) as BuildResult.Built
 
         val edition = db.editions().byId(built.editionId)!!
@@ -642,7 +656,7 @@ class EditionBuilderTest {
         val withImage = ArticleContentProvider { a, _, _, _ ->
             ArticleContent(a.title, null, "<p><img src=\"$href\"/></p>", wordCount = 238, images = listOf(EpubImage(href, "image/jpeg", ByteArray(60))))
         }
-        val built = EditionBuilder(db, withImage, tmp.root, clock, ZoneOffset.UTC, imageBudgetBytes = 100) {
+        val built = EditionBuilder(db, withImage, tmp.root, clock, { ZoneOffset.UTC }, imageBudgetBytes = 100) {
             EpubImage("images/cover.jpg", "image/jpeg", ByteArray(50))
         }.build(EditionSettings()) as BuildResult.Built
 
@@ -707,7 +721,7 @@ class EditionBuilderTest {
             fetching.complete(Unit)
             awaitCancellation()
         }
-        val job = launch { EditionBuilder(db, hanging, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings()) }
+        val job = launch { EditionBuilder(db, hanging, tmp.root, clock, { ZoneOffset.UTC }).build(EditionSettings()) }
         fetching.await()
 
         job.cancelAndJoin()
@@ -962,7 +976,7 @@ class EditionBuilderTest {
         val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder()) { sourceId, originId, e, text ->
             sources.recordFullText(sourceId, originId, e, text.check)
         }
-        val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
+        val tuned = EditionBuilder(db, provider, tmp.root, clock, { ZoneOffset.UTC })
         val id = sources.addFeed("https://blocked.example/feed", "Blocked")
         db.articles().insertNew(
             listOf("1", "2", "3").map { g ->
@@ -1019,7 +1033,7 @@ class EditionBuilderTest {
                 listOf(longArticle(ttrss, "t1", "news.example", http, originId = "7"), longArticle(ttrss, "t2", "news.example", http, originId = "8")),
         )
 
-        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+        EditionBuilder(db, provider, tmp.root, clock, { ZoneOffset.UTC }).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
 
         assertEquals(FullTextCheck.CHECKS_PER_EDITION, checked.size)
         assertEquals("one item per publication", checked.size, checked.distinct().size)
@@ -1037,7 +1051,7 @@ class EditionBuilderTest {
         val ttrss = sources.addTtrss("https://rss.example/api/")
         db.articles().insertNew((1..3).map { longArticle(ttrss, "t$it", "news.example", http, originId = if (it == 3) "8" else "7") })
 
-        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+        EditionBuilder(db, provider, tmp.root, clock, { ZoneOffset.UTC }).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
 
         assertEquals(listOf("7", "8"), checked.sorted())
         assertEquals(setOf("7", "8"), db.sources().allPublications().map { it.key }.toSet())
@@ -1060,7 +1074,7 @@ class EditionBuilderTest {
             ),
         )
 
-        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+        EditionBuilder(db, provider, tmp.root, clock, { ZoneOffset.UTC }).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
 
         assertEquals(listOf("8"), checked)
     }
@@ -1081,7 +1095,7 @@ class EditionBuilderTest {
         db.sources().savePublication(PublicationEntity(full, PublicationEntity.OWN, ContentMode.FEED, FullTextEvidence.FEED_FULL, 3, today - 1, checkedDay = today - 1))
         db.articles().insertNew(listOf(longArticle(teaser, "a", "teaser.example", http), longArticle(full, "b", "full.example", http)))
 
-        EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
+        EditionBuilder(db, provider, tmp.root, clock, { ZoneOffset.UTC }).build(EditionSettings(minutes = 600, maxPerSource = 10)) as BuildResult.Built
 
         assertEquals("the settled one waits its 14 days", listOf(teaser), checked)
     }
@@ -1095,7 +1109,7 @@ class EditionBuilderTest {
     fun paidPostsWithNothingFreeAreSkippedWhereTheSourceSaysSo() = runTest {
         val http = FakeHttp()
         val provider = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly, onEvidence = { sourceId, originId, e, text -> sources.recordFullText(sourceId, originId, e, text.check) })
-        val tuned = EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC)
+        val tuned = EditionBuilder(db, provider, tmp.root, clock, { ZoneOffset.UTC })
         val id = sources.addFeed("https://paid.example/feed", "Paid")
         val words = (1..400).joinToString(" ") { "word$it" }
         val paywall = """<div data-testid="paywall"><h2>Keep reading with a 7-day free trial</h2></div>"""
@@ -1161,6 +1175,6 @@ class EditionBuilderTest {
                 http.page(it.url, if (paid) "<html><body><article><h1>Post $g</h1><p>A line.</p></article>$paywall</body></html>" else "<html><body><article><h1>Post $g</h1><p>$words</p></article></body></html>")
             }
         }
-        return Triple(EditionBuilder(db, provider, tmp.root, clock, ZoneOffset.UTC), id, post)
+        return Triple(EditionBuilder(db, provider, tmp.root, clock, { ZoneOffset.UTC }), id, post)
     }
 }
