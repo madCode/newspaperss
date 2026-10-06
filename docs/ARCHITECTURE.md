@@ -257,10 +257,12 @@ flowchart LR
   gap, and moves the position when a line starts. Each line's id carries a
   generation number, bumped by every pause and jump, so a late callback
   from the voice can't move it. Pages are read from the book when they're
-  reached.
+  reached. Its speed is Settings' `listenSpeed`: it follows the store and
+  saves changes made from its own controls there.
 - **`Speaker`** is the voice. `SystemSpeaker` wraps Android's
-  `TextToSpeech`; tests use a fake. A better voice (Kokoro, in the
-  backlog) would be another `Speaker`.
+  `TextToSpeech`; tests use a fake. Kokoro (in the backlog) can't keep up
+  live on a phone, so it would play audio made ahead of time, with this
+  voice for what isn't made yet.
 - **`ListenService`** is a Media3 `MediaSessionService`. Its
   `SessionPlayer` (a `SimpleBasePlayer`) shows the player's state to
   Android, an article a track, and turns the lock screen's commands into
