@@ -669,6 +669,16 @@ whose Kindle and KOReader answers ask for more on the same page).
     settings. A voice, language or engine changed there is heard from the next start or jump.
     A speed asked for by a car or watch becomes the nearest of these.
     Without an engine the page says so and offers Speech Services by Google.
+    Debug builds also offer **Make a podcast in a natural voice**, Kokoro
+    (see the backlog; podcasts aren't made yet). Picking it downloads
+    384 MB, asking first when not on Wi-Fi ("Wait for Wi-Fi" starts it on
+    the next Wi-Fi by itself); then a 20-second check times this phone and
+    says what your paper would take to make: up to about an hour, "This
+    phone can do it"; up to 2½ hours, "slow, but it can"; beyond, "Too
+    slow", offering only Remove and the paper size that would fit. A 32-bit
+    phone sees the option greyed, with why. In use, it lists Heart,
+    Michael, Emma and George, each with a clip shipped in the app, and
+    **Remove Kokoro**.
   - **E-reader & delivery:** the e-reader in a dropdown at the top, then
     "How it gets there". They share a page because the e-reader decides
     which delivery options show: **Email it to your Kindle** (shown for a Kindle, or once

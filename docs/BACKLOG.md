@@ -230,7 +230,7 @@ Many of the writers worth reading publish as newsletters. Two routes, from easy 
 
 ### Listen: the paper as an audiobook
 The phone's voice reading an edition, and Settings › Listening for it, are built ([mockups](https://claude.ai/artifact/X9dZJi7XP3GxY85xjdLMXq)). Next:
-- **A podcast in Kokoro's voice, made ahead** ([mockups and spec](https://claude.ai/artifact/43jwa7iFoBUxnyxVGsiYbE)). Listen stays the one button: it plays the podcast where it's made and the phone's voice where it isn't, switching only between articles.
+- **A podcast in Kokoro's voice, made ahead** ([mockups and spec](https://claude.ai/artifact/43jwa7iFoBUxnyxVGsiYbE)). Built so far, in debug builds only: the download and the check. Next: making the podcast while charging, with the earlier start; then playing it. Listen stays the one button: it plays the podcast where it's made and the phone's voice where it isn't, switching only between articles.
   - **Turning it on:** a second voice in Settings › Listening, "Make a podcast in a natural voice". Kokoro (`kokoro-multi-lang-v1_0` through sherpa-onnx, 384 MB) downloads once; off Wi-Fi, Download asks before using mobile data. No setting for it.
   - **Which phones:** 64-bit only. After the download, a 20-second check estimates how long *your* paper takes to make (× 1.5 for warming up). Up to about 1 hour: "can do it"; up to 2½ hours: "slow, still fine"; beyond: "too slow", offering only Remove.
   - **When it's made:** after a scheduled edition's book is written, from the book, article by article, only while charging. Never on battery (a 30-minute paper would use about 20% of a charge). Unplugged, it stops and keeps what's made.

@@ -78,6 +78,20 @@ enum class PreviewTextSize(val label: String, val percent: Int) {
     LARGEST("Largest", 175),
 }
 
+/** How Listen reads: live in the phone's voice, or a podcast made ahead in Kokoro's. */
+enum class ListenVoice { PHONE, PODCAST }
+
+/**
+ * Kokoro's voices offered for the podcast. [speaker] is the voice's number in the model; British
+ * voices take the British word list, and espeak's plain English, as it has no British voice.
+ */
+enum class PodcastVoice(val label: String, val accent: String, val speaker: Int, val british: Boolean) {
+    HEART("Heart", "American", 3, false),
+    MICHAEL("Michael", "American", 16, false),
+    EMMA("Emma", "British", 21, true),
+    GEORGE("George", "British", 26, true),
+}
+
 data class Settings(
     val onboarded: Boolean = false,
     val device: Device? = null,
@@ -104,6 +118,13 @@ data class Settings(
     val foldedCategories: Set<String> = emptySet(),
     /** How fast Listen reads, 1.0 being the voice's normal pace. */
     val listenSpeed: Float = 1f,
+    val listenVoice: ListenVoice = ListenVoice.PHONE,
+    val podcastVoice: PodcastVoice = PodcastVoice.HEART,
+    /**
+     * Minutes this phone takes to make a minute of the podcast, once warm; null until Kokoro has
+     * been checked on it. See [com.app.newspaperss.core.listen.PodcastPace].
+     */
+    val podcastPace: Float? = null,
 ) {
     /**
      * The setup chosen, or before it's settled, the one [SettingsStore.settleFeedsFrom] will
@@ -150,6 +171,9 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val lastCategoryId = intPreferencesKey("ttrss_last_category_id")
         val foldedCategories = stringSetPreferencesKey("sources_folded_categories")
         val listenSpeed = floatPreferencesKey("listen_speed")
+        val listenVoice = stringPreferencesKey("listen_voice")
+        val podcastVoice = stringPreferencesKey("podcast_voice")
+        val podcastPace = floatPreferencesKey("podcast_pace")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
@@ -182,6 +206,9 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             prefs.setOrRemove(Keys.lastCategoryId, s.lastCategoryId)
             prefs[Keys.foldedCategories] = s.foldedCategories
             prefs[Keys.listenSpeed] = s.listenSpeed
+            prefs[Keys.listenVoice] = s.listenVoice.name
+            prefs[Keys.podcastVoice] = s.podcastVoice.name
+            if (s.podcastPace != null) prefs[Keys.podcastPace] = s.podcastPace else prefs.remove(Keys.podcastPace)
             prefs.remove(Keys.legacyNotesWithEdition)
         }
     }
@@ -231,6 +258,9 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             lastCategoryId = p[Keys.lastCategoryId],
             foldedCategories = p[Keys.foldedCategories] ?: emptySet(),
             listenSpeed = p[Keys.listenSpeed] ?: d.listenSpeed,
+            listenVoice = p[Keys.listenVoice]?.let { runCatching { ListenVoice.valueOf(it) }.getOrNull() } ?: d.listenVoice,
+            podcastVoice = p[Keys.podcastVoice]?.let { runCatching { PodcastVoice.valueOf(it) }.getOrNull() } ?: d.podcastVoice,
+            podcastPace = p[Keys.podcastPace],
         )
     }
 }

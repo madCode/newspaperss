@@ -5,6 +5,8 @@ import com.app.newspaperss.core.edition.Schedule
 import com.app.newspaperss.edition.EditionSettings
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.ListenVoice
+import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.Settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -82,5 +84,15 @@ class SettingsSummaryTest {
         assertEquals(Summary("This phone's voice · 1.2×"), SettingsSummary.listening(Settings(listenSpeed = 1.2f), hasVoice = true))
         // An e-reader without one, whose reader may never listen.
         assertEquals(Summary("No voice on this phone"), SettingsSummary.listening(Settings(), hasVoice = false))
+        val podcast = Settings(listenVoice = ListenVoice.PODCAST, podcastVoice = PodcastVoice.EMMA)
+        assertEquals(Summary("Podcast in Kokoro (Emma) · 1×"), SettingsSummary.listening(podcast, hasVoice = true))
+    }
+
+    @Test
+    fun timesToMakeAPodcastAreRoundedAsAnEstimateShouldBe() {
+        assertEquals("about 5 minutes", SettingsSummary.aboutTime(1.0))
+        assertEquals("about 55 minutes", SettingsSummary.aboutTime(53.6))
+        assertEquals("about 2 hours", SettingsSummary.aboutTime(112.0))
+        assertEquals("about 2½ hours", SettingsSummary.aboutTime(148.0))
     }
 }

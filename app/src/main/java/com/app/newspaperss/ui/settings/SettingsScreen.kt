@@ -357,7 +357,10 @@ private fun ListeningSection(s: AppSettings, vm: SettingsViewModel) {
     val context = LocalContext.current
     val voice = rememberPhoneVoice()
     SubHeading("Voice")
-    if (voice != null) {
+    if (vm.podcast != null) {
+        val kokoro by vm.kokoro.collectAsState()
+        ListeningVoices(s, vm, kokoro, voice, onGetPhoneVoice = { if (!PhoneVoice.get(context)) nothingOpens(context) })
+    } else if (voice != null) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("This phone's voice", style = MaterialTheme.typography.bodyLarge)

@@ -36,6 +36,15 @@ import com.app.newspaperss.listen.Listening
 import com.app.newspaperss.listen.Speaker
 import com.app.newspaperss.listen.StoredListenProgress
 import com.app.newspaperss.listen.SystemSpeaker
+import com.app.newspaperss.listen.KokoroDownload
+import com.app.newspaperss.listen.KokoroEngine
+import com.app.newspaperss.listen.KokoroInstall
+import com.app.newspaperss.listen.PodcastEngine
+import com.app.newspaperss.listen.PodcastSetup
+import com.app.newspaperss.settings.PodcastVoice
+import com.app.newspaperss.work.KokoroWorker
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import com.app.newspaperss.work.MoveFeedsWorker
 import com.app.newspaperss.work.NotesWorker
 import com.app.newspaperss.work.ReadingListTitleWorker
@@ -62,6 +71,9 @@ class AppContainer(
     moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
     speaker: () -> Speaker = { SystemSpeaker(context) },
     private val connectListening: () -> Unit = { ListenService.connect(context) },
+    private val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
+    podcastEngine: (KokoroInstall, PodcastVoice) -> PodcastEngine = ::KokoroEngine,
+    kokoroSupported: Boolean = KokoroInstall.supported,
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -108,6 +120,20 @@ class AppContainer(
     }
     val listen: ListenPlayer by listenMade
     val listening: Listening by lazy { Listening(listen, listenProgress, editions) { connectListening() } }
+
+    /** Getting the podcast's voice onto the phone. */
+    val podcastSetup: PodcastSetup by lazy {
+        PodcastSetup(
+            kokoroInstall, settings, KokoroWorker.observe(context),
+            start = { KokoroWorker.enqueue(context, it) },
+            stop = { KokoroWorker.cancel(context) },
+            supported = kokoroSupported,
+            engine = { podcastEngine(kokoroInstall, it) },
+        )
+    }
+
+    // Its own client: the shared one's cache would try to keep a 325 MB model.
+    fun kokoroDownload() = KokoroDownload(OkHttpClient.Builder().readTimeout(1, TimeUnit.MINUTES).build(), kokoroInstall)
 
     /** See [SettingsStore.settleFeedsFrom]: a tt-rss source from before the choice means the server setup. */
     suspend fun settleFeedsFrom() = settings.settleFeedsFrom { db.sources().ofKind(SourceKind.TTRSS).isNotEmpty() }

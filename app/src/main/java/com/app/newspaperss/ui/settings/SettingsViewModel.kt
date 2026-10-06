@@ -4,7 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.data.TtrssStatus
+import com.app.newspaperss.listen.KokoroState
+import com.app.newspaperss.listen.PodcastSetup
 import com.app.newspaperss.settings.DeliveryMethod
+import com.app.newspaperss.settings.ListenVoice
+import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.settings.Settings
@@ -24,10 +28,14 @@ class SettingsViewModel(
     ttrss: Flow<TtrssStatus> = flowOf(TtrssStatus.NONE),
     /** Says a line in the phone's voice at a speed: Settings › Listening's sample. */
     private val hear: (text: String, speed: Float) -> Unit = { _, _ -> },
+    /** The podcast's voice; null hides the podcast, as release builds do until podcasts play. */
+    val podcast: PodcastSetup? = null,
     /** Called after every change so the edition timer follows the schedule. */
     private val onChanged: (Settings) -> Unit,
 ) : ViewModel() {
     val settings: StateFlow<Settings?> = store.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val kokoro: StateFlow<KokoroState?> = (podcast?.state ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val ttrssStatus: StateFlow<TtrssStatus> = ttrss.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TtrssStatus.NONE)
 
@@ -61,6 +69,26 @@ class SettingsViewModel(
 
     fun setListenSpeed(speed: Float) {
         viewModelScope.launch { store.update { it.copy(listenSpeed = speed) } }
+    }
+
+    fun listenLive() {
+        viewModelScope.launch { store.update { it.copy(listenVoice = ListenVoice.PHONE) } }
+    }
+
+    fun setPodcastVoice(voice: PodcastVoice) {
+        viewModelScope.launch { store.update { it.copy(podcastVoice = voice) } }
+    }
+
+    fun downloadKokoro(mobileData: Boolean) = podcast?.download(mobileData)
+
+    fun cancelKokoro() = podcast?.cancel()
+
+    fun useKokoro() {
+        viewModelScope.launch { podcast?.use() }
+    }
+
+    fun removeKokoro() {
+        viewModelScope.launch { podcast?.remove() }
     }
 
     fun hear() {

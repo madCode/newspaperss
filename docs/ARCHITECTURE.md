@@ -277,6 +277,13 @@ flowchart LR
 - When an edition's book is deleted (the edition, or old files pruned),
   `EditionRepository`'s `onFileGone` tells the player, which lets the book
   go if it's the one loaded; the player isn't made just to be told.
+- **`PodcastSetup`** gets Kokoro onto the phone for the podcast (in the
+  backlog). `KokoroWorker` runs `KokoroDownload`, which fetches the files
+  the manifest `assets/kokoro/files.tsv` pins (a Hugging Face revision,
+  each file's size and hash) eight at a time, resuming a stopped file
+  and checking each, into `files/kokoro`; then it times `KokoroEngine`
+  (sherpa-onnx) making a paragraph and keeps the pace in Settings. The
+  setup reads its state back from WorkManager and the files.
 - **`ListenProgress`** keeps where each of the ten most recent editions
   was left, and which were heard to the end, in SharedPreferences
   (`listening`).
@@ -429,6 +436,7 @@ stays as a `DELETED` row to keep its title taken.
 | A move of phone feeds to tt-rss, and moved feeds still kept | Its own DataStore, `feed_moves` | `app/data/FeedMoves.kt` |
 | Timer state | SharedPreferences `edition-schedule` | `app/work/EditionScheduler.kt` |
 | Where listening stopped | SharedPreferences `listening` | `app/listen/ListenProgress.kt` |
+| Kokoro, the podcast's voice (384 MB) | `files/kokoro`, checked files in `.verified` | `app/listen/Kokoro.kt` |
 | EPUBs | `files/editions/`; only the newest 14 keep their file (unsent ones always do) | `EditionRepository.pruneFiles` |
 | Notes files | `files/notes/` | `app/edition/EditionNotes.kt` |
 | HTTP cache | `cache/http`, used to revalidate feeds | `AppContainer`, `core/net/HttpClient.kt` |

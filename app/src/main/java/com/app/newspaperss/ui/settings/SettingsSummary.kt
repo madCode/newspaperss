@@ -7,6 +7,7 @@ import com.app.newspaperss.data.TtrssStatus
 import com.app.newspaperss.settings.FeedsFrom
 import com.app.newspaperss.settings.DeliveryMethod
 import com.app.newspaperss.settings.Device
+import com.app.newspaperss.settings.ListenVoice
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.ui.listen.speedLabel
 import java.time.DayOfWeek
@@ -14,6 +15,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * One line on a Settings summary row, and what needs fixing there, if anything. Problems show on
@@ -86,8 +88,21 @@ object SettingsSummary {
      * Not a problem without a voice: many e-readers have none, and their readers may never want
      * Listen. The page says how to get one.
      */
-    fun listening(s: Settings, hasVoice: Boolean): Summary =
-        Summary(if (hasVoice) "This phone's voice · ${speedLabel(s.listenSpeed)}" else "No voice on this phone")
+    fun listening(s: Settings, hasVoice: Boolean): Summary = Summary(
+        when {
+            s.listenVoice == ListenVoice.PODCAST -> "Podcast in Kokoro (${s.podcastVoice.label}) · ${speedLabel(s.listenSpeed)}"
+            hasVoice -> "This phone's voice · ${speedLabel(s.listenSpeed)}"
+            else -> "No voice on this phone"
+        },
+    )
+
+    /** "about 55 minutes", "about 2 hours", "about 2½ hours": as close as an estimate deserves. */
+    fun aboutTime(minutes: Double): String {
+        if (minutes < 90) return "about ${(minutes / 5).roundToInt().coerceAtLeast(1) * 5} minutes"
+        val halves = (minutes / 30).roundToInt()
+        val whole = halves / 2
+        return "about " + (if (halves % 2 == 0) "$whole hours" else "$whole½ hours")
+    }
 
     fun notes(s: Settings, reachable: Boolean): Summary {
         val name = s.notesFolderName ?: "your folder"
