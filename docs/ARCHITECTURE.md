@@ -26,6 +26,7 @@ flowchart TB
         delivery["delivery/: share, folder, sent callback"]
         settings["settings/: SettingsStore (DataStore)"]
         notify["notify/: Notifier"]
+        listen["listen/: ListenPlayer, ListenService"]
         container["AppContainer"]
     end
     subgraph core[":core (JVM, no Android)"]
@@ -37,12 +38,14 @@ flowchart TB
         lists["lists/: curated-list scrapers"]
         ttrss["ttrss/: TtrssClient"]
         notes["notes/: NotesWriter"]
+        listenScript["listen/: ListenScript, Sentences"]
         net["net/: HttpClient (OkHttp)"]
     end
-    container --> ui & work & edition & data & delivery & settings & notify
+    container --> ui & work & edition & data & delivery & settings & notify & listen
     ui --> data & settings
     work --> edition & data
     edition --> data & delivery & notify & plan & extract & images & epub & notes
+    listen --> data & listenScript
     data --> feed & lists & ttrss & net
     extract & feed & lists & ttrss --> net
 ```
@@ -85,6 +88,7 @@ Entry points from outside the app (`app/src/main/AndroidManifest.xml`):
 | `EditionSentReceiver` | The share sheet reports which app was picked: marks the edition sent. |
 | `ClockChangeReceiver` | Time or time zone changed: re-arms the edition timer. |
 | `FileProvider` | Hands EPUB and notes files to other apps by `content://` URI. |
+| `ListenService` | Keeps an edition playing aloud with the screen off; Android's media controls talk to it. |
 
 ## Making an edition
 
@@ -224,6 +228,48 @@ flowchart LR
 - **`KindleSends`** (`app/delivery/KindleSends.kt`) remembers recent sends
   to a Kindle, by the Kindle app or by email, in memory only, for the "can
   take a few minutes" note.
+
+## Listening
+
+Reading an edition aloud (`app/listen/`, `core/listen/`). The book is the
+source: what's read is what the e-reader shows.
+
+```mermaid
+flowchart LR
+    epub["Edition's EPUB"] --> book["ListenBook: a page at a time"]
+    book --> script["ListenScript.parse: blocks, sentences"]
+    script --> player["ListenPlayer"]
+    player -->|"a line, and the next"| speaker["Speaker: SystemSpeaker (TextToSpeech)"]
+    speaker -->|"started, done"| player
+    player --> state["state: StateFlow"]
+    state --> screen["ListenScreen, ListenButton"]
+    state --> session["SessionPlayer (Media3) in ListenService"]
+    session -->|"lock screen, headphones"| player
+    player --> progress["ListenProgress (SharedPreferences)"]
+```
+
+- **`ListenScript`** (`core/listen/`) reads a book page into blocks (title,
+  paragraphs, quotes, list items, pictures) and splits them into lines:
+  one sentence each (`Sentences`), or a picture's one-line description.
+  A line is what ↶ goes back to and what the screen tints.
+- **`ListenPlayer`** is the one player, in `AppContainer`, made on first
+  use. It gives the voice the line being read and the next, so there's no
+  gap, and moves the position when a line starts. Each line's id carries a
+  generation number, bumped by every pause and jump, so a late callback
+  from the voice can't move it. Pages are read from the book when they're
+  reached.
+- **`Speaker`** is the voice. `SystemSpeaker` wraps Android's
+  `TextToSpeech`; tests use a fake. A better voice (Kokoro, in the
+  backlog) would be another `Speaker`.
+- **`ListenService`** is a Media3 `MediaSessionService`. Its
+  `SessionPlayer` (a `SimpleBasePlayer`) shows the player's state to
+  Android, an article a track, and turns the lock screen's commands into
+  the player's. It also asks for audio focus and pauses when headphones
+  are unplugged. The app binds it (`ListenService.connect`) when Listen is
+  first tapped, and Media3 makes it a foreground service while it plays.
+- **`ListenProgress`** keeps where each of the ten most recent editions
+  was left, and which were heard to the end, in SharedPreferences
+  (`listening`).
 
 ## Background work
 
@@ -372,6 +418,7 @@ stays as a `DELETED` row to keep its title taken.
 | tt-rss account | Its own DataStore; the password encrypted with an Android Keystore AES-GCM key, excluded from backups | `app/data/TtrssAccountStore.kt`, `app/data/SecretCipher.kt` |
 | A move of phone feeds to tt-rss, and moved feeds still kept | Its own DataStore, `feed_moves` | `app/data/FeedMoves.kt` |
 | Timer state | SharedPreferences `edition-schedule` | `app/work/EditionScheduler.kt` |
+| Where listening stopped | SharedPreferences `listening` | `app/listen/ListenProgress.kt` |
 | EPUBs | `files/editions/`; only the newest 14 keep their file (unsent ones always do) | `EditionRepository.pruneFiles` |
 | Notes files | `files/notes/` | `app/edition/EditionNotes.kt` |
 | HTTP cache | `cache/http`, used to revalidate feeds | `AppContainer`, `core/net/HttpClient.kt` |

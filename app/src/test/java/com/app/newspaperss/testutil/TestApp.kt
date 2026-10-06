@@ -19,6 +19,8 @@ class TestApp : NewspaperssApp() {
     val notesRequested = mutableListOf<Long>()
     /** How many times the app asked for the work that moves phone feeds into tt-rss. */
     var movesRequested = 0
+    /** The voice Listen reads with. */
+    val speaker = FakeSpeaker()
 
     override fun createContainer() = AppContainer(
         this,
@@ -29,6 +31,8 @@ class TestApp : NewspaperssApp() {
         fetchReadingListTitles = { titlesRequested += it },
         saveNotes = { notesRequested += it },
         moveFeeds = { movesRequested++ },
+        speaker = { speaker },
+        connectListening = {},
     )
 
     override fun scheduleWork() {}

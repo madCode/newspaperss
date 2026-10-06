@@ -445,7 +445,9 @@ whose Kindle and KOReader answers ask for more on the same page).
   after that it's a quiet **Make another edition**, since today's paper is
   done. A failed build or edition offers **Try again** after saying what
   went wrong. Earlier editions are listed below.
-- **Edition:** the same button as Today's card, and its contents. Its ⋮
+- **Edition:** the same button as Today's card, and its contents.
+  Under them, **Listen · about 9 min** reads the edition aloud (see
+  Listening, below). Its ⋮
   menu has the card's menu, above **Delete edition**. Tap an article to preview it as the e-reader
   will show it (read straight from the EPUB, with nothing fetched from the
   network), on top of Android's own font size. **Aa** in the top bar sets
@@ -471,6 +473,35 @@ whose Kindle and KOReader answers ask for more on the same page).
   to the articles (an unsent edition's go back for the next one). An article that went in because it was starred says
   "You starred it". On delivered editions each article has a trailing **☆** to
   bring it back ("Didn't get to one? Tap ☆ to bring it back.").
+- **Listening:** an edition read aloud by the phone's own text-to-speech
+  voice, made for a walk with the phone in a pocket and the odd glance at
+  it.
+  - What's read: each article's source, title and author, then its text
+    and the closing page, in book order. A picture is one line from its
+    caption or alt text ("Image: Tait's table of knots"), or "An image."
+    The date, reading time, link to the original and "Next" line aren't
+    read; nor are footnote markers.
+  - It reads a sentence at a time. ↶ goes back to the start of the
+    sentence, or the one before if it has only just started; ↷ skips one;
+    ⏮ ⏭ move by article (⏮ restarts the article after its first few
+    sentences). Speed steps through 1×, 1.2×, 1.5× and 0.8×.
+  - The playing screen is the article's text, the sentence being read
+    tinted, following the voice. Scrolling away stops it following, and
+    "Back to where it's reading" returns. Tapping a sentence reads from
+    there. The bar under it is the edition, one piece per article.
+  - It keeps playing with the screen off, with Android's media controls on
+    the lock screen, headphones and in the car: there the skip buttons move
+    by article and the seek buttons by sentence. A call or another app's
+    audio pauses it; after a short interruption it carries on. Unplugging
+    headphones pauses it.
+  - It stops at "That's all for today", not running on into anything.
+  - Where it stopped is kept for the ten most recent editions: the
+    edition's button says **Resume · 3 min left**. Listening to a newer
+    edition with an older one left part way asks "Finish Wednesday Morning
+    Edition first?"
+  - An article in a language the phone has no voice for is read in the
+    phone's own, with a note offering Android's download of that voice.
+  - Listening doesn't count as delivering the edition.
 - **Sources:** one plain list, ruled between rows. Nothing on it folds or
   moves, so e-ink doesn't redraw it, and TalkBack can jump by heading.
   Tapping a row opens its page; a row has nothing else to tap.

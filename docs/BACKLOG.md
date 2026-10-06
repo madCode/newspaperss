@@ -224,12 +224,13 @@ Many of the writers worth reading publish as newsletters. Two routes, from easy 
   let people point it at their own instance), and the inbox address is effectively a password.
 
 ### Listen: the paper as an audiobook
-An audiobook of your newspaper: listen to an edition on a walk, from the same finite paper.
-- **Engine:** Android's own `TextToSpeech`. It's offline and free, and voices already on the phone keep the no-account promise. Cloud voices sound better but need an account and send the text away, so they'd only ever be an option.
-- **Shape:** a "Listen" button on the edition screen that reads the articles in order. It runs as a media session with a notification (pause, skip article) and stops at the end of the edition, keeping the paper finite.
-- **Text:** the article bodies as already cleaned for the EPUB. Headings are read as pauses; image captions and link lists are skipped.
-- **Later:** export the edition as an audiobook file (M4B with a chapter per article) for podcast and audiobook apps. The EPUB could carry media overlays, but few e-readers play them.
-- **Open questions:** remember the position between sessions? Count listened articles as read for "bring back"?
+The phone's voice reading an edition is built ([mockups](https://claude.ai/artifact/X9dZJi7XP3GxY85xjdLMXq)). Next:
+- **Settings › Listening:** the voice (with a sample) and a speed that's kept; a link to Android's text-to-speech settings.
+- **Kokoro, a better voice to download** (about 120 MB, offline): its audio made with the edition, overnight, since phones read it at about real time; what isn't ready yet plays in the phone's voice. English only; other languages stay with the phone's voice.
+- **🔊 in the article preview**, starting the same player at that article.
+- **A sleep timer**, and a way in from Today's card.
+- **Save as audio:** the edition as a file with a chapter per article, for a podcast or audiobook app.
+- **To decide:** does hearing an edition to its end count as delivering it, as Read does on a Boox?
 
 ### Cloud backup
 Android's Auto Backup already copies the database and settings (sources, reading list, edition

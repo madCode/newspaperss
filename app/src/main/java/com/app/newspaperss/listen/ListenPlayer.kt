@@ -1,0 +1,300 @@
+package com.app.newspaperss.listen
+
+import com.app.newspaperss.core.listen.ListenScript
+import com.app.newspaperss.core.listen.ListenTime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class ListenState(
+    val editionId: Long? = null,
+    val editionTitle: String = "",
+    val pages: List<ListenPage> = emptyList(),
+    val at: ListenPosition = ListenPosition(),
+    /** The page at [at], once it's read out of the book. */
+    val script: ListenScript? = null,
+    val playing: Boolean = false,
+    val loading: Boolean = false,
+    /** Heard to its closing page. */
+    val finished: Boolean = false,
+    val speed: Float = 1f,
+    /** The page's language, when the phone has no voice for it and reads it in its own. */
+    val missingLanguage: String? = null,
+    val error: String? = null,
+) {
+    /** About how far in, and how long the whole edition takes, in seconds at normal speed. */
+    val secondsIn: Double get() = pages.take(at.page).sumOf { it.minutes * 60 } + secondsInPage
+
+    /**
+     * How far into the page being read: the share of its sentences heard, of the page's time.
+     * The page's time comes from its reading time, as on the edition page, so the two agree.
+     */
+    val secondsInPage: Double
+        get() {
+            val lines = script?.lines ?: return 0.0
+            val whole = lines.sumOf { ListenTime.seconds(it.spoken) }
+            if (whole <= 0.0) return 0.0
+            return lines.take(at.line).sumOf { ListenTime.seconds(it.spoken) } / whole * (pages.getOrNull(at.page)?.minutes ?: 0.0) * 60
+        }
+    val secondsTotal: Double get() = pages.sumOf { it.minutes * 60 }
+}
+
+/**
+ * Reads an edition aloud, a line at a time, from where it was left: the one player behind the
+ * edition's Listen button, the playing screen and the lock screen's controls. Call it from the
+ * main thread.
+ *
+ * The voice is given the line being read and the one after, so there's no gap between them, and
+ * each line's start moves the position: that's what the screen tints and what's saved. Lines
+ * carry a generation number, so the end of a line from before a pause or a jump can't move it.
+ */
+class ListenPlayer(
+    private val speaker: Speaker,
+    private val progress: ListenProgress,
+    private val open: suspend (editionId: Long) -> ListenBook?,
+    private val scope: CoroutineScope,
+    private val now: () -> Long = System::currentTimeMillis,
+) : Speaker.Listener {
+    private val _state = MutableStateFlow(ListenState())
+    val state: StateFlow<ListenState> = _state.asStateFlow()
+
+    private var book: ListenBook? = null
+    private var job: Job? = null
+    private var generation = 0
+    private var queued = -1
+    private var lineStartedAt = 0L
+    private var errors = 0
+
+    init {
+        speaker.listener = this
+    }
+
+    /** Starts [editionId] at [from], or where it was left (from the top once it was finished). */
+    fun start(editionId: Long, from: ListenPosition? = null) {
+        if (_state.value.editionId == editionId && book != null) {
+            if (from != null) seek(from) else play()
+            return
+        }
+        silence()
+        job?.cancel()
+        book?.close()
+        book = null
+        _state.value = ListenState(editionId = editionId, loading = true, playing = true, speed = _state.value.speed)
+        job = scope.launch {
+            val opened = open(editionId)
+            if (opened == null) {
+                _state.update { it.copy(loading = false, playing = false, error = "This edition's file is gone, so it can't be read aloud.") }
+                return@launch
+            }
+            book = opened
+            _state.update { it.copy(editionTitle = opened.title, pages = opened.pages, loading = false) }
+            val at = from ?: progress.get(editionId)?.takeUnless { progress.finished(editionId) } ?: ListenPosition()
+            goTo(at)
+        }
+    }
+
+    fun play() {
+        val current = _state.value
+        if (book == null || current.loading) return
+        if (current.finished) {
+            move(ListenPosition(), play = true)
+            return
+        }
+        if (current.script == null) {
+            move(current.at, play = true)
+            return
+        }
+        _state.update { it.copy(playing = true, error = null) }
+        speakFrom(current.at.line)
+    }
+
+    fun pause() {
+        silence()
+        _state.update { it.copy(playing = false) }
+    }
+
+    fun toggle() = if (_state.value.playing) pause() else play()
+
+    /**
+     * ↶: while playing, back to the start of the sentence being read, or to the one before if
+     * it has only just started (so a second tap goes further back). Paused, the one before.
+     */
+    fun back() {
+        val current = _state.value
+        val script = current.script ?: return
+        val restart = current.playing && now() - lineStartedAt >= BACK_GRACE_MS
+        val line = if (restart) current.at.line else current.at.line - 1
+        when {
+            line >= 0 -> goToLine(line, script)
+            current.at.page > 0 -> move(ListenPosition(current.at.page - 1, Int.MAX_VALUE), current.playing)
+            else -> goToLine(0, script)
+        }
+    }
+
+    /** ↷: the next sentence. */
+    fun forward() {
+        val current = _state.value
+        val script = current.script ?: return
+        if (current.at.line < script.lines.lastIndex) goToLine(current.at.line + 1, script) else nextPage(current.playing)
+    }
+
+    /** ⏭: the next article. */
+    fun next() = nextPage(_state.value.playing)
+
+    /** ⏮: back to the start of this article, or the one before from its first few sentences. */
+    fun previous() {
+        val current = _state.value
+        val page = if (current.at.line >= RESTART_AFTER_LINES || current.at.page == 0) current.at.page else current.at.page - 1
+        move(ListenPosition(page, 0), current.playing)
+    }
+
+    /** Plays from [position]: a tapped sentence, or an article picked from the contents. */
+    fun seek(position: ListenPosition) = move(position, play = true)
+
+    fun setSpeed(speed: Float) {
+        _state.update { it.copy(speed = speed) }
+        if (_state.value.playing) speakFrom(_state.value.at.line)
+    }
+
+    /** A picture on the page being read, for the screen. */
+    suspend fun image(src: String): ByteArray? = book?.image(src)
+
+    /** Stops and lets the edition go, as when the lock screen's player is swiped away. */
+    fun stop() {
+        silence()
+        job?.cancel()
+        book?.close()
+        book = null
+        _state.value = ListenState(speed = _state.value.speed)
+    }
+
+    fun release() {
+        stop()
+        speaker.release()
+    }
+
+    private fun nextPage(play: Boolean) {
+        val current = _state.value
+        if (current.at.page < current.pages.lastIndex) move(ListenPosition(current.at.page + 1, 0), play) else finish()
+    }
+
+    private fun goToLine(line: Int, script: ListenScript) {
+        val current = _state.value
+        val at = ListenPosition(current.at.page, line.coerceIn(0, script.lines.lastIndex))
+        _state.update { it.copy(at = at) }
+        save(at)
+        if (current.playing) speakFrom(at.line)
+    }
+
+    private fun move(position: ListenPosition, play: Boolean) {
+        silence()
+        job?.cancel()
+        // Playing or not is decided now, so a pause while the page is read out of the book holds.
+        _state.update { it.copy(playing = play) }
+        job = scope.launch { goTo(position) }
+    }
+
+    private suspend fun goTo(position: ListenPosition) {
+        val opened = book ?: return
+        val page = position.page.coerceIn(0, opened.pages.lastIndex)
+        val current = _state.value
+        val script = if (page == current.at.page && current.script != null) current.script else opened.script(page)
+        if (script == null || script.lines.isEmpty()) {
+            // A page the book doesn't have (or with nothing to say) is passed over.
+            if (page < opened.pages.lastIndex) goTo(ListenPosition(page + 1, 0)) else finish()
+            return
+        }
+        val at = ListenPosition(page, position.line.coerceIn(0, script.lines.lastIndex))
+        _state.update { it.copy(at = at, script = script, finished = false, missingLanguage = null, error = null) }
+        save(at)
+        if (_state.value.playing) speakFrom(at.line)
+    }
+
+    private fun finish() {
+        silence()
+        val current = _state.value
+        current.editionId?.let(progress::finish)
+        _state.update { it.copy(playing = false, finished = true) }
+    }
+
+    private fun silence() {
+        generation++
+        queued = -1
+        speaker.stop()
+    }
+
+    private fun speakFrom(line: Int) {
+        silence()
+        queued = line
+        say(line, flush = true)
+        queueNext()
+    }
+
+    private fun queueNext() {
+        val script = _state.value.script ?: return
+        if (queued < script.lines.lastIndex) {
+            queued++
+            say(queued, flush = false)
+        }
+    }
+
+    private fun say(line: Int, flush: Boolean) {
+        val current = _state.value
+        val script = current.script ?: return
+        val installed = speaker.speak("$generation:${current.at.page}:$line", script.lines[line].spoken, script.language, current.speed, flush)
+        val missing = script.language.takeUnless { installed }
+        if (missing != current.missingLanguage) _state.update { it.copy(missingLanguage = missing) }
+    }
+
+    private fun save(at: ListenPosition) {
+        _state.value.editionId?.let { progress.set(it, at) }
+    }
+
+    /** The line an id names, if it's of the current generation and page. */
+    private fun lineOf(id: String): Int? {
+        val parts = id.split(':')
+        if (parts.size != 3 || parts[0].toIntOrNull() != generation || parts[1].toIntOrNull() != _state.value.at.page) return null
+        return parts[2].toIntOrNull()
+    }
+
+    override fun onStart(id: String) {
+        val line = lineOf(id) ?: return
+        lineStartedAt = now()
+        errors = 0
+        val current = _state.value
+        if (line != current.at.line) {
+            val at = current.at.copy(line = line)
+            _state.update { it.copy(at = at) }
+            save(at)
+        }
+        if (queued == line) queueNext()
+    }
+
+    override fun onDone(id: String) {
+        val line = lineOf(id) ?: return
+        val script = _state.value.script ?: return
+        if (line == script.lines.lastIndex) nextPage(play = true)
+    }
+
+    /** One line the voice can't say is passed over; three in a row, and it's the voice that's stuck. */
+    override fun onError(id: String) {
+        val line = lineOf(id) ?: return
+        if (++errors >= MAX_ERRORS) {
+            silence()
+            _state.update { it.copy(playing = false, error = "The phone's voice isn't working. Check Android's text-to-speech settings, then try again.") }
+            return
+        }
+        onDone(id)
+        if (queued == line) queueNext()
+    }
+
+    private companion object {
+        const val BACK_GRACE_MS = 2_000L
+        const val RESTART_AFTER_LINES = 3
+        const val MAX_ERRORS = 3
+    }
+}

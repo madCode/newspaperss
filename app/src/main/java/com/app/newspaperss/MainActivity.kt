@@ -4,6 +4,10 @@ import android.net.Uri
 
 import com.app.newspaperss.settings.offersOpen
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import android.content.Intent
+import com.app.newspaperss.ui.listen.ListenScreen
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.ComponentActivity
@@ -81,16 +85,25 @@ private const val FEED = "source/{id}/feed/{key}"
 private const val LEFT_OUT = "source/{id}/left-out"
 private const val NOT_IN_PAPER = "source/{id}/not-in-paper"
 private const val SETTINGS_PAGE = "settings/{page}"
+private const val LISTEN = "listen"
 private val FEEDS_FROM = "settings/${SettingsPage.FEEDS.slug}"
 
 class MainActivity : ComponentActivity() {
     @Volatile private var settingsLoaded = false
+    /** What the intent that opened (or reopened) the app asks to show, until it's shown. */
+    private val opening = mutableStateOf<String?>(null)
+
+    public override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        opening.value = intent.getStringExtra(EXTRA_OPEN)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen().setKeepOnScreenCondition { !settingsLoaded }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as NewspaperssApp).container
+        if (savedInstanceState == null) opening.value = intent?.getStringExtra(EXTRA_OPEN)
         setContent {
             NewspaperssTheme {
                 val settings by container.settings.settings.collectAsState(initial = null)
@@ -118,16 +131,36 @@ class MainActivity : ComponentActivity() {
                         offerOpen = settings?.device.offersOpen,
                         kindleReader = settings?.device == com.app.newspaperss.settings.Device.KINDLE,
                         kindleEmail = settings?.kindleEmailTarget,
+                        opening = opening.value,
+                        onOpened = { opening.value = null },
                     )
                 }
             }
         }
     }
+
+    companion object {
+        /** An intent extra: a screen to open, such as [OPEN_LISTENING] from the player's notification. */
+        const val EXTRA_OPEN = "open"
+        const val OPEN_LISTENING = "listening"
+    }
 }
 
 @Composable
-private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean, kindleReader: Boolean, kindleEmail: com.app.newspaperss.settings.KindleEmail?) {
+private fun App(
+    container: AppContainer,
+    preferOpen: Boolean,
+    offerOpen: Boolean,
+    kindleReader: Boolean,
+    kindleEmail: com.app.newspaperss.settings.KindleEmail?,
+    opening: String? = null,
+    onOpened: () -> Unit = {},
+) {
     val nav = rememberNavController()
+    LaunchedEffect(opening) {
+        if (opening == MainActivity.OPEN_LISTENING) nav.navigate(LISTEN) { launchSingleTop = true }
+        if (opening != null) onOpened()
+    }
     val current by nav.currentBackStackEntryAsState()
     Scaffold(
         bottomBar = {
@@ -135,7 +168,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                 Tab.entries.forEach { tab ->
                     val route = current?.destination?.route
                     val inTab = route == tab.route || (tab == Tab.SOURCES && (route == READING_LIST || route == SOURCE || route == FEED || route == LEFT_OUT || route == NOT_IN_PAPER)) ||
-                        (tab == Tab.TODAY && (route == EDITION || route == ARTICLE)) || (tab == Tab.SETTINGS && route == SETTINGS_PAGE)
+                        (tab == Tab.TODAY && (route == EDITION || route == ARTICLE || route == LISTEN)) || (tab == Tab.SETTINGS && route == SETTINGS_PAGE)
                     NavigationBarItem(
                         selected = inTab,
                         onClick = {
@@ -178,6 +211,8 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                     offerOpen = offerOpen,
                     kindleReader = kindleReader,
                     kindleEmail = kindleEmail,
+                    listening = container.listening,
+                    onOpenPlayer = { nav.navigate(LISTEN) { launchSingleTop = true } },
                     onBack = { nav.navigateUp() },
                     onReadArticle = { position -> nav.navigate("edition/$id/article/$position") { launchSingleTop = true } },
                 )
@@ -199,6 +234,9 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
                     textSize = textSize,
                     onTextSize = { size -> container.appScope.launch { container.settings.update { it.copy(previewTextSize = size) } } },
                 )
+            }
+            composable(LISTEN) {
+                ListenScreen(container.listen, onBack = { nav.navigateUp() })
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext

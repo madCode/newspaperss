@@ -48,6 +48,18 @@ class MainActivityTest {
     }
 
     @Test
+    fun thePlayersNotificationOpensThePlayingScreenAndSoDoesTappingItAgain() {
+        runBlocking { app.container.settings.update { it.copy(onboarded = true) } }
+        val open = android.content.Intent(app, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN, MainActivity.OPEN_LISTENING)
+        val scenario = ActivityScenario.launch<MainActivity>(open)
+        shows("Nothing is playing")
+        compose.onNode(hasText("Back") or androidx.compose.ui.test.hasContentDescription("Back")).performClick()
+        shows("Sources")
+        scenario.onActivity { it.onNewIntent(open) }
+        shows("Nothing is playing")
+    }
+
+    @Test
     fun aFirstRunStartsWithOnboarding() {
         launchWith(onboarded = false)
         shows("Get started")

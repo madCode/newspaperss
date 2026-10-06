@@ -30,6 +30,13 @@ import com.app.newspaperss.delivery.KindleSends
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.edition.ExtractorContentProvider
+import com.app.newspaperss.listen.ListenBook
+import com.app.newspaperss.listen.ListenPlayer
+import com.app.newspaperss.listen.ListenService
+import com.app.newspaperss.listen.Listening
+import com.app.newspaperss.listen.Speaker
+import com.app.newspaperss.listen.StoredListenProgress
+import com.app.newspaperss.listen.SystemSpeaker
 import com.app.newspaperss.work.MoveFeedsWorker
 import com.app.newspaperss.work.NotesWorker
 import com.app.newspaperss.work.ReadingListTitleWorker
@@ -54,6 +61,8 @@ class AppContainer(
     fetchReadingListTitles: (articleIds: List<Long>) -> Unit = { ReadingListTitleWorker.enqueue(context, it) },
     saveNotes: (editionId: Long) -> Unit = { NotesWorker.enqueue(context, it) },
     moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
+    speaker: () -> Speaker = { SystemSpeaker(context) },
+    private val connectListening: () -> Unit = { ListenService.connect(context) },
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -77,6 +86,13 @@ class AppContainer(
     private val folderDelivery = FolderDelivery(context.contentResolver)
     val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier)
     val notesSaver = NotesSaver(settings, editions, editionNotes, folderDelivery, notifier)
+
+    /** Reading editions aloud. Made on first use: the voice takes a moment to start. */
+    private val listenProgress = StoredListenProgress(context)
+    val listen: ListenPlayer by lazy {
+        ListenPlayer(speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope)
+    }
+    val listening: Listening by lazy { Listening(listen, listenProgress, editions) { connectListening() } }
 
     /** See [SettingsStore.settleFeedsFrom]: a tt-rss source from before the choice means the server setup. */
     suspend fun settleFeedsFrom() = settings.settleFeedsFrom { db.sources().ofKind(SourceKind.TTRSS).isNotEmpty() }
