@@ -12,6 +12,7 @@ import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.offersOpen
+import com.app.newspaperss.settings.readsHere
 import com.app.newspaperss.settings.Settings
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -73,6 +74,8 @@ class TodayViewModel(
     private val now: () -> ZonedDateTime = { ZonedDateTime.now() },
     private val lastDue: () -> Long = { 0L },
     sentToKindle: Flow<Map<Long, KindleSend>> = flowOf(emptyMap()),
+    /** The app runs on an e-reader ([com.app.newspaperss.settings.ThisDevice.isEReader]). */
+    private val onEReader: Boolean = true,
     private val startBuild: () -> Unit,
 ) : ViewModel() {
     // The latest edition's articles arrive with the list, so its card is drawn once, whole, rather
@@ -94,7 +97,7 @@ class TodayViewModel(
             sentToKindle = kindle,
             build = buildStateOf(info, isOnline),
             next = nextEdition(s, now(), lastDue()),
-            preferOpen = s.device == Device.BOOX,
+            preferOpen = s.device.readsHere(onEReader),
             offerOpen = s.device.offersOpen,
             kindleReader = s.device == Device.KINDLE,
             deviceName = when (s.device) {

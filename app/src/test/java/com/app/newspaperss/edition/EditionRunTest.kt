@@ -54,12 +54,14 @@ class EditionRunTest {
     private val folderErrors = mutableMapOf<String, String>()
     private var clock = Instant.now()
     private val saved = mutableListOf<String>()
+    private var onEReader = true
     private val run by lazy {
         val content = ArticleContentProvider { a, _, _, _ -> ArticleContent(a.title, null, "<p>body</p>", 500) }
         EditionRun(
             settings, FeedSync(db, http), EditionBuilder(db, content, editions.editionsDir), editions,
             { file, uri, name, mime -> saved += "$uri/$name ($mime):${file.length() > 0}"; folderErrors[mime] }, notifier,
             now = { clock },
+            onEReader = onEReader,
         )
     }
 
@@ -172,11 +174,20 @@ class EditionRunTest {
     }
 
     @Test
-    fun aBooxReaderIsOfferedOpenNotSend() = runTest {
+    fun aBooxReaderOnTheBooxIsOfferedReadNotSend() = runTest {
         oneSource()
         settings.update { it.copy(device = com.app.newspaperss.settings.Device.BOOX) }
         run.run(scheduled = true)
         assertTrue(notices.single().startsWith("open"))
+    }
+
+    @Test
+    fun aBooxReaderOnTheirPhoneIsOfferedSend() = runTest {
+        onEReader = false
+        oneSource()
+        settings.update { it.copy(device = com.app.newspaperss.settings.Device.BOOX) }
+        run.run(scheduled = true)
+        assertTrue(notices.single(), !notices.single().startsWith("open"))
     }
 
     @Test

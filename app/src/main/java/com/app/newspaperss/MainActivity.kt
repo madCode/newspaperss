@@ -3,6 +3,7 @@ package com.app.newspaperss
 import android.net.Uri
 
 import com.app.newspaperss.settings.offersOpen
+import com.app.newspaperss.settings.readsHere
 import androidx.compose.runtime.remember
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -114,7 +115,7 @@ class MainActivity : ComponentActivity() {
                     }
                     true -> App(
                         container,
-                        preferOpen = settings?.device == com.app.newspaperss.settings.Device.BOOX,
+                        preferOpen = settings?.device.readsHere(container.onEReader),
                         offerOpen = settings?.device.offersOpen,
                         kindleReader = settings?.device == com.app.newspaperss.settings.Device.KINDLE,
                         kindleEmail = settings?.kindleEmailTarget,
@@ -166,7 +167,7 @@ private fun App(container: AppContainer, preferOpen: Boolean, offerOpen: Boolean
         ) {
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }, sentToKindle = container.kindleSends.recent) { EditionWorker.buildNow(context) } }
+                val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }, sentToKindle = container.kindleSends.recent, onEReader = container.onEReader) { EditionWorker.buildNow(context) } }
                 TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->

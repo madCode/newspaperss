@@ -90,8 +90,8 @@ class SentEditionActionsTest {
         filters = listOf(IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) }),
     )
 
-    private fun today(device: Device, sentToKindle: Map<Long, KindleSend> = emptyMap(), onOpenEdition: (Long) -> Unit = {}) {
-        val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(Settings(device = device)), sentToKindle = flowOf(sentToKindle)) {}
+    private fun today(device: Device, sentToKindle: Map<Long, KindleSend> = emptyMap(), onEReader: Boolean = true, onOpenEdition: (Long) -> Unit = {}) {
+        val vm = TodayViewModel(repo, flowOf(null), settings = flowOf(Settings(device = device)), sentToKindle = flowOf(sentToKindle), onEReader = onEReader) {}
         compose.setContent { TodayScreen(vm, onOpenEdition = onOpenEdition) }
         idleUntil { compose.waitForIdle(); compose.onAllNodes(hasText("Tuesday Morning Edition")).fetchSemanticsNodes().isNotEmpty() }
     }
@@ -249,6 +249,20 @@ class SentEditionActionsTest {
 
         assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity.action)
         assertEquals(EditionStatus.READY, statusOf(id))
+    }
+
+    @Test
+    fun aBooxReaderOnTheirPhoneSendsItAndCanStillOpenItThere() {
+        val id = edition(EditionStatus.READY)
+        today(Device.BOOX, onEReader = false)
+
+        button("Send").assertExists()
+        compose.onNodeWithText("Read").assertDoesNotExist()
+        compose.onNodeWithText("Sent it another way?").assertExists()
+        menu("Open on this phone")
+        compose.onNodeWithText("Open on this phone").performClick()
+
+        assertEquals("opening it on the phone isn't delivering it", EditionStatus.READY, statusOf(id))
     }
 
     @Test

@@ -223,7 +223,7 @@ module so it's all unit-tested without Android.
 | Kobo | Share to Dropbox, into the folder the Kobo syncs (`Apps/Rakuten Kobo`) | One tap |
 | PocketBook | Share to an email app, to your `@pbsync.com` address | One tap |
 | KOReader | Save to a folder that syncs to the device (Syncthing) | Yes |
-| Boox | Open it in the device's reader, from the app or the notification | Yes |
+| Boox | With the app on the Boox, **Read** it in the device's reader, from the app or the notification; with the app on a phone, **Send** it over (BooxDrop) | Yes, on the Boox; one tap from a phone |
 | Anything else | The share sheet | One tap |
 
 **Email to a Kindle.** Each Kindle has its own Send-to-Kindle address
@@ -431,7 +431,11 @@ whose Kindle and KOReader answers ask for more on the same page).
     its articles went back to wait.
   - Every card has at most one button, the next step:
     - ready: **Send**, or **Read** on a Boox, where reading it the first
-      time is the delivery; under it, "Sent it another way? **Mark as sent**";
+      time is the delivery. Only with the app on the e-reader itself: a
+      Boox reader running it on their phone gets **Send**, as reading it
+      there wouldn't put it on the Boox. The app counts itself on an
+      e-reader when it's on a Boox (made by Onyx) or a device that can't
+      make calls; under it, "Sent it another way? **Mark as sent**";
     - sent: **Read** on a Boox. Everyone else reads it on their e-reader,
       so the card has no button and its last line is a link: "and 5 more ›".
   - The rest is in a ⋮ menu at the card's top right ("More options for" the

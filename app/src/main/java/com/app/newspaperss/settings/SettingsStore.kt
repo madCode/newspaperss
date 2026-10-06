@@ -60,6 +60,13 @@ enum class Device(val label: String) {
 val Device?.offersOpen: Boolean get() = this != Device.KINDLE && this != Device.KOBO
 
 /**
+ * Whether reading an edition here delivers it: the reader picked a Boox (or another Android
+ * e-reader) and the app runs on it ([onEReader], from [ThisDevice.isEReader]). On their phone,
+ * reading it would only open it there, so it's sent like anyone else's.
+ */
+fun Device?.readsHere(onEReader: Boolean): Boolean = this == Device.BOOX && onEReader
+
+/**
  * Where the reader's sites come from: fetched by this phone, or from their own RSS server (tt-rss).
  * Never both: the reading list and curated lists stay on the phone either way.
  */

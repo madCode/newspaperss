@@ -8,9 +8,9 @@ import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.delivery.FolderWriter
 import com.app.newspaperss.notify.EditionNotifier
 import com.app.newspaperss.settings.DeliveryMethod
-import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
+import com.app.newspaperss.settings.readsHere
 import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.time.Instant
@@ -24,6 +24,8 @@ class EditionRun(
     private val folder: FolderWriter,
     private val notifier: EditionNotifier,
     private val now: () -> Instant = Instant::now,
+    /** The app runs on an e-reader ([com.app.newspaperss.settings.ThisDevice.isEReader]). */
+    private val onEReader: Boolean = true,
 ) {
     /**
      * @param scheduled true for the timed run. Only then does a shared edition
@@ -82,7 +84,7 @@ class EditionRun(
                 notifier.problem("${edition.title} wasn't delivered", error)
             }
         } else if (scheduled && editions.byId(editionId)?.status == EditionStatus.READY) {
-            notifier.editionReady(edition, file, openInstead = s.device == Device.BOOX, byEmail = s.kindleEmailTarget != null)
+            notifier.editionReady(edition, file, openInstead = s.device.readsHere(onEReader), byEmail = s.kindleEmailTarget != null)
         }
     }
 }

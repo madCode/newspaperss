@@ -29,6 +29,7 @@ import com.app.newspaperss.delivery.FolderDelivery
 import com.app.newspaperss.delivery.KindleSends
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.settings.SettingsStore
+import com.app.newspaperss.settings.ThisDevice
 import com.app.newspaperss.edition.ExtractorContentProvider
 import com.app.newspaperss.work.MoveFeedsWorker
 import com.app.newspaperss.work.NotesWorker
@@ -75,7 +76,9 @@ class AppContainer(
     val settings = SettingsStore(context)
     val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))
     private val folderDelivery = FolderDelivery(context.contentResolver)
-    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier)
+    /** Checked once: whether a Boox reader's edition is read here or sent over from a phone. */
+    val onEReader = ThisDevice.isEReader(context)
+    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier, onEReader = onEReader)
     val notesSaver = NotesSaver(settings, editions, editionNotes, folderDelivery, notifier)
 
     /** See [SettingsStore.settleFeedsFrom]: a tt-rss source from before the choice means the server setup. */
