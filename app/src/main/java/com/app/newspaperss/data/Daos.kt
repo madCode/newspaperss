@@ -19,7 +19,7 @@ import java.time.Instant
 @Dao
 interface SourceDao {
     @Query("SELECT * FROM publications WHERE sourceId = :sourceId AND leftOut = 1")
-    fun observeLeftOut(sourceId: Long): Flow<List<PublicationEntity>>
+    suspend fun leftOut(sourceId: Long): List<PublicationEntity>
 
     @Query("SELECT * FROM publications WHERE leftOut = 1")
     suspend fun allLeftOut(): List<PublicationEntity>

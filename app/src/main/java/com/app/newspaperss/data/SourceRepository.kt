@@ -253,8 +253,9 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
      * when it showed nothing ([evidence] null).
      */
     suspend fun recordFullText(
-        sourceId: Long, originId: String?, evidence: FullTextEvidence?, checked: Boolean = false, day: Long = LocalDate.now(clock).toEpochDay(),
+        sourceId: Long, originId: String?, evidence: FullTextEvidence?, checked: Boolean = false, day: Long? = null,
     ) = db.withTransaction {
+        val today = day ?: LocalDate.now(clock).toEpochDay()
         val source = sources.byId(sourceId) ?: return@withTransaction
         // The reading list and curated lists mix many sites: one article says nothing about the next.
         val key = when (source.kind) {
@@ -265,10 +266,10 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
         val publication = sources.publication(sourceId, key) ?: PublicationEntity(sourceId, key)
         if (publication.chosenMode != null) return@withTransaction
         val state = FullTextState(publication.contentMode, publication.fullTextEvidence, publication.fullTextStreak, publication.fullTextDay)
-        val next = evidence?.let { FullTextCheck.next(state, it, day) } ?: state
+        val next = evidence?.let { FullTextCheck.next(state, it, today) } ?: state
         val updated = publication.copy(
             contentMode = next.mode, fullTextEvidence = next.evidence, fullTextStreak = next.streak, fullTextDay = next.day,
-            checkedDay = if (checked) day else publication.checkedDay,
+            checkedDay = if (checked) today else publication.checkedDay,
         )
         if (updated != publication) sources.savePublication(updated)
     }

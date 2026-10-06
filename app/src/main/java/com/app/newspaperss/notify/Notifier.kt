@@ -29,7 +29,7 @@ interface EditionNotifier {
     fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean = false, byEmail: Boolean = false)
     fun editionDelivered(edition: EditionEntity, where: String)
     fun problem(title: String, reason: String)
-    /** Takes down the notification about [editionId], if it's the one showing (the edition was deleted). */
+    /** Takes down the notification about [editionId], if it's the one showing: the edition was delivered or deleted. */
     fun dismissFor(editionId: Long)
     /** A timed run found nothing new, so no edition was made. @param firstEver there's never been one. */
     fun nothingNew(firstEver: Boolean)

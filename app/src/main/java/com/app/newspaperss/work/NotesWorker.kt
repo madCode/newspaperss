@@ -1,5 +1,6 @@
 package com.app.newspaperss.work
 
+import com.app.newspaperss.container
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -7,7 +8,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.app.newspaperss.NewspaperssApp
 
 /**
  * Saves a delivered edition's reading notes. A worker, because a shared edition is marked
@@ -15,7 +15,7 @@ import com.app.newspaperss.NewspaperssApp
  */
 class NotesWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        (applicationContext as NewspaperssApp).container.notesSaver.save(inputData.getLong(EDITION_ID, -1))
+        applicationContext.container.notesSaver.save(inputData.getLong(EDITION_ID, -1))
         // Not retried: the reader is told what went wrong, and Edition › Notes still shares them.
         return Result.success()
     }

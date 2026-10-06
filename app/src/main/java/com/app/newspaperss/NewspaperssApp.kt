@@ -1,5 +1,6 @@
 package com.app.newspaperss
 
+import android.content.Context
 import android.app.Application
 import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.work.SyncWorker
@@ -29,3 +30,6 @@ open class NewspaperssApp : Application() {
         container.appScope.launch { EditionScheduler.reschedule(this@NewspaperssApp, container.settings.current()) }
     }
 }
+
+/** The app's services, from anything with a context: workers, receivers, services and activities. */
+val Context.container: AppContainer get() = (applicationContext as NewspaperssApp).container

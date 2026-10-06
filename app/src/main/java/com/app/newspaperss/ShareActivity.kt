@@ -20,7 +20,7 @@ class ShareActivity : Activity() {
         }
         // The subject is usually the page title; some apps put the URL there instead.
         val title = intent.getStringExtra(Intent.EXTRA_SUBJECT)?.takeUnless { it.contains("://") }
-        val container = (application as NewspaperssApp).container
+        val container = application.container
         val appContext = applicationContext
         container.appScope.launch {
             val saved = container.readingList.save(url, title)

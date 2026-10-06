@@ -19,7 +19,6 @@ import com.app.newspaperss.data.TtrssAccountStore
 import com.app.newspaperss.data.TtrssRepository
 import com.app.newspaperss.data.TtrssSubscriptions
 import com.app.newspaperss.edition.AndroidImageEncoder
-import com.app.newspaperss.edition.ArticleContentProvider
 import com.app.newspaperss.edition.CoverRenderer
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.edition.EditionNotes
@@ -42,6 +41,8 @@ import com.app.newspaperss.work.NotesWorker
 import com.app.newspaperss.work.ReadingListTitleWorker
 import com.app.newspaperss.work.TtrssMarkReadWorker
 import java.io.File
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,11 +52,6 @@ class AppContainer(
     context: Context,
     val http: HttpClient = OkHttpHttpClient(OkHttpHttpClient.defaultClient(File(context.cacheDir, "http"))),
     val db: AppDatabase = AppDatabase.open(context),
-    content: ArticleContentProvider = SourceRepository(db).let { sources ->
-        ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly) { sourceId, originId, evidence, text ->
-            if (text.day != null) sources.recordFullText(sourceId, originId, evidence, text.check, text.day) else sources.recordFullText(sourceId, originId, evidence, text.check)
-        }
-    },
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
     fetchReadingListTitles: (articleIds: List<Long>) -> Unit = { ReadingListTitleWorker.enqueue(context, it) },
@@ -66,7 +62,12 @@ class AppContainer(
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main +
+            // Nothing waits on these launches: a failure (a full disk, a database error) is logged
+            // rather than crashing the app in the background.
+            CoroutineExceptionHandler { _, e -> Log.w("newspaperss", "Background work failed: ${e.javaClass.name}") },
+    )
     val sources = SourceRepository(db)
     val readingList = ReadingListRepository(db, onUntitled = fetchReadingListTitles)
     val readingListTitles = ReadingListTitles(db, http)
@@ -80,6 +81,9 @@ class AppContainer(
     val ttrssSubscriptions = TtrssSubscriptions(ttrss, appScope)
     val feedMoves = FeedMoves(context, db, ttrss, moveFeeds)
     val feedSync = FeedSync(db, http, ttrssAccounts = ttrssAccounts, onUntitled = fetchReadingListTitles)
+    private val content = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly) { sourceId, originId, evidence, text ->
+        sources.recordFullText(sourceId, originId, evidence, text.check, text.day)
+    }
     val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render, retiring = feedMoves::retiringIds)
     val settings = SettingsStore(context)
     val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))

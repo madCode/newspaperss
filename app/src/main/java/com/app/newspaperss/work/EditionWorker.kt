@@ -1,27 +1,26 @@
 package com.app.newspaperss.work
 
+import com.app.newspaperss.container
 import android.content.Context
 import androidx.work.BackoffPolicy
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.app.newspaperss.NewspaperssApp
 import com.app.newspaperss.edition.BuildResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val container = (applicationContext as NewspaperssApp).container
+        val container = applicationContext.container
         setProgress(workDataOf(STAGE to STAGE_SYNCING))
         // Thrown out of doWork, an exception fails the work with no output, so the Today screen
         // could only say "Something went wrong."
@@ -31,6 +30,8 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val finalAttempt = !scheduled || runAttemptCount >= RETRIES
         val result = try {
             container.editionRun.run(
+                // Short of WorkManager's 10 minutes, with room to write and deliver the book.
+                deadline = Instant.now().plus(BUILD_TIME),
                 scheduled = scheduled,
                 finalAttempt = finalAttempt,
                 dueAt = inputData.getLong(DUE_AT, 0L).takeIf { it > 0 }?.let(Instant::ofEpochMilli),
@@ -51,6 +52,8 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     }
 
     companion object {
+        private val BUILD_TIME: Duration = Duration.ofMinutes(8)
+
         // One build at a time: a scheduled build and "Make one now" share this name.
         const val UNIQUE = "edition-build"
         const val SCHEDULED = "scheduled"
@@ -68,7 +71,7 @@ class EditionWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         /** @param dueAt for a timed edition, when it's due (epoch ms); it's titled and dated for then. */
         fun buildNow(context: Context, scheduled: Boolean = false, dueAt: Long? = null) {
             val request = OneTimeWorkRequestBuilder<EditionWorker>()
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setConstraints(CONNECTED_NETWORK)
                 .setInputData(workDataOf(SCHEDULED to scheduled, DUE_AT to (dueAt ?: 0L)))
                 // Retries after 5, then 10 more minutes: mostly within the 30 minutes a timed edition
                 // starts early, though Doze can hold them longer. A late paper beats none.

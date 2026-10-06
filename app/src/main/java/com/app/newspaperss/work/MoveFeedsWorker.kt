@@ -1,14 +1,12 @@
 package com.app.newspaperss.work
 
+import com.app.newspaperss.container
 import android.content.Context
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.app.newspaperss.NewspaperssApp
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -18,7 +16,7 @@ import kotlinx.coroutines.CancellationException
  */
 class MoveFeedsWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
-        (applicationContext as NewspaperssApp).container.feedMoves.run()
+        applicationContext.container.feedMoves.run()
         Result.success()
     } catch (e: CancellationException) {
         throw e
@@ -28,7 +26,7 @@ class MoveFeedsWorker(context: Context, params: WorkerParameters) : CoroutineWor
         if (runAttemptCount + 1 < MAX_ATTEMPTS) {
             Result.retry()
         } else {
-            (applicationContext as NewspaperssApp).container.feedMoves.giveUp("Something went wrong moving it. Try again.")
+            applicationContext.container.feedMoves.giveUp("Something went wrong moving it. Try again.")
             Result.failure()
         }
     }
@@ -39,7 +37,7 @@ class MoveFeedsWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
         fun enqueue(context: Context) {
             val request = OneTimeWorkRequestBuilder<MoveFeedsWorker>()
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setConstraints(CONNECTED_NETWORK)
                 .build()
             // Appended, not kept: a run finishing up just as a new batch starts would otherwise
             // swallow the request and leave the batch waiting. A run with nothing to do ends at once.

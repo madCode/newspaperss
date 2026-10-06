@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen().setKeepOnScreenCondition { !settingsLoaded }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val container = (application as NewspaperssApp).container
+        val container = application.container
         // Not when reopened from recents, which hands back the intent that first opened it.
         if (savedInstanceState == null && intent?.flags?.and(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) {
             opening.value = intent?.getStringExtra(EXTRA_OPEN)

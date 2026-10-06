@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.app.newspaperss.core.net.HttpClient
 import com.app.newspaperss.core.ttrss.TtrssClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -47,6 +48,18 @@ class TtrssAccountStore(private val store: DataStore<Preferences>, private val c
     }
 
     suspend fun load(): StoredAccount = read(store.data.first())
+
+    /**
+     * The saved login, or null without one or if it can't be read now: decrypting is handled in
+     * [load], so this also covers the store itself failing (an IO error reading its file).
+     */
+    suspend fun ready(): TtrssAccount? = try {
+        (load() as? StoredAccount.Ready)?.account
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
 
     /** [load], again each time the account is saved or cleared. */
     fun observe(): Flow<StoredAccount> = store.data.map(::read)
