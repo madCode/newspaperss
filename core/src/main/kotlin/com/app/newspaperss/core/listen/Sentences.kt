@@ -7,7 +7,7 @@ package com.app.newspaperss.core.listen
  * Not `java.text.BreakIterator`: the JVM's breaks after "Mr." and "U.S." before a capital, and
  * Android's differs from it, so tests on one wouldn't speak for the other.
  */
-object Sentences {
+internal object Sentences {
     /** Speech engines refuse long input (Android's limit is about 4,000 characters). */
     const val MAX_LENGTH = 1_000
 
@@ -32,7 +32,9 @@ object Sentences {
     }
 
     // A sentence ends with . ! ? or …, then any closing quotes or brackets, then a space.
-    private val END = Regex("[.!?…]+[\"'”’)\\]]*(?=\\s)|[。！？।]+[”’」』）)]*")
+    // From the start of a run, and possessive (++, *+): a long run of dots with no space after is
+    // tried once, not again from each dot and through every split of it.
+    private val END = Regex("(?<![.!?…])[.!?…]++[\"'”’)\\]]*+(?=\\s)|[。！？।]++[”’」』）)]*+")
     private const val WIDE_ENDS = "。！？।"
     private val SPACE = Regex("\\s+")
 
