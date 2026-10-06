@@ -232,7 +232,12 @@ Many of the writers worth reading publish as newsletters. Two routes, from easy 
 
 ### Listen: the paper as an audiobook
 The phone's voice reading an edition, and Settings › Listening for it, are built ([mockups](https://claude.ai/artifact/X9dZJi7XP3GxY85xjdLMXq)). Next:
-- **Kokoro, a better voice to download** (about 120 MB, offline): its audio made with the edition, overnight, since phones read it at about real time; what isn't ready yet plays in the phone's voice. English only; other languages stay with the phone's voice.
+- **Kokoro, a better voice to download.** Offline, through sherpa-onnx (on JitPack). English only; other languages stay with the phone's voice. Measured on a Pixel 8 (Tensor G3):
+  - **Use the full model** (`kokoro-multi-lang-v1_0`, 384 MB with its English files; 48 s on Wi-Fi). The compressed int8 one (170 MB) whines at 4.8 and 9.6 kHz; filtering those out leaves it fuzzy. The full one is also faster with 4 threads.
+  - **It can't read live.** Cool, it makes speech at 0.8× real time; warm, it falls to 1.4× within 7 minutes. A 30-minute paper takes about 40–50 minutes to make there, longer on slower phones.
+  - **So make the audio ahead:** after the edition is built, only while charging (about 3% of the battery in 7 minutes), in work that can stop and carry on. Keep it compressed, with each sentence's start, so the highlighting still follows. Whatever isn't made yet plays in the phone's voice.
+  - **Threads:** 4 was fastest, 1 and all 9 slowest. With 1 thread the same text came out longer (17.6 s, not 14 s); find out why before choosing.
+  - The mockup's 120 MB needs updating.
 - **🔊 in the article preview**, starting the same player at that article.
 - **A sleep timer**, and a way in from Today's card.
 - **Save as audio:** the edition as a file with a chapter per article, for a podcast or audiobook app.
