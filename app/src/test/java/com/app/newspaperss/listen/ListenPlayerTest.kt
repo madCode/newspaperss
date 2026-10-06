@@ -219,6 +219,38 @@ class ListenPlayerTest {
     }
 
     @Test
+    fun aChangeInSettingsWhileTheButtonsSpeedSavesIsCaughtUpWith() {
+        val saved = MutableStateFlow(1f)
+        val saving = CompletableDeferred<Unit>()
+        // The button's 1.2 is written, and Settings writes 1.5 before the save returns.
+        val kept = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), savedSpeed = saved, saveSpeed = { saved.value = it; saving.await() })
+        kept.start(7)
+        kept.setSpeed(1.2f)
+        saved.value = 1.5f
+        assertEquals(1.2f, kept.state.value.speed)
+        saving.complete(Unit)
+        assertEquals(1.5f, kept.state.value.speed)
+    }
+
+    @Test
+    fun aSpeedACarAsksForIsTheNearestListedOne() {
+        val saved = MutableStateFlow(1f)
+        val kept = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), savedSpeed = saved, saveSpeed = { saved.value = it })
+        kept.setSpeed(2f)
+        assertEquals(1.5f, saved.value)
+        kept.setSpeed(0.5f)
+        assertEquals(0.8f, saved.value)
+    }
+
+    @Test
+    fun aSpeedThatCantBeSavedGoesBackToTheKeptOne() {
+        val saved = MutableStateFlow(1.2f)
+        val kept = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), savedSpeed = saved, saveSpeed = { throw java.io.IOException("disk full") })
+        kept.setSpeed(1.5f)
+        assertEquals(1.2f, kept.state.value.speed)
+    }
+
+    @Test
     fun theSampleIsSaidAtItsSpeedAndPausesTheEdition() {
         player.start(7)
         speaker.startNext()

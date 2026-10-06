@@ -82,6 +82,7 @@ import com.app.newspaperss.core.listen.ListenScript
 import com.app.newspaperss.core.listen.ListenScript.Block
 import com.app.newspaperss.core.listen.ListenScript.Kind
 import com.app.newspaperss.core.ReadingTime
+import com.app.newspaperss.listen.LISTEN_SPEEDS
 import com.app.newspaperss.listen.ListenPlayer
 import com.app.newspaperss.listen.ListenPosition
 import com.app.newspaperss.listen.ListenState
@@ -91,8 +92,6 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** The speeds the speed button steps through. */
-internal val SPEEDS = listOf(1f, 1.2f, 1.5f, 0.8f)
 
 /**
  * What's playing: the page being read, its sentence tinted and the page following the voice, with
@@ -321,7 +320,7 @@ private fun PlayerDock(state: ListenState, player: ListenPlayer) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 val speed = speedLabel(state.speed)
                 TextButton(
-                    onClick = { player.setSpeed(SPEEDS[(SPEEDS.indexOf(state.speed) + 1).mod(SPEEDS.size)]) },
+                    onClick = { player.setSpeed(LISTEN_SPEEDS[(LISTEN_SPEEDS.indexOf(state.speed) + 1).mod(LISTEN_SPEEDS.size)]) },
                     modifier = Modifier.semantics { contentDescription = "Speed $speed. Change speed" },
                 ) { Text(speed) }
                 val total = state.secondsTotal

@@ -29,21 +29,27 @@ object PhoneVoice {
         return engine.loadLabel(pm).toString()
     }
 
-    /** Android's text-to-speech settings: the engine, its voice and language. Some e-readers have no such page. */
-    fun openSettings(context: Context) {
-        try {
-            context.startActivity(Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        } catch (_: ActivityNotFoundException) {
-            context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
-    }
+    /**
+     * Android's text-to-speech settings: the engine, its voice and language, or Android's settings
+     * without that page. False if neither opens, as on some e-readers.
+     */
+    fun openSettings(context: Context): Boolean =
+        open(context, Intent("com.android.settings.TTS_SETTINGS"), Intent(Settings.ACTION_SETTINGS))
 
-    /** Speech Services by Google in an app store, or on the web without one. */
-    fun get(context: Context) {
+    /** Speech Services by Google in an app store, or on the web without one. False if neither opens. */
+    fun get(context: Context): Boolean = open(
+        context,
+        Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$GOOGLE")),
+        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$GOOGLE")),
+    )
+
+    /** Opens the first of [intents] something on the phone handles. */
+    private fun open(context: Context, vararg intents: Intent): Boolean = intents.any {
         try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$GOOGLE")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            true
         } catch (_: ActivityNotFoundException) {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$GOOGLE")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            false
         }
     }
 }

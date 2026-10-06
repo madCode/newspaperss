@@ -9,8 +9,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.IOException
+import kotlin.math.abs
+
+/** The speeds Listen reads at, in the order its speed button steps through them. */
+val LISTEN_SPEEDS = listOf(1f, 1.2f, 1.5f, 0.8f)
 
 data class ListenState(
     val editionId: Long? = null,
@@ -61,7 +67,7 @@ class ListenPlayer(
     private val progress: ListenProgress,
     private val open: suspend (editionId: Long) -> ListenBook?,
     private val scope: CoroutineScope,
-    savedSpeed: Flow<Float> = emptyFlow(),
+    private val savedSpeed: Flow<Float> = emptyFlow(),
     private val saveSpeed: suspend (Float) -> Unit = {},
     private val now: () -> Long = System::currentTimeMillis,
 ) : Speaker.Listener {
@@ -106,6 +112,8 @@ class ListenPlayer(
             }
             book = opened
             _state.update { it.copy(editionTitle = opened.title, pages = opened.pages, loading = false) }
+            // The store's first value can come after the book opens, and the first line would restart at it.
+            if (savingSpeed == 0) savedSpeed.firstOrNull()?.let { speed -> _state.update { it.copy(speed = speed) } }
             val at = from ?: progress.get(editionId)?.takeUnless { progress.finished(editionId) } ?: ListenPosition()
             goTo(at)
         }
@@ -172,15 +180,21 @@ class ListenPlayer(
     /** Plays from [position]: a tapped sentence, or an article picked from the contents. */
     fun seek(position: ListenPosition) = move(position, play = true)
 
+    /** Sets and saves the speed: one of [LISTEN_SPEEDS], the nearest to what a car or watch asks for. */
     fun setSpeed(speed: Float) {
-        applySpeed(speed)
+        val listed = LISTEN_SPEEDS.minBy { abs(it - speed) }
+        applySpeed(listed)
         savingSpeed++
         scope.launch {
             try {
-                saveSpeed(speed)
+                saveSpeed(listed)
+            } catch (_: IOException) {
+                // Not kept (a full disk, say): the catch-up below goes back to the kept speed rather than crash.
             } finally {
                 savingSpeed--
             }
+            // A change made elsewhere while this was saving was passed over: catch up with the store.
+            if (savingSpeed == 0) savedSpeed.firstOrNull()?.let(::applySpeed)
         }
     }
 

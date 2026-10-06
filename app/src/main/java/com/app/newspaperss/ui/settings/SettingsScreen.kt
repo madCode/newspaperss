@@ -81,7 +81,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.listen.PhoneVoice
-import com.app.newspaperss.ui.listen.SPEEDS
+import com.app.newspaperss.listen.LISTEN_SPEEDS
 import com.app.newspaperss.ui.listen.speedLabel
 import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.core.plural
@@ -387,11 +387,11 @@ private fun ListeningSection(s: AppSettings, vm: SettingsViewModel) {
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(vertical = 8.dp),
         )
-        OutlinedButton(onClick = { PhoneVoice.get(context) }) { Text("Get Speech Services by Google") }
+        OutlinedButton(onClick = { if (!PhoneVoice.get(context)) nothingOpens(context) }) { Text("Get Speech Services by Google") }
     }
     SubHeading("Speed", Modifier.padding(top = 24.dp))
     Column(Modifier.selectableGroup()) {
-        SPEEDS.sorted().forEach { speed ->
+        LISTEN_SPEEDS.sorted().forEach { speed ->
             Row(
                 Modifier.fillMaxWidth().selectable(s.listenSpeed == speed, role = Role.RadioButton) { vm.setListenSpeed(speed) }.heightIn(min = 48.dp).padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -404,7 +404,7 @@ private fun ListeningSection(s: AppSettings, vm: SettingsViewModel) {
     if (voice != null) {
         HorizontalDivider(Modifier.padding(top = 16.dp))
         Row(
-            Modifier.fillMaxWidth().clickable(role = Role.Button) { PhoneVoice.openSettings(context) }.heightIn(min = 48.dp).padding(vertical = 14.dp),
+            Modifier.fillMaxWidth().clickable(role = Role.Button) { if (!PhoneVoice.openSettings(context)) nothingOpens(context) }.heightIn(min = 48.dp).padding(vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -419,6 +419,9 @@ private fun ListeningSection(s: AppSettings, vm: SettingsViewModel) {
         }
     }
 }
+
+private fun nothingOpens(context: android.content.Context) =
+    Toast.makeText(context, "This phone has nothing that opens it.", Toast.LENGTH_LONG).show()
 
 /** The phone's text-to-speech engine's name, or null without one; checked again on coming back from Android's settings. */
 @Composable

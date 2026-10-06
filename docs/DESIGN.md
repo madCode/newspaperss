@@ -668,7 +668,8 @@ whose Kindle and KOReader answers ask for more on the same page).
     at the chosen speed (it pauses an edition that's playing); the speed as
     radio rows, 0.8× to 1.5×, the same one the player's speed button sets;
     and **Change the phone's voice**, which opens Android's text-to-speech
-    settings. A new engine chosen there is used from the next start or jump.
+    settings. A voice, language or engine changed there is heard from the next start or jump.
+    A speed asked for by a car or watch becomes the nearest of these.
     Without an engine the page says so and offers Speech Services by Google.
   - **E-reader & delivery:** the e-reader in a dropdown at the top, then
     "How it gets there". They share a page because the e-reader decides
