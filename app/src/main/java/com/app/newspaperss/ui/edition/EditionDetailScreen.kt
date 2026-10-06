@@ -42,6 +42,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.app.newspaperss.data.EditionContent
 import com.app.newspaperss.ui.components.ArticleRowFrame
+import com.app.newspaperss.listen.Listening
+import com.app.newspaperss.ui.listen.ListenButton
 import com.app.newspaperss.ui.components.StarToggle
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -65,6 +67,7 @@ import kotlin.math.roundToInt
  * @param offerOpen false for a Kindle or Kobo, whose reader sends the book rather than opening it here.
  * @param kindleReader a sent edition offers to open the Kindle app, where it shows up.
  * @param kindleEmail Send emails the edition to this Kindle address rather than sharing it.
+ * @param listening offers to read the edition aloud; null leaves Listen out.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +79,8 @@ fun EditionDetailScreen(
     offerOpen: Boolean = true,
     kindleReader: Boolean = false,
     kindleEmail: KindleEmail? = null,
+    listening: Listening? = null,
+    onOpenPlayer: () -> Unit = {},
 ) {
     val detail by viewModel.detail.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -212,6 +217,9 @@ fun EditionDetailScreen(
                     onSend = ::send,
                     onOpen = ::open,
                     onSent = viewModel::markSent,
+                    listen = listening?.takeIf { current.file != null && current.contents.isNotEmpty() && (edition.status == EditionStatus.READY || edition.status == EditionStatus.DELIVERED) }?.let { l ->
+                        { modifier: Modifier -> ListenButton(l, edition.id, current.contents.sortedBy { it.entry.position }.map { it.entry.minutes }, onOpenPlayer, modifier) }
+                    },
                 )
             }
             if (current.contents.isNotEmpty()) {
@@ -262,6 +270,7 @@ private fun Header(
     onSend: () -> Unit,
     onOpen: () -> Unit,
     onSent: () -> Unit,
+    listen: (@Composable (Modifier) -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(edition.title, style = MaterialTheme.typography.headlineSmall)
@@ -286,6 +295,7 @@ private fun Header(
             )
         }
         if (edition.status == EditionStatus.READY) MarkAsSentLine(preferOpen, onSent, Modifier.padding(top = 4.dp))
+        listen?.invoke(Modifier.padding(top = 8.dp))
     }
 }
 

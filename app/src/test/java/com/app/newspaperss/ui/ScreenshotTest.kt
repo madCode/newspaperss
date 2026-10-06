@@ -55,6 +55,13 @@ import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.testutil.installApp
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import com.app.newspaperss.ui.edition.EditionDetailScreen
+import com.app.newspaperss.listen.ListenBook
+import com.app.newspaperss.listen.ListenPlayer
+import com.app.newspaperss.listen.ListenPosition
+import com.app.newspaperss.listen.Listening
+import com.app.newspaperss.listen.StoredListenProgress
+import com.app.newspaperss.testutil.FakeSpeaker
+import com.app.newspaperss.ui.listen.ListenScreen
 import com.app.newspaperss.core.epub.EditionArticle
 import com.app.newspaperss.core.epub.EditionDoc
 import com.app.newspaperss.core.epub.EditionSection
@@ -370,7 +377,61 @@ class ScreenshotTest {
     @Test
     fun editionDetail() {
         val vm = sentEdition()
-        shoot("05b-edition-detail", ready = { vm.detail.value?.contents?.isNotEmpty() == true }) { EditionDetailScreen(vm, onBack = {}) }
+        val listening = listening()
+        shoot("05b-edition-detail", ready = { vm.detail.value?.contents?.isNotEmpty() == true }) { EditionDetailScreen(vm, onBack = {}, listening = listening) }
+    }
+
+    /** A player with a voice that says nothing, over [db]'s editions in [files]. */
+    private fun listenPlayer(files: File = tmp.newFolder()): Pair<ListenPlayer, FakeSpeaker> {
+        val repo = EditionRepository(db, files)
+        val speaker = FakeSpeaker()
+        val progress = StoredListenProgress(ApplicationProvider.getApplicationContext())
+        return ListenPlayer(speaker, progress, open = { ListenBook.open(repo, it) }, kotlinx.coroutines.MainScope()) to speaker
+    }
+
+    private fun listening(): Listening {
+        val (player, _) = listenPlayer()
+        return Listening(player, StoredListenProgress(ApplicationProvider.getApplicationContext()), EditionRepository(db, tmp.newFolder())) {}
+    }
+
+    /** Listening to an article, two sentences in, its picture just ahead. */
+    @Test
+    fun listenPlaying() {
+        val files = tmp.newFolder()
+        val picture = Bitmap.createBitmap(600, 300, Bitmap.Config.ARGB_8888).apply {
+            val canvas = Canvas(this)
+            canvas.drawColor(android.graphics.Color.rgb(228, 221, 204))
+            val ink = android.graphics.Paint().apply { color = android.graphics.Color.rgb(74, 71, 64); strokeWidth = 8f; style = android.graphics.Paint.Style.STROKE }
+            for (i in 0 until 4) canvas.drawCircle(90f + i * 140f, 150f, 55f, ink)
+        }
+        val png = java.io.ByteArrayOutputStream().also { picture.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        val knots = EditionArticle(
+            title = "The Mathematician Who Counted the Shapes of Knots", sourceTitle = "Quanta Magazine", url = "https://example.com/knots",
+            bodyHtml = "<p>For forty years, nobody could say how many ways a loop of string can tangle. Then a retired schoolteacher wrote a program.</p>" +
+                "<p>The question sounds like a puzzle for a rainy afternoon. Tie a knot in a piece of string, fuse the ends, and ask which knots are really different. Two that look nothing alike may be the same knot, pulled into a new shape.</p>" +
+                "<figure><img src=\"images/knots.png\"/><figcaption>Tait's 1877 table of knots, drawn by hand</figcaption></figure>" +
+                "<p>Mathematicians had catalogued them by hand since the 1870s.</p>",
+            minutes = 8.0, author = "Erica Klarreich", images = listOf(com.app.newspaperss.core.epub.EpubImage("images/knots.png", "image/png", png)),
+        )
+        val others = listOf(
+            "Rest of World" to "Why Lagos's ride-hailing drivers built their own app" to 6.0,
+            "Nautilus" to "What do octopuses dream about?" to 5.0,
+            "ProPublica" to "The hidden cost of hospital price lists" to 6.0,
+        ).map { (st, minutes) -> EditionArticle(title = st.second, sourceTitle = st.first, url = "https://example.com/x", bodyHtml = "<p>Text.</p>", minutes = minutes) }
+        val articles = listOf(EditionArticle(title = "Flooding forces thousands from their homes in northern Italy", sourceTitle = "BBC News", url = "https://example.com/f", bodyHtml = "<p>Text.</p>", minutes = 3.0), knots) + others
+        File(files, "l.epub").outputStream().use {
+            EpubWriter.write(EditionDoc("Thursday Morning Edition", LocalDate.of(2026, 10, 1), "urn:uuid:5b1f3c8e-0000-4000-8000-000000000010", listOf(EditionSection(null, articles))), it)
+        }
+        val id = runBlocking {
+            val id = db.editions().insert(EditionEntity(title = "Thursday Morning Edition", status = EditionStatus.DELIVERED, fileName = "l.epub", articleCount = articles.size, minutes = articles.sumOf { it.minutes }))
+            db.editions().insertArticles(articles.mapIndexed { i, a -> EditionArticleEntity(editionId = id, articleId = null, position = i, title = a.title, sourceTitle = a.sourceTitle, minutes = a.minutes) })
+            id
+        }
+        val (player, speaker) = listenPlayer(files)
+        player.start(id, ListenPosition(1, 6))
+        idleUntil { player.state.value.script != null }
+        speaker.startNext()
+        shoot("11a-listen-playing", ready = { player.state.value.at.line == 6 }) { ListenScreen(player, onBack = {}) }
     }
 
     @Test

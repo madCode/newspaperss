@@ -79,6 +79,13 @@ Setup takes a couple of minutes, in four steps:
   few reflection prompts, and a citation and room for notes under each
   article. Pick a folder (your vault) and each delivered edition's notes are
   saved there, however you send the edition.
+- **Listen to it.** **Listen** on an edition reads it aloud in your phone's
+  own voice, article by article to its closing page, and keeps going with
+  the screen off, from the lock screen and headphones. Take the phone out
+  and it's on the article's text, the sentence being read tinted, its
+  pictures in place; tap a sentence to hear it from there, or go back one.
+  It remembers where you stopped, and offers to finish yesterday's paper
+  before today's.
 - **Calm by design.** No unread counts, no infinite timeline, no
   animations to smear on an e-ink screen.
 

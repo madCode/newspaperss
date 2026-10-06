@@ -110,6 +110,8 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.work.runtime)
+    implementation(libs.media3.session)
+    implementation(libs.media3.common)
     implementation(libs.datastore.preferences)
     implementation(libs.coroutines.android)
     implementation(libs.okhttp)

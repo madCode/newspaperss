@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Listening: reading an edition aloud keeps playing with the screen off. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!-- Mail apps, for emailing editions to a Kindle (MailApps): Android 11 and later hide
          other apps unless asked for. -->
@@ -14,6 +17,10 @@
         <intent>
             <action android:name="android.intent.action.SEND" />
             <data android:mimeType="application/epub+zip" />
+        </intent>
+        <!-- The phone's text-to-speech voice, for Listen. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
         <!-- Open Kindle on a sent edition shows only while the Kindle app is installed. -->
         <package android:name="com.amazon.kindle" />
@@ -78,6 +85,14 @@
                 <action android:name="android.intent.action.TIME_SET" />
             </intent-filter>
         </receiver>
+        <service
+            android:name=".listen.ListenService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"
