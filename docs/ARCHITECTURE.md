@@ -32,14 +32,14 @@ flowchart TB
     subgraph core[":core (JVM, no Android)"]
         feed["feed/: FeedParser, FeedFinder, OPML, imports"]
         plan["edition/: EditionPlanner, titles, schedule"]
-        extract["extract/: ArticleExtractor, PageExtractor"]
-        images["images/: ImageRules, ImageBudget"]
-        epub["epub/: EpubWriter"]
+        extract["extract/: ArticleExtractor, PageExtractor, HtmlCleaner"]
+        images["images/: ImageRules, ImageBudget,<br/>ArticleImages, ImageAllowance"]
+        epub["epub/: EpubWriter, ArticleBody"]
         lists["lists/: curated-list scrapers"]
         ttrss["ttrss/: TtrssClient"]
         notes["notes/: NotesWriter"]
         listenScript["listen/: ListenScript, Sentences"]
-        net["net/: HttpClient (OkHttp)"]
+        net["net/: HttpClient (OkHttp), Urls"]
     end
     container --> ui & work & edition & data & delivery & settings & notify & listen
     ui --> data & settings
@@ -159,6 +159,9 @@ The steps, with where they live:
    order, tt-rss last as on Sources, each feed's articles together), `ImageBudget.fit` settles the final image set,
    `CoverRenderer` draws the cover, and `EpubWriter` (`core/epub/`) writes
    the book to `files/editions/`.
+   An article's HTML is cleaned twice on purpose: `HtmlCleaner` when it's
+   extracted, and `ArticleBody` again as the book is written, since the
+   writer can't assume what it's given is safe XHTML.
 7. **Commit.** One Room transaction writes `edition_articles`, sets the
    articles to `IN_EDITION` and the edition to `READY`. Until then no
    article has changed state, so a failure leaves them all for next time.

@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui.edition
 
+import com.app.newspaperss.core.epub.EpubWriter
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
@@ -49,8 +50,7 @@ class EpubPages(private val file: File) : Closeable {
     }
 
     companion object {
-        /** Must match EpubWriter's naming: article-001.xhtml is the first article. */
-        fun articleHref(position: Int) = "article-%03d.xhtml".format(position + 1)
+        fun articleHref(position: Int) = EpubWriter.articleHref(position)
 
         fun mimeOf(path: String) = when (path.substringAfterLast('.').lowercase()) {
             "css" -> "text/css"

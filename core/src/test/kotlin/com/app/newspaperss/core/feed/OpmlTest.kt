@@ -33,4 +33,12 @@ class OpmlTest {
         )
         assertEquals(feeds, Opml.parse(Opml.write("My feeds", feeds)))
     }
+
+    @Test
+    fun aControlCharacterInATitleDoesntBreakTheFileForOtherReaders() {
+        val xml = Opml.write("My feeds", listOf(OpmlFeed("https://a.example/feed", "A\u0008 title", null)))
+        // A strict parser, as other feed readers use.
+        val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
+        assertEquals("A title", doc.getElementsByTagName("outline").item(0).attributes.getNamedItem("text").nodeValue)
+    }
 }

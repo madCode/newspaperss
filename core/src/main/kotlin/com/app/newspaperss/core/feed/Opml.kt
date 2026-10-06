@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.feed
 
+import com.app.newspaperss.core.epub.esc
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 
@@ -38,7 +39,4 @@ object Opml {
         }
         append("  </body>\n</opml>\n")
     }
-
-    private fun esc(s: String) =
-        s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 }

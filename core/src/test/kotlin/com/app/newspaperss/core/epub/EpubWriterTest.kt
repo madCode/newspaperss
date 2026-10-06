@@ -798,4 +798,23 @@ class EpubWriterTest {
         assertTrue(selectors.isNotEmpty())
         assertTrue(selectors.filter { Regex("[>+~]|::?(before|after|first-child)").containsMatchIn(it) }.toString(), selectors.none { Regex("[>+~]|::?(before|after|first-child)").containsMatchIn(it) })
     }
+
+    @Test
+    fun chapterFileNamesUseAsciiDigitsWhateverThePhonesLanguage() {
+        val before = java.util.Locale.getDefault()
+        java.util.Locale.setDefault(java.util.Locale.forLanguageTag("fa-IR"))
+        try {
+            assertEquals("article-001.xhtml", EpubWriter.articleHref(0))
+        } finally {
+            java.util.Locale.setDefault(before)
+        }
+    }
+
+    @Test
+    fun anInternationalSitesOriginalLinkIsKeptAndNamedInItsOwnLetters() {
+        val epub = write(unsectioned(article(url = "https://bücher.example/buch")))
+        val page = epub.text("OEBPS/article-001.xhtml")
+        assertTrue(page, page.contains("href=\"https://xn--bcher-kva.example/buch\""))
+        assertTrue(page, page.contains(">bücher.example</a>"))
+    }
 }

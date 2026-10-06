@@ -1,10 +1,15 @@
 package com.app.newspaperss.core.epub
 
+import com.app.newspaperss.core.extract.HtmlCleaner
 import com.app.newspaperss.core.extract.LanguageDetector
+import java.net.IDN
 import java.net.URI
 import java.net.URISyntaxException
 
-/** Escapes [text] for XML text or a double- or single-quoted attribute value. */
+/**
+ * Escapes [text] for XML text or a double- or single-quoted attribute value, dropping characters
+ * XML can't hold at all (feeds do send control characters). For the book, OPML and feed XML alike.
+ */
 internal fun esc(text: String): String {
     val out = StringBuilder(text.length + 16)
     var i = 0
@@ -41,26 +46,22 @@ private fun isXmlChar(cp: Int): Boolean =
         cp in 0x20..0xD7FF || cp in 0xE000..0xFFFD || cp in 0x10000..0x10FFFF
 
 /**
- * [url] as an href an EPUB can carry, or null. Send to Kindle and EPUB validators reject hrefs
- * that aren't valid URIs (spaces, a second `#`), and a relative link would point at a file the
- * book doesn't have.
+ * [url] as an href an EPUB can carry, or null: absolute, http(s) or mailto, and a valid URI.
+ * Send to Kindle and EPUB validators reject hrefs that aren't (spaces, a second `#`), and a
+ * relative link would point at a file the book doesn't have. The same rules as links in an
+ * article's text ([HtmlCleaner.absoluteUrl]).
  */
-internal fun externalHref(url: String): String? {
-    val trimmed = url.trim()
-    if (trimmed.isEmpty() || trimmed.any { it == '"' || it == '<' || it == '>' || it == '\\' }) return null
-    val hash = trimmed.indexOf('#')
-    val fixed = (if (hash < 0) trimmed else trimmed.substring(0, hash + 1) + trimmed.substring(hash + 1).replace("#", "%23"))
-        .replace(" ", "%20")
+internal fun externalHref(url: String): String? = HtmlCleaner.absoluteUrl(url, "", HtmlCleaner.LINK_SCHEMES)
+
+/** The site's name in [href] for the reader: without "www.", an international name in its own letters. */
+internal fun siteName(href: String): String? {
     val uri = try {
-        URI(fixed)
+        URI(href)
     } catch (_: URISyntaxException) {
         return null
     }
-    return when (uri.scheme?.lowercase()) {
-        "http", "https" -> if (uri.host.isNullOrEmpty()) null else fixed
-        "mailto" -> fixed
-        else -> null
-    }
+    val host = uri.host ?: uri.rawAuthority?.substringAfterLast('@')?.substringBefore(':') ?: return null
+    return IDN.toUnicode(host, IDN.ALLOW_UNASSIGNED).removePrefix("www.").ifEmpty { null }
 }
 
 /**

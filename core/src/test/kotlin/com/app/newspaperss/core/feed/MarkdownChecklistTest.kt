@@ -45,4 +45,10 @@ class MarkdownChecklistTest {
         assertEquals("https://en.wikipedia.org/wiki/The_Hitchhiker's_Guide", MarkdownChecklist.firstUrl("Read https://en.wikipedia.org/wiki/The_Hitchhiker's_Guide!"))
         assertNull(MarkdownChecklist.firstUrl("no link here"))
     }
+
+    @Test
+    fun aLineWithALongRunOfSpacesIsStillRead() {
+        val line = "- [ ] https://a.example/x" + " ".repeat(20_000) + "note"
+        assertEquals("https://a.example/x", MarkdownChecklist.parse(line).single().url)
+    }
 }
