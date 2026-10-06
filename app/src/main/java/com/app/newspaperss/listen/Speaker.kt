@@ -82,10 +82,15 @@ class SystemSpeaker(context: Context) : Speaker {
     }
 
     override fun speak(id: String, text: String, language: String?, rate: Float, flush: Boolean): Boolean {
-        if (failed) {
+        // Started afresh only for a line that starts speaking (not each line queued behind it),
+        // so an engine that keeps failing isn't rebound over and over.
+        if (failed && flush) {
             failed = false
             tts.shutdown()
             tts = connect()
+        } else if (failed) {
+            main.post { listener?.onError(id) }
+            return true
         }
         if (!ready) {
             waiting += {

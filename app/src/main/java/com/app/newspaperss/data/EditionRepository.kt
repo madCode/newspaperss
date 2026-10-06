@@ -27,6 +27,8 @@ class EditionRepository(
     private val kindleSends: KindleSends = KindleSends(),
     private val onDelivered: (editionId: Long) -> Unit = {},
     private val onTtrssChanged: (editionId: Long) -> Unit = {},
+    /** An edition's book was deleted (the edition, or only its file when old): Listen lets it go. */
+    private val onFileGone: (editionId: Long) -> Unit = {},
 ) {
     fun observeAll(): Flow<List<EditionEntity>> = db.editions().observeAll()
 
@@ -170,6 +172,7 @@ class EditionRepository(
             edition
         } ?: return false
         deleted.fileName?.let { File(editionsDir, it) }?.delete()
+        onFileGone(id)
         return true
     }
 
@@ -182,6 +185,7 @@ class EditionRepository(
             if (edition.status == EditionStatus.READY || edition.status == EditionStatus.BUILDING) continue
             edition.fileName?.let { File(editionsDir, it).delete() }
             db.editions().clearFile(edition.id)
+            onFileGone(edition.id)
         }
     }
 

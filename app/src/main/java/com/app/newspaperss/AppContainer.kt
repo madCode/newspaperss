@@ -46,6 +46,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
 class AppContainer(
@@ -74,7 +75,10 @@ class AppContainer(
     val notifier = Notifier(context)
     val kindleSends = KindleSends()
     // A sent edition's Ready notification comes down: its Send would offer an edition already sent.
-    val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead, kindleSends = kindleSends)
+    val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead, kindleSends = kindleSends,
+        // Only if Listen has started: it isn't made just to be told.
+        onFileGone = { id -> if (listenMade.isInitialized()) appScope.launch { listen.forget(id) } },
+    )
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)
@@ -93,9 +97,8 @@ class AppContainer(
 
     /** Reading editions aloud. Made on first use: the voice takes a moment to start. */
     private val listenProgress = StoredListenProgress(context)
-    val listen: ListenPlayer by lazy {
-        ListenPlayer(speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope)
-    }
+    private val listenMade = lazy { ListenPlayer(speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope) }
+    val listen: ListenPlayer by listenMade
     val listening: Listening by lazy { Listening(listen, listenProgress, editions) { connectListening() } }
 
     /** See [SettingsStore.settleFeedsFrom]: a tt-rss source from before the choice means the server setup. */

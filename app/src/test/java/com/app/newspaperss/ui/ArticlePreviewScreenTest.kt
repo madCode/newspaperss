@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.testutil.writeEpub
 import androidx.compose.ui.test.assertIsDisplayed
 import android.view.View
 import android.view.ViewGroup
@@ -71,9 +72,7 @@ class ArticlePreviewScreenTest {
     fun anEditionOnDiskIsShownNotReportedMissing() {
         val file = tmp.newFile("e.epub")
         val article = EditionArticle(title = "A story", sourceTitle = "S", url = "https://a.example/", bodyHtml = "<p>x</p>", minutes = 1.0)
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
-        }
+        file.writeEpub(listOf(article))
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "A story", onBack = {}) }
 
         // Once the page is up, the file has been read.
@@ -87,9 +86,7 @@ class ArticlePreviewScreenTest {
         val articles = listOf("One", "Two").map {
             EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 1.0)
         }
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
-        }
+        file.writeEpub(articles)
         val style = "body { margin: 0 5%; background: #1C1B1F; color: #E6E1E5; }"
         val dark = 0xFF1C1B1F.toInt() to 0xFFE6E1E5.toInt()
         EpubPages(file).use { pages ->
@@ -118,9 +115,7 @@ class ArticlePreviewScreenTest {
             EditionArticle(title = "One", sourceTitle = "S", url = "https://a.example/1", bodyHtml = body, minutes = 1.0, images = images),
             EditionArticle(title = "Two", sourceTitle = "S", url = "https://a.example/2", bodyHtml = "<img src=\"images/solo.png\" alt=\"\"/>", minutes = 1.0, images = listOf(EpubImage("images/solo.png", "image/png", png(600, 200)))),
         )
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
-        }
+        file.writeEpub(articles)
         EpubPages(file).use { pages ->
             fun filled(xhtml: String): List<String> {
                 // Still XHTML a strict parser takes: the WebView loads it as application/xhtml+xml.
@@ -141,9 +136,7 @@ class ArticlePreviewScreenTest {
     private fun oneArticleEdition(url: String = "https://a.example/"): File {
         val file = tmp.newFile("z.epub")
         val article = EditionArticle(title = "A story", sourceTitle = "S", url = url, bodyHtml = "<p>x</p>", minutes = 1.0)
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
-        }
+        file.writeEpub(listOf(article))
         return file
     }
 
@@ -192,9 +185,7 @@ class ArticlePreviewScreenTest {
         val articles = listOf("One", "Two").map {
             EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 30.0)
         }
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
-        }
+        file.writeEpub(articles)
         var size by mutableStateOf(PreviewTextSize.DEFAULT)
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}, textSize = size) }
         val view = webView()
@@ -351,9 +342,7 @@ class ArticlePreviewScreenTest {
         val articles = listOf("One", "Two").map {
             EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 30.0)
         }
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("T", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, articles))), it)
-        }
+        file.writeEpub(articles)
         compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}) }
         val view = webView()
         val client = shadowOf(view).webViewClient

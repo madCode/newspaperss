@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.testutil.writeEpub
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
@@ -478,9 +479,7 @@ class ScreenshotTest {
     fun articlePreview() {
         val file = tmp.newFile("p.epub")
         val article = EditionArticle(title = "The quiet return of the night train", sourceTitle = "The Example Review", url = "https://example.com/night-train", bodyHtml = "<p>Sleeper services are coming back.</p>", minutes = 4.0)
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("Tuesday Morning Edition", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
-        }
+        file.writeEpub(listOf(article), title = "Tuesday Morning Edition")
         // The page itself is a WebView, which Robolectric doesn't draw; this shoots the top bar.
         shoot("05c-article-preview", ready = { compose.onAllNodes(hasText("Opening…")).fetchSemanticsNodes().isEmpty() }) {
             ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {})
@@ -493,9 +492,7 @@ class ScreenshotTest {
     fun articlePreviewAtTwiceTheFontSize() {
         val file = tmp.newFile("p.epub")
         val article = EditionArticle(title = "The quiet return of the night train", sourceTitle = "The Example Review", url = "https://example.com/night-train", bodyHtml = "<p>Sleeper services are coming back.</p>", minutes = 4.0)
-        file.outputStream().use {
-            EpubWriter.write(EditionDoc("Tuesday Morning Edition", LocalDate.of(2026, 9, 29), "urn:uuid:1", listOf(EditionSection(null, listOf(article)))), it)
-        }
+        file.writeEpub(listOf(article), title = "Tuesday Morning Edition")
         shoot("05d-article-preview-200", ready = { compose.onAllNodes(hasText("Opening…")).fetchSemanticsNodes().isEmpty() }) {
             ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {}, textSize = PreviewTextSize.LARGEST)
         }

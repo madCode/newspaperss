@@ -8,9 +8,24 @@ caught, and what got in the way. Newest first. Times are Pacific.
 
 ## Status
 
-- **Last night:** Night 2 focused on one reader: a tt-rss user reading a 30-minute paper on a Kindle over breakfast, who wants thoughtful, varied writing with some fun, and time to reflect. It shipped stars and Mark as read, a Kindle-first EPUB, tt-rss per-feed sync, a category choice, fair turns across many feeds, Start fresh and leaving feeds out, Obsidian-friendly notes saved to your vault, a question at the end of each paper, and a dark preview.
+- **Lately:** Listen (an edition read aloud, #162), a four-cycle architecture audit (#163 onward), and the edition card and its buttons made simpler (#156, #157).
 - **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
+
+## Tue 6 Oct
+
+### Listen
+- **From you:** a "podcast mode"; an audiobook of the paper rather than a podcast; listening on the go with the phone in a pocket, taking it out for a picture or a sentence that didn't land.
+- **Shipped (#162):** Listen on the edition reads it aloud in the phone's voice, a sentence at a time: the screen is the article's text following the voice, ↶ goes back a sentence, the lock screen and headphones skip by article. Where you stopped is kept, and yesterday's paper is offered before today's.
+- **Next, in the backlog:** Settings › Listening, then Kokoro, a better voice to download, its audio made with the edition.
+
+### Architecture audit, four cycles
+- **From you:** an audit for simplicity and best practices, in four cycles.
+- **Cycle 1 (#163), data and background work:** builds stop fetching after 8 minutes rather than hitting WorkManager's limit and starting over; folder delivery can't be cancelled between copying and marking delivered; the time zone is read per build; indexes for two watched queries.
+- **Cycle 2 (#164), `:core`:** windows-1252 pages labelled Latin-1, cancellable fetches, ASCII chapter names on any locale, international domains kept, entity-expansion feeds refused, linear regexes.
+- **Cycle 3, the screens:** two crashes (notification settings, folder grants), feed links limited to the web, the preview keeping its place, lifecycle-aware screens, headings for TalkBack.
+- **Cycle 4, Listen, build and docs:** Listen lets go of a deleted book, CI checkouts hold no token, docs brought up to date.
+- **Left for you:** timed and manual builds can swallow each other (cycle 1); turning on R8 for release; pinning CI actions by SHA; a debug key anyone can sign with.
 
 ## Day 6 · Sat 3 Oct
 
