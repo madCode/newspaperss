@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.extract
 
+import java.util.Locale
 import com.app.newspaperss.core.ReadingTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -12,6 +13,7 @@ import org.jsoup.nodes.Element
 import org.jsoup.nodes.Entities
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
+import java.net.IDN
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -90,7 +92,7 @@ object HtmlCleaner {
     }
 
     /** Wraps plain text in paragraphs, taking blank lines as paragraph breaks. */
-    fun textToHtml(text: String): String = text.split(BLANK_LINE)
+    internal fun textToHtml(text: String): String = text.split(BLANK_LINE)
         .map { it.trim().replace(WHITESPACE, " ") }
         .filter { it.isNotEmpty() }
         .joinToString("") { "<p>${Entities.escape(it)}</p>" }
@@ -139,7 +141,8 @@ object HtmlCleaner {
             }
             val scheme = resolved.scheme?.lowercase() ?: return null
             if (scheme !in schemes) return null
-            if (scheme != "mailto" && resolved.host.isNullOrEmpty()) return null
+            // A host with an underscore parses as an authority without a host, and is still a site.
+            if (scheme != "mailto" && resolved.host.isNullOrEmpty() && resolved.rawAuthority.isNullOrEmpty()) return null
             resolved.toString()
         } catch (_: URISyntaxException) {
             null
@@ -149,7 +152,7 @@ object HtmlCleaner {
     }
 
     private fun encodeUrl(raw: String): String? {
-        val url = raw.trim()
+        val url = asciiHost(raw.trim())
         if (url.isEmpty() || MANGLED_URL.containsMatchIn(url)) return null
         val hash = url.indexOf('#')
         if (hash < 0) return percentEncode(url)
@@ -167,7 +170,7 @@ object HtmlCleaner {
                 else -> {
                     val end = if (Character.isHighSurrogate(c) && i + 1 < s.length) i + 2 else i + 1
                     for (b in s.substring(i, end).toByteArray(Charsets.UTF_8)) {
-                        out.append('%').append("%02X".format(b.toInt() and 0xFF))
+                        out.append('%').append("%02X".format(Locale.ROOT, b.toInt() and 0xFF))
                     }
                     i = end
                     continue
@@ -176,6 +179,22 @@ object HtmlCleaner {
             i++
         }
         return out.toString()
+    }
+
+    /**
+     * [url] with an international host name (bücher.de) in its ASCII form (xn--bcher-kva.de):
+     * percent-encoded, as the rest of the URL is, the host would no longer be one.
+     */
+    private fun asciiHost(url: String): String {
+        val m = HOST.find(url) ?: return url
+        val host = m.groupValues[2]
+        if (host.all { it.code < 128 }) return url
+        val ascii = try {
+            IDN.toASCII(host, IDN.ALLOW_UNASSIGNED)
+        } catch (_: IllegalArgumentException) {
+            return url
+        }
+        return url.replaceRange(m.groups[2]!!.range, ascii)
     }
 
     private fun isHex(c: Char?) = c != null && (c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F')
@@ -795,5 +814,7 @@ object HtmlCleaner {
     private val MANGLED_URL = Regex("[\"\\\\<>]")
     private val URL_SAFE = ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" + "-._~:/?@!$&'()*+,;=").toSet()
     private val WEB_SCHEMES = setOf("http", "https")
-    private val LINK_SCHEMES = setOf("http", "https", "mailto")
+    internal val LINK_SCHEMES = setOf("http", "https", "mailto")
+    // scheme://[user@]host
+    private val HOST = Regex("""^([A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@]*@)?)([^/?#:\[\]]+)""")
 }

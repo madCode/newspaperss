@@ -52,14 +52,12 @@ object EditionPlanner {
      * takes its source's slot ahead of unstarred articles, and [fill] holds back extra stars
      * ahead of extra unstarred ones.
      *
-     * Parameters
-     * ----------
-     * candidates: in any order.
-     * sourceOrder: source ids in the reader's order; sources not listed go last.
-     * lastFeatured: when each source last had an article in an edition. Sources go in turn from
+     * @param candidates in any order.
+     * @param sourceOrder source ids in the reader's order; sources not listed go last.
+     * @param lastFeatured when each source last had an article in an edition. Sources go in turn from
      *   the one featured longest ago (never first), so with more sources than fit, the next
      *   edition picks up the ones the last one left out.
-     * rotation: breaks ties between sources featured at the same time (pass the edition count).
+     * @param rotation breaks ties between sources featured at the same time (pass the edition count).
      *   All of one edition's sources tie, and without it the first of them in the reader's order
      *   would go in every time whenever most sources fit.
      */

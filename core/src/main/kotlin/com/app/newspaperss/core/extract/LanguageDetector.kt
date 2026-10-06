@@ -12,7 +12,7 @@ import java.lang.Character.UnicodeScript
  * and common function words for a few Latin-script languages. When it can't tell (a short caption,
  * a language it doesn't know), the declared language stands.
  */
-object LanguageDetector {
+internal object LanguageDetector {
     /**
      * @param text the article's text, title included.
      * @param declared what the page said (`<html lang>`, `og:locale` and the like), if anything.

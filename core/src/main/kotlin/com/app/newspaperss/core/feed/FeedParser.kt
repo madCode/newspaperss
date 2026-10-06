@@ -1,5 +1,7 @@
 package com.app.newspaperss.core.feed
 
+import com.app.newspaperss.core.epub.esc
+import com.app.newspaperss.core.extract.HtmlCleaner
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -22,12 +24,12 @@ object FeedParser {
     // media:content, itunes:summary and the like share local names with the
     // elements read here, so only RSS/Atom's own namespaces count.
     private val FEED_NAMESPACES = setOf("", RSS1_NS, ATOM_NS)
+    private val ROOT = Regex("<(rss|feed|rdf:RDF)[\\s>]", RegexOption.IGNORE_CASE)
+    private const val MAX_PROLOG = 64 * 1024
 
     /**
-     * Parameters
-     * ----------
-     * body: the response body.
-     * feedUrl: where it was fetched from; relative links resolve against it.
+     * @param body the response body.
+     * @param feedUrl where it was fetched from; relative links resolve against it.
      */
     fun parse(body: String, feedUrl: String): Feed {
         val text = body.trimStart('﻿', ' ', '\t', '\r', '\n')
@@ -42,6 +44,12 @@ object FeedParser {
     }
 
     private fun parseXml(text: String, feedUrl: String): Feed {
+        // A feed declaring its own entities is refused before parsing: nested ones can expand to
+        // gigabytes ("billion laughs"), and feeds have no use for them.
+        val root = ROOT.find(text)?.range?.first ?: text.length
+        if (text.substring(0, minOf(root, MAX_PROLOG)).contains("<!ENTITY", ignoreCase = true)) {
+            throw FeedParseException("Not a readable feed: it declares entities of its own.")
+        }
         val parser = XmlPullParserFactory.newInstance().apply { isNamespaceAware = true }.newPullParser()
         // Feeds often use HTML entities like &nbsp; that plain XML rejects;
         // kxml's relaxed mode (also the Android parser) tolerates them.
@@ -175,7 +183,7 @@ object FeedParser {
                         out.append('<').append(p.name)
                         for (i in 0 until p.attributeCount) {
                             out.append(' ').append(p.getAttributeName(i)).append("=\"")
-                                .append(escape(p.getAttributeValue(i))).append('"')
+                                .append(esc(p.getAttributeValue(i))).append('"')
                         }
                         out.append('>')
                     }
@@ -183,7 +191,7 @@ object FeedParser {
                         if (!(p.depth == depth + 1 && p.name == "div" && p.namespace == XHTML_NS)) {
                             out.append("</").append(p.name).append('>')
                         }
-                    XmlPullParser.TEXT, XmlPullParser.CDSECT, XmlPullParser.ENTITY_REF -> out.append(escape(p.text))
+                    XmlPullParser.TEXT, XmlPullParser.CDSECT, XmlPullParser.ENTITY_REF -> out.append(esc(p.text))
                     XmlPullParser.END_DOCUMENT -> break
                 }
             }
@@ -228,7 +236,7 @@ object FeedParser {
                 guid = o.str("id") ?: url,
                 url = url,
                 title = cleanTitle(o.str("title")).ifBlank { url },
-                contentHtml = o.str("content_html") ?: o.str("content_text")?.let(::textToHtml) ?: o.str("summary"),
+                contentHtml = o.str("content_html") ?: o.str("content_text")?.let(HtmlCleaner::textToHtml) ?: o.str("summary"),
                 author = author,
                 published = FeedDates.parse(o.str("date_published")) ?: FeedDates.parse(o.str("date_modified")),
             )
@@ -239,8 +247,6 @@ object FeedParser {
     private fun JsonObject.str(key: String): String? =
         (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
-    private fun textToHtml(text: String) =
-        text.split(Regex("\n\\s*\n")).joinToString("") { "<p>${escape(it.trim())}</p>" }
 
     /** Titles may be entity-encoded HTML ("Q&amp;A", "<em>New</em>"); reduce to plain text. */
     internal fun cleanTitle(raw: String?): String {
@@ -249,11 +255,18 @@ object FeedParser {
         return plain.replace(Regex("\\s+"), " ").trim()
     }
 
-    private fun escape(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 }
 
+/**
+ * [url] made absolute against [base]. A link java.net.URI refuses (a `|` or a brace in its query)
+ * goes through the stricter cleaner, which percent-encodes it; one even that can't read is kept as
+ * it came.
+ */
 internal fun resolveUrl(base: String, url: String): String = try {
-    URI(base).resolve(url.trim().replace(" ", "%20")).toString()
+    val baseUri = URI(base)
+    // Against "https://host" (no path) Android's URI glues the reference onto the host name.
+    val from = if (baseUri.rawPath.isNullOrEmpty() && !baseUri.isOpaque) baseUri.resolve("/") else baseUri
+    from.resolve(url.trim().replace(" ", "%20")).toString()
 } catch (_: Exception) {
-    url.trim()
+    HtmlCleaner.absoluteUrl(url, base, HtmlCleaner.LINK_SCHEMES) ?: url.trim()
 }

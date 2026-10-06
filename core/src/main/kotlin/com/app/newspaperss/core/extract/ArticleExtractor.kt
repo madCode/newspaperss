@@ -125,7 +125,10 @@ class ArticleExtractor(private val http: HttpClient) {
         fun fromFeed(
             clean: CleanResult, note: String?, pageWords: Int?, blocked: Boolean = false, declaredLanguage: String? = null, failure: PageFailure? = null,
             siteName: String? = null,
-        ) = article(input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, true, note, feedWords, pageWords, blocked, declaredLanguage, failure, siteName)
+        ) = article(
+            input.feedTitle.ifBlank { titleFromUrl(input.url) }, feedAuthor, clean, usedFeed = true, note = note, feedWords = feedWords,
+            pageWords = pageWords, blocked = blocked, declaredLanguage = declaredLanguage, failure = failure, siteName = siteName,
+        )
 
         // A FEED source's item with no content still gets its page fetched: better than an empty article.
         // Ending in "Read more" back to the post, it's an excerpt however long.
@@ -165,7 +168,7 @@ class ArticleExtractor(private val http: HttpClient) {
                     feed != null && words < KEEP_FEED_RATIO * feedWords -> fromFeed(feed, null, words, declaredLanguage = page.content.language)
                     words == 0 -> failed(input, "no article text found on the page")
                     else -> article(
-                        title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) },
+                        title = titleFor(input, page),
                         author = feedAuthor ?: page.content.author,
                         clean = page.clean,
                         usedFeed = false,
@@ -192,7 +195,7 @@ class ArticleExtractor(private val http: HttpClient) {
         val words = page.clean.wordCount
         if (words < TEASER_RATIO * feedWords) return pitch(SHORT_STORY_NOTE, page.content.siteName)
         return article(
-            title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) },
+            title = titleFor(input, page),
             // The item's author wrote the pitch, not the story.
             author = page.content.author,
             clean = page.clean,
@@ -299,11 +302,18 @@ class ArticleExtractor(private val http: HttpClient) {
             }.html()
         }?.takeIf { Jsoup.parse(it).text().isNotBlank() || !feedImagesAreThumbnails }
         val caption = fromFeed ?: page.content.description?.let { "<p>${Entities.escape(it)}</p>" }.orEmpty()
-        val title = input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) }
+        val title = titleFor(input, page)
         val clean = HtmlCleaner.clean(image + caption, page.url, title)
         if (clean.imageUrls.isEmpty()) return null
-        return article(title, feedAuthor ?: page.content.author, clean, false, null, feedWords, page.clean.wordCount, declaredLanguage = page.content.language)
+        return article(
+            title, feedAuthor ?: page.content.author, clean, usedFeed = false, note = null, feedWords = feedWords, pageWords = page.clean.wordCount,
+            declaredLanguage = page.content.language,
+        )
     }
+
+    /** The feed's title, else the page's, else one made from the address. */
+    private fun titleFor(input: ExtractInput, page: PageResult.Fetched) =
+        input.feedTitle.ifBlank { page.content.title?.takeIf { it.isNotBlank() } ?: titleFromUrl(input.url) }
 
     private fun article(
         title: String, author: String?, clean: CleanResult, usedFeed: Boolean, note: String?, feedWords: Int, pageWords: Int?,

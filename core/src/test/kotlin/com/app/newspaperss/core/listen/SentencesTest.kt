@@ -63,4 +63,11 @@ class SentencesTest {
         val emoji = "😀".repeat(Sentences.MAX_LENGTH)
         assertTrue(Sentences.split(emoji).all { !it.first().isLowSurrogate() && !it.last().isHighSurrogate() })
     }
+
+    @Test
+    fun aLongRunOfDotsIsSplitQuickly() {
+        val started = System.nanoTime()
+        Sentences.split("Wait" + ".".repeat(50_000) + "x and on.")
+        assertTrue(System.nanoTime() - started < 2_000_000_000L)
+    }
 }

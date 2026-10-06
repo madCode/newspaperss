@@ -25,11 +25,9 @@ object LinkPosts {
     /**
      * The story a link post points to, without tracking parameters, or null if the item isn't one.
      *
-     * Parameters
-     * ----------
-     * itemUrl: the item's own link.
-     * html: the item's content from the feed.
-     * siteUrl: the feed's site, whose name counts as the item's site too (a feed served from
+     * @param itemUrl the item's own link.
+     * @param html the item's content from the feed.
+     * @param siteUrl the feed's site, whose name counts as the item's site too (a feed served from
      *   another host); null if unknown.
      */
     fun storyUrl(itemUrl: String, html: String?, siteUrl: String? = null): String? {

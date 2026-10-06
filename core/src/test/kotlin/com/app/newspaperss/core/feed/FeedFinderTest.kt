@@ -125,4 +125,10 @@ class FeedFinderTest {
         val page = "<a href=\"/comments/feed\">Comments</a><a href=\"/tag/cats/feed\">Cats</a><a href=\"/feed\">Posts</a>"
         assertEquals(listOf("https://blog.example/feed", "https://blog.example/tag/cats/feed"), FeedFinder.linkedFeeds(page, "https://blog.example/"))
     }
+
+    @Test
+    fun aLinkedFeedOnTheSameSiteCountsWhateverTheHostsCase() {
+        val page = "<a href=\"https://Blog.Example/feed\">RSS</a>"
+        assertEquals(listOf("https://Blog.Example/feed"), FeedFinder.linkedFeeds(page, "https://blog.example/"))
+    }
 }
