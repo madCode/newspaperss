@@ -224,6 +224,7 @@ module so it's all unit-tested without Android.
 | PocketBook | Share to an email app, to your `@pbsync.com` address | One tap |
 | KOReader | Save to a folder that syncs to the device (Syncthing) | Yes |
 | Boox | With the app on the Boox, **Read** it in the device's reader, from the app or the notification; with the app on a phone, **Send** it over (BooxDrop) | Yes, on the Boox; one tap from a phone |
+| On this device | **Read** it in a reading app here (Android asks which, once, with Always), or save it to a folder that app watches | Yes |
 | Anything else | The share sheet | One tap |
 
 **Email to a Kindle.** Each Kindle has its own Send-to-Kindle address
@@ -364,9 +365,11 @@ phone restarts.
 ## 8. Onboarding (target: first edition in under two minutes)
 
 1. **Welcome.**
-2. **Where do you read?** Kindle, Kobo, Boox, PocketBook, KOReader, or
-   "just the file". This picks the delivery method; KOReader asks for its
-   folder. Kindle sets up email to the Kindle: its address (Next waits for
+2. **Where do you read?** Kindle, Kobo, Boox, PocketBook, KOReader, **On
+   this device**, or "just the file". This picks the delivery method;
+   KOReader asks for its folder, and On this device offers one its reading
+   app watches. On an e-reader the app starts at On this device, saying
+   so in one line, with **I read on another device** for the list. Kindle sets up email to the Kindle: its address (Next waits for
    one that looks like an email address, and an address not at kindle.com
    or kindle.cn gets a warning), the mail app to send with, and a reminder
    to approve the sending address on Amazon. **Use the Kindle app
@@ -430,8 +433,8 @@ whose Kindle and KOReader answers ask for more on the same page).
     it) and reading time, then "and N more". A failed edition shows none:
     its articles went back to wait.
   - Every card has at most one button, the next step:
-    - ready: **Send**, or **Read** on a Boox, where reading it the first
-      time is the delivery. Only with the app on the e-reader itself: a
+    - ready: **Send**, or **Read** on this device or a Boox, where reading
+      it the first time is the delivery. Only with the app on the e-reader itself: a
       Boox reader running it on their phone gets **Send**, as reading it
       there wouldn't put it on the Boox. The app counts itself on an
       e-reader when its maker makes only e-ink devices (Onyx, which makes

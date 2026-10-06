@@ -266,6 +266,17 @@ class SentEditionActionsTest {
     }
 
     @Test
+    fun aReaderOnThisPhoneReadsAndThatCountsAsSent() {
+        val id = edition(EditionStatus.READY)
+        today(Device.HERE, onEReader = false)
+
+        button("Read").performClick()
+
+        assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity.action)
+        idleUntil { statusOf(id) == EditionStatus.DELIVERED }
+    }
+
+    @Test
     fun aBooxReaderReadsAndThatCountsAsSent() {
         val id = edition(EditionStatus.READY)
         today(Device.BOOX)

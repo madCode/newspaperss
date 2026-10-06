@@ -44,6 +44,7 @@ class ThisDeviceTest {
         assertTrue(Device.BOOX.readsHere(onEReader = true))
         assertFalse(Device.BOOX.readsHere(onEReader = false))
         assertFalse(Device.KOBO.readsHere(onEReader = true))
+        assertTrue("on this device means here, phone or not", Device.HERE.readsHere(onEReader = false))
         assertFalse((null as Device?).readsHere(onEReader = true))
     }
 }

@@ -104,6 +104,7 @@ class MainActivity : ComponentActivity() {
                             OnboardingViewModel(
                                 container.settings, container.sources, container.feedFinder, container.ttrss, createSavedStateHandle(),
                                 savedLinks = container.readingList.observeWaiting(),
+                                onEReader = container.onEReader,
                             ) { saved ->
                                 container.appScope.launch { EditionScheduler.reschedule(context, saved) }
                                 EditionWorker.buildNow(context)

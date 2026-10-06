@@ -120,8 +120,11 @@ data class OnboardingState(
     /** "Step N of M", counted along [path]; 0 for the welcome, which isn't a step. */
     val stepNumber get() = path.indexOf(step) + 1
 
-    /** KOReader reads from a synced folder, so it's offered folder delivery. */
-    val needsFolder get() = device == Device.KOREADER
+    /**
+     * KOReader reads from a synced folder, so it's offered folder delivery; so is a reader on
+     * this device, whose reading app may watch a folder (a Boox's Books, say).
+     */
+    val needsFolder get() = device == Device.KOREADER || device == Device.HERE
     /** The Kindle's email setup is showing, so Next needs its address. */
     val emailsKindle get() = device == Device.KINDLE && kindleByEmail
     val canContinue get() = when (step) {
@@ -150,10 +153,15 @@ class OnboardingViewModel(
     private val saved: SavedStateHandle = SavedStateHandle(),
     /** How many links wait in the reading list; any is enough to start with. */
     private val savedLinks: Flow<Int> = flowOf(0),
+    /**
+     * The app runs on an e-reader ([com.app.newspaperss.settings.ThisDevice.isEReader]): setup
+     * starts at reading here, rather than asking where the reader reads.
+     */
+    val onEReader: Boolean = false,
     /** Schedules the timer and starts the first edition once onboarding is saved. */
     private val onFinished: (Settings) -> Unit,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(restore(saved))
+    private val _state = MutableStateFlow(restore(saved).let { if (onEReader && it.device == null) it.copy(device = Device.HERE) else it })
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
 
     init {

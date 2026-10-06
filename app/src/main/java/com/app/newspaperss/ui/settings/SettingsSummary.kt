@@ -115,6 +115,7 @@ object SettingsSummary {
         Device.BOOX -> "Boox"
         Device.POCKETBOOK -> "PocketBook"
         Device.KOREADER -> "KOReader"
+        Device.HERE -> "This device"
         Device.OTHER -> "Other e-reader"
     }
 

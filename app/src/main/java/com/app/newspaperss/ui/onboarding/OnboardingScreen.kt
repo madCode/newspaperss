@@ -162,7 +162,16 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
         }
     }
     Title("Where do you read?")
-    Device.entries.forEach { device ->
+    // On an e-reader the answer is almost always "right here": say so, with the list a tap away.
+    var showAll by rememberSaveable { mutableStateOf(!vm.onEReader || (s.device != null && s.device != Device.HERE)) }
+    if (!showAll) {
+        Text(
+            "Right here, on this e-reader. Each edition opens in your reading app, and reading it counts as delivered.",
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        TextButton(onClick = { showAll = true }, contentPadding = PaddingValues(end = 12.dp)) { Text("I read on another device") }
+    } else Device.entries.forEach { device ->
         Row(
             Modifier.fillMaxWidth().selectable(s.device == device, role = Role.RadioButton) { vm.chooseDevice(device) }.padding(vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -176,7 +185,8 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
         KindleEmailSetup(s, vm)
         return
     }
-    Text(DeviceTips.tip(device), modifier = Modifier.padding(top = 16.dp), style = MaterialTheme.typography.bodyMedium)
+    // The short line on an e-reader already says what the tip would.
+    if (showAll) Text(DeviceTips.tip(device), modifier = Modifier.padding(top = 16.dp), style = MaterialTheme.typography.bodyMedium)
     if (device == Device.KINDLE) {
         TextButton(onClick = vm::useKindleEmail, contentPadding = PaddingValues(end = 12.dp)) { Text("Email it to your Kindle instead") }
     }
@@ -186,7 +196,7 @@ private fun DeviceStep(s: OnboardingState, vm: OnboardingViewModel) {
         }
         if (s.folderUri == null) {
             Text(
-                "You can skip this and send editions yourself for now.",
+                if (device == Device.HERE) "Optional: without one, tap Read for each edition." else "You can skip this and send editions yourself for now.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -23,6 +23,10 @@ object DeviceTips {
         Device.KOREADER ->
             "Pick a folder that syncs to your e-reader, for example with Syncthing, and new editions are " +
                 "saved there automatically. Without one, tap Send to share each edition."
+        Device.HERE ->
+            "When an edition is ready, tap Read and pick your reading app; choose Always and it opens there " +
+                "every time. Reading it counts as delivered. Or save each edition into a folder your reading app " +
+                "watches, and it's there by itself."
         Device.OTHER -> "Tap Send to share the EPUB with any app. To read it on this phone instead, it's Open on this phone in the edition's ⋮ menu."
     }
 }

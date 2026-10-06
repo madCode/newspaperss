@@ -481,6 +481,33 @@ class OnboardingTest {
     }
 
     @Test
+    fun onAnEReaderSetupStartsAtReadingHereWithTheListATapAway() {
+        val here = OnboardingViewModel(store, SourceRepository(db), FeedFinder(http), onEReader = true) { finished = it }
+        compose.setContent { OnboardingScreen(here) }
+        click("Get started")
+
+        compose.onNodeWithText("Right here, on this e-reader", substring = true).assertExists()
+        compose.onNodeWithText("Kindle").assertDoesNotExist()
+        compose.onNodeWithText("Next").assertIsEnabled()
+        assertEquals(Device.HERE, here.state.value.device)
+
+        click("I read on another device")
+        compose.onNodeWithText("Kindle").assertExists()
+        compose.onNodeWithText("On this device").assertExists()
+    }
+
+    @Test
+    fun readingHereWithAFolderGetsFolderDelivery() {
+        vm.chooseDevice(Device.HERE)
+        vm.chooseFolder("content://tree/books", "Books")
+        vm.toggleFeed(StarterPacks.all.first().feeds.first().url)
+        vm.finish()
+        idleUntil { finished != null }
+        assertEquals(DeliveryMethod.FOLDER, finished!!.delivery)
+        assertEquals(Device.HERE, finished!!.device)
+    }
+
+    @Test
     fun koreaderWithAFolderGetsFolderDelivery() {
         vm.chooseDevice(Device.KOREADER)
         vm.chooseFolder("content://tree/books", "Books")

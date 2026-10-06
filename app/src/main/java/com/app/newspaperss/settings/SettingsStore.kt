@@ -50,6 +50,8 @@ enum class Device(val label: String) {
     BOOX("Boox or another Android e-reader"),
     POCKETBOOK("PocketBook"),
     KOREADER("KOReader"),
+    /** Read in a reading app on the phone or e-reader the app runs on, which is the delivery. */
+    HERE("On this device"),
     OTHER("Something else / just the file"),
 }
 
@@ -60,11 +62,11 @@ enum class Device(val label: String) {
 val Device?.offersOpen: Boolean get() = this != Device.KINDLE && this != Device.KOBO
 
 /**
- * Whether reading an edition here delivers it: the reader picked a Boox (or another Android
- * e-reader) and the app runs on it ([onEReader], from [ThisDevice.isEReader]). On their phone,
- * reading it would only open it there, so it's sent like anyone else's.
+ * Whether reading an edition here delivers it: the reader reads on this device, or picked a Boox
+ * (or another Android e-reader) and the app runs on it ([onEReader], from [ThisDevice.isEReader]).
+ * A Boox reader running it on their phone sends it over, like anyone else.
  */
-fun Device?.readsHere(onEReader: Boolean): Boolean = this == Device.BOOX && onEReader
+fun Device?.readsHere(onEReader: Boolean): Boolean = this == Device.HERE || (this == Device.BOOX && onEReader)
 
 /**
  * Where the reader's sites come from: fetched by this phone, or from their own RSS server (tt-rss).

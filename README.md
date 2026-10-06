@@ -23,7 +23,8 @@ who'd rather not set up Python, a server and a scheduler.
 Setup takes a couple of minutes, in four steps:
 
 1. **Where do you read?** Kindle, Kobo, Boox (or another Android e-reader),
-   PocketBook, KOReader, or just the file. Each gets a tip on how editions
+   PocketBook, KOReader, on this device, or just the file. On an e-reader
+   it starts at reading right there. Each gets a tip on how editions
    reach it; KOReader asks for a folder that syncs to the device, and a
    Kindle can have editions emailed to its own address instead.
 2. **Where do your feeds live now?** Pick sites yourself (starter packs of
