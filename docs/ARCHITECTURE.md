@@ -306,8 +306,8 @@ flowchart LR
   the closing page), says each line with `KokoroEngine`, and encodes it
   with `AacEncoder` (AAC in MP4, through `MediaCodec`).
   - `PodcastStore` keeps a page in pieces of about 2 minutes, each whole or
-    not at all, with each line's start time. Work stopped part way (Android
-    stops it after 10 minutes) carries on from the last piece.
+    not at all, with each line's start time. Work stopped part way
+    (unplugged, or Android's limits) carries on from the last piece.
   - A page not in English, or with a line Kokoro fails on, is left to the
     phone's voice. So is one where the app died twice saying the same line:
     a crash in Kokoro's native code would otherwise repeat on every charge.
@@ -343,7 +343,7 @@ twice.
 | `ReadingListTitleWorker` | New untitled links | `reading-list-titles`, APPEND_OR_REPLACE | Batches of 20, one batch at a time. |
 | `MoveFeedsWorker` | Moving phone feeds to tt-rss; app start, if a move is stored | `move-feeds`, APPEND_OR_REPLACE | Connected. Runs `FeedMoves.run`; what's left is in DataStore, so a run stopped part way carries on in the next. Appended so a run finishing up can't swallow a new move. |
 | `KokoroWorker` | Settings › Listening, picking the podcast | `kokoro`, REPLACE | Downloads Kokoro on Wi-Fi (any connection if the reader chose mobile data), then the speed check. Resumes across WorkManager's 10-minute limit; gives up after 6 failures with nothing arriving between them. |
-| `PodcastWorker` | A scheduled edition built with Kokoro in use; turning Kokoro back on | `podcast`, APPEND_OR_REPLACE | Only while charging. Unplugged, or at WorkManager's 10-minute limit, it stops and carries on from the last piece kept when it runs again. Appended so a run finishing up can't swallow a new edition. |
+| `PodcastWorker` | A scheduled edition built with Kokoro in use; turning Kokoro back on | `podcast`, APPEND_OR_REPLACE | Only while charging. Runs in the foreground with a quiet notification, so past WorkManager's 10-minute limit; Android refuses that from the background unless battery use is Unrestricted, and then it runs as plain background work, stopped at 10 minutes and rationed. Unplugged, it stops and carries on from the last piece kept when it runs again. Appended so a run finishing up can't swallow a new edition. |
 
 Timed editions use a chain of one-off timers, not periodic work, because
 periodic work can't say "6:30 on weekdays" and its start time drifts

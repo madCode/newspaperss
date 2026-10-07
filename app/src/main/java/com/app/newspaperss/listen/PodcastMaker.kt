@@ -45,8 +45,8 @@ class PodcastMaker(
 
     /**
      * Keeps this phone's pace from what a finished podcast cost, over all the runs it took, so
-     * scheduled editions start as early as it needs. One run alone is cut off by Android's
-     * 10-minute limit, and is mostly a cool phone's.
+     * scheduled editions start as early as it needs. One run alone may be cut off (unplugged,
+     * or Android's limits on background work), and is mostly a cool phone's.
      */
     private suspend fun learnPace(editionId: Long) {
         val (nanos, speech) = store.cost(editionId)
