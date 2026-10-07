@@ -140,7 +140,10 @@ class TodayViewModel(
                 now.toLocalDate().plusDays(1) -> "Tomorrow"
                 else -> next.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
             }
-            return "$day at $time \u00b7 about ${s.edition.minutes} min"
+            val podcast = EditionScheduler.podcastStart(s)?.let {
+                ", with its podcast. It starts at ${it.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))}: leave your phone charging"
+            }.orEmpty()
+            return "$day at $time \u00b7 about ${s.edition.minutes} min$podcast"
         }
 
         /** @param online without a connection, queued work is waiting for one, not checking sources. */

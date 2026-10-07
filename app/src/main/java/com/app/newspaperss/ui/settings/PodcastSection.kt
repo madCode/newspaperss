@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui.settings
 
+import java.time.format.FormatStyle
+import java.time.format.DateTimeFormatter
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.ConnectivityManager
@@ -197,14 +199,14 @@ private fun Verdict(s: AppSettings, kokoro: KokoroState.Ready, size: String, onU
     val time = SettingsSummary.aboutTime(PodcastPace.minutesToMake(paper, kokoro.pace))
     when (verdict(s, kokoro)) {
         Verdict.CAN -> Step("This phone can do it") {
-            Text("Your $paper-minute paper takes $time to make here, while charging.")
+            Text("Your $paper-minute paper takes $time to make here, while charging." + earlier(s, kokoro))
             Buttons {
                 Button(onClick = onUse) { Text("Use it") }
                 OutlinedButton(onClick = onRemove) { Text("Remove it") }
             }
         }
         Verdict.SLOW -> Step("This phone is slow at it, but it can") {
-            Text("Your $paper-minute paper takes $time to make here. Leave the phone charging overnight.")
+            Text("Your $paper-minute paper takes $time to make here." + earlier(s, kokoro) + " Leave the phone charging overnight.")
             Buttons {
                 Button(onClick = onUse) { Text("Use it") }
                 OutlinedButton(onClick = onRemove) { Text("Remove it") }
@@ -219,6 +221,14 @@ private fun Verdict(s: AppSettings, kokoro: KokoroState.Ready, size: String, onU
             Buttons { Button(onClick = onRemove) { Text("Remove Kokoro ($size)") } }
         }
     }
+}
+
+/** How much earlier scheduled editions would start for the podcast, if any are scheduled. */
+private fun earlier(s: AppSettings, kokoro: KokoroState.Ready): String {
+    if (!s.scheduleEnabled) return ""
+    val minutes = PodcastPace.earlier(s.edition.minutes, kokoro.pace, s.podcastPaceMeasured)
+    val ready = s.schedule.time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
+    return " Scheduled editions will start $minutes minutes earlier, so the podcast is ready by $ready."
 }
 
 /** Kokoro in use: its voices, what a paper costs on this phone, and removing it. */
@@ -241,9 +251,9 @@ private fun Podcast(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState.R
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
-        // Until podcasts are made and played, which comes next, picking it changes nothing.
+        // Until podcasts are played, which comes next, Listen sounds the same.
         Text(
-            "Podcasts aren't made yet: until they are, Listen reads live.",
+            "Podcasts are made, but not played yet: until they are, Listen reads live.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),

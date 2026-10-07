@@ -10,6 +10,7 @@ import com.app.newspaperss.settings.Device
 import com.app.newspaperss.settings.ListenVoice
 import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.ui.listen.speedLabel
+import com.app.newspaperss.work.EditionScheduler
 import java.time.DayOfWeek
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -61,12 +62,14 @@ object SettingsSummary {
             days == WEEKEND -> "$time, weekends"
             else -> "$time, " + days.sorted().joinToString(", ") { it.getDisplayName(TextStyle.SHORT, locale) }
         }
+        val start = EditionScheduler.podcastStart(s)
+            ?.let { " · starts " + it.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale)) + " for the podcast" }.orEmpty()
         val problem = when {
             days.isEmpty() -> "Pick at least one day."
             !notificationsOn -> "Notifications are off."
             else -> null
         }
-        return Summary(text, problem)
+        return Summary(text + start, problem)
     }
 
     fun delivery(s: Settings, folderReachable: Boolean): Summary {

@@ -134,7 +134,7 @@ class PodcastSetup(
         stop()
         install.remove()
         withContext(Dispatchers.IO) { podcasts.deleteAll() }
-        settings.update { it.copy(listenVoice = ListenVoice.PHONE, podcastPace = null) }
+        settings.update { it.copy(listenVoice = ListenVoice.PHONE, podcastPace = null, podcastPaceMeasured = false) }
     }
 
     /**
@@ -182,7 +182,7 @@ class PodcastSetup(
                 // Cancelled while it spoke: its timing isn't the one wanted.
                 currentCoroutineContext().ensureActive()
                 val pace = PodcastPace.fromSample((now() - started) / 1e9 / speech.seconds)
-                settings.update { it.copy(podcastPace = pace.toFloat()) }
+                settings.update { it.copy(podcastPace = pace.toFloat(), podcastPaceMeasured = false) }
             } finally {
                 kokoro.release()
                 // Only a crash in native code skips this, which is what the marker is for: a stop

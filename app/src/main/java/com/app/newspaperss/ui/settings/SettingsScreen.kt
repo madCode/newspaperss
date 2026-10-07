@@ -18,6 +18,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import com.app.newspaperss.work.EditionScheduler
+import com.app.newspaperss.core.listen.PodcastPace
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -303,6 +306,7 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
             TimePickerDialog(context, { _, h, m -> vm.setTime(LocalTime.of(h, m)) }, s.schedule.time.hour, s.schedule.time.minute, android.text.format.DateFormat.is24HourFormat(context)).show()
         }) { Text(s.schedule.time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))) }
     }
+    PodcastStart(s)
     val locale = LocalConfiguration.current.locales[0]
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
         DayOfWeek.entries.forEach { day ->
@@ -315,6 +319,27 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
     }
     if (s.schedule.days.isEmpty()) {
         Text("Pick at least one day.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** With the podcast in use, when scheduled editions start, and why, under the time they're ready by. */
+@Composable
+private fun PodcastStart(s: AppSettings) {
+    val start = EditionScheduler.podcastStart(s) ?: return
+    val pace = s.podcastPace ?: return
+    val at = start.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
+    val earlier = EditionScheduler.lead(s).minus(EditionScheduler.LEAD).toMinutes()
+    val making = SettingsSummary.aboutTime(PodcastPace.minutesToMake(s.edition.minutes, pace.toDouble()))
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Starts at $at, for the podcast", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+            Text(
+                "Making the podcast takes $making on this phone, so the paper starts $earlier minutes earlier, with room to spare. " +
+                    "Anything published after $at goes in the next one.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text("Leave the phone charging from $at.", style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

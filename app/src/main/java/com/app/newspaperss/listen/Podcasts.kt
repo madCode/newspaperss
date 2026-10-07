@@ -8,6 +8,8 @@ import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import com.app.newspaperss.core.listen.PodcastPace
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -203,8 +205,13 @@ class PodcastMaker(
     private val encoder: AudioEncoder,
     /** Seconds of audio in a piece: kept that often, so a stop loses at most that much work. */
     private val pieceSeconds: Double = PIECE_SECONDS,
+    private val now: () -> Long = System::nanoTime,
     private val start: () -> Unit,
 ) {
+    // This run's work and what it made, to learn this phone's real pace from.
+    private var workNanos = 0L
+    private var madeSeconds = 0.0
+
     /**
      * Asks for [editionId]'s podcast if Kokoro is in use, and starts making it once the phone
      * charges. The voice is the one chosen now: a podcast keeps the voice it started in.
@@ -222,7 +229,24 @@ class PodcastMaker(
         // for it, rather than loading Kokoro twice and writing the same piece.
         KokoroEngine.lock.withLock {
             store.dropScratch()
-            makeUnderLock()
+            workNanos = 0L
+            madeSeconds = 0.0
+            try {
+                makeUnderLock()
+            } finally {
+                // Stopped too: an unplugged phone has still shown its pace.
+                withContext(NonCancellable) { learnPace() }
+            }
+        }
+    }
+
+    /** Keeps this phone's pace from what this run made, so scheduled editions start as early as it needs. */
+    private suspend fun learnPace() {
+        if (madeSeconds < PodcastPace.LEARN_FROM_SECONDS) return
+        val work = workNanos / 1e9
+        settings.update { s ->
+            val last = s.podcastPace ?: return@update s
+            s.copy(podcastPace = PodcastPace.learn(last.toDouble(), s.podcastPaceMeasured, work, madeSeconds).toFloat(), podcastPaceMeasured = true)
         }
     }
 
@@ -291,12 +315,14 @@ class PodcastMaker(
                 val death = if (i == deadAt) deaths + 1 else 1
                 if (death > CRASHES) throw Unsayable(IllegalStateException("Line $i took the app down $deaths times"))
                 store.saying(editionId, page, i, death)
+                val began = now()
                 val speech = try {
                     kokoro.speak(lines[i].spoken)
                 } catch (e: Exception) {
                     throw Unsayable(e)
                 }
                 val current = piece ?: Piece(i, store.scratch(editionId, page, i), speech.sampleRate).also { piece = it }
+                current.work += now() - began
                 if (i > 0 && lines[i - 1].block != lines[i].block) current.write(FloatArray((current.rate * PAUSE).toInt()))
                 current.starts += current.seconds
                 current.write(speech.samples)
@@ -332,6 +358,8 @@ class PodcastMaker(
 
     /** A piece being written: opened on its first line, kept once it's long enough or the page ends. */
     private inner class Piece(val firstLine: Int, val file: File, val rate: Int) {
+        /** Time Kokoro spent saying this piece's lines. */
+        var work = 0L
         private val sink = encoder.open(file, rate)
         val starts = mutableListOf<Double>()
         private var samples = 0L
@@ -348,6 +376,8 @@ class PodcastMaker(
             if (samples == 0L) write(FloatArray(rate / 10))
             sink.close()
             store.keep(editionId, page, firstLine, file, starts)
+            workNanos += work
+            madeSeconds += seconds
         }
 
         fun drop() {
