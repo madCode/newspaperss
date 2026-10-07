@@ -318,7 +318,8 @@ class ListenPlayer(
     private fun say(line: Int, flush: Boolean) {
         val current = _state.value
         val script = current.script ?: return
-        val installed = speaker.speak("$generation:${current.at.page}:$line", script.lines[line].spoken, script.language, current.speed, flush)
+        val id = LineId(generation, current.editionId ?: return, current.at.page, line, script.lines.size)
+        val installed = speaker.speak(id.toString(), script.lines[line].spoken, script.language, current.speed, flush)
         val missing = script.language.takeUnless { installed }
         if (missing != current.missingLanguage) _state.update { it.copy(missingLanguage = missing) }
     }
@@ -329,9 +330,10 @@ class ListenPlayer(
 
     /** The line an id names, if it's of the current generation and page. */
     private fun lineOf(id: String): Int? {
-        val parts = id.split(':')
-        if (parts.size != 3 || parts[0].toIntOrNull() != generation || parts[1].toIntOrNull() != _state.value.at.page) return null
-        return parts[2].toIntOrNull()
+        val line = LineId.parse(id) ?: return null
+        val current = _state.value
+        if (line.generation != generation || line.editionId != current.editionId || line.page != current.at.page) return null
+        return line.line
     }
 
     override fun onStart(id: String) {

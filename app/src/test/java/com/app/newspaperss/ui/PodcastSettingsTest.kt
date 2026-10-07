@@ -85,7 +85,9 @@ class PodcastSettingsTest {
         )
         val vm = SettingsViewModel(store, podcast = setup) {}
         compose.setContent { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
-        idleUntil { vm.settings.value != null }
+        // Until Kokoro's state is read (off the main thread), picking the podcast can't tell
+        // whether to ask about mobile data, and does nothing.
+        idleUntil { vm.settings.value != null && vm.kokoro.value != null }
         return vm
     }
 
@@ -154,7 +156,7 @@ class PodcastSettingsTest {
         // In use: its voices, each with a sample.
         compose.onNodeWithText("Emma").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
         idleUntil { vm.settings.value?.podcastVoice == PodcastVoice.EMMA }
-        waitFor("Podcasts are made, but not played yet")
+        waitFor("Listen plays an article from its podcast once it's made")
     }
 
     @Test

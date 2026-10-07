@@ -63,6 +63,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import com.app.newspaperss.settings.ListenVoice
+import com.app.newspaperss.listen.MediaPlayerAudio
+import com.app.newspaperss.listen.PodcastAudio
+import com.app.newspaperss.listen.PodcastSpeaker
 
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
 class AppContainer(
@@ -75,6 +83,7 @@ class AppContainer(
     saveNotes: (editionId: Long) -> Unit = { NotesWorker.enqueue(context, it) },
     moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
     speaker: () -> Speaker = { SystemSpeaker(context) },
+    podcastAudio: () -> PodcastAudio = { MediaPlayerAudio() },
     private val connectListening: () -> Unit = { ListenService.connect(context) },
     val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
     podcastEngine: (KokoroInstall, PodcastVoice) -> PodcastEngine = ::KokoroEngine,
@@ -124,9 +133,23 @@ class AppContainer(
 
     /** Reading editions aloud. Made on first use: the voice takes a moment to start. */
     private val listenProgress = StoredListenProgress(context)
+    private val listenSettings by lazy { settings.settings.stateIn(appScope, SharingStarted.Eagerly, null) }
+
+    /** Listen's voice: a made podcast where there is one, the phone's elsewhere. */
+    private val listenSpeaker by lazy {
+        PodcastSpeaker(speaker(), podcasts, podcastAudio()) {
+            // Just after the app starts, before the store's first value: read it, or a made
+            // article would play in the phone's voice.
+            (listenSettings.value ?: runCatching { runBlocking { settings.current() } }.getOrNull())?.listenVoice == ListenVoice.PODCAST
+        }
+    }
+
+    /** The podcast's voice while an article plays from it; null in the phone's voice. */
+    val podcastPlaying: StateFlow<PodcastVoice?> get() = listenSpeaker.voice
+
     private val listenMade: Lazy<ListenPlayer> = lazy {
         ListenPlayer(
-            speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope,
+            listenSpeaker, listenProgress, open = { ListenBook.open(editions, it) }, appScope,
             savedSpeed = settings.settings.map { it.listenSpeed }.distinctUntilChanged(),
             saveSpeed = { speed -> settings.update { it.copy(listenSpeed = speed) } },
         )

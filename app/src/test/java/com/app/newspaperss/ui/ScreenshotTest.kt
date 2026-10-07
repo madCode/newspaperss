@@ -413,7 +413,13 @@ class ScreenshotTest {
 
     /** Listening to an article, two sentences in, its picture just ahead. */
     @Test
-    fun listenPlaying() {
+    fun listenPlaying() = shootListening("11a-listen-playing", voice = null)
+
+    /** The same article playing from its podcast: the voice's name by the source. */
+    @Test
+    fun listenPlayingThePodcast() = shootListening("11b-listen-podcast", voice = com.app.newspaperss.settings.PodcastVoice.HEART)
+
+    private fun shootListening(name: String, voice: com.app.newspaperss.settings.PodcastVoice?) {
         val files = tmp.newFolder()
         val picture = Bitmap.createBitmap(600, 300, Bitmap.Config.ARGB_8888).apply {
             val canvas = Canvas(this)
@@ -448,7 +454,7 @@ class ScreenshotTest {
         player.start(id, ListenPosition(1, 6))
         idleUntil { player.state.value.script != null }
         speaker.startNext()
-        shoot("11a-listen-playing", ready = { player.state.value.at.line == 6 }) { ListenScreen(player, onBack = {}) }
+        shoot(name, ready = { player.state.value.at.line == 6 }) { ListenScreen(player, onBack = {}, podcastVoice = MutableStateFlow(voice)) }
     }
 
     @Test

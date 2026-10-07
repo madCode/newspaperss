@@ -66,6 +66,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.border
+import com.app.newspaperss.settings.PodcastVoice
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
@@ -101,8 +105,9 @@ import kotlin.math.roundToInt
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListenScreen(player: ListenPlayer, onBack: () -> Unit) {
+fun ListenScreen(player: ListenPlayer, onBack: () -> Unit, podcastVoice: StateFlow<PodcastVoice?> = MutableStateFlow(null)) {
     val state by player.state.collectAsStateWithLifecycle()
+    val voice by podcastVoice.collectAsStateWithLifecycle()
     var contents by remember { mutableStateOf(false) }
     val title = when {
         state.pages.isEmpty() -> "Listening"
@@ -121,7 +126,7 @@ fun ListenScreen(player: ListenPlayer, onBack: () -> Unit) {
                 },
             )
         },
-        bottomBar = { if (state.pages.isNotEmpty()) PlayerDock(state, player) },
+        bottomBar = { if (state.pages.isNotEmpty()) PlayerDock(state, player, voice) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             val script = state.script
@@ -299,7 +304,7 @@ private fun MissingVoice(tag: String) {
 }
 
 @Composable
-private fun PlayerDock(state: ListenState, player: ListenPlayer) {
+private fun PlayerDock(state: ListenState, player: ListenPlayer, voice: PodcastVoice?) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
             val page = state.pages.getOrNull(state.at.page)
@@ -307,6 +312,19 @@ private fun PlayerDock(state: ListenState, player: ListenPlayer) {
             val pageLeft = ((page?.minutes ?: 0.0) * 60 - inPage).coerceAtLeast(0.0)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(page?.source ?: state.editionTitle, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                // The only sign this article plays from the podcast: its voice's name.
+                // Only while it plays: paused, the next article's voice isn't chosen until it starts.
+                if (voice != null && state.playing) {
+                    Text(
+                        voice.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 8.dp)
+                            .border(1.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                            .semantics { contentDescription = "Podcast, in ${voice.label}'s voice" },
+                    )
+                }
                 if (page?.end != true) Text("${minutes(pageLeft)} left", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 8.dp))
             }
             Chapters(state, Modifier.padding(vertical = 8.dp))
