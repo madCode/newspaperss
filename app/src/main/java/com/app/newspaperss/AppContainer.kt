@@ -69,6 +69,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import com.app.newspaperss.settings.ListenVoice
 import com.app.newspaperss.listen.MediaPlayerAudio
+import com.app.newspaperss.listen.MediaPlayerChime
 import com.app.newspaperss.listen.PodcastSpeaker
 
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
@@ -153,6 +154,7 @@ class AppContainer(
             listenSpeaker, listenProgress, open = { ListenBook.open(editions, it) }, appScope,
             savedSpeed = settings.settings.map { it.listenSpeed }.distinctUntilChanged(),
             saveSpeed = { speed -> settings.update { it.copy(listenSpeed = speed) } },
+            chime = MediaPlayerChime(context),
         )
     }
     val listen: ListenPlayer by listenMade

@@ -48,7 +48,18 @@ class ListenPlayerTest {
             read = { pages.getOrNull(it) }, onClose = { closed++ },
         )
     }
-    private val player = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), now = { clock })
+    /** A chime that rings until the test says it's done. */
+    private class HeldChime : Chime {
+        var ringing: (() -> Unit)? = null
+        var rung = 0
+        override fun play(done: () -> Unit) { rung++; ringing = done }
+        override fun stop() { ringing = null }
+        override fun release() = stop()
+        fun end() = ringing?.also { ringing = null }?.invoke()
+    }
+
+    private val chime = HeldChime()
+    private val player = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), now = { clock }, chime = chime)
     private val state get() = player.state.value
 
     @Test
@@ -57,11 +68,46 @@ class ListenPlayerTest {
         // The line being read and the next, so there's no gap between them.
         assertEquals(listOf("A one.", "A two."), speaker.queue.map { it.text })
         val heard = mutableListOf<String>()
-        while (speaker.queue.isNotEmpty()) heard += speaker.sayNext()
+        while (speaker.queue.isNotEmpty() || chime.ringing != null) {
+            if (speaker.queue.isEmpty()) chime.end() else heard += speaker.sayNext()
+        }
         assertEquals(listOf("A one.", "A two.", "A three.", "B one.", "B two.", "That's all for today."), heard)
         assertTrue(state.finished)
         assertFalse(state.playing)
         assertTrue(progress.finished(7))
+    }
+
+    @Test
+    fun aChimeSitsBetweenOneArticleAndTheNextAndTheNextWaitsForIt() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext() // "A three.", the article's last
+        assertEquals(1, chime.rung)
+        assertTrue("the next article waits for the chime", speaker.queue.isEmpty())
+        assertEquals(ListenPosition(1, 0), state.at)
+        chime.end()
+        assertEquals("B one.", speaker.queue.first().text)
+    }
+
+    @Test
+    fun skippingToTheNextArticleHasNoChime() {
+        player.start(7)
+        player.next()
+        assertEquals("B one.", speaker.queue.first().text)
+        assertEquals(0, chime.rung)
+    }
+
+    @Test
+    fun pausedDuringTheChimeItHoldsAndPlayStartsTheNextArticle() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext()
+        player.pause()
+        assertNull("pausing stops the chime", chime.ringing)
+        assertTrue(speaker.queue.isEmpty())
+        player.play()
+        assertEquals("B one.", speaker.queue.first().text)
+        assertEquals(1, chime.rung)
     }
 
     @Test
