@@ -1,0 +1,24 @@
+# Pinning actions to a commit stops a tag being re-pointed under us; it also means the pins go
+# stale on their own. anthropics/claude-code-action@v1 moved within a day of being pinned, which
+# left the "# v1" comments lying and zizmor's ref-version-mismatch failing.
+#
+# The cooldown is the point: most poisoned releases are caught in the first few days, so waiting
+# a week before taking an update gets the fix without being first to run it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
