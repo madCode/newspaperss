@@ -19,6 +19,7 @@ import com.app.newspaperss.settings.KindleEmail
 import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.testutil.MAIL_APP
 import com.app.newspaperss.testutil.installApp
+import com.app.newspaperss.testutil.installVoice
 import org.robolectric.Shadows.shadowOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -70,13 +71,14 @@ class SettingsScreenTest {
     // its rename, and the error lands in whichever test is running then.
     private val storeScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val rescheduled = mutableListOf<Settings>()
+    private val heard = mutableListOf<Pair<String, Float>>()
 
     private lateinit var vm: SettingsViewModel
 
     @Before
     fun makeStore() {
         store = SettingsStore(PreferenceDataStoreFactory.create(scope = storeScope) { tmp.newFile("s.preferences_pb") })
-        vm = SettingsViewModel(store) { rescheduled += it }
+        vm = SettingsViewModel(store, hear = { text, speed -> heard += text to speed }) { rescheduled += it }
     }
 
     /** Settings as the app shows it: the summary, or [page] opened from it, with Back to the summary. */
@@ -160,6 +162,37 @@ class SettingsScreenTest {
 
         compose.onNodeWithContentDescription("Back").performClick()
         waitFor("Largest")
+    }
+
+    @Test
+    fun listeningNamesThePhonesVoiceKeepsASpeedAndPlaysASample() {
+        installVoice(ApplicationProvider.getApplicationContext())
+        show()
+        waitFor("This phone's voice · 1×")
+        compose.onNodeWithText("Listening").performScrollTo().performClick()
+        waitFor("Speech Services by Google")
+        compose.onNodeWithText("1× · normal").assertIsSelected()
+
+        compose.onNodeWithText("1.5×").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
+        idleUntil { runBlocking { store.current().listenSpeed } == 1.5f }
+        compose.onNodeWithText("1.5×").assertIsSelected()
+
+        compose.onNodeWithText("Hear it").performClick()
+        assertEquals(listOf(SettingsViewModel.SAMPLE to 1.5f), heard)
+
+        compose.onNodeWithText("Change the phone's voice").performScrollTo().performClick()
+        assertEquals("com.android.settings.TTS_SETTINGS", shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>()).nextStartedActivity.action)
+    }
+
+    @Test
+    fun withoutAVoiceListeningSaysWhereToGetOne() {
+        show()
+        waitFor("No voice on this phone")
+        compose.onNodeWithText("Listening").performScrollTo().performClick()
+        waitFor("no text-to-speech voice")
+        compose.onNodeWithText("Hear it").assertDoesNotExist()
+        compose.onNodeWithText("Get Speech Services by Google").performClick()
+        assertEquals("market://details?id=com.google.android.tts", shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>()).nextStartedActivity.dataString)
     }
 
     @Test

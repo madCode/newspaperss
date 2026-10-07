@@ -38,6 +38,7 @@ class SettingsStoreTest {
                 kindleEmail = "me_42@kindle.com",
                 mailApp = "com.example.mail",
                 feedsFrom = FeedsFrom.SERVER,
+                listenSpeed = 1.5f,
             )
         }
         val s = store.current()
@@ -57,6 +58,7 @@ class SettingsStoreTest {
         assertEquals("me_42@kindle.com", s.kindleEmail)
         assertEquals("com.example.mail", s.mailApp)
         assertEquals(FeedsFrom.SERVER, s.feedsFrom)
+        assertEquals(1.5f, s.listenSpeed)
     }
 
     @Test

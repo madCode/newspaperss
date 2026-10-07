@@ -54,6 +54,7 @@ import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.closeAfter
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.testutil.installApp
+import com.app.newspaperss.testutil.installVoice
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
 import com.app.newspaperss.ui.edition.EditionDetailScreen
 import com.app.newspaperss.listen.ListenBook
@@ -813,6 +814,7 @@ class ScreenshotTest {
 
     @Test
     fun settings() {
+        installVoice(ApplicationProvider.getApplicationContext())
         runBlocking { store.update { it.copy(device = Device.KINDLE, scheduleEnabled = true, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "name_abc123@kindle.com") } }
         val vm = SettingsViewModel(store) {}
         shoot("07-settings", ready = { vm.settings.value != null }) { SettingsScreen(vm, onOpen = {}) }
@@ -866,6 +868,14 @@ class ScreenshotTest {
         runBlocking { store.update { it.copy(previewTextSize = PreviewTextSize.LARGEST) } }
         val vm = SettingsViewModel(store) {}
         shoot("07n-settings-text-size-largest-200", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.TEXT_SIZE, onBack = {}) }
+    }
+
+    @Test
+    fun settingsListening() {
+        installVoice(ApplicationProvider.getApplicationContext())
+        runBlocking { store.update { it.copy(listenSpeed = 1.2f) } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07o-settings-listening", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
     }
 
     /** Settings › Where your feeds live, signed in to a tt-rss account. */

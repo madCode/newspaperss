@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui.settings
 
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import android.Manifest
@@ -67,6 +69,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.app.newspaperss.listen.PhoneVoice
+import com.app.newspaperss.listen.LISTEN_SPEEDS
+import com.app.newspaperss.ui.listen.speedLabel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.core.plural
@@ -93,12 +98,14 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpen: (SettingsPage) -> Unit)
         val folderReachable = rememberReachable(s.folderUri)
         val notesReachable = rememberReachable(s.notesFolderUri)
         val ttrss by viewModel.ttrssStatus.collectAsStateWithLifecycle()
+        val voice = rememberPhoneVoice()
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
             SettingsPage.entries.forEach { page ->
                 val summary = when (page) {
                     SettingsPage.EDITION -> SettingsSummary.edition(s)
                     SettingsPage.SCHEDULE -> SettingsSummary.schedule(s, notificationsOn, locale)
                     SettingsPage.TEXT_SIZE -> SettingsSummary.textSize(s)
+                    SettingsPage.LISTENING -> SettingsSummary.listening(s, hasVoice = voice != null)
                     SettingsPage.DELIVERY -> SettingsSummary.delivery(s, folderReachable)
                     SettingsPage.FEEDS -> SettingsSummary.feedsFrom(s.feedsFrom(hasServer = ttrss.source != null), ttrss)
                     SettingsPage.NOTES -> SettingsSummary.notes(s, notesReachable)
@@ -186,6 +193,7 @@ fun SettingsPageScreen(viewModel: SettingsViewModel, page: SettingsPage, onBack:
                 SettingsPage.EDITION -> EditionSection(s, viewModel)
                 SettingsPage.SCHEDULE -> ScheduleSection(s, viewModel)
                 SettingsPage.TEXT_SIZE -> TextSizeSection(s, viewModel)
+                SettingsPage.LISTENING -> ListeningSection(s, viewModel)
                 SettingsPage.DELIVERY -> {
                     ReaderPicker(s, viewModel)
                     DeliverySection(s, viewModel)
@@ -342,3 +350,72 @@ private fun TextSizeSection(s: AppSettings, vm: SettingsViewModel) {
 }
 
 private const val SAMPLE_LINE = "The quiet return of the night train"
+
+/** Listen's voice, the phone's own, with a sample; the speed it reads at; and where Android changes the voice. */
+@Composable
+private fun ListeningSection(s: AppSettings, vm: SettingsViewModel) {
+    val context = LocalContext.current
+    val voice = rememberPhoneVoice()
+    SubHeading("Voice")
+    if (voice != null) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("This phone's voice", style = MaterialTheme.typography.bodyLarge)
+                Text(voice, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            OutlinedButton(onClick = vm::hear, modifier = Modifier.padding(start = 8.dp)) { Text("Hear it") }
+        }
+    } else {
+        Text(
+            "This phone has no text-to-speech voice, so Listen can't read editions aloud. " +
+                "Speech Services by Google is free.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+        OutlinedButton(onClick = { if (!PhoneVoice.get(context)) nothingOpens(context) }) { Text("Get Speech Services by Google") }
+    }
+    SubHeading("Speed", Modifier.padding(top = 24.dp))
+    Column(Modifier.selectableGroup()) {
+        LISTEN_SPEEDS.sorted().forEach { speed ->
+            Row(
+                Modifier.fillMaxWidth().selectable(s.listenSpeed == speed, role = Role.RadioButton) { vm.setListenSpeed(speed) }.heightIn(min = 48.dp).padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = s.listenSpeed == speed, onClick = null)
+                Text(speedLabel(speed) + if (speed == 1f) " · normal" else "", Modifier.padding(start = 12.dp))
+            }
+        }
+    }
+    if (voice != null) {
+        HorizontalDivider(Modifier.padding(top = 16.dp))
+        Row(
+            Modifier.fillMaxWidth().clickable(role = Role.Button) { if (!PhoneVoice.openSettings(context)) nothingOpens(context) }.heightIn(min = 48.dp).padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Change the phone's voice", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "Another voice, language or engine, in Android's text-to-speech settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun nothingOpens(context: android.content.Context) =
+    Toast.makeText(context, "This phone has nothing that opens it.", Toast.LENGTH_LONG).show()
+
+/** The phone's text-to-speech engine's name, or null without one; checked again on coming back from Android's settings. */
+@Composable
+private fun rememberPhoneVoice(): String? {
+    val context = LocalContext.current
+    var voice by remember { mutableStateOf(PhoneVoice.name(context)) }
+    LifecycleResumeEffect(Unit) {
+        voice = PhoneVoice.name(context)
+        onPauseOrDispose {}
+    }
+    return voice
+}

@@ -229,12 +229,18 @@ Many of the writers worth reading publish as newsletters. Two routes, from easy 
   let people point it at their own instance), and the inbox address is effectively a password.
 
 ### Listen: the paper as an audiobook
-The phone's voice reading an edition is built ([mockups](https://claude.ai/artifact/X9dZJi7XP3GxY85xjdLMXq)). Next:
-- **Settings › Listening:** the voice (with a sample) and a speed that's kept; a link to Android's text-to-speech settings.
-- **Kokoro, a better voice to download** (about 120 MB, offline): its audio made with the edition, overnight, since phones read it at about real time; what isn't ready yet plays in the phone's voice. English only; other languages stay with the phone's voice.
+The phone's voice reading an edition, and Settings › Listening for it, are built ([mockups](https://claude.ai/artifact/X9dZJi7XP3GxY85xjdLMXq)). Next:
+- **A podcast in Kokoro's voice, made ahead** ([mockups and spec](https://claude.ai/artifact/43jwa7iFoBUxnyxVGsiYbE)). Listen stays the one button: it plays the podcast where it's made and the phone's voice where it isn't, switching only between articles.
+  - **Turning it on:** a second voice in Settings › Listening, "Make a podcast in a natural voice". Kokoro (`kokoro-multi-lang-v1_0` through sherpa-onnx, 384 MB) downloads once; off Wi-Fi, Download asks before using mobile data. No setting for it.
+  - **Which phones:** 64-bit only. After the download, a 20-second check estimates how long *your* paper takes to make (× 1.5 for warming up). Up to about 1 hour: "can do it"; up to 2½ hours: "slow, still fine"; beyond: "too slow", offering only Remove.
+  - **When it's made:** after a scheduled edition's book is written, from the book, article by article, only while charging. Never on battery (a 30-minute paper would use about 20% of a charge). Unplugged, it stops and keeps what's made.
+  - **Starting early:** scheduled editions start earlier by paper length × this phone's pace × 1.25 (× 1.1 once real times come in), shown with the ready time in Settings, Schedule and Today ("starts 5:05 for the podcast; leave your phone charging").
+  - **Editions made by hand:** "Make the podcast" under Listen and in ⋮, waiting for a charger too.
+  - **Stored** compressed (about 5 MB per 30 minutes) with each sentence's start time, beside its edition and deleted with it. English only; other articles play in the phone's voice.
+  - **Measured on a Pixel 8 (Tensor G3):** the full model makes speech at 0.8× real time cool and 1.4× warm within 7 minutes, so it can't read live; a 30-minute paper takes 40–50 minutes. The compressed int8 model (170 MB) whines at 4.8 and 9.6 kHz and is no faster. 4 threads was fastest; with 1 thread the same text came out longer (17.6 s, not 14 s), which needs explaining.
 - **🔊 in the article preview**, starting the same player at that article.
 - **A sleep timer**, and a way in from Today's card.
-- **Save as audio:** the edition as a file with a chapter per article, for a podcast or audiobook app.
+- **Save as audio:** the edition as a file with a chapter per article, for a podcast or audiobook app. With a podcast made, it's already most of the way there.
 
 ### Backup *(you asked)*
 Android's Auto Backup already copies the database and settings (sources, reading list, edition

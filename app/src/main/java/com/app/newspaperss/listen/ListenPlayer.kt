@@ -3,11 +3,19 @@ package com.app.newspaperss.listen
 import com.app.newspaperss.core.listen.ListenScript
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.IOException
+import kotlin.math.abs
+
+/** The speeds Listen reads at, in the order its speed button steps through them. */
+val LISTEN_SPEEDS = listOf(1f, 1.2f, 1.5f, 0.8f)
 
 data class ListenState(
     val editionId: Long? = null,
@@ -49,12 +57,16 @@ data class ListenState(
  * The voice is given the line being read and the one after, so there's no gap between them, and
  * each line's start moves the position: that's what the screen tints and what's saved. Lines
  * carry a generation number, so the end of a line from before a pause or a jump can't move it.
+ *
+ * The speed is kept in Settings: the player follows [savedSpeed], and [setSpeed] saves to it.
  */
 class ListenPlayer(
     private val speaker: Speaker,
     private val progress: ListenProgress,
     private val open: suspend (editionId: Long) -> ListenBook?,
     private val scope: CoroutineScope,
+    private val savedSpeed: Flow<Float> = emptyFlow(),
+    private val saveSpeed: suspend (Float) -> Unit = {},
     private val now: () -> Long = System::currentTimeMillis,
 ) : Speaker.Listener {
     private val _state = MutableStateFlow(ListenState())
@@ -69,9 +81,14 @@ class ListenPlayer(
     /** A page is being read out of the book: until it is, the script and position are the old page's. */
     private var turning = false
     private var turns = 0
+    private var savingSpeed = 0
 
     init {
         speaker.listener = this
+        scope.launch {
+            // Until a speed set here is saved, the store still hands back the one before it.
+            savedSpeed.collect { if (savingSpeed == 0) applySpeed(it) }
+        }
     }
 
     /** Starts [editionId] at [from], or where it was left (from the top once it was finished). */
@@ -95,6 +112,8 @@ class ListenPlayer(
             }
             book = opened
             _state.update { it.copy(editionTitle = opened.title, pages = opened.pages, loading = false) }
+            // The store's first value can come after the book opens, and the first line would restart at it.
+            if (savingSpeed == 0) savedSpeed.firstOrNull()?.let { speed -> _state.update { it.copy(speed = speed) } }
             val at = from ?: progress.get(editionId)?.takeUnless { progress.finished(editionId) } ?: ListenPosition()
             goTo(at)
         }
@@ -161,9 +180,29 @@ class ListenPlayer(
     /** Plays from [position]: a tapped sentence, or an article picked from the contents. */
     fun seek(position: ListenPosition) = move(position, play = true)
 
+    /** Sets and saves the speed: one of [LISTEN_SPEEDS], the nearest to what a car or watch asks for. */
     fun setSpeed(speed: Float) {
-        _state.update { it.copy(speed = speed) }
-        if (_state.value.playing && !turning) speakFrom(_state.value.at.line)
+        val listed = LISTEN_SPEEDS.minBy { abs(it - speed) }
+        applySpeed(listed)
+        savingSpeed++
+        scope.launch {
+            try {
+                saveSpeed(listed)
+            } catch (_: IOException) {
+                // Not kept (a full disk, say): the catch-up below goes back to the kept speed rather than crash.
+            } finally {
+                savingSpeed--
+            }
+            // A change made elsewhere while this was saving was passed over: catch up with the store.
+            if (savingSpeed == 0) savedSpeed.firstOrNull()?.let(::applySpeed)
+        }
+    }
+
+    /** Says [text] at [speed] in the phone's own voice, pausing the edition: Settings' sample. */
+    fun sample(text: String, speed: Float) {
+        if (_state.value.playing) pause() else silence()
+        // Its id names no line, so its start and end move nothing.
+        speaker.speak(SAMPLE_ID, text, null, speed, flush = true)
     }
 
     /** A picture on the page being read, for the screen. */
@@ -187,6 +226,12 @@ class ListenPlayer(
     fun release() {
         stop()
         speaker.release()
+    }
+
+    private fun applySpeed(speed: Float) {
+        if (speed == _state.value.speed) return
+        _state.update { it.copy(speed = speed) }
+        if (_state.value.playing && !turning) speakFrom(_state.value.at.line)
     }
 
     private fun nextPage(play: Boolean) {
@@ -324,5 +369,6 @@ class ListenPlayer(
         const val BACK_GRACE_MS = 2_000L
         const val RESTART_AFTER_LINES = 3
         const val MAX_ERRORS = 3
+        const val SAMPLE_ID = "sample"
     }
 }

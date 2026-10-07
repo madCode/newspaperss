@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -101,6 +102,8 @@ data class Settings(
     val lastCategoryId: Int? = null,
     /** The tt-rss categories folded on Sources, by name; "" is Uncategorized. */
     val foldedCategories: Set<String> = emptySet(),
+    /** How fast Listen reads, 1.0 being the voice's normal pace. */
+    val listenSpeed: Float = 1f,
 ) {
     /**
      * The setup chosen, or before it's settled, the one [SettingsStore.settleFeedsFrom] will
@@ -146,6 +149,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val feedsFrom = stringPreferencesKey("feeds_from")
         val lastCategoryId = intPreferencesKey("ttrss_last_category_id")
         val foldedCategories = stringSetPreferencesKey("sources_folded_categories")
+        val listenSpeed = floatPreferencesKey("listen_speed")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
@@ -177,6 +181,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             prefs.setOrRemove(Keys.feedsFrom, s.feedsFrom?.name)
             prefs.setOrRemove(Keys.lastCategoryId, s.lastCategoryId)
             prefs[Keys.foldedCategories] = s.foldedCategories
+            prefs[Keys.listenSpeed] = s.listenSpeed
             prefs.remove(Keys.legacyNotesWithEdition)
         }
     }
@@ -225,6 +230,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             feedsFrom = p[Keys.feedsFrom]?.enumOrNull<FeedsFrom>(),
             lastCategoryId = p[Keys.lastCategoryId],
             foldedCategories = p[Keys.foldedCategories] ?: emptySet(),
+            listenSpeed = p[Keys.listenSpeed] ?: d.listenSpeed,
         )
     }
 }
