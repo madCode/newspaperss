@@ -7,7 +7,10 @@ import android.os.Handler
 import android.os.Looper
 import com.app.newspaperss.R
 
-/** The short sound between articles, so a listener hears one end and the next begin. */
+/**
+ * The pause between articles: a moment's quiet, a soft breath of sound with a page turning, and
+ * the next article once it has settled, so a listener can let one go before the next begins.
+ */
 interface Chime {
     /** Plays it, then calls [done] on the main thread. [stop] cancels both. */
     fun play(done: () -> Unit)
@@ -79,7 +82,7 @@ class MediaPlayerChime(context: Context) : Chime {
     override fun release() = stop()
 
     private companion object {
-        /** The chime is 1.4 s long. */
-        const val LONGEST_MS = 3_000L
+        /** The sound, its quiet included, is 4 s long. */
+        const val LONGEST_MS = 6_000L
     }
 }

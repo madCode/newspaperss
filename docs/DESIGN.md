@@ -491,9 +491,11 @@ whose Kindle and KOReader answers ask for more on the same page).
     caption or alt text ("Image: Tait's table of knots"), or "An image."
     The date, reading time, link to the original and "Next" line aren't
     read; nor are footnote markers.
-  - A soft chime sits between one article and the next, in either voice,
-    so the end of one is heard. Skipping with ⏭ doesn't chime; pausing
-    during it stops it, and Play starts the next article.
+  - Between one article and the next, in either voice, a pause of about
+    4 seconds: a moment's quiet, a soft breath of sound with a page
+    turning, then the next article, so the listener can change contexts.
+    Skipping with ⏭ has no pause; pausing during it stops it, and Play
+    starts the next article.
   - It reads a sentence at a time. ↶ goes back to the start of the
     sentence, or the one before if it has only just started; ↷ skips one;
     ⏮ ⏭ move by article (⏮ restarts the article after its first few
