@@ -31,6 +31,11 @@ Migration with a `MigrationTest` case, and committing the new schema JSON
 in `app/schemas`. CI publishes main's debug APK to the `latest-debug`
 release; its version name carries the CI run and commit.
 
+The sections from Privacy to Pull requests are shared with the projects in
+[claude-playground](https://github.com/madCode/claude-playground/blob/main/CLAUDE.md),
+whose root CLAUDE.md has the same rules for any project. A change to one
+belongs in the other too.
+
 ## Privacy
 
 This repository is public. Never commit personal data: no feed lists,
