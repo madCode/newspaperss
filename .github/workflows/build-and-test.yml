@@ -31,7 +31,11 @@ jobs:
         run: ./gradlew build koverXmlReport koverHtmlReport koverVerify
       - name: Coverage of the lines this branch changed
         if: github.event_name == 'pull_request'
-        run: python3 tools/changed-line-coverage.py 80 "origin/${{ github.base_ref }}"
+        # Through the environment, not interpolated into the command: a branch name is not
+        # guaranteed to be free of shell metacharacters.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: python3 tools/changed-line-coverage.py 80 "origin/$BASE_REF"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
