@@ -76,9 +76,8 @@ class KokoroDownloadTest {
     @Test
     fun everyFileArrivesCheckedAndTheProgressReachesTheWhole() {
         serve()
-        // Lanes report from their own threads, so the report that carries the whole needn't be the
-        // last one to run: a slower lane's smaller figure can land after it. What the download
-        // promises is that progress reaches the whole, not which report arrives last.
+        // Lanes report from their own threads: the report carrying the whole needn't be the last
+        // to run, so track the peak rather than the final one.
         val reached = AtomicLong(0)
         val wholes = Collections.synchronizedSet(mutableSetOf<Long>())
         download { got, total ->
