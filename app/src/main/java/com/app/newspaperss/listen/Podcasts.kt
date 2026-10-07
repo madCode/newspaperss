@@ -451,10 +451,12 @@ class PodcastMaker(
  * An edition's podcast as its page shows it.
  *
  * @param made for each article, in book order, whether it plays from the podcast.
+ * @param leftOut for each article, whether the podcast left it to the phone's voice: not in
+ *   English, or something Kokoro couldn't say.
  * @param asked whether a podcast was asked for: made with a scheduled edition, or by hand.
  * @param pace this phone's, to say how long making one would take.
  */
-data class PodcastProgress(val asked: Boolean, val made: List<Boolean>, val finished: Boolean, val pace: Double)
+data class PodcastProgress(val asked: Boolean, val made: List<Boolean>, val finished: Boolean, val pace: Double, val leftOut: List<Boolean>)
 
 /** What the edition page shows of an edition's podcast, and asking for one. */
 class Podcasts(
@@ -471,6 +473,7 @@ class Podcasts(
         PodcastProgress(
             asked = store.voice(editionId) != null,
             made = (0 until articles).map { store.made(editionId, it) },
+            leftOut = (0 until articles).map { store.live(editionId, it) },
             finished = store.finished(editionId),
             pace = pace.toDouble(),
         )

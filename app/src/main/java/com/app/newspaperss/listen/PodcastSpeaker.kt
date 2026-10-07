@@ -32,8 +32,9 @@ data class LineId(val generation: Int, val editionId: Long, val page: Int, val l
 
 /**
  * Listen's voice when podcasts are made: an article whose podcast is made plays from it, any
- * other in the phone's voice. The choice is made when an article starts and kept until another
- * one does, so the voice changes only between articles, never mid-way.
+ * other in the phone's voice. The choice is made when an article starts, and kept while it plays
+ * on, so the voice changes between articles, not mid-sentence. An article in the phone's voice
+ * moves to its podcast when played or jumped in once that's made.
  *
  * Playing a podcast, it reports each line's start as the audio reaches it, from the times kept
  * with each piece, so the player tints and saves sentences as it does for the phone's voice.
@@ -106,7 +107,9 @@ class PodcastSpeaker(
             return phone.speak(id, text, language, rate, flush)
         }
         val here = line.editionId to line.page
-        if (here != article) choose(here, line.lines)
+        // A new article, or one read in the phone's voice played or jumped in again: its podcast
+        // may be made since (overnight, while paused). Once from the podcast, it stays so.
+        if (here != article || (flush && pieces.isEmpty())) choose(here, line.lines)
         asked[line.line] = Asked(text, language, rate)
         // Kokoro turned off, or removed with its podcasts, since the article started: the phone's
         // voice from here, rather than a file that's gone.
@@ -134,7 +137,8 @@ class PodcastSpeaker(
         chosen = if (pieces.isEmpty()) null else podcasts.voice(editionId)
         _instead.value = when {
             pieces.isNotEmpty() || !inUse() || podcasts.voice(editionId) == null -> null
-            podcasts.live(editionId, page) -> Instead.LEFT_OUT
+            // Left to the phone's voice, or made from other sentences than the book now has.
+            podcasts.live(editionId, page) || made.isNotEmpty() -> Instead.LEFT_OUT
             else -> Instead.NOT_MADE_YET
         }
     }

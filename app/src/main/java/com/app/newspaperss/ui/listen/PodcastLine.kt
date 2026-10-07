@@ -24,7 +24,9 @@ import com.app.newspaperss.core.listen.ListenTime
 import com.app.newspaperss.core.listen.PodcastPace
 import com.app.newspaperss.listen.Podcasts
 import com.app.newspaperss.ui.settings.SettingsSummary
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Under Listen, while Kokoro is in use: how much of the edition's podcast is made, as a bar of its
@@ -44,7 +46,13 @@ fun PodcastLine(podcasts: Podcasts, editionId: Long, minutes: List<Double>, modi
         if (!p.asked) {
             Text("No podcast for this edition yet: it plays in your phone's voice.", style = small, color = soft)
             val making = SettingsSummary.aboutTime(PodcastPace.minutesToMake(minutes.sum().toInt(), p.pace))
-            TextButton(onClick = { scope.launch { podcasts.make(editionId) } }) { Text("Make the podcast · $making while charging") }
+            TextButton(onClick = {
+                scope.launch {
+                    // Asked for and its work started together, even if the page is left meanwhile;
+                    // a full disk mustn't take the app down.
+                    runCatching { withContext(NonCancellable) { podcasts.make(editionId) } }
+                }
+            }) { Text("Make the podcast · $making while charging") }
             return@Column
         }
         // The text says the same: TalkBack reads that, not the bar.
@@ -55,11 +63,15 @@ fun PodcastLine(podcasts: Podcasts, editionId: Long, minutes: List<Double>, modi
             }
         }
         val made = heard.filterIndexed { i, _ -> p.made.getOrElse(i) { false } }.sum()
+        val anyMade = p.made.any { it }
+        val leftOut = p.leftOut.any { it }
         val text = when {
             p.made.all { it } -> "The podcast is ready."
-            p.finished -> "The podcast is ready. Articles not in English play in your phone's voice."
-            made == 0.0 -> "The podcast is made while the phone charges. Until then, Listen uses your phone's voice."
-            else -> "${ReadingTime.format(made)} of ${ReadingTime.format(heard.sum())} made, while the phone charges. The rest plays in your phone's voice until it's made."
+            p.finished && !anyMade -> "The podcast couldn't make any of this edition, as it's English only: it plays in your phone's voice."
+            p.finished -> "The podcast is ready. Articles it left out, not being in English, play in your phone's voice."
+            !anyMade -> "The podcast is made while the phone charges. Until then, Listen uses your phone's voice."
+            else -> "${ReadingTime.format(made)} of ${ReadingTime.format(heard.sum())} made, while the phone charges. " +
+                if (leftOut) "The rest plays in your phone's voice until it's made, and articles not in English always do." else "The rest plays in your phone's voice until it's made."
         }
         Text(text, style = small, color = soft, modifier = Modifier.padding(top = 6.dp))
     }

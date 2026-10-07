@@ -690,8 +690,8 @@ whose Kindle and KOReader answers ask for more on the same page).
     stops and keeps what's made. English articles only; the rest are left
     to the phone's voice. A podcast is deleted with its edition's book, and
     all of them with Kokoro. Listen plays an article from its podcast once
-    it's made, and in the phone's voice until then; the voice changes only
-    between articles. The playing screen shows the podcast voice's name by
+    it's made, and in the phone's voice until then: from the next play or
+    jump once it's made, never mid-sentence. The playing screen shows the podcast voice's name by
     the source, and a quiet line when an article of an edition with a
     podcast plays in the phone's voice (not made yet, or left out).
     Under Listen on the edition page, a bar of its articles fills as each

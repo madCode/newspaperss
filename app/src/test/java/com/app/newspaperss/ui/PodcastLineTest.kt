@@ -77,6 +77,27 @@ class PodcastLineTest {
     }
 
     @Test
+    fun articlesLeftOutAreSaidToBe() {
+        store.want(7, PodcastVoice.HEART)
+        store.complete(7, 0)
+        store.leaveLive(7, 1)
+        show()
+        waitFor("articles not in English always do")
+        store.complete(7, 2)
+        store.finish(7)
+        waitFor("Articles it left out")
+    }
+
+    @Test
+    fun anEditionAllLeftOutIsntCalledReady() {
+        store.want(7, PodcastVoice.HEART)
+        (0..2).forEach { store.leaveLive(7, it) }
+        store.finish(7)
+        show()
+        waitFor("couldn't make any of this edition")
+    }
+
+    @Test
     fun withThePhonesVoiceChosenThereIsNothing() {
         store.want(7, PodcastVoice.HEART)
         show(ListenVoice.PHONE)
