@@ -8,7 +8,8 @@ ideas, not commitments.
 
 Grouped by part of the app. The tag says where each item came from: *device* (your testing),
 *personas* ([docs/research/personas.md](research/personas.md)), *resources* (the resource audit),
-*live* (building real editions), *a11y* (the accessibility audit), *ux* (the Day 3 UX pass).
+*live* (building real editions), *a11y* (the accessibility audit), *ux* (the Day 3 UX pass),
+*audit* (the architecture audit, #163–#166).
 
 ### Onboarding and setup
 - [ ] A short Kindle how-to: same Amazon account, pick the device in Send to Kindle, Library › Docs *(personas)*
@@ -85,6 +86,11 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] A floor device: Android 8, 2 GB RAM, slow CPU and storage (a 2018 budget phone or an older Boox). Measure on an emulator with that profile how long a 30-minute edition takes, peak memory, whether timed editions still arrive under Doze, and whether long lists and the preview stay smooth; set budgets from the numbers *(you asked)*
 - [ ] Load build candidates without feedHtml; fetch it per article
 - [ ] EPUB zip: buffered output, JPEGs stored uncompressed
+
+### Recurring reviews *(audit)*
+Whole-codebase passes for what a review of one PR can't see. Each follows the audit's pattern: fresh-eyes reviewers, each finding checked, a PR per area.
+- [ ] **Security and supply chain**, before each release or every 20–30 cycles: hostile feeds and pages (entity expansion, slow regexes, huge inputs), links and intents that leave the app, what CI's jobs can write, signing keys, and pinned actions and dependencies
+- [ ] **Architecture and test health**, every 30–40 cycles or before a release: duplication and code that has grown complicated, how features fit together (what one feature deletes that another still uses), tests that can never fail, waits that flake under load, and copied test helpers
 
 ### Tech debt
 - [ ] Test DataStores made without a scope can fail under full-suite load (DataStore "Unable to rename …tmp", a write still running when the temp folder is deleted). `SettingsScreenTest` has one now; `TtrssFeedsTest`, `SourcesScreenTest`, `SettingsStoreTest`, `TtrssSyncTest`, `FeedMovesTest` and `ScreenshotTest` don't. One shared helper that cancels the scope before cleanup
