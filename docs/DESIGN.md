@@ -80,7 +80,7 @@ module so it's all unit-tested without Android.
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
 - **Posts on a shared page.** An item linking to its spot on a page
-  (`05.html#a165533`, one of a day's posts on Scripting News) is just its
+  (`05.html#a1`, one of a day's posts on a blog) is just its
   feed text, when the page has that spot and the item's text: the page
   holds the day's other posts too.
 - **Paid posts.** A post for paying subscribers goes in as its free part,

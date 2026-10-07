@@ -142,7 +142,7 @@ class ArticleExtractor(private val http: HttpClient) {
                 else failed(input, page.reason, page.blocked, page.failure)
             is PageResult.Fetched -> {
                 val words = page.clean.wordCount
-                // The page holds this item among others (a day's posts on a blog like Scripting News,
+                // The page holds this item among others (one of a day's posts on a blog's page for the day,
                 // the link naming its spot): the page would bring all of them, and the feed's text is
                 // the entry. Whatever the mode, and saying nothing about the source's full text.
                 if (input.feedUrl == null && feed != null && onThePage(feed, page)) return fromFeed(feed, null, null)

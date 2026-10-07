@@ -533,7 +533,7 @@ object HtmlCleaner {
      * without the script, it's an empty div that goes (its class, "comment", reads as a comments
      * box, and tt-rss strips classes anyway), leaving the sentence that introduced it hanging. Its
      * text and author make a quote instead. An @-mention is filled in the same way, so in the feed
-     * it's an empty span and "As katie lowe points out" would read "As points out": it gets the name.
+     * it's an empty span and "As Jane Doe points out" would read "As points out": it gets the name.
      */
     private fun expandSubstackNotes(body: Element) {
         // The last quote placed after each paragraph, so several from one paragraph keep their order.
