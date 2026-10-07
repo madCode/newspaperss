@@ -127,9 +127,9 @@ class PodcastSetupTest {
     fun aCheckThatTookTheAppDownIsntRunAgainUntilAskedAfresh() {
         installed()
         val setup = setup()
-        // As if the app died in the middle of the last check.
+        // As if the app died in the middle of the last two checks.
         install.dir.mkdirs()
-        java.io.File(install.dir, ".checking").createNewFile()
+        java.io.File(install.dir, ".checking").writeText("2")
         assertTrue(runCatching { check(setup) }.exceptionOrNull() is IllegalStateException)
         assertNull(voiceUsed)
         setup.download(mobileData = false)
@@ -146,6 +146,16 @@ class PodcastSetupTest {
         broken = false
         check(setup)
         assertEquals(1.8f, kotlinx.coroutines.runBlocking { store.current().podcastPace }!!, 0.001f)
+    }
+
+    @Test
+    fun oneCheckTheAppDiedInIsTriedAgain() {
+        installed()
+        // Swiped away mid-check, say: once isn't taken for a crash.
+        install.dir.mkdirs()
+        java.io.File(install.dir, ".checking").writeText("1")
+        check(setup())
+        assertEquals(PodcastVoice.HEART, voiceUsed)
     }
 
     @Test

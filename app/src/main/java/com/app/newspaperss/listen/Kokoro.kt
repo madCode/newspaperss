@@ -66,8 +66,12 @@ class KokoroInstall(val dir: File, manifest: () -> List<KokoroFile>) {
             KokoroManifest.parse(context.assets.open("kokoro/files.tsv").bufferedReader().use { it.readText() })
         }
 
-        /** sherpa-onnx ships only 64-bit code with the app, and Kokoro is too slow for 32-bit phones. */
-        val supported: Boolean get() = Build.SUPPORTED_64_BIT_ABIS.any { it == "arm64-v8a" || it == "x86_64" }
+        /**
+         * sherpa-onnx ships only 64-bit code with the app, and Kokoro is too slow for 32-bit phones.
+         * The app itself must run as 64-bit, not only the phone be able to.
+         */
+        val supported: Boolean
+            get() = android.os.Process.is64Bit() && Build.SUPPORTED_64_BIT_ABIS.any { it == "arm64-v8a" || it == "x86_64" }
     }
 }
 
@@ -143,11 +147,14 @@ class KokoroDownload(
                     }
                     val into = restarted ?: digest
                     FileOutputStream(part, have > 0).use { out ->
-                        feed(response.body.byteStream(), Long.MAX_VALUE) { buf, n ->
+                        val body = response.body.byteStream()
+                        feed(body, file.size - have) { buf, n ->
                             out.write(buf, 0, n)
                             into.update(buf, 0, n)
                             onProgress(got.addAndGet(n.toLong()), install.bytes)
                         }
+                        // More than the file holds isn't the file: stop before it fills the phone.
+                        if (body.read() != -1) throw DamagedException(file.path)
                     }
                 }
             } finally {

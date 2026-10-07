@@ -43,6 +43,7 @@ class KokoroDownloadTest {
     private val served = mutableMapOf<String, Int>()
     private var ranges = true
     private var damaged: String? = null
+    private var extra = 0
     private val asked = mutableMapOf<String, String?>()
 
     private fun serve() {
@@ -55,6 +56,7 @@ class KokoroDownloadTest {
                 }
                 var bytes = content[path] ?: return MockResponse.Builder().code(404).build()
                 if (path == damaged) bytes = bytes.copyOf().also { it[0] = (it[0] + 1).toByte() }
+                if (extra > 0 && path == "model.onnx") bytes = bytes + ByteArray(extra)
                 val range = request.headers["Range"]?.removePrefix("bytes=")?.removeSuffix("-")?.toInt()
                 return if (range != null && ranges) {
                     MockResponse.Builder().code(206).body(Buffer().write(bytes, range, bytes.size - range)).build()
@@ -88,6 +90,16 @@ class KokoroDownloadTest {
         assertFalse(install.file("tokens.txt").exists())
         assertFalse(java.io.File(install.file("tokens.txt").path + ".part").exists())
         assertFalse(install.complete)
+    }
+
+    @Test
+    fun aServerSendingMoreThanTheFileIsStoppedThere() {
+        serve()
+        extra = 100_000
+        val failed = runCatching { download() }.exceptionOrNull()
+        assertTrue(failed is KokoroDownload.DamagedException)
+        // It stopped at the file's size, not at whatever the server sent.
+        assertTrue(java.io.File(install.dir, "model.onnx.part").length() <= model.size)
     }
 
     @Test

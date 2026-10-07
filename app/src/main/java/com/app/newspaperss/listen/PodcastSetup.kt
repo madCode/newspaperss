@@ -9,7 +9,11 @@ import com.app.newspaperss.settings.Settings
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import kotlinx.coroutines.withContext
 
@@ -153,26 +157,40 @@ class PodcastSetup(
             }
         } }
         onChecking()
-        // Marked first: sherpa can abort in native code, and a check that took the app down
-        // isn't run again on the next start, only when asked afresh.
-        install.dir.mkdirs()
-        if (!checking.createNewFile()) throw IllegalStateException("The last check stopped the app")
-        val kokoro = engine(settings.current().podcastVoice)
-        try {
-            val started = now()
-            val speech = kokoro.speak(SAMPLE)
-            check(speech.seconds > 0) { "Kokoro said nothing" }
-            val pace = PodcastPace.fromSample((now() - started) / 1e9 / speech.seconds)
-            settings.update { it.copy(podcastPace = pace.toFloat()) }
-        } finally {
-            kokoro.release()
-            // Only a crash in native code skips this, which is what the marker is for: a stop or
-            // an error here mustn't read as one next time.
-            checking.delete()
+        // One check at a time: a cancelled one keeps speaking (native code doesn't stop), and two
+        // at once would hold the model twice and time each other too slow.
+        checkLock.withLock {
+            // Marked first, counting checks that started and never finished: sherpa can abort in
+            // native code, and two in a row that took the app down aren't run again on the next
+            // start, only when asked afresh. One could be the app swiped away.
+            install.dir.mkdirs()
+            val unfinished = checking.takeIf { it.exists() }?.readText()?.toIntOrNull() ?: 0
+            if (unfinished >= CHECK_TRIES) throw IllegalStateException("The last checks stopped the app")
+            checking.writeText((unfinished + 1).toString())
+            val kokoro = engine(settings.current().podcastVoice)
+            try {
+                val started = now()
+                val speech = kokoro.speak(SAMPLE)
+                check(speech.seconds > 0) { "Kokoro said nothing" }
+                // Cancelled while it spoke: its timing isn't the one wanted.
+                currentCoroutineContext().ensureActive()
+                val pace = PodcastPace.fromSample((now() - started) / 1e9 / speech.seconds)
+                settings.update { it.copy(podcastPace = pace.toFloat()) }
+            } finally {
+                kokoro.release()
+                // Only a crash in native code skips this, which is what the marker is for: a stop
+                // or an error here mustn't read as one next time.
+                checking.delete()
+            }
         }
     }
 
     companion object {
+        private val checkLock = Mutex()
+
+        /** Checks that took the app down in a row before it's taken as Kokoro crashing this phone. */
+        private const val CHECK_TRIES = 2
+
         const val PHASE = "phase"
         const val PHASE_DOWNLOAD = "download"
         const val PHASE_CHECK = "check"

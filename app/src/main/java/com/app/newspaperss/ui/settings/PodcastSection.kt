@@ -23,7 +23,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -60,8 +62,11 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
     // Choosing to read live puts a failed setup aside for this visit.
     var failureSeen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(kokoro) {
-        if (kokoro !is KokoroState.Absent && kokoro !is KokoroState.Failed) asking = false
+        // Null is the state not read yet (as after the app is restored), not a reason to drop the question.
+        if (kokoro != null && kokoro !is KokoroState.Absent && kokoro !is KokoroState.Failed) asking = false
     }
+    val samples = remember { SamplePlayer() }
+    DisposableEffect(Unit) { onDispose { samples.release() } }
     val busy = kokoro is KokoroState.Waiting || kokoro is KokoroState.Downloading || kokoro is KokoroState.Checking
     val podcast = s.listenVoice == ListenVoice.PODCAST || asking || busy
     val mb = size?.let { "${it / 1_000_000} MB" } ?: "a few hundred MB"
@@ -105,7 +110,7 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
             detail = if (unsupported) "Kokoro needs a 64-bit phone, and this one is 32-bit." else "Kokoro · made ahead while your phone charges · $mb",
             enabled = !unsupported,
             onSelect = ::pickPodcast,
-            sample = if (unsupported) null else ({ playSample(context, sampleOf(s.podcastVoice)) }),
+            sample = if (unsupported) null else ({ samples.play(context, sampleOf(s.podcastVoice)) }),
         )
     }
 
@@ -143,7 +148,7 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
             Text(kokoro.message)
             Buttons { OutlinedButton(onClick = ::pickPodcast) { Text("Try again") } }
         }
-        kokoro is KokoroState.Ready && s.listenVoice == ListenVoice.PODCAST -> Podcast(s, vm, kokoro, mb)
+        kokoro is KokoroState.Ready && s.listenVoice == ListenVoice.PODCAST -> Podcast(s, vm, kokoro, mb, samples)
         kokoro is KokoroState.Ready -> Verdict(s, kokoro, mb, onUse = vm::useKokoro, onRemove = vm::removeKokoro)
     }
 }
@@ -218,7 +223,7 @@ private fun Verdict(s: AppSettings, kokoro: KokoroState.Ready, size: String, onU
 
 /** Kokoro in use: its voices, what a paper costs on this phone, and removing it. */
 @Composable
-private fun Podcast(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState.Ready, size: String) {
+private fun Podcast(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState.Ready, size: String, samples: SamplePlayer) {
     val context = LocalContext.current
     Column(Modifier.padding(start = INDENT).selectableGroup()) {
         PodcastVoice.entries.forEach { voice ->
@@ -227,7 +232,7 @@ private fun Podcast(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState.R
                 title = voice.label,
                 detail = voice.accent,
                 onSelect = { vm.setPodcastVoice(voice) },
-                sample = { playSample(context, sampleOf(voice)) },
+                sample = { samples.play(context, sampleOf(voice)) },
             )
         }
         Text(
@@ -268,9 +273,23 @@ private fun sampleOf(voice: PodcastVoice): Int = when (voice) {
     PodcastVoice.GEORGE -> R.raw.kokoro_sample_george
 }
 
-/** A clip made with Kokoro and shipped with the app, so a voice can be heard before downloading it. */
-private fun playSample(context: Context, @RawRes sample: Int) {
-    val player = MediaPlayer.create(context, sample) ?: return
-    player.setOnCompletionListener { it.release() }
-    player.start()
+/**
+ * Clips made with Kokoro and shipped with the app, so a voice can be heard before downloading it.
+ * One at a time, and held while it plays: a MediaPlayer nothing refers to can be collected mid-word.
+ */
+private class SamplePlayer {
+    private var player: MediaPlayer? = null
+
+    fun play(context: Context, @RawRes sample: Int) {
+        release()
+        player = MediaPlayer.create(context, sample)?.apply {
+            setOnCompletionListener { done -> if (player === done) release() }
+            start()
+        }
+    }
+
+    fun release() {
+        player?.release()
+        player = null
+    }
 }

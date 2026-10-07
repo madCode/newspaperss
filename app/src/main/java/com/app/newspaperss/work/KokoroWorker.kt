@@ -75,7 +75,6 @@ class KokoroWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(if (mobileData) NetworkType.CONNECTED else NetworkType.UNMETERED)
-                        .setRequiresStorageNotLow(true)
                         .build(),
                 )
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
