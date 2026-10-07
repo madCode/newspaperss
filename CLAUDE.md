@@ -67,13 +67,23 @@ Docs are for people: keep them readable, current and short.
 ## Pull requests
 
 Before opening a PR that changes behaviour, have a fresh-eyes subagent
-review the diff. Point it at the risky parts (how the change interacts
-with other features touching the same data, sync and delivery, removal
-and re-adding, cancellation, e-ink and accessibility), and ask for
-concrete findings only: file:line and a failure scenario, most severe
-first, no edits. Verify each finding before acting on it, and say in the
-PR what the review found and what was fixed or deliberately left. Docs-,
-comment- and config-only changes can skip this; after fixing the
+review the diff. Point it at the risky parts:
+
+- How the change interacts with other features touching the same data,
+  including whatever else deletes or replaces that data.
+- Sync and delivery, removal and re-adding, cancellation.
+- Rotation, and the app being killed and restored.
+- Feeds, pages and links as untrusted input: a hostile feed, a link that
+  isn't to the web.
+- Other locales: non-Latin digits, international domain names, pages in
+  older encodings.
+- E-ink, accessibility, and e-reader firmware that lacks standard
+  Android screens.
+
+Ask for concrete findings only: file:line and a failure scenario, most
+severe first, no edits. Verify each finding before acting on it, and say
+in the PR what the review found and what was fixed or deliberately left.
+Docs-, comment- and config-only changes can skip this; after fixing the
 findings, a short second look at just the new diff is enough.
 
 A PR that changes how a screen looks shows it: before and after images in
