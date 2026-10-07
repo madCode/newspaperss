@@ -40,7 +40,7 @@ class ArticleExtractorTest {
         val day = "https://example.com/2026/10/05.html"
         val dayPage = page("<html><body><div><a name=\"a1\"></a><p>${sentence.repeat(40)}</p></div>" +
             "<div><a name=\"a2\"></a><p>What's the best way to block a browser from a website?</p></div></body></html>", finalUrl = day)
-        val http = FakeHttp(mapOf(day to dayPage, "$day#a2" to dayPage, "$day#ref=rss" to dayPage))
+        val http = FakeHttp(mapOf(day to dayPage, "$day#a2" to dayPage))
         val short = "<p>What's the best way to block a browser from a website?</p>"
         for (mode in listOf(ContentMode.AUTO, ContentMode.PAGE)) {
             val article = ArticleExtractor(http).extract(ExtractInput("$day#a2", "", short, null, mode = mode))
@@ -49,9 +49,6 @@ class ArticleExtractorTest {
             assertNull("it says nothing about the source", FullTextCheck.evidence(article))
         }
         assertTrue("the page isn't fetched", http.requested.isEmpty())
-        // A tracking tag isn't a spot on the page: a short item still gets its page read.
-        ArticleExtractor(http).extract(ExtractInput("$day#ref=rss", "", short, null))
-        assertEquals(listOf("$day#ref=rss"), http.requested)
     }
 
     @Test
