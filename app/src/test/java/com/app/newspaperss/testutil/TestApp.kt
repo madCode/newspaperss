@@ -50,6 +50,8 @@ class TestApp : NewspaperssApp() {
         connectListening = {},
         kokoroInstall = kokoroInstall,
         newKokoroDownload = { install -> KokoroDownload(OkHttpClient(), install, kokoroBaseUrl) },
+        // CI's own builds carry a build number: tests shouldn't depend on whether they run there.
+        installedBuild = null,
     )
 
     override fun scheduleWork() {}

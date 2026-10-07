@@ -63,12 +63,14 @@ import com.app.newspaperss.ui.edition.NextStepButton
 import com.app.newspaperss.ui.edition.editionChoices
 import com.app.newspaperss.ui.edition.rememberKindleApp
 import com.app.newspaperss.ui.edition.startKindle
+import com.app.newspaperss.DebugUpdates
+import com.app.newspaperss.ui.components.openInBrowser
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 @Composable
-fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), onOpenEdition: (Long) -> Unit = {}) {
+fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), newerBuild: Int? = null, onOpenEdition: (Long) -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     fun launch(intent: android.content.Intent): Boolean = try {
@@ -86,6 +88,13 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), o
         // Keyed, so an item keeps its state when others come and go above it: the build panel's
         // status line has to stay the same node for TalkBack to announce its changes.
         item(key = "masthead") { Masthead(today, Modifier.padding(top = 24.dp, bottom = 16.dp)) }
+        newerBuild?.let { build ->
+            item(key = "newerBuild") {
+                TextButton(onClick = { openInBrowser(context, DebugUpdates.DOWNLOAD) }, modifier = Modifier.padding(bottom = 8.dp)) {
+                    Text("Test build $build is out. Download it", textAlign = TextAlign.Center)
+                }
+            }
+        }
         state.next?.let { next ->
             item(key = "next") { Text("Next edition: $next", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp)) }
         }

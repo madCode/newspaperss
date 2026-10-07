@@ -122,7 +122,8 @@ The newest debug build is always at
 (Android 8 or later). It installs beside a release build, and Settings shows
 which build it is. The [release page](https://github.com/madCode/newspaperss/releases/tag/latest-debug)
 names the newest build, its commit and date, and has the same file under the
-build's number.
+build's number. Today says when a newer build is out (the app asks GitHub at
+most every three hours).
 
 ## Building
 
