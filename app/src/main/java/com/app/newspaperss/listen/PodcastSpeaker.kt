@@ -1,6 +1,5 @@
 package com.app.newspaperss.listen
 
-import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Handler
@@ -11,17 +10,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
-/** Where a line [ListenPlayer] asks for is: its edition, page and line, and the play it belongs to. */
-data class LineId(val generation: Int, val editionId: Long, val page: Int, val line: Int) {
-    override fun toString() = "$generation:$editionId:$page:$line"
+/**
+ * Where a line [ListenPlayer] asks for is: its edition, page and line, of how many [lines] on
+ * the page, and the play it belongs to.
+ */
+data class LineId(val generation: Int, val editionId: Long, val page: Int, val line: Int, val lines: Int) {
+    override fun toString() = "$generation:$editionId:$page:$line:$lines"
 
     companion object {
         fun parse(id: String): LineId? {
             val parts = id.split(':')
-            if (parts.size != 4) return null
+            if (parts.size != 5) return null
             return LineId(
                 parts[0].toIntOrNull() ?: return null, parts[1].toLongOrNull() ?: return null,
                 parts[2].toIntOrNull() ?: return null, parts[3].toIntOrNull() ?: return null,
+                parts[4].toIntOrNull() ?: return null,
             )
         }
     }
@@ -59,6 +62,11 @@ class PodcastSpeaker(
     private var article: Pair<Long, Int>? = null
     private var pieces: List<PodcastPiece> = emptyList()
 
+    /** What the player has asked this article's lines to say: the phone's voice takes over with them. */
+    private val asked = mutableMapOf<Int, Asked>()
+
+    private class Asked(val text: String, val language: String?, val rate: Float)
+
     /** What's playing: the line it started from, the piece, and the last line reported. */
     private var playing: LineId? = null
     private var piece = 0
@@ -69,11 +77,7 @@ class PodcastSpeaker(
         audio.listener = object : PodcastAudio.Listener {
             override fun onPosition(ms: Long) = reach(ms)
             override fun onEnded() = pieceEnded()
-            override fun onError() {
-                val at = playing ?: return
-                stopAudio()
-                listener?.onError(at.copy(line = reported.coerceAtLeast(at.line)).toString())
-            }
+            override fun onError() = audioFailed()
         }
     }
 
@@ -85,7 +89,11 @@ class PodcastSpeaker(
             return phone.speak(id, text, language, rate, flush)
         }
         val here = line.editionId to line.page
-        if (here != article) choose(here)
+        if (here != article) choose(here, line.lines)
+        asked[line.line] = Asked(text, language, rate)
+        // Kokoro turned off, or removed with its podcasts, since the article started: the phone's
+        // voice from here, rather than a file that's gone.
+        if (flush && pieces.isNotEmpty() && !(inUse() && pieces.all { it.audio.exists() })) toPhone()
         if (pieces.isEmpty()) return phone.speak(id, text, language, rate, flush)
         // Already on its way: the audio reaches it.
         if (!flush) return true
@@ -94,11 +102,38 @@ class PodcastSpeaker(
         return true
     }
 
-    private fun choose(here: Pair<Long, Int>) {
+    private fun choose(here: Pair<Long, Int>, lines: Int) {
         article = here
+        asked.clear()
         val (editionId, page) = here
-        pieces = if (inUse() && podcasts.made(editionId, page)) podcasts.pieces(editionId, page) else emptyList()
+        val made = if (inUse() && podcasts.made(editionId, page)) podcasts.pieces(editionId, page) else emptyList()
+        // Made from the same lines as the player reads: an update that splits sentences
+        // differently would otherwise tint the wrong ones, and never reach the article's end.
+        pieces = made.takeIf { it.isNotEmpty() && it.last().firstLine + it.last().starts.size == lines }.orEmpty()
         _voice.value = if (pieces.isEmpty()) null else podcasts.voice(editionId)
+    }
+
+    private fun toPhone() {
+        stopAudio()
+        pieces = emptyList()
+        _voice.value = null
+    }
+
+    /**
+     * The podcast can't be played (a damaged file, say): the phone's voice reads on from the
+     * line it reached, so Listen doesn't sit silent showing it's playing.
+     */
+    private fun audioFailed() {
+        val at = playing ?: return
+        val line = reported.coerceAtLeast(at.line)
+        toPhone()
+        val now = asked[line]
+        if (now == null) {
+            listener?.onError(at.copy(line = line).toString())
+            return
+        }
+        phone.speak(at.copy(line = line).toString(), now.text, now.language, now.rate, flush = true)
+        asked[line + 1]?.let { phone.speak(at.copy(line = line + 1).toString(), it.text, it.language, it.rate, flush = false) }
     }
 
     private fun play(from: LineId, rate: Float) {
@@ -189,11 +224,13 @@ interface PodcastAudio {
  * [PodcastAudio] through Android's MediaPlayer, whose speed keeps the voice's pitch. Audio focus,
  * the lock screen and headphones are [ListenService]'s, as for the phone's voice.
  */
-class MediaPlayerAudio(context: Context) : PodcastAudio {
+class MediaPlayerAudio : PodcastAudio {
     override var listener: PodcastAudio.Listener? = null
-    private val app = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
+
+    /** Bumped by each play and stop, so an end or error posted for an earlier one is dropped. */
+    private var plays = 0
 
     private val tick = object : Runnable {
         override fun run() {
@@ -205,30 +242,44 @@ class MediaPlayerAudio(context: Context) : PodcastAudio {
 
     override fun play(file: File, fromMs: Long, speed: Float) {
         stop()
+        val play = plays
+        fun later(call: PodcastAudio.Listener.() -> Unit) = main.post { if (plays == play) listener?.call() }
         val p = MediaPlayer()
         try {
             p.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             p.setDataSource(file.path)
             // A local file of a couple of minutes: quick enough to prepare in place.
             p.prepare()
-            p.setOnCompletionListener { if (player === it) main.post { listener?.onEnded() } }
-            p.setOnErrorListener { mp, _, _ ->
-                if (player === mp) main.post { listener?.onError() }
+            p.setOnCompletionListener { later { onEnded() } }
+            p.setOnErrorListener { _, _, _ ->
+                later { onError() }
                 true
             }
-            if (fromMs > 0) p.seekTo(fromMs, MediaPlayer.SEEK_CLOSEST)
-            p.playbackParams = p.playbackParams.setSpeed(speed)
-            p.start()
+            // Setting a speed starts playback, so only once the seek has landed: before, a moment
+            // from the piece's start would be heard.
+            val begin = {
+                if (plays == play) {
+                    p.playbackParams = p.playbackParams.setSpeed(speed)
+                    p.start()
+                    main.post(tick)
+                }
+            }
+            if (fromMs > 0) {
+                p.setOnSeekCompleteListener { begin() }
+                p.seekTo(fromMs, MediaPlayer.SEEK_CLOSEST)
+            } else {
+                begin()
+            }
         } catch (e: Exception) {
             p.release()
-            main.post { listener?.onError() }
+            later { onError() }
             return
         }
         player = p
-        main.post(tick)
     }
 
     override fun stop() {
+        plays++
         main.removeCallbacks(tick)
         player?.release()
         player = null

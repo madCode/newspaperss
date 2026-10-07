@@ -73,7 +73,8 @@ class PodcastSpeakerTest {
         store.keep(editionId, page, first, scratch, starts)
     }
 
-    private fun id(line: Int, page: Int = 0, generation: Int = 1) = LineId(generation, 7, page, line).toString()
+    /** A line of edition 7: five lines on a page, as made() makes them. */
+    private fun id(line: Int, page: Int = 0, generation: Int = 1, lines: Int = 5) = LineId(generation, 7, page, line, lines).toString()
 
     @Test
     fun aMadeArticlePlaysFromItsPodcastReportingEachSentenceAsItsReached() {
@@ -156,25 +157,63 @@ class PodcastSpeakerTest {
     }
 
     @Test
-    fun audioThatFailsIsReportedAtTheSentenceItReached() {
-        made()
-        listen()
-        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
-        audio.listener!!.onPosition(2_100)
-        audio.listener!!.onError()
-        assertEquals("error ${id(1)}", heard.last())
-        // A tick after the stop reports nothing.
-        audio.listener!!.onPosition(5_000)
-        assertEquals("error ${id(1)}", heard.last())
-    }
-
-    @Test
     fun stoppingStopsBoth() {
         made()
         speaker.speak(id(0), "Quanta", null, 1f, flush = true)
         speaker.stop()
         assertEquals(1, audio.stopped)
         assertTrue(phone.queue.isEmpty())
+    }
+
+    @Test
+    fun audioThatCantBePlayedHandsOverToThePhonesVoiceWhereItWas() {
+        made()
+        listen()
+        // The player queues each line as the one before starts.
+        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
+        speaker.speak(id(1), "Counting Knots", null, 1f, flush = false)
+        audio.listener!!.onPosition(2_100)
+        speaker.speak(id(2), "Nobody knew.", null, 1f, flush = false)
+        audio.listener!!.onError()
+
+        // From the sentence it had reached, with the one queued behind it.
+        assertEquals(listOf("Counting Knots", "Nobody knew."), phone.said.map { it.text })
+        assertEquals(listOf(id(1), id(2)), phone.said.map { it.id })
+        assertNull(speaker.voice.value)
+        // A tick from the stopped audio reports nothing.
+        val before = heard.size
+        audio.listener!!.onPosition(5_000)
+        assertEquals(before, heard.size)
+    }
+
+    @Test
+    fun kokoroTurnedOffPartWayIsHeardAtTheNextPlay() {
+        made()
+        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
+        inUse = false
+        // Paused and played again.
+        speaker.speak(id(1, generation = 2), "Counting Knots", null, 1f, flush = true)
+        assertEquals("Counting Knots", phone.said.single().text)
+        assertEquals(1, audio.played.size)
+    }
+
+    @Test
+    fun aPodcastRemovedPartWayIsntPlayedFromFilesThatAreGone() {
+        made()
+        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
+        store.deleteAll()
+        speaker.speak(id(3, generation = 2), "It took a week.", null, 1f, flush = true)
+        assertEquals("It took a week.", phone.said.single().text)
+        assertEquals(1, audio.played.size)
+    }
+
+    @Test
+    fun aPodcastMadeFromOtherSentencesThanTheBooksIsntUsed() {
+        made()
+        // The book now splits the page into six sentences; the podcast has five.
+        speaker.speak(id(0, lines = 6), "Quanta", null, 1f, flush = true)
+        assertEquals(1, phone.said.size)
+        assertTrue(audio.played.isEmpty())
     }
 
     @Test

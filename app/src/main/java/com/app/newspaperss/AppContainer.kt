@@ -63,6 +63,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -82,7 +83,7 @@ class AppContainer(
     saveNotes: (editionId: Long) -> Unit = { NotesWorker.enqueue(context, it) },
     moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
     speaker: () -> Speaker = { SystemSpeaker(context) },
-    podcastAudio: () -> PodcastAudio = { MediaPlayerAudio(context) },
+    podcastAudio: () -> PodcastAudio = { MediaPlayerAudio() },
     private val connectListening: () -> Unit = { ListenService.connect(context) },
     val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
     podcastEngine: (KokoroInstall, PodcastVoice) -> PodcastEngine = ::KokoroEngine,
@@ -136,7 +137,11 @@ class AppContainer(
 
     /** Listen's voice: a made podcast where there is one, the phone's elsewhere. */
     private val listenSpeaker by lazy {
-        PodcastSpeaker(speaker(), podcasts, podcastAudio()) { listenSettings.value?.listenVoice == ListenVoice.PODCAST }
+        PodcastSpeaker(speaker(), podcasts, podcastAudio()) {
+            // Just after the app starts, before the store's first value: read it, or a made
+            // article would play in the phone's voice.
+            (listenSettings.value ?: runBlocking { settings.current() }).listenVoice == ListenVoice.PODCAST
+        }
     }
 
     /** The podcast's voice while an article plays from it; null in the phone's voice. */

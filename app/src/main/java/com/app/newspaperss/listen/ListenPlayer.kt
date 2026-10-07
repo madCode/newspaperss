@@ -318,7 +318,7 @@ class ListenPlayer(
     private fun say(line: Int, flush: Boolean) {
         val current = _state.value
         val script = current.script ?: return
-        val id = LineId(generation, current.editionId ?: return, current.at.page, line)
+        val id = LineId(generation, current.editionId ?: return, current.at.page, line, script.lines.size)
         val installed = speaker.speak(id.toString(), script.lines[line].spoken, script.language, current.speed, flush)
         val missing = script.language.takeUnless { installed }
         if (missing != current.missingLanguage) _state.update { it.copy(missingLanguage = missing) }

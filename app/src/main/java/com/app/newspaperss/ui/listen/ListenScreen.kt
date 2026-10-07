@@ -313,7 +313,8 @@ private fun PlayerDock(state: ListenState, player: ListenPlayer, voice: PodcastV
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(page?.source ?: state.editionTitle, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 // The only sign this article plays from the podcast: its voice's name.
-                if (voice != null) {
+                // Only while it plays: paused, the next article's voice isn't chosen until it starts.
+                if (voice != null && state.playing) {
                     Text(
                         voice.label,
                         style = MaterialTheme.typography.labelMedium,
