@@ -452,8 +452,8 @@ class PodcastMakerTest {
     @Test
     fun aPodcastTeachesThePaceItWasMadeAt() {
         inUse()
-        // Five minutes of speech, made at 1.5× where the check guessed 1.2×.
-        val id = edition("Thursday", long(60))
+        // Ten minutes of speech, made at 1.5× where the check guessed 1.2×.
+        val id = edition("Thursday", long(125))
         request(id)
         make()
 
@@ -463,7 +463,7 @@ class PodcastMakerTest {
 
         // The next, at 1.1×, moves it halfway there.
         paceNow = 1.1
-        request(edition("Friday", long(60)))
+        request(edition("Friday", long(125)))
         make()
         assertEquals(1.3f, runBlocking { settings.current() }.podcastPace!!, 0.01f)
     }

@@ -8,6 +8,7 @@ import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.delivery.KindleSend
 import com.app.newspaperss.settings.KindleEmail
+import com.app.newspaperss.ui.settings.SettingsSummary
 import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.work.EditionWorker
 import com.app.newspaperss.settings.Device
@@ -72,6 +73,7 @@ class TodayViewModel(
     online: Flow<Boolean> = flowOf(true),
     private val now: () -> ZonedDateTime = { ZonedDateTime.now() },
     private val lastDue: () -> Long = { 0L },
+    private val lastStart: () -> Long = lastDue,
     sentToKindle: Flow<Map<Long, KindleSend>> = flowOf(emptyMap()),
     private val startBuild: () -> Unit,
 ) : ViewModel() {
@@ -93,7 +95,7 @@ class TodayViewModel(
             latestArticles = latestArticles,
             sentToKindle = kindle,
             build = buildStateOf(info, isOnline),
-            next = nextEdition(s, now(), lastDue()),
+            next = nextEdition(s, now(), lastDue(), lastStart()),
             preferOpen = s.device == Device.BOOX,
             offerOpen = s.device.offersOpen,
             kindleReader = s.device == Device.KINDLE,
@@ -130,18 +132,21 @@ class TodayViewModel(
     }
 
     companion object {
-        /** @param lastDueMs [EditionScheduler.LAST_DUE], so an edition started early isn't shown as still to come. */
-        fun nextEdition(s: Settings, now: ZonedDateTime, lastDueMs: Long = 0L): String? {
+        /**
+         * @param lastDueMs [EditionScheduler.LAST_DUE] and [lastStartMs] [EditionScheduler.LAST_START],
+         *   so an edition started early isn't shown as still to come.
+         */
+        fun nextEdition(s: Settings, now: ZonedDateTime, lastDueMs: Long = 0L, lastStartMs: Long = lastDueMs): String? {
             if (!s.scheduleEnabled) return null
-            val next = EditionScheduler.nextDue(s, now, lastDueMs)?.atZone(now.zone) ?: return null
+            val next = EditionScheduler.nextDue(s, now, lastDueMs, lastStartMs)?.atZone(now.zone) ?: return null
             val time = next.toLocalTime().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
             val day = when (next.toLocalDate()) {
                 now.toLocalDate() -> "Today"
                 now.toLocalDate().plusDays(1) -> "Tomorrow"
                 else -> next.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
             }
-            val podcast = EditionScheduler.podcastStart(s)?.let {
-                ", with its podcast. It starts at ${it.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))}: leave your phone charging"
+            val podcast = SettingsSummary.podcastStart(s, Locale.getDefault())?.let {
+                ", with its podcast. It starts at $it: leave your phone charging"
             }.orEmpty()
             return "$day at $time \u00b7 about ${s.edition.minutes} min$podcast"
         }

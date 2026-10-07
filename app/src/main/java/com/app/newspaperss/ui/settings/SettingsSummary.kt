@@ -62,14 +62,23 @@ object SettingsSummary {
             days == WEEKEND -> "$time, weekends"
             else -> "$time, " + days.sorted().joinToString(", ") { it.getDisplayName(TextStyle.SHORT, locale) }
         }
-        val start = EditionScheduler.podcastStart(s)
-            ?.let { " · starts " + it.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale)) + " for the podcast" }.orEmpty()
+        val start = podcastStart(s, locale)?.let { " · starts $it for the podcast" }.orEmpty()
         val problem = when {
             days.isEmpty() -> "Pick at least one day."
             !notificationsOn -> "Notifications are off."
             else -> null
         }
         return Summary(text + start, problem)
+    }
+
+    /**
+     * When scheduled editions start for their podcast, as "4:50 AM", or "11:20 PM the day before"
+     * when that's before midnight; null with no podcast to make.
+     */
+    fun podcastStart(s: Settings, locale: Locale): String? {
+        val start = EditionScheduler.podcastStart(s) ?: return null
+        val time = start.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))
+        return if (start.isAfter(s.schedule.time)) "$time the day before" else time
     }
 
     fun delivery(s: Settings, folderReachable: Boolean): Summary {

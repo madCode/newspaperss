@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import kotlinx.coroutines.withContext
@@ -49,7 +50,7 @@ sealed interface KokoroState {
 class PodcastSetup(
     private val install: KokoroInstall,
     private val settings: SettingsStore,
-    work: Flow<WorkInfo?>,
+    private val work: Flow<WorkInfo?>,
     private val start: (mobileData: Boolean) -> Unit,
     private val stop: () -> Unit,
     private val supported: Boolean,
@@ -127,6 +128,20 @@ class PodcastSetup(
     suspend fun use() {
         settings.update { it.copy(listenVoice = ListenVoice.PODCAST) }
         if (withContext(Dispatchers.IO) { podcasts.waiting().isNotEmpty() }) makePodcasts()
+    }
+
+    /**
+     * Goes back to reading live if Kokoro is chosen or timed but isn't on the phone, as after a
+     * restore: settings come back, the 384 MB doesn't. Otherwise scheduled editions would start
+     * hours early for a podcast nothing can make, and the old phone's pace would stand. Left
+     * alone while a download is under way or waiting.
+     */
+    suspend fun settle() {
+        val s = settings.current()
+        if (s.listenVoice != ListenVoice.PODCAST && s.podcastPace == null) return
+        if (work.first()?.state?.isFinished == false) return
+        if (withContext(Dispatchers.IO) { install.complete }) return
+        settings.update { it.copy(listenVoice = ListenVoice.PHONE, podcastPace = null, podcastPaceMeasured = false) }
     }
 
     /** Deletes Kokoro and the podcasts made with it, and goes back to reading live. */

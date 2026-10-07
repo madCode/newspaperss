@@ -216,9 +216,37 @@ class EditionSchedulerTest {
     @Test
     fun aShorterStartLearnedWhileTheEditionIsBeingMadeDoesntStartItAgain() = runTest {
         // Started at 4:50 for 6:30; at 5:00 a podcast teaches a pace that would start it at 5:50.
-        prefs.edit { putLong(EditionScheduler.LAST_DUE, sixThirty) }
+        prefs.edit {
+            putLong(EditionScheduler.LAST_DUE, sixThirty)
+            putLong(EditionScheduler.LAST_START, startsAt(4, 50))
+        }
         EditionScheduler.reschedule(context, podcast.copy(podcastPace = 0.5f, podcastPaceMeasured = true), morning)
 
         assertEquals(sixThirty + day, prefs.getLong(EditionScheduler.PENDING, 0))
+    }
+
+    @Test
+    fun turningThePodcastOffWhileItsEditionIsBeingMadeDoesntStartItAgain() = runTest {
+        // Started at 4:50 for 6:30; at 5:15, Kokoro is removed, and the lead is 30 minutes again.
+        prefs.edit {
+            putLong(EditionScheduler.LAST_DUE, sixThirty)
+            putLong(EditionScheduler.LAST_START, startsAt(4, 50))
+        }
+        EditionScheduler.reschedule(context, settings, morning.withMinute(15))
+
+        assertEquals(sixThirty + day, prefs.getLong(EditionScheduler.PENDING, 0))
+    }
+
+    @Test
+    fun movingTheTimeAfterTodaysPaperCameDoesntMakeAnotherNow() = runTest {
+        // Today's came at 6:30; at 9:00 the reader moves the time to 8:00.
+        prefs.edit {
+            putLong(EditionScheduler.LAST_DUE, sixThirty)
+            putLong(EditionScheduler.LAST_START, startsAt(4, 50))
+        }
+        val eight = podcast.copy(schedule = Schedule(time = LocalTime.of(8, 0)))
+        EditionScheduler.reschedule(context, eight, morning.withHour(9))
+
+        assertEquals(morning.withHour(8).withMinute(0).toInstant().toEpochMilli() + day, prefs.getLong(EditionScheduler.PENDING, 0))
     }
 }

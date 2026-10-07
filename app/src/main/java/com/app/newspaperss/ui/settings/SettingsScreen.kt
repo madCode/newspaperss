@@ -325,17 +325,23 @@ private fun ScheduleSection(s: AppSettings, vm: SettingsViewModel) {
 /** With the podcast in use, when scheduled editions start, and why, under the time they're ready by. */
 @Composable
 private fun PodcastStart(s: AppSettings) {
-    val start = EditionScheduler.podcastStart(s) ?: return
+    val at = SettingsSummary.podcastStart(s, LocalConfiguration.current.locales[0]) ?: return
     val pace = s.podcastPace ?: return
-    val at = start.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
     val earlier = EditionScheduler.lead(s).minus(EditionScheduler.LEAD).toMinutes()
-    val making = SettingsSummary.aboutTime(PodcastPace.minutesToMake(s.edition.minutes, pace.toDouble()))
+    val minutes = PodcastPace.minutesToMake(s.edition.minutes, pace.toDouble())
+    val making = SettingsSummary.aboutTime(minutes)
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Starts at $at, for the podcast", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
             Text(
-                "Making the podcast takes $making on this phone, so the paper starts $earlier minutes earlier, with room to spare. " +
-                    "Anything published after $at goes in the next one.",
+                when {
+                    minutes > PodcastPace.MOST_EARLIER ->
+                        "Making the podcast takes $making on this phone, more than the 3 hours a paper can start early. " +
+                            "The end of it will play in your phone's voice; a shorter paper would fit."
+                    earlier >= PodcastPace.MOST_EARLIER ->
+                        "Making the podcast takes $making on this phone, so the paper starts 3 hours earlier, the most it can, with little room to spare."
+                    else -> "Making the podcast takes $making on this phone, so the paper starts $earlier minutes earlier, with room to spare."
+                } + " Anything published after $at goes in the next one.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text("Leave the phone charging from $at.", style = MaterialTheme.typography.bodyMedium)

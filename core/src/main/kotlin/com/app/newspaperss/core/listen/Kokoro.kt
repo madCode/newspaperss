@@ -97,6 +97,9 @@ object PodcastPace {
         return if (lastMeasured) (last + made) / 2 else made
     }
 
-    /** Less audio than this in a run says little about the pace: a cool phone's first minutes. */
-    const val LEARN_FROM_SECONDS = 300.0
+    /**
+     * Less speech than this in a run says little about the pace: a Pixel 8 took 7 minutes to warm
+     * up, and a cool phone is faster.
+     */
+    const val LEARN_FROM_SECONDS = 600.0
 }

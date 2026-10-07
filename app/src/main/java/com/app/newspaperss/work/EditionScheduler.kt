@@ -41,6 +41,8 @@ object EditionScheduler {
     internal const val PENDING_START = "pending_start_epoch_ms"
     /** The due time of the last edition a timer started, so it isn't scheduled again around that time. */
     internal const val LAST_DUE = "last_due_epoch_ms"
+    /** When the timer that started the last edition fired. */
+    internal const val LAST_START = "last_start_epoch_ms"
     internal const val DUE = "due_epoch_ms"
     val LEAD: Duration = Duration.ofMinutes(30)
 
@@ -70,7 +72,7 @@ object EditionScheduler {
         // a stale one would stop timed editions for good: it only counts while the work exists.
         val armed = work.getWorkInfosForUniqueWorkFlow(UNIQUE).first().any { !it.state.isFinished }
         val pending = prefs.getLong(PENDING, 0L).takeIf { armed && it > 0 }?.let(Instant::ofEpochMilli)
-        val target = if (settings.scheduleEnabled) nextDue(settings, now, prefs.getLong(LAST_DUE, 0L)) else null
+        val target = if (settings.scheduleEnabled) nextDue(settings, now, prefs.getLong(LAST_DUE, 0L), prefs.getLong(LAST_START, prefs.getLong(LAST_DUE, 0L))) else null
         val action = ScheduleTimer.decide(pending, target, now.toInstant())
         val start = target?.let { startOf(it, settings) }
         // The same edition, starting at another time: the podcast's pace, or turning it on or off,
@@ -98,20 +100,23 @@ object EditionScheduler {
     fun lastDue(context: Context): Long =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(LAST_DUE, 0L)
 
+    fun lastStart(context: Context): Long = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).let { it.getLong(LAST_START, it.getLong(LAST_DUE, 0L)) }
+
     /**
-     * The next due time, skipping any within the lead of the last edition started: that one is
-     * being built already, and with the time moved from 6:30 to 6:45 during its lead, 6:45
-     * would be a second paper. Further away, [lastDueMs] is ignored, so a clock set far ahead
-     * and then corrected can't hold back timed editions until that date.
+     * The next due time, skipping the last edition started while it's being made: from when its
+     * timer fired until [LEAD] after it was due. Otherwise, with the time moved from 6:30 to 6:45
+     * during its lead, 6:45 would be a second paper; and so would 6:30 again, with the podcast
+     * turned off during a lead it had made longer. Outside that span, [lastDueMs] is ignored, so
+     * a clock set far ahead and then corrected can't hold back timed editions until that date.
      *
-     * With the podcast in use, the lead is the longest it can be, not today's: a pace learned
-     * during the lead shortens it, and the edition already started would look still to come.
+     * @param lastStartMs when the last timer fired; before that was kept, [LEAD] before its due time.
      */
-    internal fun nextDue(settings: Settings, now: ZonedDateTime, lastDueMs: Long): Instant? {
+    internal fun nextDue(settings: Settings, now: ZonedDateTime, lastDueMs: Long, lastStartMs: Long = lastDueMs): Instant? {
         val lastDue = Instant.ofEpochMilli(lastDueMs)
-        val window = if (lead(settings) == LEAD) LEAD else LEAD.plusMinutes(PodcastPace.MOST_EARLIER.toLong())
-        val nearLast = Duration.between(now.toInstant(), lastDue).abs() <= window
-        val after = if (nearLast) lastDue.plus(LEAD).atZone(now.zone) else now
+        val from = minOf(Instant.ofEpochMilli(lastStartMs), lastDue.minus(LEAD))
+        val until = lastDue.plus(LEAD)
+        val nearLast = !now.toInstant().isBefore(from) && !now.toInstant().isAfter(until)
+        val after = if (nearLast) until.atZone(now.zone) else now
         return settings.schedule.nextAfter(after)?.toInstant()
     }
 
@@ -123,15 +128,19 @@ object EditionScheduler {
     class Timer(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
         override suspend fun doWork(): Result {
             val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val settings = applicationContext.container.settings.current()
             // Locked: a reschedule between clearing PENDING and arming the next timer would see
             // no timer and arm one with REPLACE, cancelling this worker.
             lock.withLock {
+                // Read in the lock, so a change made while waiting for it is the one used.
+                val settings = applicationContext.container.settings.current()
                 val now = ZonedDateTime.now()
                 val due = inputData.getLong(DUE, now.toInstant().toEpochMilli())
                 EditionWorker.buildNow(applicationContext, scheduled = true, dueAt = due)
-                prefs.edit { putLong(LAST_DUE, due) }
-                val next = if (settings.scheduleEnabled) nextDue(settings, now, due) else null
+                prefs.edit {
+                    putLong(LAST_DUE, due)
+                    putLong(LAST_START, now.toInstant().toEpochMilli())
+                }
+                val next = if (settings.scheduleEnabled) nextDue(settings, now, due, now.toInstant().toEpochMilli()) else null
                 if (next != null) {
                     val start = startOf(next, settings)
                     // Appended rather than replaced: REPLACE on our own name would cancel this running worker.

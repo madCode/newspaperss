@@ -234,8 +234,9 @@ class PodcastMaker(
             try {
                 makeUnderLock()
             } finally {
-                // Stopped too: an unplugged phone has still shown its pace.
-                withContext(NonCancellable) { learnPace() }
+                // Stopped too: an unplugged phone has still shown its pace. Failing to keep it
+                // mustn't hide why the run ended.
+                withContext(NonCancellable) { runCatching { learnPace() } }
             }
         }
     }
@@ -273,7 +274,10 @@ class PodcastMaker(
                         if (kokoro?.first != voice) {
                             kokoro?.second?.release()
                             kokoro = null
+                            // Loading is part of what a podcast costs: each of Android's stops means another.
+                            val began = now()
                             kokoro = voice to engine(voice)
+                            workNanos += now() - began
                         }
                         makePage(editionId, page, script(book, page), kokoro!!.second)
                     }
@@ -314,18 +318,19 @@ class PodcastMaker(
                 currentCoroutineContext().ensureActive()
                 val death = if (i == deadAt) deaths + 1 else 1
                 if (death > CRASHES) throw Unsayable(IllegalStateException("Line $i took the app down $deaths times"))
-                store.saying(editionId, page, i, death)
                 val began = now()
+                store.saying(editionId, page, i, death)
                 val speech = try {
                     kokoro.speak(lines[i].spoken)
                 } catch (e: Exception) {
                     throw Unsayable(e)
                 }
                 val current = piece ?: Piece(i, store.scratch(editionId, page, i), speech.sampleRate).also { piece = it }
-                current.work += now() - began
                 if (i > 0 && lines[i - 1].block != lines[i].block) current.write(FloatArray((current.rate * PAUSE).toInt()))
                 current.starts += current.seconds
                 current.write(speech.samples)
+                current.spoken += speech.samples.size
+                current.work += now() - began
                 if (current.seconds >= pieceSeconds && i < lines.lastIndex) {
                     current.keep(editionId, page)
                     piece = null
@@ -358,8 +363,10 @@ class PodcastMaker(
 
     /** A piece being written: opened on its first line, kept once it's long enough or the page ends. */
     private inner class Piece(val firstLine: Int, val file: File, val rate: Int) {
-        /** Time Kokoro spent saying this piece's lines. */
+        /** Time spent making this piece: Kokoro, the encoder and the files. */
         var work = 0L
+        /** Samples of speech, not counting the breaths between paragraphs: what the check timed too. */
+        var spoken = 0L
         private val sink = encoder.open(file, rate)
         val starts = mutableListOf<Double>()
         private var samples = 0L
@@ -374,10 +381,11 @@ class PodcastMaker(
             // Lines Kokoro made nothing of (a row of symbols): an encoder given no audio at all
             // can't finish its file.
             if (samples == 0L) write(FloatArray(rate / 10))
+            val began = now()
             sink.close()
             store.keep(editionId, page, firstLine, file, starts)
-            workNanos += work
-            madeSeconds += seconds
+            workNanos += work + now() - began
+            madeSeconds += spoken.toDouble() / rate
         }
 
         fun drop() {

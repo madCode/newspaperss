@@ -31,6 +31,7 @@ open class NewspaperssApp : Application() {
         // restore); a pending or overdue one is left alone. Again whenever the head start
         // for the podcast changes: its pace learned from a podcast, or Kokoro turned on or off.
         container.appScope.launch {
+            runCatching { container.podcastSetup.settle() }
             container.settings.settings.map { EditionScheduler.lead(it) }.distinctUntilChanged().collect {
                 EditionScheduler.reschedule(this@NewspaperssApp, container.settings.current())
             }
