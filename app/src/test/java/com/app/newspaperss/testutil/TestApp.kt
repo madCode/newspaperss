@@ -4,6 +4,11 @@ import androidx.room.Room
 import com.app.newspaperss.AppContainer
 import com.app.newspaperss.NewspaperssApp
 import com.app.newspaperss.data.AppDatabase
+import com.app.newspaperss.core.listen.KokoroFile
+import com.app.newspaperss.listen.KokoroDownload
+import com.app.newspaperss.listen.KokoroInstall
+import okhttp3.OkHttpClient
+import java.io.File
 
 /**
  * The app with an in-memory database, a fake network, a software cipher in place of the
@@ -22,6 +27,16 @@ class TestApp : NewspaperssApp() {
     /** The voice Listen reads with. */
     val speaker = FakeSpeaker()
 
+    /**
+     * Where Kokoro's download goes and what it asks for. The real voice is 325 MB from Hugging
+     * Face, so a test serves a few bytes from [kokoroBaseUrl] instead; read when the download
+     * starts, so a test can set it after the container is built.
+     */
+    var kokoroFiles: List<KokoroFile> = emptyList()
+    var kokoroBaseUrl: String = "http://127.0.0.1:1"
+    val kokoroDir: File by lazy { File(cacheDir, "kokoro-test").apply { mkdirs() } }
+    val kokoroInstall by lazy { KokoroInstall(kokoroDir) { kokoroFiles } }
+
     override fun createContainer() = AppContainer(
         this,
         http = http,
@@ -33,6 +48,8 @@ class TestApp : NewspaperssApp() {
         moveFeeds = { movesRequested++ },
         speaker = { speaker },
         connectListening = {},
+        kokoroInstall = kokoroInstall,
+        newKokoroDownload = { install -> KokoroDownload(OkHttpClient(), install, kokoroBaseUrl) },
     )
 
     override fun scheduleWork() {}
