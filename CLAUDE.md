@@ -57,6 +57,11 @@ A test should be able to catch a plausible regression. Test behaviour, not
 structure. Don't feed code inputs it can never receive. When a change has
 no behaviour to test, say so in the PR instead of inventing a test.
 
+Delivery ends in another app's hands, so the part past the hand-off can
+only be checked by a person: [docs/DELIVERY-CHECKS.md](docs/DELIVERY-CHECKS.md)
+says how, and a change to delivery or the EPUB wants it run. Adding a test
+that asserts the intent again raises coverage without covering anything.
+
 ## Documentation
 
 Docs are for people: keep them readable, current and short.
