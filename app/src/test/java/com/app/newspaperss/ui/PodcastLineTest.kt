@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -28,9 +29,10 @@ import org.robolectric.annotation.Config
 @Config(application = TestApp::class)
 class PodcastLineTest {
     @get:Rule(order = 0) val tmp = TemporaryFolder()
+    @get:Rule(order = 2) val stores = TestDataStores()
     @get:Rule(order = 1) val compose = createComposeRule()
 
-    private val settings by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
+    private val settings by lazy { SettingsStore(stores.preferences("s")) }
     private val store by lazy { PodcastStore(tmp.newFolder("podcasts")) }
     private val install by lazy { kokoroInstall(tmp.newFolder("kokoro")) }
     /** How many times making podcasts was started. */

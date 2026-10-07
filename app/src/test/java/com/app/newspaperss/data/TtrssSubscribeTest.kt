@@ -1,5 +1,6 @@
 package com.app.newspaperss.data
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.ttrss.TtrssCategory
@@ -33,13 +34,14 @@ import java.time.ZoneOffset
 @Config(application = TestApp::class)
 class TtrssSubscribeTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val stores = TestDataStores()
     @get:Rule val dbRule = DbRule()
     private val db = dbRule.db
     private val http = FakeHttp()
     private val server = FakeTtrss(http)
     private val now = Instant.parse("2026-10-03T06:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
-    private val accountData by lazy { PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") } }
+    private val accountData by lazy { stores.preferences("ttrss") }
     private val accounts by lazy { TtrssAccountStore(accountData, testCipher()) }
     private val sources by lazy { SourceRepository(db, clock) }
     private val ttrss by lazy { TtrssRepository(db, http, accounts, sources, clock) }
