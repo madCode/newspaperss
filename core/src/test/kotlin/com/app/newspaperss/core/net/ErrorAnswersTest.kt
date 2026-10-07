@@ -14,10 +14,10 @@ class ErrorAnswersTest {
         )
         // A curated list's address is built in: adding it again can't help, so the reader isn't asked to.
         assertEquals(
-            "The list's page isn't where newspapeRSS expects it any more (error 410). An update to newspapeRSS should fix it.",
+            "The list's page isn't where NewspapeRSS expects it any more (error 410). An update to NewspapeRSS should fix it.",
             ErrorAnswers.message(410, curatedList = true),
         )
-        assertEquals("The site turned newspapeRSS away (error 429). Some sites block apps: try again later.", ErrorAnswers.message(429))
+        assertEquals("The site turned NewspapeRSS away (error 429). Some sites block apps: try again later.", ErrorAnswers.message(429))
         assertEquals("The site isn't working right now (error 502). Try again later.", ErrorAnswers.message(502))
         assertEquals("The site answered with error 418.", ErrorAnswers.message(418))
     }

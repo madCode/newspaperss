@@ -399,7 +399,7 @@ class TtrssClient(
         const val CATCHUP_MODE_LEVEL = 15
         /** subscribeToFeed and unsubscribeFeed arrived in API level 5 (tt-rss 1.7.6). */
         const val SUBSCRIBE_LEVEL = 5
-        const val TOO_OLD_TO_SUBSCRIBE = "Your tt-rss is too old to add feeds from newspapeRSS. Update it, or add the feed in tt-rss itself."
+        const val TOO_OLD_TO_SUBSCRIBE = "Your tt-rss is too old to add feeds from NewspapeRSS. Update it, or add the feed in tt-rss itself."
 
         /**
          * The API endpoint for an address the reader typed: "rss.example.com/tt-rss" becomes

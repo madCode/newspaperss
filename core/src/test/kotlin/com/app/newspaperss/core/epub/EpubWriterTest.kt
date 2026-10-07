@@ -291,7 +291,7 @@ class EpubWriterTest {
         val sources = listOf("Alpha", "Beta", "Alpha", "Gamma", "Delta", "Epsilon")
         val epub = write(unsectioned(*sources.map { article(source = it, minutes = 4.4) }.toTypedArray()))
         val cover = epub.xml("OEBPS/" + epub.spineHrefs().first()).documentElement.textContent
-        assertTrue(cover.contains("newspapeRSS"))
+        assertTrue(cover.contains("NewspapeRSS"))
         assertTrue(cover.contains("Tuesday Morning Edition"))
         assertTrue(cover.contains("Tuesday, September 29, 2026"))
         assertTrue(cover.contains("6 articles · 26 min"))

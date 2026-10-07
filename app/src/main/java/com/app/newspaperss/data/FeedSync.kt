@@ -285,8 +285,8 @@ class FeedSync(
         val KEEP_WAITING: Duration = Duration.ofDays(7)
 
         const val LIST_LAYOUT_CHANGED =
-            "This page has changed its layout, so newspapeRSS can't tell which links are new and took none. An app update should fix it."
-        const val LIST_UNSUPPORTED = "This version of newspapeRSS can't read this list any more. Remove it or update the app."
+            "This page has changed its layout, so NewspapeRSS can't tell which links are new and took none. An app update should fix it."
+        const val LIST_UNSUPPORTED = "This version of NewspapeRSS can't read this list any more. Remove it or update the app."
 
         val REMEMBER_DELIVERED: Duration = Duration.ofDays(365)
         // A month: long enough to bring an article back from a recent edition with its text.

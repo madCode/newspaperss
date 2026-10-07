@@ -240,7 +240,7 @@ private fun SourcesStep(s: OnboardingState, vm: OnboardingViewModel, sources: So
     if (sources != null) FromAnotherReader(s.added, vm, sources)
     if (readingList != null) SavedLinks(s.savedLinks, readingList)
     Text(
-        "Saw something to read later? In any app, tap Share and choose \u201cRead in newspapeRSS\u201d.",
+        "Saw something to read later? In any app, tap Share and choose \u201cRead in NewspapeRSS\u201d.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 4.dp),
@@ -484,7 +484,7 @@ private fun ExtrasStep(s: OnboardingState, vm: OnboardingViewModel, readingList:
     Text("These stay on the phone, whatever your server does.", style = MaterialTheme.typography.bodyMedium)
     Text("Your reading list", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp).semantics { heading() })
     Text(
-        "Links you share from any app: tap Share and choose \u201cRead in newspapeRSS\u201d. Always on.",
+        "Links you share from any app: tap Share and choose \u201cRead in NewspapeRSS\u201d. Always on.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

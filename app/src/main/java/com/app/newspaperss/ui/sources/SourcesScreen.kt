@@ -162,7 +162,7 @@ fun SourcesScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Export your sites (OPML)") },
-                                    onClick = { menu = false; exportFile.launch("newspapeRSS-sources.opml") },
+                                    onClick = { menu = false; exportFile.launch("NewspapeRSS-sources.opml") },
                                 )
                             }
                         }
@@ -287,7 +287,7 @@ private fun SignInBanner(onSignIn: () -> Unit) {
         Column(Modifier.padding(16.dp)) {
             Text("Sign in to your tt-rss", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             Text(
-                "Your sites come from your tt-rss, and newspapeRSS isn't signed in to it. Until it is, your paper has only what's on this phone.",
+                "Your sites come from your tt-rss, and NewspapeRSS isn't signed in to it. Until it is, your paper has only what's on this phone.",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
             )
@@ -300,7 +300,7 @@ private fun SignInBanner(onSignIn: () -> Unit) {
 private fun ReadingListRow(onClick: () -> Unit) {
     ListItem(
         headlineContent = { Text("Your reading list") },
-        supportingContent = { Text("Links you share to newspapeRSS from any app") },
+        supportingContent = { Text("Links you share to NewspapeRSS from any app") },
         leadingContent = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
         modifier = Modifier.clickable(onClickLabel = "Open reading list", onClick = onClick),
     )
@@ -315,7 +315,7 @@ private fun EmptySources(modifier: Modifier) {
     ) {
         Text("No sources yet", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Add a website you like to read. Paste its address and newspapeRSS does the rest.",
+            "Add a website you like to read. Paste its address and NewspapeRSS does the rest.",
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
         )
@@ -551,7 +551,7 @@ internal fun RemoveSourceDialog(source: SourceEntity, onConfirm: () -> Unit, onD
         text = {
             Text(
                 when (source.kind) {
-                    SourceKind.TTRSS -> "Its waiting and starred articles go with it. This also signs newspapeRSS out of your tt-rss account; your articles stay on the server."
+                    SourceKind.TTRSS -> "Its waiting and starred articles go with it. This also signs NewspapeRSS out of your tt-rss account; your articles stay on the server."
                     else -> "Its waiting and starred articles go with it. If you add it again, articles you already got won't be sent again."
                 },
             )
@@ -690,7 +690,7 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
                 }
                 is AddState.NoFeed -> Column {
                     Text(
-                        if (state.list != null) "${state.site} has no feed, but newspapeRSS can read its picks each day, on this phone."
+                        if (state.list != null) "${state.site} has no feed, but NewspapeRSS can read its picks each day, on this phone."
                         else "${state.site} doesn't offer a feed, so tt-rss can't follow it.",
                     )
                     state.list?.let { list -> TextButton(onClick = { viewModel.addList(list) }) { Text("Add ${list.title}") } }

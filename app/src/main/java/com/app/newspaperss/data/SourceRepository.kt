@@ -296,7 +296,7 @@ class SourceRepository(private val db: AppDatabase, private val clock: Clock = C
     }
 
     suspend fun exportOpml(): String = Opml.write(
-        "newspapeRSS sources",
+        "NewspapeRSS sources",
         sources.all().filter { it.kind == SourceKind.FEED }.map { OpmlFeed(it.url, it.title, folder = null) },
     )
 

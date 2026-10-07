@@ -92,7 +92,7 @@ class SettingsScreenTest {
         }
         // The title draws before the settings load from DataStore, so wait for the content.
         idleUntil { vm.settings.value != null }
-        waitFor(if (page == null) "newspapeRSS" else page.title)
+        waitFor(if (page == null) "NewspapeRSS" else page.title)
     }
 
     @After fun stopStore() = runBlocking { storeScope.coroutineContext[Job]!!.cancelAndJoin() }
@@ -295,14 +295,14 @@ class SettingsScreenTest {
     @Test
     fun theBuildIsNamedAtTheBottomSoFeedbackCanSayWhichOne() {
         show()
-        compose.onNodeWithText("newspapeRSS 0.1.0", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("NewspapeRSS 0.1.0", substring = true).performScrollTo().assertExists()
     }
 
     @Test
     fun aLongPressCopiesTheBuildForABugReportAndATapDoesNot() {
         show()
         val clipboard = ApplicationProvider.getApplicationContext<android.content.Context>().getSystemService(android.content.ClipboardManager::class.java)
-        val version = compose.onNodeWithText("newspapeRSS 0.1.0", substring = true).performScrollTo()
+        val version = compose.onNodeWithText("NewspapeRSS 0.1.0", substring = true).performScrollTo()
         val shown = version.fetchSemanticsNode().config[SemanticsProperties.Text].single().text
 
         version.performTouchInput { click() }

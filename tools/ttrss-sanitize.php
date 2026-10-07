@@ -1,6 +1,6 @@
 <?php
 // Runs feed HTML through a tt-rss checkout's own Sanitizer, as its API does for getHeadlines with
-// show_content, so the platform corpus can test what newspapeRSS gets through tt-rss.
+// show_content, so the platform corpus can test what NewspapeRSS gets through tt-rss.
 //
 //   php tools/ttrss-sanitize.php /path/to/tt-rss SITE_URL < content.html > sanitized.html
 //
