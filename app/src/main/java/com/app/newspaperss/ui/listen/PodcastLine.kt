@@ -68,13 +68,16 @@ fun PodcastLine(podcasts: Podcasts, editionId: Long, minutes: List<Double>, modi
         val made = heard.indices.sumOf { heard[it] * p.share.getOrElse(it) { 0.0 } }
         val anyMade = p.made.any { it }
         val leftOut = p.leftOut.any { it }
-        val sofar = "${ReadingTime.format(made)} of ${ReadingTime.format(heard.sum())} made."
+        val total = ReadingTime.format(heard.sum())
+        // Rounded to whole minutes, nearly done would read as all of it.
+        val sofar = if (ReadingTime.format(made) == total) "Almost all of $total made." else "${ReadingTime.format(made)} of $total made."
         val rest = if (leftOut) "The rest plays in your phone's voice until it's made, and articles it left out always do." else "The rest plays in your phone's voice until it's made."
         val text = when {
             p.made.all { it } -> "The podcast is ready."
             p.finished && !anyMade -> "The podcast couldn't make any of this edition, so it plays in your phone's voice."
             p.finished -> "The podcast is ready. Articles it left out, not in English or that it couldn't say, play in your phone's voice."
             p.makingNow -> "Making the podcast now. $sofar $rest"
+            p.makingOther -> "Waiting while another edition's podcast is made: this one comes next. " + (if (made > 0.0) "$sofar " else "") + rest
             made == 0.0 -> "Waiting to make the podcast: it's made while the phone charges, and Android can take a few minutes to start. Until then, Listen uses your phone's voice."
             else -> "$sofar It carries on while the phone charges. $rest"
         }

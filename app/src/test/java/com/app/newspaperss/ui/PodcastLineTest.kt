@@ -92,6 +92,9 @@ class PodcastLineTest {
         // Unplugged: it says it carries on later.
         store.making(null)
         waitFor("It carries on while the phone charges")
+        // Another edition's being made first.
+        store.making(8)
+        waitFor("Waiting while another edition's podcast is made")
     }
 
     @Test

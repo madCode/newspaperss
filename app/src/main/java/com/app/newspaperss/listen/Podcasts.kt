@@ -55,12 +55,14 @@ class PodcastStore(val dir: File) {
     @Synchronized
     fun lines(editionId: Long, page: Int, lines: Int) {
         folder(editionId).takeIf { it.exists() }?.let { File(it, "$page.$LINES").writeText(lines.toString()) }
+        // Pieces kept before the count was known show from now, not from the next piece.
+        changed()
     }
 
     /** How much of [page] is made, 0 to 1: whole once it's made, by its lines while it's being made. */
     fun share(editionId: Long, page: Int): Double {
         if (made(editionId, page)) return 1.0
-        val lines = File(folder(editionId), "$page.$LINES").takeIf { it.exists() }?.readText()?.toIntOrNull() ?: return 0.0
+        val lines = File(folder(editionId), "$page.$LINES").takeIf { it.exists() }?.readText()?.toIntOrNull()?.takeIf { it > 0 } ?: return 0.0
         return (linesMade(editionId, page).toDouble() / lines).coerceIn(0.0, 1.0)
     }
 
@@ -481,6 +483,7 @@ class PodcastMaker(
  *   English, or something Kokoro couldn't say.
  * @param share for each article, how much of it is made, 0 to 1.
  * @param makingNow whether it's being made right now (the phone is charging).
+ * @param makingOther whether another edition's podcast is being made right now, this one after it.
  * @param asked whether a podcast was asked for: made with a scheduled edition, or by hand.
  * @param pace this phone's, to say how long making one would take.
  */
@@ -492,6 +495,7 @@ data class PodcastProgress(
     val leftOut: List<Boolean>,
     val share: List<Double>,
     val makingNow: Boolean,
+    val makingOther: Boolean,
 )
 
 /** What the edition page shows of an edition's podcast, and asking for one. */
@@ -514,6 +518,7 @@ class Podcasts(
             pace = pace.toDouble(),
             share = (0 until articles).map { store.share(editionId, it) },
             makingNow = making == editionId,
+            makingOther = making != null && making != editionId,
         )
     }.flowOn(Dispatchers.IO)
 
