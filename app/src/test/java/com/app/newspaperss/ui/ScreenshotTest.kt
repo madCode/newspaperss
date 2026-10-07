@@ -885,7 +885,7 @@ class ScreenshotTest {
         val install = com.app.newspaperss.listen.KokoroInstall(tmp.newFolder()) {
             listOf(com.app.newspaperss.core.listen.KokoroFile("tokens.txt", 384_077_374L, "0".repeat(40)))
         }
-        if (pace != null) install.markVerified("tokens.txt")
+        if (pace != null) { install.file("tokens.txt").writeText("a b c\n"); install.markVerified("tokens.txt") }
         runBlocking { store.update { it.copy(podcastPace = pace, listenVoice = if (inUse) com.app.newspaperss.settings.ListenVoice.PODCAST else com.app.newspaperss.settings.ListenVoice.PHONE) } }
         val setup = com.app.newspaperss.listen.PodcastSetup(
             install, store, flowOf(work), start = {}, stop = {}, supported = true, engine = { error("not shot") },
@@ -919,6 +919,7 @@ class ScreenshotTest {
         val setup = com.app.newspaperss.listen.PodcastSetup(install, store, checked, start = {}, stop = {}, supported = true, engine = { error("not shot") })
         val vm = SettingsViewModel(store, podcast = setup) {}
         shoot("07r-settings-podcast-checked", ready = { vm.kokoro.value is com.app.newspaperss.listen.KokoroState.Checking }, act = {
+            install.file("tokens.txt").writeText("a b c\n")
             install.markVerified("tokens.txt")
             runBlocking { store.update { it.copy(podcastPace = 1.2f) } }
             checked.value = null
