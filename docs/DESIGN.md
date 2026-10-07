@@ -183,7 +183,8 @@ module so it's all unit-tested without Android.
     at the whole footnote, so a Kindle's popup shows its text, and markers
     side by side are split with a comma ("3, 4"). Substack
     Notes quoted where the post embeds them (from Substack's own feed: tt-rss
-    strips the Note's text);
+    strips the Note's text), and @-mentions keep the name the page's script
+    would have filled in;
   - "That's all for today", a chapter in the contents, with the day's
     totals and a question to think about, one of a short list of open
     questions that suit any paper ("What surprised you?"). It usually differs from

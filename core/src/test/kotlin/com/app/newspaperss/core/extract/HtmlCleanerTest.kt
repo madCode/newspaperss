@@ -31,6 +31,23 @@ class HtmlCleanerTest {
         assertTrue("several keep their order", inline.indexOf("Lincoln Michel") < inline.indexOf("Someone Else"))
     }
 
+    /** Substack's feed has an @-mention as an empty span its page script fills in from `data-attrs`. */
+    @Test
+    fun aSubstackMentionKeepsItsName() {
+        val attrs = """{&quot;name&quot;:&quot;katie lowe&quot;,&quot;id&quot;:1,&quot;type&quot;:&quot;user&quot;,&quot;url&quot;:null}"""
+        // As the feed has it, and with tt-rss's stripping of classes.
+        for (mention in listOf(
+            """<span class="mention-wrap" data-attrs="$attrs" data-component-name="MentionToDOM"></span>""",
+            """<span data-attrs="$attrs"></span>""",
+        )) {
+            val html = clean("<p>As $mention points out, she had to get an iPad.</p><p>$longText</p>")
+            assertTrue(html, html.contains("<p>As katie lowe points out, she had to get an iPad.</p>"))
+        }
+        // The page itself has the script's result: the name isn't doubled.
+        val page = clean("""<p>As <span data-attrs="$attrs"><a href="https://substack.com/@k">katie lowe</a></span> points out.</p><p>$longText</p>""")
+        assertEquals(1, Regex("katie lowe").findAll(page).count())
+    }
+
     /** tt-rss strips ids and resolves "#footnote-4" against the site; the book's footnotes must still work. */
     @Test
     fun footnotesSurviveTtrssStrippingTheirIdsAndResolvingTheirLinks() {
