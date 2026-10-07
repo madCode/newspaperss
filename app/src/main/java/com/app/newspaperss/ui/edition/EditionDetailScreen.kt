@@ -45,6 +45,7 @@ import com.app.newspaperss.data.EditionContent
 import com.app.newspaperss.ui.components.ArticleRowFrame
 import com.app.newspaperss.listen.Listening
 import com.app.newspaperss.ui.listen.ListenButton
+import com.app.newspaperss.ui.listen.PodcastLine
 import com.app.newspaperss.ui.components.StarToggle
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -208,6 +209,8 @@ fun EditionDetailScreen(
             Text("This edition has been deleted.", modifier = Modifier.padding(padding).padding(24.dp))
             return@Scaffold
         }
+        val listenable = listening?.takeIf { current.file != null && current.contents.isNotEmpty() && (edition.status == EditionStatus.READY || edition.status == EditionStatus.DELIVERED) }
+        val minutes = current.contents.sortedBy { it.entry.position }.map { it.entry.minutes }
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
             item {
                 Header(
@@ -219,10 +222,13 @@ fun EditionDetailScreen(
                     onSend = ::send,
                     onOpen = ::open,
                     onSent = viewModel::markSent,
-                    listen = listening?.takeIf { current.file != null && current.contents.isNotEmpty() && (edition.status == EditionStatus.READY || edition.status == EditionStatus.DELIVERED) }?.let { l ->
-                        { modifier: Modifier -> ListenButton(l, edition.id, current.contents.sortedBy { it.entry.position }.map { it.entry.minutes }, onOpenPlayer, modifier) }
+                    listen = listenable?.let { l ->
+                        { modifier: Modifier -> ListenButton(l, edition.id, minutes, onOpenPlayer, modifier) }
                     },
                 )
+            }
+            listenable?.podcasts?.let { podcasts ->
+                item { PodcastLine(podcasts, edition.id, minutes, Modifier.padding(horizontal = 16.dp).padding(top = 8.dp)) }
             }
             if (current.contents.isNotEmpty()) {
                 item {

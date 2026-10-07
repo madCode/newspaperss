@@ -92,6 +92,7 @@ import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import com.app.newspaperss.data.TtrssSubscriptions
 import com.app.newspaperss.data.FeedMoves
@@ -398,6 +399,32 @@ class ScreenshotTest {
         shoot("05b-edition-detail", ready = { vm.detail.value?.contents?.isNotEmpty() == true }) { EditionDetailScreen(vm, onBack = {}, listening = listening) }
     }
 
+    /** Kokoro in use, the first two of four articles made: the bar under Listen. */
+    @Test
+    fun editionDetailWithThePodcast() {
+        val vm = sentEdition()
+        val (player, _) = listenPlayer()
+        runBlocking { store.update { it.copy(listenVoice = com.app.newspaperss.settings.ListenVoice.PODCAST, podcastPace = 1.2f) } }
+        val install = com.app.newspaperss.listen.KokoroInstall(tmp.newFolder()) {
+            listOf(com.app.newspaperss.core.listen.KokoroFile("tokens.txt", 6, "ce013625030ba8dba906f756967f9e9ca394464a"))
+        }.apply {
+            file("tokens.txt").writeText("hello\n")
+            markVerified("tokens.txt")
+        }
+        val made = com.app.newspaperss.listen.PodcastStore(tmp.newFolder())
+        val id = runBlocking { db.editions().observeAll().first().first().id }
+        made.want(id, com.app.newspaperss.settings.PodcastVoice.HEART)
+        made.complete(id, 0)
+        made.complete(id, 1)
+        val listening = Listening(
+            player, StoredListenProgress(ApplicationProvider.getApplicationContext()), EditionRepository(db, tmp.newFolder()),
+            com.app.newspaperss.listen.Podcasts(made, store, install) {},
+        ) {}
+        shoot("05i-edition-detail-podcast", ready = {
+            vm.detail.value?.contents?.isNotEmpty() == true && compose.onAllNodes(hasText("made, while the phone charges", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }) { EditionDetailScreen(vm, onBack = {}, listening = listening) }
+    }
+
     /** A player with a voice that says nothing, over [db]'s editions in [files]. */
     private fun listenPlayer(files: File = tmp.newFolder()): Pair<ListenPlayer, FakeSpeaker> {
         val repo = EditionRepository(db, files)
@@ -415,11 +442,16 @@ class ScreenshotTest {
     @Test
     fun listenPlaying() = shootListening("11a-listen-playing", voice = null)
 
+    /** In the phone's voice, the podcast not having reached this article yet. */
+    @Test
+    fun listenPlayingBeforeThePodcastReachesIt() =
+        shootListening("11c-listen-not-made-yet", voice = null, instead = com.app.newspaperss.listen.PodcastSpeaker.Instead.NOT_MADE_YET)
+
     /** The same article playing from its podcast: the voice's name by the source. */
     @Test
     fun listenPlayingThePodcast() = shootListening("11b-listen-podcast", voice = com.app.newspaperss.settings.PodcastVoice.HEART)
 
-    private fun shootListening(name: String, voice: com.app.newspaperss.settings.PodcastVoice?) {
+    private fun shootListening(name: String, voice: com.app.newspaperss.settings.PodcastVoice?, instead: com.app.newspaperss.listen.PodcastSpeaker.Instead? = null) {
         val files = tmp.newFolder()
         val picture = Bitmap.createBitmap(600, 300, Bitmap.Config.ARGB_8888).apply {
             val canvas = Canvas(this)
@@ -454,7 +486,7 @@ class ScreenshotTest {
         player.start(id, ListenPosition(1, 6))
         idleUntil { player.state.value.script != null }
         speaker.startNext()
-        shoot(name, ready = { player.state.value.at.line == 6 }) { ListenScreen(player, onBack = {}, podcastVoice = MutableStateFlow(voice)) }
+        shoot(name, ready = { player.state.value.at.line == 6 }) { ListenScreen(player, onBack = {}, podcastVoice = MutableStateFlow(voice), instead = MutableStateFlow(instead)) }
     }
 
     @Test

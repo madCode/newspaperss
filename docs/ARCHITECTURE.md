@@ -269,12 +269,18 @@ flowchart LR
   so it makes podcasts ahead of time (below).
 - **`PodcastSpeaker`** is the `Speaker` the player gets. When an article
   starts, it picks its voice: the podcast if that article is made and
-  Kokoro is in use, else `SystemSpeaker`; the choice holds until another
-  article starts. Playing a podcast (`MediaPlayerAudio`, pieces one after
+  Kokoro is in use, else `SystemSpeaker`; the choice holds while the article
+  plays on, and one in the phone's voice is chosen again at the next play
+  or jump. Playing a podcast (`MediaPlayerAudio`, pieces one after
   another), it reports each line's start from the times kept with each
   piece, so the player tints and saves sentences the same way. Line ids
-  (`LineId`) carry the edition, page and line. Its `voice` is the name the
-  playing screen shows.
+  (`LineId`) carry the edition, page and line, and the page's line count:
+  a podcast made from other lines isn't used. Its `voice` is the name the
+  playing screen shows, and `instead` why an article of an edition with a
+  podcast plays in the phone's voice.
+- **`Podcasts`** is what the edition page shows of a podcast: which
+  articles are made, followed through `PodcastStore.changes`, and **Make
+  the podcast** for an edition without one (`PodcastMaker.request`).
 - **`ListenService`** is a Media3 `MediaSessionService`. Its
   `SessionPlayer` (a `SimpleBasePlayer`) shows the player's state to
   Android, an article a track, and turns the lock screen's commands into

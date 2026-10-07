@@ -12,6 +12,13 @@ import com.app.newspaperss.core.listen.PodcastPace
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.update
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
@@ -28,6 +35,13 @@ import java.util.Locale
  * Kokoro) nothing writes into it again: a piece finishing after that is dropped.
  */
 class PodcastStore(val dir: File) {
+    private val _changes = MutableStateFlow(0)
+
+    /** Moves on whenever a podcast is asked for, gains a page, is finished or deleted: for screens to follow. */
+    val changes: StateFlow<Int> = _changes.asStateFlow()
+
+    private fun changed() = _changes.update { it + 1 }
+
     private fun folder(editionId: Long) = File(dir, editionId.toString())
 
     private fun voiceFile(editionId: Long) = File(folder(editionId), VOICE)
@@ -38,6 +52,7 @@ class PodcastStore(val dir: File) {
         folder(editionId).mkdirs()
         // Rewritten if unreadable: the app may have died as it was first written.
         if (voice(editionId) == null) voiceFile(editionId).writeText(voice.name)
+        changed()
     }
 
     /** Editions whose podcast was asked for and isn't finished, newest first. */
@@ -90,20 +105,28 @@ class PodcastStore(val dir: File) {
         val name = "$page$SEP$firstLine"
         File(folder, "$name.$STARTS").writeText(starts.joinToString("\n", postfix = "\n") { "%.3f".format(Locale.ROOT, it) })
         if (!made.renameTo(File(folder, "$name.$AUDIO"))) throw IOException("Couldn't keep $name")
+        changed()
     }
 
     @Synchronized
-    fun complete(editionId: Long, page: Int) = mark(editionId, "$page.$MADE")
+    fun complete(editionId: Long, page: Int) {
+        mark(editionId, "$page.$MADE")
+        changed()
+    }
 
     /** Leaves [page] to the phone's voice, dropping any of it made: an article doesn't change voice part way. */
     @Synchronized
     fun leaveLive(editionId: Long, page: Int) {
         folder(editionId).listFiles { file -> file.name.startsWith("$page$SEP") }?.forEach { it.delete() }
         mark(editionId, "$page.$LIVE")
+        changed()
     }
 
     @Synchronized
-    fun finish(editionId: Long) = mark(editionId, FINISHED)
+    fun finish(editionId: Long) {
+        mark(editionId, FINISHED)
+        changed()
+    }
 
     /** Adds to what making [editionId]'s podcast has cost: time spent, and seconds of speech made. */
     @Synchronized
@@ -169,11 +192,13 @@ class PodcastStore(val dir: File) {
     @Synchronized
     fun delete(editionId: Long) {
         folder(editionId).deleteRecursively()
+        changed()
     }
 
     @Synchronized
     fun deleteAll() {
         dir.deleteRecursively()
+        changed()
     }
 
     private companion object {
@@ -420,4 +445,40 @@ class PodcastMaker(
         /** Kokoro's voices here are English ones; a page with no language is taken to be English. */
         fun english(language: String?): Boolean = language == null || Locale.forLanguageTag(language).language == "en"
     }
+}
+
+/**
+ * An edition's podcast as its page shows it.
+ *
+ * @param made for each article, in book order, whether it plays from the podcast.
+ * @param leftOut for each article, whether the podcast left it to the phone's voice: not in
+ *   English, or something Kokoro couldn't say.
+ * @param asked whether a podcast was asked for: made with a scheduled edition, or by hand.
+ * @param pace this phone's, to say how long making one would take.
+ */
+data class PodcastProgress(val asked: Boolean, val made: List<Boolean>, val finished: Boolean, val pace: Double, val leftOut: List<Boolean>)
+
+/** What the edition page shows of an edition's podcast, and asking for one. */
+class Podcasts(
+    private val store: PodcastStore,
+    private val settings: SettingsStore,
+    private val install: KokoroInstall,
+    /** [PodcastMaker.request]. */
+    private val request: suspend (editionId: Long) -> Unit,
+) {
+    /** [editionId]'s podcast, with [articles] articles; null while Kokoro isn't in use. */
+    fun observe(editionId: Long, articles: Int): Flow<PodcastProgress?> = combine(store.changes, settings.settings) { _, s ->
+        val pace = s.podcastPace
+        if (s.listenVoice != ListenVoice.PODCAST || pace == null || !install.complete) return@combine null
+        PodcastProgress(
+            asked = store.voice(editionId) != null,
+            made = (0 until articles).map { store.made(editionId, it) },
+            leftOut = (0 until articles).map { store.live(editionId, it) },
+            finished = store.finished(editionId),
+            pace = pace.toDouble(),
+        )
+    }.flowOn(Dispatchers.IO)
+
+    /** Asks for [editionId]'s podcast, made once the phone charges: for an edition made by hand. */
+    suspend fun make(editionId: Long) = request(editionId)
 }

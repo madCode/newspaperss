@@ -123,19 +123,22 @@ class PodcastSpeakerTest {
     }
 
     @Test
-    fun theVoiceChangesOnlyBetweenArticles() {
-        // Started in the phone's voice; made while it's listened to; a jump within it stays put.
+    fun theVoiceChangesBetweenArticlesNotAsOnePlaysOn() {
+        // Started in the phone's voice; made while it's listened to: the lines queued go on in it.
         speaker.speak(id(0), "Quanta", null, 1f, flush = true)
         made()
-        speaker.speak(id(3, generation = 2), "It took a week.", null, 1f, flush = true)
+        speaker.speak(id(1), "Counting Knots", null, 1f, flush = false)
         assertEquals(2, phone.said.size)
         assertTrue(audio.played.isEmpty())
 
-        // The next article, made, plays from its podcast; coming back, so does this one.
-        made(page = 1)
+        // Played again, or a sentence tapped, it's from the podcast now.
+        speaker.speak(id(3, generation = 2), "It took a week.", null, 1f, flush = true)
+        assertEquals(Triple("0-3.m4a", 0L, 1f), audio.played.single())
+        assertEquals(2, phone.said.size)
+
+        // The next article, not made, is in the phone's voice.
         speaker.speak(id(0, page = 1, generation = 3), "Lagos Drivers", null, 1f, flush = true)
-        speaker.speak(id(0, generation = 4), "Quanta", null, 1f, flush = true)
-        assertEquals(2, audio.played.size)
+        assertEquals("Lagos Drivers", phone.said.last().text)
     }
 
     @Test
@@ -184,6 +187,10 @@ class PodcastSpeakerTest {
         val before = heard.size
         audio.listener!!.onPosition(5_000)
         assertEquals(before, heard.size)
+        // Played again, it stays in the phone's voice rather than failing the same way.
+        speaker.speak(id(0, generation = 2), "Quanta", null, 1f, flush = true)
+        assertEquals(1, audio.played.size)
+        assertEquals("Quanta", phone.said.last().text)
     }
 
     @Test
@@ -242,6 +249,24 @@ class PodcastSpeakerTest {
         speaker.speak(id(0, lines = 6), "Quanta", null, 1f, flush = true)
         assertEquals(1, phone.said.size)
         assertTrue(audio.played.isEmpty())
+    }
+
+    @Test
+    fun itSaysWhyAnArticleOfAnEditionWithAPodcastPlaysInThePhonesVoice() {
+        made(page = 0)
+        store.leaveLive(7, 1)
+        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
+        assertNull(speaker.instead.value)
+        speaker.speak(id(0, page = 1), "Le Monde", null, 1f, flush = true)
+        assertEquals(PodcastSpeaker.Instead.LEFT_OUT, speaker.instead.value)
+        speaker.speak(id(0, page = 2), "Rest of World", null, 1f, flush = true)
+        assertEquals(PodcastSpeaker.Instead.NOT_MADE_YET, speaker.instead.value)
+        // Made from five sentences where the book now has six: left out, not "not made yet".
+        speaker.speak(id(0, page = 0, generation = 2, lines = 6), "Quanta", null, 1f, flush = true)
+        assertEquals(PodcastSpeaker.Instead.LEFT_OUT, speaker.instead.value)
+        // An edition without a podcast needs no word about it.
+        speaker.speak(LineId(1, 8, 0, 0, 5).toString(), "Nautilus", null, 1f, flush = true)
+        assertNull(speaker.instead.value)
     }
 
     @Test

@@ -32,8 +32,9 @@ data class LineId(val generation: Int, val editionId: Long, val page: Int, val l
 
 /**
  * Listen's voice when podcasts are made: an article whose podcast is made plays from it, any
- * other in the phone's voice. The choice is made when an article starts and kept until another
- * one does, so the voice changes only between articles, never mid-way.
+ * other in the phone's voice. The choice is made when an article starts, and kept while it plays
+ * on, so the voice changes between articles, not mid-sentence. An article in the phone's voice
+ * moves to its podcast when played or jumped in once that's made.
  *
  * Playing a podcast, it reports each line's start as the audio reaches it, from the times kept
  * with each piece, so the player tints and saves sentences as it does for the phone's voice.
@@ -58,6 +59,19 @@ class PodcastSpeaker(
     /** The podcast's voice while an article plays from it; null in the phone's voice. */
     val voice: StateFlow<PodcastVoice?> = _voice.asStateFlow()
 
+    private val _instead = MutableStateFlow<Instead?>(null)
+
+    /** Why an article of an edition with a podcast plays in the phone's voice; null otherwise. */
+    val instead: StateFlow<Instead?> = _instead.asStateFlow()
+
+    enum class Instead {
+        /** The podcast hasn't reached it yet. */
+        NOT_MADE_YET,
+
+        /** The podcast left it to the phone's voice: not in English, or something Kokoro couldn't say. */
+        LEFT_OUT,
+    }
+
     /** The article the voice was chosen for, and its pieces if it plays from the podcast. */
     private var article: Pair<Long, Int>? = null
     private var pieces: List<PodcastPiece> = emptyList()
@@ -66,6 +80,9 @@ class PodcastSpeaker(
     private val asked = mutableMapOf<Int, Asked>()
 
     private class Asked(val text: String, val language: String?, val rate: Float)
+
+    /** Articles whose podcast failed to play: the phone's voice for them, not the same failure each play. */
+    private val failed = mutableSetOf<Pair<Long, Int>>()
 
     /** What's playing: the line it started from, the piece, and the last line reported. */
     private var playing: LineId? = null
@@ -93,7 +110,9 @@ class PodcastSpeaker(
             return phone.speak(id, text, language, rate, flush)
         }
         val here = line.editionId to line.page
-        if (here != article) choose(here, line.lines)
+        // A new article, or one read in the phone's voice played or jumped in again: its podcast
+        // may be made since (overnight, while paused). Once from the podcast, it stays so.
+        if (here != article || (flush && pieces.isEmpty())) choose(here, line.lines)
         asked[line.line] = Asked(text, language, rate)
         // Kokoro turned off, or removed with its podcasts, since the article started: the phone's
         // voice from here, rather than a file that's gone.
@@ -114,11 +133,17 @@ class PodcastSpeaker(
         article = here
         asked.clear()
         val (editionId, page) = here
-        val made = if (inUse() && podcasts.made(editionId, page)) podcasts.pieces(editionId, page) else emptyList()
+        val made = if (inUse() && podcasts.made(editionId, page) && here !in failed) podcasts.pieces(editionId, page) else emptyList()
         // Made from the same lines as the player reads: an update that splits sentences
         // differently would otherwise tint the wrong ones, and never reach the article's end.
         pieces = made.takeIf { it.isNotEmpty() && it.last().firstLine + it.last().starts.size == lines }.orEmpty()
         chosen = if (pieces.isEmpty()) null else podcasts.voice(editionId)
+        _instead.value = when {
+            pieces.isNotEmpty() || !inUse() || podcasts.voice(editionId) == null -> null
+            // Left to the phone's voice, or made from other sentences than the book now has.
+            podcasts.live(editionId, page) || made.isNotEmpty() -> Instead.LEFT_OUT
+            else -> Instead.NOT_MADE_YET
+        }
     }
 
     private fun toPhone() {
@@ -136,6 +161,7 @@ class PodcastSpeaker(
         val at = playing ?: return
         // Failing to start the next piece, the last line reported was heard whole: on from the next.
         val line = if (between) reported + 1 else reported.coerceAtLeast(at.line)
+        article?.let { failed += it }
         toPhone()
         val now = asked[line]
         if (now == null) {
