@@ -31,6 +31,11 @@ Migration with a `MigrationTest` case, and committing the new schema JSON
 in `app/schemas`. CI publishes main's debug APK to the `latest-debug`
 release; its version name carries the CI run and commit.
 
+Delivery ends in another app's hands, so the part past the hand-off can only
+be checked by a person: [docs/DELIVERY-CHECKS.md](docs/DELIVERY-CHECKS.md) says
+how, and a change to delivery or the EPUB wants it run. Adding a test that
+asserts the intent again raises coverage without covering anything.
+
 The sections from Privacy to Pull requests are shared with the projects in
 [claude-playground](https://github.com/madCode/claude-playground/blob/main/CLAUDE.md),
 whose root CLAUDE.md has the same rules for any project. A change to one
@@ -56,11 +61,6 @@ commit message. Public API KDoc stays accurate when signatures change.
 A test should be able to catch a plausible regression. Test behaviour, not
 structure. Don't feed code inputs it can never receive. When a change has
 no behaviour to test, say so in the PR instead of inventing a test.
-
-Delivery ends in another app's hands, so the part past the hand-off can
-only be checked by a person: [docs/DELIVERY-CHECKS.md](docs/DELIVERY-CHECKS.md)
-says how, and a change to delivery or the EPUB wants it run. Adding a test
-that asserts the intent again raises coverage without covering anything.
 
 ## Documentation
 
