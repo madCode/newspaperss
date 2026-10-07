@@ -85,7 +85,9 @@ class PodcastSettingsTest {
         )
         val vm = SettingsViewModel(store, podcast = setup) {}
         compose.setContent { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
-        idleUntil { vm.settings.value != null }
+        // Until Kokoro's state is read (off the main thread), picking the podcast can't tell
+        // whether to ask about mobile data, and does nothing.
+        idleUntil { vm.settings.value != null && vm.kokoro.value != null }
         return vm
     }
 
