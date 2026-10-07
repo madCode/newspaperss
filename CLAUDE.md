@@ -47,6 +47,21 @@ This repository is public. Never commit personal data: no feed lists,
 hosts, emails or accounts from anyone's own setup. Starter packs contain
 only well-known public feeds.
 
+## Posting as madCode
+
+Claude Code posts from madCode's account, so anything it writes says so **at the top**, where
+it's read, not only in a footer a reader scrolls past. The first line of a pull request
+description, an issue or PR comment, or a review:
+
+    🤖 **Claude · <tag>**
+
+Tags: `pull request`, `proposal`, `fix ready`, `needs info`, `update`, `review notes`,
+`question for madCode`. `update` when none of the others fit. The first comment in an issue
+thread also opens by saying who is writing and what to expect, which the `handle-issues` skill
+spells out.
+
+Nothing from the Claude GitHub App needs this: its author already says so.
+
 ## Comments
 
 A comment is for what the code can't say itself: **why** it is written
