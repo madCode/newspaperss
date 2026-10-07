@@ -36,6 +36,7 @@ class Podcasts(
     private val store: PodcastStore,
     private val settings: SettingsStore,
     private val install: KokoroInstall,
+    private val log: PodcastLog = PodcastLog(null),
     /** Starts [PodcastMaker] once the phone charges. */
     private val start: () -> Unit,
 ) {
@@ -63,6 +64,7 @@ class Podcasts(
         val s = settings.current()
         if (s.listenVoice != ListenVoice.PODCAST || !withContext(Dispatchers.IO) { install.complete }) return
         withContext(Dispatchers.IO) { store.want(editionId, s.podcastVoice) }
+        log.add("Edition $editionId's podcast asked for, in ${s.podcastVoice.label}; made once the phone charges")
         start()
     }
 

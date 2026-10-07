@@ -689,10 +689,17 @@ whose Kindle and KOReader answers ask for more on the same page).
     phone can do it"; up to 2½ hours, "slow, but it can"; beyond, "Too
     slow", offering only Remove and the paper size that would fit. A 32-bit
     phone sees the option greyed, with why. In use, it lists Heart,
-    Michael, Emma and George, each with a clip shipped in the app, and
-    **Remove Kokoro**. While it's in use, each scheduled edition's podcast
+    Michael, Emma and George, each with a clip shipped in the app,
+    **Remove Kokoro**, and **Podcast log**: what the making did, run by run,
+    newest first, with Share to send it to whoever's fixing it. While it's in use, each scheduled edition's podcast
     is made after the book, only while the phone charges: unplugged, it
-    stops and keeps what's made. English articles only; the rest are left
+    stops and keeps what's made. It's made in the foreground, with a
+    quiet "Making the podcast" notification (if notifications are on):
+    Android lets long work run only so. From Android 12 that's allowed
+    overnight only if the app's battery use is Unrestricted, and from
+    Android 15 for 6 hours a day; otherwise it's made a few minutes at a
+    time, slowly.
+    English articles only; the rest are left
     to the phone's voice. A podcast is deleted with its edition's book, and
     all of them with Kokoro. Listen plays an article from its podcast once
     it's made, and in the phone's voice until then: from the next play or

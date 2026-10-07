@@ -1,6 +1,5 @@
 package com.app.newspaperss.listen
 
-import android.util.Log
 import com.app.newspaperss.core.listen.ListenScript
 import com.app.newspaperss.core.listen.PodcastPace
 import com.app.newspaperss.data.EditionRepository
@@ -32,12 +31,18 @@ class PodcastMaker(
     /** Seconds of audio in a piece: kept that often, so a stop loses at most that much work. */
     private val pieceSeconds: Double = PIECE_SECONDS,
     private val now: () -> Long = System::nanoTime,
+    private val log: PodcastLog = PodcastLog(null),
 ) {
     /** Makes every podcast asked for, until they're all finished, Kokoro is turned off, or it's stopped. */
     suspend fun makeAll() = withContext(Dispatchers.Default) {
         // A run stopped mid-sentence goes on in native code until the sentence ends; a new run waits
         // for it, rather than loading Kokoro twice and writing the same piece.
+        val asked = now()
+        // A sentence that never ends would hold every run here: this, and no "Kokoro loaded", says so.
+        if (KokoroEngine.lock.isLocked) log.add("Waiting for Kokoro: the last run finishing its sentence, or the speed check")
         KokoroEngine.lock.withLock {
+            val waited = seconds(now() - asked)
+            if (waited >= 1) log.add("Waited ${waited}s for the last run's sentence to end")
             store.dropScratch()
             makeUnderLock()
         }
@@ -45,8 +50,8 @@ class PodcastMaker(
 
     /**
      * Keeps this phone's pace from what a finished podcast cost, over all the runs it took, so
-     * scheduled editions start as early as it needs. One run alone is cut off by Android's
-     * 10-minute limit, and is mostly a cool phone's.
+     * scheduled editions start as early as it needs. One run alone may be cut off (unplugged,
+     * or Android's limits on background work), and is mostly a cool phone's.
      */
     private suspend fun learnPace(editionId: Long) {
         val (nanos, speech) = store.cost(editionId)
@@ -62,8 +67,15 @@ class PodcastMaker(
         var kokoro: Pair<PodcastVoice, PodcastEngine>? = null
         try {
             while (true) {
-                val editionId = store.waiting().firstOrNull() ?: break
-                if (!inUse()) break
+                val editionId = store.waiting().firstOrNull()
+                if (editionId == null) {
+                    log.add("Nothing left to make")
+                    break
+                }
+                if (!inUse()) {
+                    log.add("Stopped: Kokoro turned off or removed")
+                    break
+                }
                 store.making(editionId)
                 val book = ListenBook.open(editions, editionId)
                 if (book == null) {
@@ -75,7 +87,10 @@ class PodcastMaker(
                 book.use {
                     for (page in book.pages.indices) {
                         if (store.settled(editionId, page)) continue
-                        if (!inUse()) return
+                        if (!inUse()) {
+                            log.add("Stopped: Kokoro turned off or removed")
+                            return
+                        }
                         // A newer edition asked for since: it goes first, and this one carries on after.
                         if (store.waiting().firstOrNull() != editionId) return@use
                         if (kokoro?.first != voice) {
@@ -85,10 +100,12 @@ class PodcastMaker(
                             val began = now()
                             kokoro = voice to engine(voice)
                             store.addCost(editionId, now() - began, 0.0)
+                            log.add("Kokoro loaded (${voice.label}) in ${seconds(now() - began)}s")
                         }
                         makePage(editionId, page, script(book, page), kokoro!!.second)
                     }
                     store.finish(editionId)
+                    log.add("Edition $editionId: podcast finished")
                     // Failing to keep the pace mustn't stop the podcasts behind this one.
                     runCatching { learnPace(editionId) }
                 }
@@ -122,9 +139,12 @@ class PodcastMaker(
         val lines = script.lines
         store.lines(editionId, page, lines.size)
         val (deadAt, deaths) = store.deaths(editionId, page)
+        val from = store.linesMade(editionId, page)
+        log.add("Edition $editionId page $page: from line $from of ${lines.size}" + if (deadAt >= 0) ", line $deadAt took the app down $deaths times" else "")
         var piece: Piece? = null
+        var next = from
         try {
-            for (i in store.linesMade(editionId, page) until lines.size) {
+            for (i in from until lines.size) {
                 // Native code can't be stopped mid-sentence: between sentences is the soonest.
                 currentCoroutineContext().ensureActive()
                 val death = if (i == deadAt) deaths + 1 else 1
@@ -142,6 +162,9 @@ class PodcastMaker(
                 current.write(speech.samples)
                 current.spoken += speech.samples.size
                 current.work += now() - began
+                val took = seconds(now() - began)
+                if (took >= SLOW_LINE_SECONDS) log.add("Page $page line $i took ${took}s (${lines[i].spoken.length} characters)")
+                next = i + 1
                 if (current.seconds >= pieceSeconds && i < lines.lastIndex) {
                     current.keep(editionId, page)
                     piece = null
@@ -150,21 +173,26 @@ class PodcastMaker(
             piece?.keep(editionId, page)
             piece = null
             store.complete(editionId, page)
+            log.add("Page $page made")
         } catch (e: Unsayable) {
             // Something in this page Kokoro couldn't say: the phone's voice reads it, rather than
             // the podcast stopping at it every time.
-            Log.w(TAG, "Page $page left to the phone's voice: ${e.cause?.message ?: e.cause?.javaClass?.name}")
+            log.add("Page $page left to the phone's voice: ${e.cause?.message ?: e.cause?.javaClass?.name}")
             store.leaveLive(editionId, page)
         } catch (e: CancellationException) {
+            log.add("Stopped on page $page before line $next; ${piece?.seconds?.toInt() ?: 0}s of unkept audio dropped, resumes at line ${piece?.firstLine ?: next}")
             throw e
         } catch (e: IOException) {
             // A full disk, most likely: tried again later, as it is.
+            log.add("Page $page: ${e.javaClass.simpleName}, tried again next run")
             throw e
         } catch (e: Exception) {
             // The encoder, say, failing the same way each time: given up after a few runs, so
             // the pages after it, and older podcasts, aren't held up for good.
-            if (store.failed(editionId, page) < FAILURES) throw e
-            Log.w(TAG, "Page $page left to the phone's voice: ${e.javaClass.name}")
+            val failures = store.failed(editionId, page)
+            log.add("Page $page failed ($failures of $FAILURES): ${e.javaClass.name}")
+            if (failures < FAILURES) throw e
+            log.add("Page $page left to the phone's voice")
             store.leaveLive(editionId, page)
         } finally {
             piece?.drop()
@@ -196,6 +224,7 @@ class PodcastMaker(
             sink.close()
             store.keep(editionId, page, firstLine, file, starts)
             store.addCost(editionId, work + now() - began, spoken.toDouble() / rate)
+            log.add("Kept page $page lines $firstLine–${firstLine + starts.size - 1}: ${seconds.toInt()}s of audio in ${seconds(work + now() - began)}s")
         }
 
         fun drop() {
@@ -208,12 +237,15 @@ class PodcastMaker(
     private class Unsayable(cause: Exception) : Exception(cause)
 
     companion object {
-        private const val TAG = "PodcastMaker"
-
         /** Seconds of quiet between paragraphs, as a reader takes a breath. */
         private const val PAUSE = 0.35
 
         const val PIECE_SECONDS = 120.0
+
+        /** A line taking this long is logged: one too long for a run would never be made. */
+        private const val SLOW_LINE_SECONDS = 30
+
+        private fun seconds(nanos: Long) = nanos / 1_000_000_000
 
         /** Times saying the same line took the app down before the page is left to the phone's voice. */
         private const val CRASHES = 2

@@ -1,6 +1,7 @@
 package com.app.newspaperss.notify
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -59,7 +60,25 @@ class Notifier(private val context: Context) : EditionNotifier {
                 description = "An edition couldn't be made or delivered"
             },
         )
+        system.createNotificationChannel(
+            NotificationChannel(PODCAST, "Making the podcast", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Shows while a podcast is made, as the phone charges"
+            },
+        )
     }
+
+    /**
+     * Shown while a podcast is made: Android lets work run past its 10-minute limit only with a
+     * notification up. Quiet, and gone when the making stops.
+     */
+    fun makingPodcast(): Notification = NotificationCompat.Builder(context, PODCAST)
+        .setSmallIcon(R.drawable.ic_notification)
+        .setContentTitle("Making the podcast")
+        .setContentText("It carries on while the phone charges")
+        .setContentIntent(open())
+        .setOngoing(true)
+        .setSilent(true)
+        .build()
 
     override fun editionReady(edition: EditionEntity, file: File, openInstead: Boolean, byEmail: Boolean) {
         val intent = if (openInstead) {
@@ -118,14 +137,15 @@ class Notifier(private val context: Context) : EditionNotifier {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
             android.os.Build.VERSION.SDK_INT >= 33
         ) return
-        val open = PendingIntent.getActivity(
-            context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_IMMUTABLE,
-        )
         // One slot per kind: a newer edition's news replaces the last one's, but
         // never an unread problem.
-        manager.notify(id, builder.setSmallIcon(R.drawable.ic_notification).setContentIntent(open).setAutoCancel(true).build())
+        manager.notify(id, builder.setSmallIcon(R.drawable.ic_notification).setContentIntent(open()).setAutoCancel(true).build())
     }
+
+    private fun open() = PendingIntent.getActivity(
+        context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        PendingIntent.FLAG_IMMUTABLE,
+    )
 
     private fun summary(edition: EditionEntity) =
         "${plural(edition.articleCount, "article")} · about ${ReadingTime.format(edition.minutes)}"
@@ -135,8 +155,10 @@ class Notifier(private val context: Context) : EditionNotifier {
         const val READY = "edition-ready"
         const val EDITIONS = "editions"
         const val PROBLEMS = "problems"
+        const val PODCAST = "podcast"
         private const val EXTRA_EDITION = "com.app.newspaperss.EDITION_ID"
         private const val EDITION_ID = 1
         private const val PROBLEM_ID = 2
+        const val PODCAST_ID = 3
     }
 }

@@ -100,7 +100,8 @@ class PodcastMakerTest {
 
     private var started = 0
     private var pieceSeconds = PodcastMaker.PIECE_SECONDS
-    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds, now = { clock }) }
+    private val log by lazy { PodcastLog(tmp.newFile("log")) }
+    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds, now = { clock }, log = log) }
     private val podcasts by lazy { Podcasts(store, settings, install) { started++ } }
 
     private val knots = EditionArticle(
@@ -197,6 +198,22 @@ class PodcastMakerTest {
     }
 
     @Test
+    fun theLogSaysWhatWasKeptAndWhereAStoppedRunLeftOff() {
+        inUse()
+        val id = edition("Thursday", knots, lagos)
+        request(id)
+        val job = Job()
+        afterLine = { if (it == "Rest of World") job.cancel() }
+        runBlocking { runCatching { withContext(job) { maker.makeAll() } } }
+
+        val entries = log.read()
+        assertTrue(entries.toString(), entries.any { it.contains("Kept page 0 lines 0–4") })
+        assertTrue(entries.toString(), entries.any { it.contains("Page 0 made") })
+        // Where it left off, and what it lost by stopping: the clue to runs that never keep a piece.
+        assertTrue(entries.toString(), entries.last().contains("Stopped on page 1 before line 1; 0s of unkept audio dropped, resumes at line 0"))
+    }
+
+    @Test
     fun aNewerEditionGoesFirstAndTheOlderOneCarriesOnAfter() {
         inUse()
         val older = edition("Wednesday", knots, lagos)
@@ -250,6 +267,8 @@ class PodcastMakerTest {
         assertTrue(store.made(id, 0))
         assertFalse(store.settled(id, 1))
         assertEquals(listOf(id), store.waiting())
+        // Not "nothing left": the log is read to tell the two apart.
+        assertTrue(log.read().toString(), log.read().last().endsWith("Stopped: Kokoro turned off or removed"))
     }
 
     @Test

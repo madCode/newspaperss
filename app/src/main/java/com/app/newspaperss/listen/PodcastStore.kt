@@ -12,7 +12,7 @@ import java.util.Locale
 /**
  * Podcasts made ahead, a folder per edition. Each page's audio is kept in pieces of a couple of
  * minutes, each with the time its lines start, so work stopped part way through a long article
- * (unplugged, or Android's 10-minute limit on work) carries on from the last piece kept. A piece
+ * (unplugged, or Android's limits on background work) carries on from the last piece kept. A piece
  * is there whole or not at all.
  *
  * A folder is made only when a podcast is asked for, and once deleted (with its edition, or with

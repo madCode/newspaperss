@@ -40,6 +40,7 @@ import com.app.newspaperss.listen.KokoroDownload
 import com.app.newspaperss.listen.KokoroEngine
 import com.app.newspaperss.listen.KokoroInstall
 import com.app.newspaperss.listen.PodcastSetup
+import com.app.newspaperss.listen.PodcastLog
 import com.app.newspaperss.listen.PodcastMaker
 import com.app.newspaperss.listen.PodcastStore
 import com.app.newspaperss.listen.Podcasts
@@ -168,14 +169,17 @@ class AppContainer(
             supported = KokoroInstall.supported,
             engine = podcastEngine,
             podcasts = podcasts,
+            log = podcastLog,
         )
     }
 
+    /** What the podcast's making did, shown in Settings › Listening while the podcast is debug-only. */
+    val podcastLog = PodcastLog(File(context.filesDir, "podcast-log.txt"))
     private val podcastEngine = { voice: PodcastVoice -> KokoroEngine(kokoroInstall, voice) }
     private val podcastStore = PodcastStore(File(context.filesDir, "podcasts"))
-    private val podcasts = Podcasts(podcastStore, settings, kokoroInstall, start = { PodcastWorker.enqueue(context) })
+    private val podcasts = Podcasts(podcastStore, settings, kokoroInstall, start = { PodcastWorker.enqueue(context) }, log = podcastLog)
     val podcastMaker: PodcastMaker by lazy {
-        PodcastMaker(editions, podcastStore, kokoroInstall, settings, podcastEngine, AacEncoder)
+        PodcastMaker(editions, podcastStore, kokoroInstall, settings, podcastEngine, AacEncoder, log = podcastLog)
     }
 
     fun kokoroDownload() = newKokoroDownload(kokoroInstall)
