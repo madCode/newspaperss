@@ -22,7 +22,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] Webtoons: episodes are one long strip of dozens of lazy images (`data-url`), beyond the 20-image cap, and its mobile site hides the feed. Support strips properly *(device)*
 
 ### The book
-- [ ] Video and audio players vanish without a trace: the cleaner drops every iframe, video and audio, leaving "Watch:" or a heading over nothing. In a sample of 405 recent items from 41 feeds (Oct 2), 8% had a player (16% outside the starter packs), almost all YouTube. Put a line where each was ("▶ Video: title, youtube.com/…") *(live)*
+- [ ] Audio players, and video players other than YouTube and Vimeo (which become a still and a link), vanish without a trace, leaving a lead-in line or a heading over nothing. Put a line where each was *(live)*
 - [ ] EPUB design, round 2: the cover image and a look on real devices (Kindle, Kobo, KOReader) *(device)*
 - [ ] Substack Notes embedded in posts that come through tt-rss: tt-rss strips the Note's text, so the sentence introducing it hangs. Fetching the post's page would bring it back (the full post is in the page's data), at one page fetch per Substack article *(device)*
 
@@ -34,7 +34,7 @@ Grouped by part of the app. The tag says where each item came from: *device* (yo
 - [ ] If lead time isn't enough on a real device, wake timed editions with an exact alarm (Doze defers WorkManager; expedited work can silently restart a long build)
 
 ### tt-rss, for a returning reader *(personas)*
-- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page, is built (cycles 77–79). Still open: adding feeds to tt-rss from here, and how this joins "tt-rss and Google Reader API servers as full backends" below. Sections were taken out (cycle 80)
+- [ ] Decide what tt-rss is as a source. Explored ([research/ttrss-backend/](research/ttrss-backend/index.html), open it in a browser): one tt-rss row in Sources with its feeds inset under it, folded, each opening its own page, is built (cycles 77–79). Still open: how this joins "tt-rss and Google Reader API servers as full backends" below. Sections were taken out (cycle 80)
 - [ ] A quiet tt-rss feed says so under its row ("Nothing new in 3 weeks"). tt-rss's feed list gives when it last fetched a feed, not when it last posted, so this needs the newest article's date from getHeadlines, once a day
 - [ ] Search on the account page's feed list (F4), if scrolling 50+ feeds on Sources gets slow
 - [ ] Several categories, and tt-rss's Starred and Published as choices
@@ -73,7 +73,7 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] App: TalkBack walk-through of every screen (labels, headings, focus order), font scale at 200%, display size, touch targets ≥ 48dp, contrast in light and dark, e-ink readability, nothing carried by colour or animation alone. Confirm the new live regions with TalkBack on a device
 - [ ] Book: EPUB Accessibility 1.1 metadata (`schema:accessMode`, `accessibilityFeature`, `accessibilitySummary`), image alt text carried through, reading order checked with a screen reader
 - [ ] Tooling: Compose accessibility checks in the Robolectric tests, Accessibility Scanner on a device, Ace by DAISY on a live edition
-- [ ] Generate alt text for pictures that have none *(you asked)*. Many feeds' images arrive without a description, so a screen reader (and Listen, if it's built) says nothing or a file name. Do it when the edition is built, so the book gets it too, and on the phone, so nothing leaves it. Cheapest first, stopping at the first that gives something:
+- [ ] Generate alt text for pictures that have none *(you asked)*. Many feeds' images arrive without a description, so a screen reader (and Listen) says nothing or a file name. Do it when the edition is built, so the book gets it too, and on the phone, so nothing leaves it. Cheapest first, stopping at the first that gives something:
   - The article's own alt text or caption (free, every phone). Never replace it
   - Text in the picture, read with ML Kit text recognition (free, offline, every phone): for charts, screenshots and signs, "Image with text: …"
   - ML Kit's on-device GenAI image description, on the newer phones that have it (free, no download for us). Check which phones and whether it's still in preview
@@ -87,12 +87,14 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] EPUB zip: buffered output, JPEGs stored uncompressed
 
 ### Tech debt
-- [ ] `SettingsScreenTest` can fail under full-suite load (DataStore "Unable to rename …tmp", a write still running when the temp folder is deleted). Give test DataStores a scope that finishes before cleanup
+- [ ] Test DataStores made without a scope can fail under full-suite load (DataStore "Unable to rename …tmp", a write still running when the temp folder is deleted). `SettingsScreenTest` has one now; `TtrssFeedsTest`, `SourcesScreenTest`, `SettingsStoreTest`, `TtrssSyncTest`, `FeedMovesTest` and `ScreenshotTest` don't. One shared helper that cancels the scope before cleanup
+- [ ] Screenshots read the real clock (titles from today's weekday, "2 days ago"), so the same screen rendered on another day differs. A fixed clock, here and in the screens' "ago" lines
 
 ### Later
 - [ ] Send the email itself (SMTP, an app password), so a Kindle edition arrives with no tap and from a chosen account; email delivery through the mail app is done (#123)
 
 ## Feature proposals
+Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
 
 ### What you found thought-provoking
 Let the reader mark articles that stayed with them (in the app, or by finishing or highlighting them on
@@ -136,8 +138,7 @@ The reader's own choice, visible on the source's page, rather than the app guess
 Share an article with someone. The link is easy; the full extracted text raises copyright questions and
 shouldn't become a way around paywalls. A likely middle: the link plus a short excerpt.
 
-- [ ] **First step: Share the original's link** *(you asked)*. Android's share sheet with the title and the original URL (tracking tags already stripped; a link post's story, not the list's pick), nothing else.
-  - Where: the article preview's top bar, and on rows (in Select mode's bar, or a TalkBack action) so rows don't get a second icon on e-ink.
+- [ ] **Share the original's link from a row** *(you asked)*. The article preview's top bar has it; rows don't yet (in Select mode's bar, or a TalkBack action, so rows don't get a second icon on e-ink).
   - From the book: each article already ends with "Read the original"; a Kindle can share that link itself, so nothing needed there.
   - Later: the excerpt, if the link alone feels bare.
 
@@ -149,8 +150,6 @@ Kindle (My Clippings), Kobo or KOReader; where notes should live (the app, or a 
 ### More than one schedule, and one-off editions
 Several timed editions (a weekday morning paper and Sunday long reads), and a one-off custom edition
 (pick sources, size) without changing the defaults.
-
-Ideas worth doing, not yet planned. Each gets a sketch before it moves to Next.
 
 ### Add sources to tt-rss, not just the phone
 With a server, Add a site now subscribes in tt-rss, into a category the reader picks (cycle 85).
@@ -167,8 +166,7 @@ handle (saved links, curated lists) stay on the phone.
 - Designed: two setups, server or phone, never mixed, with a build order ([research/server-mode.md](research/server-mode.md)).
   Steps (a), the choice in onboarding and Settings (cycle 83), (b), Sources for a server
   (cycle 84), (c), adding a site to the server (cycle 85), and (d), moving phone feeds there
-  (cycle 86), are built. Next: (e) leaving a server (its feeds become phone feeds, starred
-  articles go to the reading list).
+  (cycle 86), are built. Next: (e) leaving a server (see "Moving off tt-rss" above).
 - Which servers: tt-rss (done as one source today) and the
   [Google Reader API](https://freshrss.github.io/FreshRSS/en/developers/06_GoogleReader_API.html),
   which [FreshRSS](https://freshrss.org), [Miniflux](https://miniflux.app/docs/google_reader.html),
@@ -308,6 +306,7 @@ A first step, if wanted: move `:core` to Kotlin Multiplatform, which also keeps 
 
 ## Done
 
+- [x] Listen: an edition read aloud in the phone's voice, a sentence at a time, with the article's text following along, lock-screen controls, and where you stopped kept (#162) *(you asked)*
 - [x] Onboarding asks "Where do your feeds live now?" with three tap cards (pick sites, your own RSS server, another reader app), and another reader app starts with importing its OPML file; Sources with a server is one list, the account only showing when something's wrong, phone feeds still to move under "Still on this phone", and curated lists in a group *(you asked)*
 - [x] Moving your phone feeds into tt-rss: a banner on Sources and an offer right after signing in, a sheet with every feed ticked and one category, stepped progress in the background, "Move the other 3" for what didn't move; settings carried over, and a moved feed kept, paused and hidden, until its stars are delivered; step (d) of [research/server-mode](research/server-mode.md) *(you asked)*
 - [x] Adding a site with a server subscribes in your tt-rss, in a category you pick (the last one used), with Undo; already there, no feed, or tt-rss refusing each say so and offer the reading list or a curated list; OPML items give way to Where your feeds come from; step (c) of [research/server-mode](research/server-mode.md) *(you asked)*

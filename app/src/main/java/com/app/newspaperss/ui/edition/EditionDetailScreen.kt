@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui.edition
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.semantics.heading
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.Toast
@@ -33,7 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -60,7 +61,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlin.math.roundToInt
 
 /**
  * @param preferOpen the reader reads on this device (a Boox), so opening an edition delivers it.
@@ -82,10 +82,10 @@ fun EditionDetailScreen(
     listening: Listening? = null,
     onOpenPlayer: () -> Unit = {},
 ) {
-    val detail by viewModel.detail.collectAsState()
-    val message by viewModel.message.collectAsState()
-    val building by viewModel.building.collectAsState()
-    val sentToKindle by viewModel.sentToKindle.collectAsState()
+    val detail by viewModel.detail.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val building by viewModel.building.collectAsStateWithLifecycle()
+    val sentToKindle by viewModel.sentToKindle.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     fun launch(intent: Intent): Boolean = try {
@@ -95,7 +95,7 @@ fun EditionDetailScreen(
         Toast.makeText(context, "No reading app on this phone can open the edition. Try Send instead.", Toast.LENGTH_LONG).show()
         false
     }
-    val notesFile by viewModel.notesFile.collectAsState()
+    val notesFile by viewModel.notesFile.collectAsStateWithLifecycle()
     LaunchedEffect(notesFile) {
         val file = notesFile ?: return@LaunchedEffect
         context.startActivity(EditionIntents.shareNotes(context, file, detail?.edition?.title ?: file.nameWithoutExtension))
@@ -141,7 +141,9 @@ fun EditionDetailScreen(
         MarkNotSentDialog(edition.title, onDismiss = { markingNotSent = false }, onConfirm = viewModel::markNotSent)
     }
 
-    var deleting by remember { mutableStateOf(false) }
+    val deleted by viewModel.deleted.collectAsStateWithLifecycle()
+    LaunchedEffect(deleted) { if (deleted) onBack() }
+    var deleting by rememberSaveable { mutableStateOf(false) }
     detail?.edition?.takeIf { deleting }?.let { edition ->
         AlertDialog(
             onDismissRequest = { deleting = false },
@@ -155,7 +157,7 @@ fun EditionDetailScreen(
                     },
                 )
             },
-            confirmButton = { TextButton(onClick = { deleting = false; viewModel.delete(onBack) }) { Text("Delete edition") } },
+            confirmButton = { TextButton(onClick = { deleting = false; viewModel.delete() }) { Text("Delete edition") } },
             dismissButton = { TextButton(onClick = { deleting = false }) { Text("Keep") } },
         )
     }
@@ -224,7 +226,7 @@ fun EditionDetailScreen(
             }
             if (current.contents.isNotEmpty()) {
                 item {
-                    Text("Contents", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp))
+                    Text("Contents", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp).semantics { heading() })
                 }
                 if (current.contents.any(current::canStar)) {
                     item {
@@ -273,15 +275,14 @@ private fun Header(
     listen: (@Composable (Modifier) -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Text(edition.title, style = MaterialTheme.typography.headlineSmall)
+        Text(edition.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
         Text(dateOf(edition.createdAt), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
         Text(statusOf(edition), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
         if (edition.status == EditionStatus.FAILED) {
             Text(edition.error ?: "This edition couldn't be made.", color = failureColor(edition.error))
         }
         if (edition.articleCount > 0) {
-            val articles = if (edition.articleCount == 1) "1 article" else "${edition.articleCount} articles"
-            Text("$articles · about ${minutes(edition.minutes)} min", style = MaterialTheme.typography.bodyMedium)
+            Text(articlesAndMinutes(edition.articleCount, edition.minutes), style = MaterialTheme.typography.bodyMedium)
         }
         if (edition.status == EditionStatus.DELIVERED) sentToKindle?.let { KindleNote(it) }
         // The same button as Today's card; the rest is in the top bar's ⋮.
@@ -313,7 +314,7 @@ private fun ContentRow(
     val entry = content.entry
     // Words, not the glyph, so it isn't mistaken for the toggle beside it; past tense, since that
     // toggle is about the next edition and may be off.
-    val details = listOfNotNull(entry.sourceTitle, "${minutes(entry.minutes)} min", "You starred it".takeIf { entry.starred }).joinToString(" · ")
+    val details = listOfNotNull(entry.sourceTitle, minutesLabel(entry.minutes), "You starred it".takeIf { entry.starred }).joinToString(" · ")
     ArticleRowFrame(
         modifier = if (onOpen != null) Modifier.clickable(onClickLabel = "Read", onClick = onOpen) else Modifier,
         title = { Text(entry.title, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis) },
@@ -332,7 +333,6 @@ private fun ContentRow(
     )
 }
 
-private fun minutes(value: Double) = value.roundToInt().coerceAtLeast(1)
 
 private fun dateOf(instant: Instant): String =
     instant.atZone(ZoneId.systemDefault()).toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))

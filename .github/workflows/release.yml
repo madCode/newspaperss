@@ -17,6 +17,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The build runs plugins and dependencies' code: it gets no token to push with.
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           java-version: '21'

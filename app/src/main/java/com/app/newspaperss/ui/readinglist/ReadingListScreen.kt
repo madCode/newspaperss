@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui.readinglist
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.app.newspaperss.ui.components.openInBrowser
 import com.app.newspaperss.core.extract.ArticleExtractor
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.ui.components.historyLine
@@ -43,7 +45,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,8 +62,8 @@ import com.app.newspaperss.data.SourceRepository
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
-    val items by viewModel.items.collectAsState()
-    val message by viewModel.message.collectAsState()
+    val items by viewModel.items.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     var menu by remember { mutableStateOf(false) }
@@ -85,7 +86,7 @@ fun ReadingListScreen(viewModel: ReadingListViewModel, onBack: () -> Unit) {
     DisposableEffect(Unit) {
         onDispose { if ((context as? Activity)?.isChangingConfigurations != true) viewModel.commitRemove() }
     }
-    val removed by viewModel.removed.collectAsState()
+    val removed by viewModel.removed.collectAsStateWithLifecycle()
     LaunchedEffect(removed) {
         val gone = removed ?: return@LaunchedEffect
         val result = snackbar.showSnackbar("Removed “${titleOf(gone)}”", actionLabel = "Undo", duration = SnackbarDuration.Long)
@@ -174,7 +175,7 @@ private fun SavedLink(article: ArticleEntity, onRemove: () -> Unit) {
     ).joinToString(" · ")
     ListItem(
         modifier = Modifier.clickable(onClickLabel = "Open in your browser") {
-            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            openInBrowser(context, article.url)
         },
         headlineContent = { Text(titleOf(article), maxLines = 2) },
         supportingContent = {

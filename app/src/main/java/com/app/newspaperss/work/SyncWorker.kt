@@ -1,5 +1,6 @@
 package com.app.newspaperss.work
 
+import com.app.newspaperss.container
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -10,12 +11,11 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.app.newspaperss.NewspaperssApp
 import java.util.concurrent.TimeUnit
 
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val container = (applicationContext as NewspaperssApp).container
+        val container = applicationContext.container
         container.feedSync.syncAll()
         // Moved phone feeds go once their last starred article has been delivered.
         container.feedMoves.tidy()
@@ -26,7 +26,6 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         internal const val PERIODIC = "sync-periodic-12h"
         private const val OLD_PERIODIC = "sync-periodic"
         private const val NOW = "sync-now"
-        private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
         /**
          * Keeps the Sources screen current between editions. Twice a day is plenty: every edition
@@ -43,7 +42,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         }
 
         fun syncNow(context: Context) {
-            val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(network).build()
+            val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(CONNECTED_NETWORK).build()
             // Append, not KEEP: a sync already running read the source list before
             // a newly added source existed, so it wouldn't fetch it.
             WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.APPEND_OR_REPLACE, request)

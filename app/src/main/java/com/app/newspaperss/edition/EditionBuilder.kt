@@ -65,7 +65,8 @@ class EditionBuilder(
     private val content: ArticleContentProvider,
     private val editionsDir: File,
     private val clock: Clock = Clock.systemDefaultZone(),
-    private val zone: ZoneId = ZoneId.systemDefault(),
+    /** Read for each build: the phone may have changed time zone since the app started. */
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
     private val imageBudgetBytes: Long = ImageRules.MAX_EDITION_BYTES,
     /**
      * Phone feeds moved to tt-rss: paused so they fetch nothing, but what they still hold, stars
@@ -74,7 +75,13 @@ class EditionBuilder(
     private val retiring: suspend () -> Set<Long> = { emptySet() },
     private val cover: (CoverInfo) -> EpubImage? = { null },
 ) {
-    suspend fun build(settings: EditionSettings, dueAt: Instant? = null, onProgress: (done: Int) -> Unit = {}): BuildResult {
+    /**
+     * @param deadline past it (the clock includes the sync before the build), no more articles are
+     *   fetched once there's at least one: the edition
+     *   goes out with what it has rather than WorkManager stopping the build at its time limit, to
+     *   start it again from the top and run into the limit again.
+     */
+    suspend fun build(settings: EditionSettings, dueAt: Instant? = null, deadline: Instant? = null, onProgress: (done: Int) -> Unit = {}): BuildResult {
         failInterrupted()
         releaseUndelivered()
         // tt-rss last, after what's on the phone, as Sources lists them.
@@ -83,6 +90,7 @@ class EditionBuilder(
         val sourcesById = sources.associateBy { it.id }
 
         // A timed edition is built ahead of its time; it's titled and dated for when it's due.
+        val zone = zone()
         val now = LocalDateTime.ofInstant(dueAt ?: clock.instant(), zone)
         // From the day before: an edition due just after midnight was made just before it.
         // Titles carry their date, so yesterday's can't clash.
@@ -109,7 +117,7 @@ class EditionBuilder(
                 db.editions().deleteEmpty(editionId)
                 BuildResult.NothingNew
             } else {
-                fill(editionId, title, now, sources, publications, articles, settings, onProgress)
+                fill(editionId, title, now, zone, sources, publications, articles, settings, onProgress, deadline)
             }
         } catch (e: CancellationException) {
             withContext(NonCancellable) { fail(editionId, STOPPED) }
@@ -126,11 +134,13 @@ class EditionBuilder(
         editionId: Long,
         title: String,
         now: LocalDateTime,
+        zone: ZoneId,
         sources: List<SourceEntity>,
         publications: List<PublicationEntity>,
         articles: List<ArticleEntity>,
         settings: EditionSettings,
         onProgress: (done: Int) -> Unit,
+        deadline: Instant?,
     ): BuildResult {
         val sourcesById = sources.associateBy { it.id }
         val byId = articles.associateBy { it.id }
@@ -150,6 +160,7 @@ class EditionBuilder(
             rotation = db.editions().countDelivered(),
         )
         var fetched = 0
+        var kept = 0
         val tried = mutableListOf<Long>()
         val allowance = ImageAllowance(imageBudgetBytes)
         fun minutesOf(c: ArticleContent) = ReadingTime.minutes(c.wordCount, settings.wordsPerMinute)
@@ -157,6 +168,7 @@ class EditionBuilder(
         val rules = settings.rules.copy(sourceCaps = caps)
         val texts = TextChoices(publications, clock.instant().atZone(zone).toLocalDate().toEpochDay())
         val picked = EditionPlanner.fill<Pair<ArticleEntity, ArticleContent>>(ordered, rules, { minutesOf(it.second) }) { c ->
+            if (deadline != null && kept > 0 && !clock.instant().isBefore(deadline)) return@fill null
             val article = byId.getValue(c.id.toLong())
             val source = sourcesById.getValue(article.sourceId)
             tried += article.id
@@ -171,6 +183,7 @@ class EditionBuilder(
                 null
             }
             onProgress(++fetched)
+            if (result != null) kept++
             result
         }
         if (picked.isEmpty()) {
@@ -215,7 +228,7 @@ class EditionBuilder(
             title = title,
             date = now.toLocalDate(),
             identifier = "urn:uuid:${UUID.randomUUID()}",
-            sections = listOf(EditionSection(null, withImages.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId)) })),
+            sections = listOf(EditionSection(null, withImages.map { (a, c) -> toEpub(a, c, minutesOf(c), sourcesById.getValue(a.sourceId), zone) })),
             modified = clock.instant(),
             cover = coverImage,
             reflection = Reflection.forEdition(editionId),
@@ -298,7 +311,7 @@ class EditionBuilder(
         return BuildResult.Failed(editionId, reason)
     }
 
-    private fun toEpub(a: ArticleEntity, c: ArticleContent, minutes: Double, source: SourceEntity) = EditionArticle(
+    private fun toEpub(a: ArticleEntity, c: ArticleContent, minutes: Double, source: SourceEntity, zone: ZoneId) = EditionArticle(
         title = c.title,
         sourceTitle = bylineOf(a, c, source),
         url = a.viaUrl?.takeIf { c.notTheStory } ?: a.url,

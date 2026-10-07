@@ -2,6 +2,7 @@ package com.app.newspaperss.settings
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
@@ -12,7 +13,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.edition.Ordering
 import com.app.newspaperss.core.edition.Schedule
 import com.app.newspaperss.edition.EditionSettings
@@ -162,7 +162,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         store.edit { prefs ->
             val s = transform(read(prefs))
             prefs[Keys.onboarded] = s.onboarded
-            if (s.device != null) prefs[Keys.device] = s.device.name else prefs.remove(Keys.device)
+            prefs.setOrRemove(Keys.device, s.device?.name)
             prefs[Keys.minutes] = s.edition.minutes
             prefs[Keys.maxPerSource] = s.edition.maxPerSource
             prefs[Keys.ordering] = s.edition.ordering.name
@@ -171,15 +171,15 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             prefs[Keys.scheduleTime] = s.schedule.time.toString()
             prefs[Keys.scheduleDays] = s.schedule.days.map { it.name }.toSet()
             prefs[Keys.delivery] = s.delivery.name
-            if (s.folderUri != null) prefs[Keys.folderUri] = s.folderUri else prefs.remove(Keys.folderUri)
-            if (s.folderName != null) prefs[Keys.folderName] = s.folderName else prefs.remove(Keys.folderName)
-            if (s.notesFolderUri != null) prefs[Keys.notesFolderUri] = s.notesFolderUri else prefs.remove(Keys.notesFolderUri)
-            if (s.notesFolderName != null) prefs[Keys.notesFolderName] = s.notesFolderName else prefs.remove(Keys.notesFolderName)
+            prefs.setOrRemove(Keys.folderUri, s.folderUri)
+            prefs.setOrRemove(Keys.folderName, s.folderName)
+            prefs.setOrRemove(Keys.notesFolderUri, s.notesFolderUri)
+            prefs.setOrRemove(Keys.notesFolderName, s.notesFolderName)
             prefs[Keys.previewTextSize] = s.previewTextSize.name
-            if (s.kindleEmail != null) prefs[Keys.kindleEmail] = s.kindleEmail else prefs.remove(Keys.kindleEmail)
-            if (s.mailApp != null) prefs[Keys.mailApp] = s.mailApp else prefs.remove(Keys.mailApp)
-            if (s.feedsFrom != null) prefs[Keys.feedsFrom] = s.feedsFrom.name else prefs.remove(Keys.feedsFrom)
-            if (s.lastCategoryId != null) prefs[Keys.lastCategoryId] = s.lastCategoryId else prefs.remove(Keys.lastCategoryId)
+            prefs.setOrRemove(Keys.kindleEmail, s.kindleEmail)
+            prefs.setOrRemove(Keys.mailApp, s.mailApp)
+            prefs.setOrRemove(Keys.feedsFrom, s.feedsFrom?.name)
+            prefs.setOrRemove(Keys.lastCategoryId, s.lastCategoryId)
             prefs[Keys.foldedCategories] = s.foldedCategories
             prefs[Keys.listenSpeed] = s.listenSpeed
             prefs.remove(Keys.legacyNotesWithEdition)
@@ -194,7 +194,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
     suspend fun settleFeedsFrom(hasServer: suspend () -> Boolean): FeedsFrom {
         var settled: FeedsFrom? = null
         store.edit { prefs ->
-            val current = prefs[Keys.feedsFrom]?.let { runCatching { FeedsFrom.valueOf(it) }.getOrNull() }
+            val current = prefs[Keys.feedsFrom]?.enumOrNull<FeedsFrom>()
             settled = current ?: (if (hasServer()) FeedsFrom.SERVER else FeedsFrom.PHONE).also { prefs[Keys.feedsFrom] = it.name }
         }
         return settled!!
@@ -202,35 +202,42 @@ class SettingsStore(private val store: DataStore<Preferences>) {
 
     private fun read(p: Preferences): Settings {
         val d = Settings()
-        val delivery = p[Keys.delivery]?.let { runCatching { DeliveryMethod.valueOf(it) }.getOrNull() } ?: d.delivery
+        val delivery = p[Keys.delivery]?.enumOrNull<DeliveryMethod>() ?: d.delivery
         // Only a folder that was being delivered to had notes saved in it.
         val legacyNotes = p[Keys.legacyNotesWithEdition] == true && delivery == DeliveryMethod.FOLDER
         return Settings(
             onboarded = p[Keys.onboarded] ?: false,
-            device = p[Keys.device]?.let { runCatching { Device.valueOf(it) }.getOrNull() },
+            device = p[Keys.device]?.enumOrNull<Device>(),
             edition = EditionSettings(
                 minutes = p[Keys.minutes] ?: d.edition.minutes,
                 maxPerSource = p[Keys.maxPerSource] ?: d.edition.maxPerSource,
-                ordering = p[Keys.ordering]?.let { runCatching { Ordering.valueOf(it) }.getOrNull() } ?: d.edition.ordering,
-                wordsPerMinute = p[Keys.wpm] ?: ReadingTime.DEFAULT_WPM,
+                ordering = p[Keys.ordering]?.enumOrNull<Ordering>() ?: d.edition.ordering,
+                wordsPerMinute = p[Keys.wpm] ?: d.edition.wordsPerMinute,
             ),
             scheduleEnabled = p[Keys.scheduleEnabled] ?: d.scheduleEnabled,
             schedule = Schedule(
                 time = p[Keys.scheduleTime]?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: d.schedule.time,
-                days = p[Keys.scheduleDays]?.mapNotNull { runCatching { DayOfWeek.valueOf(it) }.getOrNull() }?.toSet() ?: d.schedule.days,
+                days = p[Keys.scheduleDays]?.mapNotNull { it.enumOrNull<DayOfWeek>() }?.toSet() ?: d.schedule.days,
             ),
             delivery = delivery,
             folderUri = p[Keys.folderUri],
             folderName = p[Keys.folderName],
             notesFolderUri = p[Keys.notesFolderUri] ?: p[Keys.folderUri]?.takeIf { legacyNotes },
             notesFolderName = p[Keys.notesFolderName] ?: p[Keys.folderName]?.takeIf { legacyNotes },
-            previewTextSize = p[Keys.previewTextSize]?.let { runCatching { PreviewTextSize.valueOf(it) }.getOrNull() } ?: d.previewTextSize,
+            previewTextSize = p[Keys.previewTextSize]?.enumOrNull<PreviewTextSize>() ?: d.previewTextSize,
             kindleEmail = p[Keys.kindleEmail],
             mailApp = p[Keys.mailApp],
-            feedsFrom = p[Keys.feedsFrom]?.let { runCatching { FeedsFrom.valueOf(it) }.getOrNull() },
+            feedsFrom = p[Keys.feedsFrom]?.enumOrNull<FeedsFrom>(),
             lastCategoryId = p[Keys.lastCategoryId],
             foldedCategories = p[Keys.foldedCategories] ?: emptySet(),
             listenSpeed = p[Keys.listenSpeed] ?: d.listenSpeed,
         )
     }
 }
+
+private fun <T> MutablePreferences.setOrRemove(key: Preferences.Key<T>, value: T?) {
+    if (value != null) this[key] = value else remove(key)
+}
+
+/** A stored enum's value, or null for one this version doesn't have (from a newer one, say). */
+private inline fun <reified E : Enum<E>> String.enumOrNull(): E? = enumValues<E>().firstOrNull { it.name == this }

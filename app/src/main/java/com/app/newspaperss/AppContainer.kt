@@ -19,7 +19,6 @@ import com.app.newspaperss.data.TtrssAccountStore
 import com.app.newspaperss.data.TtrssRepository
 import com.app.newspaperss.data.TtrssSubscriptions
 import com.app.newspaperss.edition.AndroidImageEncoder
-import com.app.newspaperss.edition.ArticleContentProvider
 import com.app.newspaperss.edition.CoverRenderer
 import com.app.newspaperss.edition.EditionBuilder
 import com.app.newspaperss.edition.EditionNotes
@@ -42,22 +41,20 @@ import com.app.newspaperss.work.NotesWorker
 import com.app.newspaperss.work.ReadingListTitleWorker
 import com.app.newspaperss.work.TtrssMarkReadWorker
 import java.io.File
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
 class AppContainer(
     context: Context,
     val http: HttpClient = OkHttpHttpClient(OkHttpHttpClient.defaultClient(File(context.cacheDir, "http"))),
     val db: AppDatabase = AppDatabase.open(context),
-    content: ArticleContentProvider = SourceRepository(db).let { sources ->
-        ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly) { sourceId, originId, evidence, text ->
-            if (text.day != null) sources.recordFullText(sourceId, originId, evidence, text.check, text.day) else sources.recordFullText(sourceId, originId, evidence, text.check)
-        }
-    },
     cipher: SecretCipher = AesGcmCipher.androidKeystore(),
     markTtrssRead: (editionId: Long) -> Unit = { TtrssMarkReadWorker.enqueue(context, it) },
     fetchReadingListTitles: (articleIds: List<Long>) -> Unit = { ReadingListTitleWorker.enqueue(context, it) },
@@ -68,20 +65,31 @@ class AppContainer(
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main +
+            // Nothing waits on these launches: a failure (a full disk, a database error) is logged
+            // rather than crashing the app in the background.
+            CoroutineExceptionHandler { _, e -> Log.w("newspaperss", "Background work failed: ${e.javaClass.name}") },
+    )
     val sources = SourceRepository(db)
     val readingList = ReadingListRepository(db, onUntitled = fetchReadingListTitles)
     val readingListTitles = ReadingListTitles(db, http)
     val notifier = Notifier(context)
     val kindleSends = KindleSends()
     // A sent edition's Ready notification comes down: its Send would offer an edition already sent.
-    val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead, kindleSends = kindleSends)
+    val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead, kindleSends = kindleSends,
+        // Only if Listen has started: it isn't made just to be told.
+        onFileGone = { id -> if (listenMade.isInitialized()) appScope.launch { listen.forget(id) } },
+    )
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
     val ttrss = TtrssRepository(db, http, ttrssAccounts, sources)
     val ttrssSubscriptions = TtrssSubscriptions(ttrss, appScope)
     val feedMoves = FeedMoves(context, db, ttrss, moveFeeds)
     val feedSync = FeedSync(db, http, ttrssAccounts = ttrssAccounts, onUntitled = fetchReadingListTitles)
+    private val content = ExtractorContentProvider(ArticleExtractor(http), http, AndroidImageEncoder(), onPaidOnly = sources::markPaidOnly) { sourceId, originId, evidence, text ->
+        sources.recordFullText(sourceId, originId, evidence, text.check, text.day)
+    }
     val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render, retiring = feedMoves::retiringIds)
     val settings = SettingsStore(context)
     val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))
@@ -91,13 +99,14 @@ class AppContainer(
 
     /** Reading editions aloud. Made on first use: the voice takes a moment to start. */
     private val listenProgress = StoredListenProgress(context)
-    val listen: ListenPlayer by lazy {
+    private val listenMade: Lazy<ListenPlayer> = lazy {
         ListenPlayer(
             speaker(), listenProgress, open = { ListenBook.open(editions, it) }, appScope,
             savedSpeed = settings.settings.map { it.listenSpeed }.distinctUntilChanged(),
             saveSpeed = { speed -> settings.update { it.copy(listenSpeed = speed) } },
         )
     }
+    val listen: ListenPlayer by listenMade
     val listening: Listening by lazy { Listening(listen, listenProgress, editions) { connectListening() } }
 
     /** See [SettingsStore.settleFeedsFrom]: a tt-rss source from before the choice means the server setup. */

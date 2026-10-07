@@ -15,6 +15,13 @@ dependencies {
 // change that lets it slide.
 kover {
     reports {
+        // Generated code (Room's DAOs, Compose's lambda holders) isn't ours to cover, and counting
+        // it would hide a drop in what is.
+        filters {
+            excludes {
+                classes("*_Impl", "*_Impl\$*", "*ComposableSingletons*", "*.BuildConfig")
+            }
+        }
         verify {
             rule {
                 minBound(90)

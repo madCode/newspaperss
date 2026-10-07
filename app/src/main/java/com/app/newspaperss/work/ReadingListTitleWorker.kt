@@ -1,21 +1,19 @@
 package com.app.newspaperss.work
 
+import com.app.newspaperss.container
 import android.content.Context
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.app.newspaperss.NewspaperssApp
 
 /** Looks up saved links' titles and lengths, and curated-list picks' titles (see [com.app.newspaperss.data.ReadingListTitles]). */
 class ReadingListTitleWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val ids = inputData.getLongArray(ARTICLE_IDS)?.toList().orEmpty()
-        val done = (applicationContext as NewspaperssApp).container.readingListTitles.fetch(ids)
+        val done = applicationContext.container.readingListTitles.fetch(ids)
         return when {
             done -> Result.success()
             runAttemptCount + 1 < MAX_ATTEMPTS -> Result.retry()
@@ -36,7 +34,7 @@ class ReadingListTitleWorker(context: Context, params: WorkerParameters) : Corou
             val work = WorkManager.getInstance(context)
             for (batch in articleIds.chunked(BATCH)) {
                 val request = OneTimeWorkRequestBuilder<ReadingListTitleWorker>()
-                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                    .setConstraints(CONNECTED_NETWORK)
                     .setInputData(workDataOf(ARTICLE_IDS to batch.toLongArray()))
                     .build()
                 // One batch at a time, so a big import doesn't fetch hundreds of pages at once.

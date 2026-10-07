@@ -66,7 +66,13 @@ class EditionReadGrantTest {
     }
 
     @Test
-    fun anAppThatIsntInstalledIsSkipped() {
-        EditionIntents.grantRead(app, "com.example.not.installed", EditionIntents.uriFor(app, editionFile()))
+    fun anAppThatIsntInstalledIsSkippedNotACrash() {
+        // Android refuses a grant to a package that isn't there, in one of two ways.
+        for (refusal in listOf(IllegalArgumentException("no such package"), SecurityException("not allowed"))) {
+            val refusing = object : ContextWrapper(app) {
+                override fun grantUriPermission(toPackage: String, uri: Uri, modeFlags: Int) = throw refusal
+            }
+            EditionIntents.grantRead(refusing, "com.example.not.installed", EditionIntents.uriFor(app, editionFile()))
+        }
     }
 }

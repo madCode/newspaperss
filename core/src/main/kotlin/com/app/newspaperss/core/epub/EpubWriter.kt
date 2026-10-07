@@ -3,7 +3,6 @@ package com.app.newspaperss.core.epub
 import com.app.newspaperss.core.ReadingTime
 import com.app.newspaperss.core.plural
 import java.io.OutputStream
-import java.net.URI
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -26,6 +25,13 @@ object EpubWriter {
     private const val END = "end.xhtml"
     /** The closing page's heading; the app's preview ends the last article with it too. */
     const val END_TITLE = "That's all for today"
+
+    /**
+     * The [index]th article's page in the book (0-based). ASCII digits whatever the phone's
+     * language: a Persian or Arabic locale's digits would make file names some readers refuse.
+     */
+    fun articleHref(index: Int): String = "article-%03d.xhtml".format(Locale.ROOT, index + 1)
+
     /** Articles at least this long are followed by a line naming the next one. */
     const val NEXT_AFTER_MINUTES = 5.0
     private const val COVER_IMAGE_ID = "cover-image"
@@ -81,7 +87,7 @@ object EpubWriter {
     private class Book(val doc: EditionDoc) {
         val lang = doc.language
         val articles = doc.articles
-        val articleHrefs = articles.indices.map { "article-%03d.xhtml".format(it + 1) }
+        val articleHrefs = articles.indices.map(::articleHref)
         val images = collectImages()
         val totalMinutes = articles.sumOf { it.minutes }
         val sections = doc.sections.filter { it.articles.isNotEmpty() }
@@ -238,7 +244,7 @@ object EpubWriter {
                     val href = externalHref(url)
                     // The site's name, not the whole address: a long URL has nowhere to break and
                     // pushes the page wider than a phone.
-                    val host = href?.let { runCatching { URI(it).host }.getOrNull() }?.removePrefix("www.")
+                    val host = href?.let(::siteName)
                     if (href != null && !host.isNullOrEmpty()) {
                         append("<p class=\"source-link\">Read the original at <a href=\"${esc(href)}\">${esc(host)}</a></p>\n")
                     } else {

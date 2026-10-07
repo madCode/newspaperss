@@ -610,7 +610,8 @@ class EditionDetailScreenTest {
         compose.onNodeWithContentDescription("More options").performClick()
         compose.onNodeWithText("Delete edition").performClick()
         compose.onNode(hasText("Delete edition") and hasAnyAncestor(isDialog())).performClick()
-        idleUntil { left }
+        // The screen leaves once it sees the deletion, on its next frame.
+        idleUntil { compose.waitForIdle(); left }
     }
 
     private fun isGone(id: Long) = runBlocking { repo.observeAll().first().none { it.id == id } && repo.observe(id).first() == null }

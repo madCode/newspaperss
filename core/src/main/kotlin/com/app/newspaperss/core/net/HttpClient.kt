@@ -1,17 +1,22 @@
 package com.app.newspaperss.core.net
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.Cache
-import okhttp3.CacheControl
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.IOException
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import okhttp3.Cache
+import okhttp3.CacheControl
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 
 class HttpResponse(
     val code: Int,
@@ -68,8 +73,9 @@ class OkHttpHttpClient(
     override suspend fun postJson(url: String, body: String): HttpResponse =
         text(request(url, emptyMap()) { post(body.toRequestBody(JSON)) }, postClient)
 
+    // On IO throughout: closing a response it didn't read to the end reads the rest off the network.
     private suspend fun text(request: Request, via: OkHttpClient = client): HttpResponse = withContext(Dispatchers.IO) {
-        via.newCall(request).execute().use { r ->
+        via.newCall(request).await().use { r ->
             if (r.isRedirect) {
                 val location = r.header("Location")?.let { r.request.url.resolve(it)?.toString() } ?: r.request.url.toString()
                 return@use HttpResponse(r.code, location, r.header("Content-Type"), "")
@@ -83,7 +89,7 @@ class OkHttpHttpClient(
     }
 
     override suspend fun getBytes(url: String, headers: Map<String, String>): HttpBytes = withContext(Dispatchers.IO) {
-        imageClient.newCall(request(url, headers)).execute().use { r ->
+        imageClient.newCall(request(url, headers)).await().use { r ->
             val source = r.body.source()
             if (source.request(MAX_IMAGE_BYTES + 1)) throw IOException("Too large for an image.")
             HttpBytes(r.code, r.header("Content-Type"), source.readByteArray())
@@ -103,6 +109,7 @@ class OkHttpHttpClient(
         const val MAX_BYTES = 10L * 1024 * 1024
         const val MAX_IMAGE_BYTES = 8L * 1024 * 1024
         private val JSON = "application/json; charset=utf-8".toMediaType()
+        private val WINDOWS_1252: Charset = Charset.forName("windows-1252")
 
         private val xmlEncoding = Regex("""^\s*<\?xml[^>]*encoding=["']([A-Za-z0-9._-]+)["']""")
 
@@ -116,7 +123,8 @@ class OkHttpHttpClient(
          * everything but the header.
          */
         internal fun decode(bytes: ByteArray, headerCharset: Charset?): String {
-            if (headerCharset != null) return String(bytes, headerCharset)
+            // A header's Latin-1 is windows-1252 too: servers send that label for pages with curly quotes.
+            if (headerCharset != null) return String(bytes, if (headerCharset == Charsets.ISO_8859_1 || headerCharset == Charsets.US_ASCII) WINDOWS_1252 else headerCharset)
             if (bytes.size >= 3 && bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()) {
                 return String(bytes, Charsets.UTF_8).removePrefix("\uFEFF")
             }
@@ -133,7 +141,7 @@ class OkHttpHttpClient(
          * decodes as control characters; a UTF-16 label on bytes read this way can only be wrong.
          */
         private fun browserEquivalent(declared: Charset): Charset = when (declared) {
-            Charsets.ISO_8859_1, Charsets.US_ASCII -> Charset.forName("windows-1252")
+            Charsets.ISO_8859_1, Charsets.US_ASCII -> WINDOWS_1252
             Charsets.UTF_16, Charsets.UTF_16BE, Charsets.UTF_16LE -> Charsets.UTF_8
             else -> declared
         }
@@ -156,4 +164,16 @@ class OkHttpHttpClient(
         private const val CACHE_BYTES = 10L * 1024 * 1024
         private val REVALIDATE = CacheControl.Builder().maxAge(0, TimeUnit.SECONDS).build()
     }
+}
+
+/**
+ * The call's response, and the call cancelled if the coroutine is: a blocking execute() would keep
+ * a stopped edition build waiting on a slow server for up to its whole timeout.
+ */
+private suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
+    cont.invokeOnCancellation { cancel() }
+    enqueue(object : Callback {
+        override fun onResponse(call: Call, response: Response) = cont.resume(response) { _, value, _ -> value.close() }
+        override fun onFailure(call: Call, e: IOException) = cont.resumeWithException(e)
+    })
 }

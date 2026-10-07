@@ -1,5 +1,6 @@
 package com.app.newspaperss.work
 
+import com.app.newspaperss.container
 import android.content.Context
 import androidx.core.content.edit
 import androidx.work.CoroutineWorker
@@ -8,7 +9,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.app.newspaperss.NewspaperssApp
 import com.app.newspaperss.core.edition.ScheduleTimer
 import com.app.newspaperss.core.edition.TimerAction
 import com.app.newspaperss.settings.Settings
@@ -88,7 +88,7 @@ object EditionScheduler {
     class Timer(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
         override suspend fun doWork(): Result {
             val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val settings = (applicationContext as NewspaperssApp).container.settings.current()
+            val settings = applicationContext.container.settings.current()
             // Locked: a reschedule between clearing PENDING and arming the next timer would see
             // no timer and arm one with REPLACE, cancelling this worker.
             lock.withLock {

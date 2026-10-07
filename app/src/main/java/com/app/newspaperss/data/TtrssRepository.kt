@@ -66,7 +66,7 @@ class TtrssRepository(
             val feeds = if (!readFeeds) null else optional { client.allFeeds() }
             return Check.Passed(categories, feeds)
         } catch (e: TtrssException) {
-            return Check.Failed(e.message ?: "tt-rss reported an error.")
+            return Check.Failed(e.reason)
         } catch (e: IOException) {
             return Check.Failed(
                 if (FeedSync.tooSlow(e)) "${address.trim()} took too long to answer. Try again in a moment."
@@ -181,19 +181,12 @@ class TtrssRepository(
      * [includeEmpty] one to subscribe a feed into.
      */
     suspend fun categories(includeEmpty: Boolean = false): Categories {
-        // Some devices' Keystore throws runtime exceptions of its own.
-        val account = try {
-            (accounts.load() as? StoredAccount.Ready)?.account
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        } ?: return Categories.Failed(FeedSync.SIGN_IN_AGAIN)
+        val account = accounts.ready() ?: return Categories.Failed(FeedSync.SIGN_IN_AGAIN)
         val client = account.client(http)
         return try {
             Categories.Loaded(client.categories(includeEmpty))
         } catch (e: TtrssException) {
-            Categories.Failed(e.message ?: "tt-rss reported an error.")
+            Categories.Failed(e.reason)
         } catch (e: IOException) {
             Categories.Failed(FeedSync.ttrssUnreachable(e))
         } catch (e: CancellationException) {
@@ -225,13 +218,7 @@ class TtrssRepository(
      */
     suspend fun startFresh(sourceId: Long): String? {
         val source = db.sources().byId(sourceId) ?: return "This source has been removed."
-        val account = try {
-            (accounts.load() as? StoredAccount.Ready)?.account
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        } ?: return FeedSync.SIGN_IN_AGAIN
+        val account = accounts.ready() ?: return FeedSync.SIGN_IN_AGAIN
         // A category id means nothing on another server, and "everything" would be someone else's.
         if (account.apiUrl != source.url) return FeedSync.SIGN_IN_AGAIN
         val client = account.client(http)
@@ -241,7 +228,7 @@ class TtrssRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (e: TtrssException) {
-            return e.message ?: "tt-rss reported an error."
+            return e.reason
         } catch (e: IOException) {
             // The catch-up may still be running on the server after the app stops waiting.
             return if (FeedSync.tooSlow(e)) "tt-rss took too long to answer. It may still be working through it: check in tt-rss before trying again." else FeedSync.ttrssUnreachable(e)
@@ -345,7 +332,7 @@ class TtrssRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (e: TtrssException) {
-            return Asked.Failed(Subscribed.Failed(e.message ?: "tt-rss reported an error."))
+            return Asked.Failed(Subscribed.Failed(e.reason))
         } catch (e: IOException) {
             // tt-rss may still add it after the app stops waiting.
             return Asked.Failed(
@@ -374,8 +361,11 @@ class TtrssRepository(
     sealed interface MoveAnswer {
         /** In tt-rss now; [already] it was there before. [feedId] is null when tt-rss didn't say it. */
         data class In(val feedId: Int?, val already: Boolean) : MoveAnswer
-        /** [unreachable]: tt-rss didn't answer, so asking about the next feed now is likely no use either. */
-        data class Failed(val reason: String, val unreachable: Boolean = false) : MoveAnswer
+        /**
+         * [stopsBatch]: the rest of the move would fail the same way (tt-rss didn't answer, or the
+         * login is gone or changed), so it's given up together rather than each after its own wait.
+         */
+        data class Failed(val reason: String, val stopsBatch: Boolean = false) : MoveAnswer
     }
 
     /**
@@ -384,12 +374,12 @@ class TtrssRepository(
      * [subscribe], the feeds aren't listed after each one; [listFor] does that once for the batch.
      */
     suspend fun subscribeForMove(feedUrl: String, categoryId: Int, login: Login): MoveAnswer {
-        val (account, _) = usableAccount() ?: return MoveAnswer.Failed(FeedSync.SIGN_IN_AGAIN)
-        if (Login(account.apiUrl, account.user) != login) return MoveAnswer.Failed(SIGNED_IN_AGAIN)
+        val (account, _) = usableAccount() ?: return MoveAnswer.Failed(FeedSync.SIGN_IN_AGAIN, stopsBatch = true)
+        if (Login(account.apiUrl, account.user) != login) return MoveAnswer.Failed(SIGNED_IN_AGAIN, stopsBatch = true)
         val client = account.client(http)
         return try {
             when (val asked = ask(client, feedUrl, categoryId)) {
-                is Asked.Failed -> MoveAnswer.Failed(asked.failed.reason, asked.unreachable)
+                is Asked.Failed -> MoveAnswer.Failed(asked.failed.reason, stopsBatch = asked.unreachable)
                 is Asked.Answered -> when (val answer = asked.answer) {
                     is TtrssSubscription.Added -> MoveAnswer.In(answer.feedId, already = false)
                     is TtrssSubscription.AlreadySubscribed -> MoveAnswer.In(answer.feedId, already = true)
@@ -475,7 +465,7 @@ class TtrssRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (e: TtrssException) {
-            return e.message ?: "tt-rss reported an error."
+            return e.reason
         } catch (e: IOException) {
             return FeedSync.ttrssUnreachable(e)
         } catch (e: Exception) {
@@ -488,14 +478,7 @@ class TtrssRepository(
     /** The saved login and the account's source, when the login is for that source's server. */
     private suspend fun usableAccount(): Pair<TtrssAccount, SourceEntity>? {
         val source = db.sources().ofKind(SourceKind.TTRSS).firstOrNull() ?: return null
-        // Some devices' Keystore throws runtime exceptions of its own.
-        val account = try {
-            (accounts.load() as? StoredAccount.Ready)?.account
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        } ?: return null
+        val account = accounts.ready() ?: return null
         // Feed and category ids mean nothing on another server.
         return if (account.apiUrl == source.url) account to source else null
     }
@@ -536,7 +519,15 @@ class TtrssRepository(
     private suspend fun update(articles: List<ArticleEntity>, read: Boolean, failed: String, call: suspend TtrssClient.(List<Long>) -> Unit): Boolean {
         if (articles.isEmpty()) return true
         val sourceIds = articles.map { it.sourceId }.distinct()
-        val account = (accounts.load() as? StoredAccount.Ready)?.account
+        // The store failing to read is tried again later; only no login at all asks to sign in.
+        val stored = try {
+            accounts.load()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return false
+        }
+        val account = (stored as? StoredAccount.Ready)?.account
         if (account == null) {
             sourceIds.forEach { db.sources().setServerNote(it, FeedSync.SIGN_IN_AGAIN) }
             return true

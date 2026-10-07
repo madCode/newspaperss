@@ -26,16 +26,25 @@ class SendEditionActivity : Activity() {
             finish()
             return
         }
-        val title = intent.getStringExtra(EXTRA_TITLE) ?: file.nameWithoutExtension
-        val container = (application as NewspaperssApp).container
-        container.appScope.launch {
-            val email = container.settings.current().kindleEmailTarget
-            val body = email?.let { container.editions.emailBody(id) }
-            // Its own task: this one is excluded from Recents, and the half-written email shouldn't be.
-            EditionIntents.launchSend(this@SendEditionActivity, file, title, id, email, body, newTask = true) {
-                container.appScope.launch { container.editions.markEmailedToKindle(id) }
-            }
+        // Recreated (a rotation while it reads the settings): the first one is already sending.
+        if (savedInstanceState != null) {
             finish()
+            return
+        }
+        val title = intent.getStringExtra(EXTRA_TITLE) ?: file.nameWithoutExtension
+        val container = application.container
+        container.appScope.launch {
+            try {
+                val email = container.settings.current().kindleEmailTarget
+                val body = email?.let { container.editions.emailBody(id) }
+                // Its own task: this one is excluded from Recents, and the half-written email shouldn't be.
+                EditionIntents.launchSend(applicationContext, file, title, id, email, body, newTask = true) {
+                    container.appScope.launch { container.editions.markEmailedToKindle(id) }
+                }
+            } finally {
+                // Whatever happened: left open, this see-through screen would sit over everything.
+                finish()
+            }
         }
     }
 

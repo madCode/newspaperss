@@ -1,5 +1,6 @@
 package com.app.newspaperss.core.feed
 
+import com.app.newspaperss.core.net.siteHost
 import com.app.newspaperss.core.net.ErrorAnswers
 import com.app.newspaperss.core.net.HttpClient
 import org.jsoup.Jsoup
@@ -73,8 +74,7 @@ class FeedFinder(private val http: HttpClient) {
         if (contentType != null && "html" !in contentType.lowercase()) return false
         val a = runCatching { URI(asked) }.getOrNull() ?: return false
         val l = runCatching { URI(landed) }.getOrNull() ?: return false
-        fun host(u: URI) = u.host?.lowercase()?.removePrefix("www.")
-        if (host(a) == null || host(a) != host(l)) return false
+        if (siteHost(a) == null || siteHost(a) != siteHost(l)) return false
         return !l.path.isNullOrEmpty() && l.path != "/"
     }
 
@@ -93,13 +93,13 @@ class FeedFinder(private val http: HttpClient) {
          * feed comes before a tag's or a category's; comment feeds are left out.
          */
         internal fun linkedFeeds(html: String, pageUrl: String): List<String> {
-            val host = runCatching { URI(pageUrl).host?.removePrefix("www.") }.getOrNull() ?: return emptyList()
+            val host = runCatching { siteHost(URI(pageUrl)) }.getOrNull() ?: return emptyList()
             return Jsoup.parse(html, pageUrl).select("a[href]").map { it.absUrl("href") }
                 .filter { href ->
                     val uri = runCatching { URI(href) }.getOrNull() ?: return@filter false
                     val last = uri.path.orEmpty().trimEnd('/').substringAfterLast('/').lowercase()
                     val segments = uri.path.orEmpty().lowercase().split('/')
-                    uri.host?.removePrefix("www.") == host && last in FEED_LINK_NAMES && "comments" !in segments
+                    siteHost(uri) == host && last in FEED_LINK_NAMES && "comments" !in segments
                 }
                 .distinct()
                 .sortedBy { runCatching { URI(it).path.orEmpty().count { c -> c == '/' } }.getOrDefault(Int.MAX_VALUE) }

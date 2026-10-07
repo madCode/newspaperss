@@ -1,5 +1,8 @@
 package com.app.newspaperss
 
+import androidx.navigation.NavBackStackEntry
+import com.app.newspaperss.data.PublicationEntity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
 
 import com.app.newspaperss.settings.offersOpen
@@ -27,7 +30,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import com.app.newspaperss.ui.edition.ArticlePreviewScreen
@@ -102,14 +104,14 @@ class MainActivity : ComponentActivity() {
         installSplashScreen().setKeepOnScreenCondition { !settingsLoaded }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val container = (application as NewspaperssApp).container
+        val container = application.container
         // Not when reopened from recents, which hands back the intent that first opened it.
         if (savedInstanceState == null && intent?.flags?.and(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) {
             opening.value = intent?.getStringExtra(EXTRA_OPEN)
         }
         setContent {
             NewspaperssTheme {
-                val settings by container.settings.settings.collectAsState(initial = null)
+                val settings by container.settings.settings.collectAsStateWithLifecycle(initialValue = null)
                 if (settings != null) settingsLoaded = true
                 when (settings?.onboarded) {
                     null -> {}
@@ -206,7 +208,7 @@ private fun App(
                 TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
-                val id = entry.arguments?.getLong("id") ?: 0L
+                val id = entry.idArg
                 val vm = viewModel { EditionDetailViewModel(container.editions, id, container.editionNotes, container.kindleSends.recent, container.notifier::dismissFor) }
                 EditionDetailScreen(
                     vm,
@@ -224,11 +226,11 @@ private fun App(
                 ARTICLE,
                 arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("position") { type = NavType.IntType }),
             ) { entry ->
-                val id = entry.arguments?.getLong("id") ?: 0L
+                val id = entry.idArg
                 val position = entry.arguments?.getInt("position") ?: 0
-                val contents by container.editions.observeContents(id).collectAsState(initial = emptyList())
+                val contents by remember(id) { container.editions.observeContents(id) }.collectAsStateWithLifecycle(initialValue = emptyList())
                 val editionTitle by produceState<String?>(null, id) { value = container.editions.byId(id)?.title }
-                val textSize by remember { container.settings.settings.map { it.previewTextSize } }.collectAsState(initial = null)
+                val textSize by remember { container.settings.settings.map { it.previewTextSize } }.collectAsStateWithLifecycle(initialValue = null)
                 ArticlePreviewScreen(
                     loadFile = { container.editions.byId(id)?.let(container.editions::fileOf) },
                     position = position,
@@ -255,35 +257,35 @@ private fun App(
                     vm,
                     onOpenReadingList = { nav.navigate(READING_LIST) },
                     onOpenSource = { nav.navigate("source/$it") { launchSingleTop = true } },
-                    onOpenFeed = { id, key -> nav.navigate("source/$id/feed/${Uri.encode(key)}") { launchSingleTop = true } },
+                    onOpenFeed = { id, key -> nav.navigate(feedRoute(id, key)) { launchSingleTop = true } },
                     onOpenLeftOut = { nav.navigate("source/$it/left-out") { launchSingleTop = true } },
                     onOpenNotInPaper = { nav.navigate("source/$it/not-in-paper") { launchSingleTop = true } },
                     onOpenAccount = { nav.navigate(FEEDS_FROM) { launchSingleTop = true } },
                 )
             }
             composable(FEED, arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("key") { type = NavType.StringType })) { entry ->
-                val id = entry.arguments?.getLong("id") ?: 0L
+                val id = entry.idArg
                 val key = entry.arguments?.getString("key").orEmpty()
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel {
-                    SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, key) { SyncWorker.syncNow(context) }
+                    sourceDetail(container, id, key) { SyncWorker.syncNow(context) }
                 }
                 SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(FEED, inclusive = true) })
             }
             composable(LEFT_OUT, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
-                val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }) }
-                LeftOutScreen(vm, onBack = { nav.navigateUp() }, onOpenFeed = { nav.navigate("source/$id/feed/${Uri.encode(it)}") { launchSingleTop = true } })
+                val id = entry.idArg
+                val vm = viewModel { sourceDetail(container, id) }
+                LeftOutScreen(vm, onBack = { nav.navigateUp() }, onOpenFeed = { nav.navigate(feedRoute(id, it)) { launchSingleTop = true } })
             }
             composable(NOT_IN_PAPER, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
-                val id = entry.arguments?.getLong("id") ?: 0L
-                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }) }
+                val id = entry.idArg
+                val vm = viewModel { sourceDetail(container, id) }
                 NotInPaperScreen(vm, onBack = { nav.navigateUp() }, onOpenAccount = { nav.navigate(FEEDS_FROM) { launchSingleTop = true } })
             }
             composable(SOURCE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
-                val id = entry.arguments?.getLong("id") ?: 0L
+                val id = entry.idArg
                 val context = LocalContext.current.applicationContext
-                val vm = viewModel { SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }) { SyncWorker.syncNow(context) } }
+                val vm = viewModel { sourceDetail(container, id) { SyncWorker.syncNow(context) } }
                 SourceDetailScreen(vm, onBack = { nav.navigateUp() }, onGone = { nav.popBackStack(SOURCE, inclusive = true) })
             }
             composable(READING_LIST) {
@@ -312,3 +314,12 @@ private fun settingsViewModel(container: AppContainer): SettingsViewModel {
         }
     }
 }
+
+/** A destination's source or edition id. */
+private val NavBackStackEntry.idArg: Long get() = arguments?.getLong("id") ?: 0L
+
+private fun feedRoute(sourceId: Long, key: String) = "source/$sourceId/feed/${Uri.encode(key)}"
+
+/** A source's page, or one of a tt-rss account's feeds by its [key]. */
+private fun sourceDetail(container: AppContainer, id: Long, key: String = PublicationEntity.OWN, sync: () -> Unit = {}) =
+    SourceDetailViewModel(container.sources, id, container.settings.settings.map { it.edition.maxPerSource }, key, sync)

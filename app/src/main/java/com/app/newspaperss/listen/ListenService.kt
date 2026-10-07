@@ -1,5 +1,6 @@
 package com.app.newspaperss.listen
 
+import com.app.newspaperss.container
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -20,7 +21,6 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionToken
 import com.app.newspaperss.MainActivity
-import com.app.newspaperss.NewspaperssApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,7 +40,7 @@ class ListenService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val listen = (application as NewspaperssApp).container.listen
+        val listen = application.container.listen
         // Its own action: PendingIntents that differ only in extras are one and the same, and
         // this one would turn the edition notifications' taps into "open the player".
         val open = PendingIntent.getActivity(
@@ -72,7 +72,7 @@ class ListenService : MediaSessionService() {
 
     override fun onDestroy() {
         // Without the service there's no notification, focus or headphone pause: don't play on.
-        (application as NewspaperssApp).container.listen.pause()
+        application.container.listen.pause()
         focus?.release()
         session?.run {
             player.release()

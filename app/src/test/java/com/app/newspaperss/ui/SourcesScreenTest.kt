@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.testutil.idleUntil
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -64,7 +65,7 @@ class SourcesScreenTest {
         waitFor("No sources yet")
     }
 
-    private fun waitFor(text: String, present: Boolean = true) = compose.waitUntil(5_000) {
+    private fun waitFor(text: String, present: Boolean = true) = idleUntil {
         compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() == present
     }
 

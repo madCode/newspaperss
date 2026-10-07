@@ -1,7 +1,6 @@
 package com.app.newspaperss.listen
 
 import com.app.newspaperss.core.listen.ListenScript
-import com.app.newspaperss.core.listen.ListenTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -43,10 +42,9 @@ data class ListenState(
      */
     val secondsInPage: Double
         get() {
-            val lines = script?.lines ?: return 0.0
-            val whole = lines.sumOf { ListenTime.seconds(it.spoken) }
-            if (whole <= 0.0) return 0.0
-            return lines.take(at.line).sumOf { ListenTime.seconds(it.spoken) } / whole * (pages.getOrNull(at.page)?.minutes ?: 0.0) * 60
+            val script = script ?: return 0.0
+            if (script.seconds <= 0.0) return 0.0
+            return script.secondsBefore(at.line) / script.seconds * (pages.getOrNull(at.page)?.minutes ?: 0.0) * 60
         }
     val secondsTotal: Double get() = pages.sumOf { it.minutes * 60 }
 }
@@ -101,6 +99,8 @@ class ListenPlayer(
         }
         silence()
         job?.cancel()
+        // A turn cancelled before it ran never reaches its finally.
+        turning = false
         book?.close()
         book = null
         _state.value = ListenState(editionId = editionId, loading = true, playing = true, speed = _state.value.speed)
@@ -208,10 +208,16 @@ class ListenPlayer(
     /** A picture on the page being read, for the screen. */
     suspend fun image(src: String): ByteArray? = book?.image(src)
 
-    /** Stops and lets the edition go. */
+    /** Lets [editionId] go if it's the one loaded: its book was deleted. */
+    fun forget(editionId: Long) {
+        if (_state.value.editionId == editionId) stop()
+    }
+
+    /** Stops and lets the edition go, closing its book. */
     fun stop() {
         silence()
         job?.cancel()
+        turning = false
         book?.close()
         book = null
         _state.value = ListenState(speed = _state.value.speed)

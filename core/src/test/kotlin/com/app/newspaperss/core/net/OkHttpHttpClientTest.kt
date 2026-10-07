@@ -1,5 +1,11 @@
 package com.app.newspaperss.core.net
 
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -120,5 +126,22 @@ class OkHttpHttpClientTest {
     @Test(expected = IOException::class)
     fun malformedUrlIsAnIOException() = runTest {
         OkHttpHttpClient().get("not a url")
+    }
+
+    @Test
+    fun aHeadersLatin1IsReadAsWindows1252LikeAMetaTags() {
+        // Curly quotes and a dash in windows-1252 bytes, labelled Latin-1 by the server.
+        val bytes = "\u201cDon\u2019t\u201d \u2014 yes".toByteArray(charset("windows-1252"))
+        assertEquals("\u201cDon\u2019t\u201d \u2014 yes", OkHttpHttpClient.decode(bytes, Charsets.ISO_8859_1))
+    }
+
+    @Test
+    fun aCancelledFetchCancelsItsRequestRatherThanWaitingItOut() = runBlocking {
+        server.enqueue(MockResponse.Builder().body("late").headersDelay(30, TimeUnit.SECONDS).build())
+        val started = System.nanoTime()
+        val fetch = launch(Dispatchers.IO) { OkHttpHttpClient().get(server.url("/slow").toString()) }
+        delay(300)
+        fetch.cancelAndJoin()
+        assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(10))
     }
 }

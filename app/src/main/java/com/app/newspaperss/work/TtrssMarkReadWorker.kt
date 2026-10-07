@@ -1,15 +1,13 @@
 package com.app.newspaperss.work
 
+import com.app.newspaperss.container
 import android.content.Context
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.app.newspaperss.NewspaperssApp
 
 /**
  * Marks an edition's tt-rss articles read on the server once it's delivered, or unread once it's
@@ -18,7 +16,7 @@ import com.app.newspaperss.NewspaperssApp
 class TtrssMarkReadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val editionId = inputData.getLong(EDITION_ID, -1)
-        val done = (applicationContext as NewspaperssApp).container.ttrss.syncRead(editionId)
+        val done = applicationContext.container.ttrss.syncRead(editionId)
         return when {
             done -> Result.success()
             runAttemptCount + 1 < MAX_ATTEMPTS -> Result.retry()
@@ -33,7 +31,7 @@ class TtrssMarkReadWorker(context: Context, params: WorkerParameters) : Coroutin
 
         fun enqueue(context: Context, editionId: Long) {
             val request = OneTimeWorkRequestBuilder<TtrssMarkReadWorker>()
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setConstraints(CONNECTED_NETWORK)
                 .setInputData(workDataOf(EDITION_ID to editionId))
                 .build()
             // Replaced, not kept: the work reads the edition's state when it runs, so only the

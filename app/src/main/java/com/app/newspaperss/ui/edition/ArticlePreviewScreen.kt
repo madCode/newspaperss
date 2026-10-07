@@ -1,5 +1,8 @@
 package com.app.newspaperss.ui.edition
 
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import java.util.Locale
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -190,6 +193,9 @@ fun ArticlePreviewScreen(
             }
         }
     }
+    // Outside the WebView, which a rotation, a theme change or a tab switch rebuilds: without it
+    // the reader would be back at the top of the first article, however many "Next"s ago.
+    val place = rememberSaveable(position, saver = PLACE_SAVER) { Place() }
     val context = LocalContext.current
     Scaffold(
         topBar = {
@@ -223,7 +229,7 @@ fun ArticlePreviewScreen(
                 // Keyed: the WebView is built once, so a new article needs a new one. A new size or
                 // alignment is applied to it in place.
                 key(p) {
-                    BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, justify, BOOK_ORIGIN + EpubPages.articleHref(position), { onPage(it, p.pages) }, { link }, Modifier.fillMaxSize().padding(padding))
+                    BookView(p.pages, p.xhtml, colors.background.toArgb(), colors.onBackground.toArgb(), textZoom, justify, BOOK_ORIGIN + EpubPages.articleHref(position), { onPage(it, p.pages) }, { link }, place, Modifier.fillMaxSize().padding(padding))
                 }
             }
         }
@@ -287,6 +293,7 @@ private fun BookView(
     onPage: (url: String) -> Unit,
     /** The page on screen's original, added under shared selected text. */
     source: () -> ArticleLink?,
+    place: Place,
     modifier: Modifier,
 ) {
     // Read when a page is served, so pages reached by "Next" follow a change too.
@@ -335,7 +342,11 @@ private fun BookView(
                     }
 
                     override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
-                        if (url.startsWith(BOOK_ORIGIN)) style.page = url
+                        if (url.startsWith(BOOK_ORIGIN)) {
+                            style.page = url
+                            if (url.substringBefore('#') != place.page?.substringBefore('#')) place.at = 0f
+                            place.page = url
+                        }
                         currentOnPage(url)
                     }
 
@@ -357,9 +368,20 @@ private fun BookView(
                         return true
                     }
                 }
-                // The page's own address in the book, not the bare origin: its footnote links then
-                // resolve to this page, and the Share link follows the page on screen.
-                loadDataWithBaseURL(pageUrl, forPreview(xhtml, background, text, imageSizes(pages), justify), "application/xhtml+xml", "utf-8", null)
+                // Not while a reloaded page is still on its way back to where it was: it's at the top meanwhile.
+                setOnScrollChangeListener { v, _, y, _, _ ->
+                    if (style.restoreAt == null) place.at = y / ((v as WebView).contentHeight * v.pageScale).coerceAtLeast(1f)
+                }
+                // Back where it was, after the WebView was rebuilt.
+                if (place.at > 0f) style.restoreAt = place.at
+                val wasOn = place.page?.substringBefore('#')
+                if (wasOn != null && wasOn != pageUrl) {
+                    loadUrl(wasOn)
+                } else {
+                    // The page's own address in the book, not the bare origin: its footnote links then
+                    // resolve to this page, and the Share link follows the page on screen.
+                    loadDataWithBaseURL(pageUrl, forPreview(xhtml, background, text, imageSizes(pages), justify), "application/xhtml+xml", "utf-8", null)
+                }
             }
         },
     )
@@ -373,6 +395,11 @@ private class PageStyle(var justify: Boolean) {
     var page: String? = null
     var restoreAt: Float? = null
 }
+
+/** The book page on screen and how far down it, saved across the WebView being rebuilt. */
+internal class Place(var page: String? = null, var at: Float = 0f)
+
+private val PLACE_SAVER = Saver<Place, List<Any?>>(save = { listOf(it.page, it.at) }, restore = { Place(it[0] as String?, it[1] as Float) })
 
 /** Screen pixels per CSS pixel: the density, times any pinch-zoom. */
 @Suppress("DEPRECATION")
@@ -431,4 +458,4 @@ internal fun imageSizes(pages: EpubPages): (String) -> Pair<Int, Int>? = { src -
     }
 }
 
-private fun css(argb: Int) = "#%06X".format(argb and 0xFFFFFF)
+private fun css(argb: Int) = "#%06X".format(Locale.ROOT, argb and 0xFFFFFF)

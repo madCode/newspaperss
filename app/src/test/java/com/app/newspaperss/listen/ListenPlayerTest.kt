@@ -375,4 +375,34 @@ class ListenPlayerTest {
         assertTrue(state.secondsIn > 60.0)
         assertEquals(120.0, state.secondsTotal, 0.01)
     }
+
+    @Test
+    fun aDeletedBookIsLetGoButAnotherEditionsIsnt() {
+        player.start(7)
+        player.forget(8)
+        assertEquals(7L, state.editionId)
+        player.forget(7)
+        assertNull(state.editionId)
+        assertEquals(1, closed)
+        assertTrue(speaker.queue.isEmpty())
+    }
+
+    @Test
+    fun aTurnCancelledBeforeItRanDoesntLeaveTheControlsDead() {
+        // A scope that queues work rather than running it at once, as the main thread does.
+        val queued = TestScope(kotlinx.coroutines.test.StandardTestDispatcher())
+        val p = ListenPlayer(
+            speaker, progress,
+            open = { ListenBook(it, "E", listOf(ListenPage("A", null, 1.0), ListenPage("B", null, 1.0)), read = { i -> script(if (i == 0) "A one." else "B one.") }) },
+            scope = queued,
+        )
+        p.start(4)
+        queued.testScheduler.runCurrent()
+        p.next() // queued, not run
+        p.start(5) // cancels it
+        queued.testScheduler.runCurrent()
+        p.pause()
+        p.play()
+        assertEquals("A one.", speaker.queue.first().text)
+    }
 }

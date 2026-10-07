@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui.listen
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -9,7 +10,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ListenButton(listening: Listening, editionId: Long, minutes: List<Double>, onOpenPlayer: () -> Unit, modifier: Modifier = Modifier) {
-    val state by listening.player.state.collectAsState()
+    val state by listening.player.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var offer by remember { mutableStateOf<Unfinished?>(null) }
     val here = state.editionId == editionId

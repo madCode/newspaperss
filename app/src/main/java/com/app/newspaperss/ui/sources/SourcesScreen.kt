@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui.sources
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.font.FontWeight
@@ -70,7 +71,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,9 +108,9 @@ fun SourcesScreen(
     /** Opens Settings › Where your feeds live: the tt-rss account, and signing in to it. */
     onOpenAccount: () -> Unit = {},
 ) {
-    val screen by viewModel.screen.collectAsState()
-    val add by viewModel.add.collectAsState()
-    val message by viewModel.message.collectAsState()
+    val screen by viewModel.screen.collectAsStateWithLifecycle()
+    val add by viewModel.add.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     var menu by remember { mutableStateOf(false) }
@@ -127,7 +127,7 @@ fun SourcesScreen(
         }
     }
     // tt-rss's answers, which can arrive after the dialog that asked has closed.
-    val results by viewModel.subscribeResults.collectAsState()
+    val results by viewModel.subscribeResults.collectAsStateWithLifecycle()
     LaunchedEffect(results) { results.firstOrNull()?.let(viewModel::take) }
     LaunchedEffect(Unit) {
         viewModel.notices.collect { waiting ->
@@ -210,10 +210,10 @@ fun SourcesScreen(
             }
         }
     }
-    val curatedLists by viewModel.curatedLists.collectAsState()
+    val curatedLists by viewModel.curatedLists.collectAsStateWithLifecycle()
     AddSourceDialog(add, curatedLists, viewModel, server)
     viewModel.mover?.let { mover ->
-        val sheet by mover.sheet.collectAsState()
+        val sheet by mover.sheet.collectAsStateWithLifecycle()
         sheet?.let { MoveSheetDialog(it, mover) }
     }
 }
@@ -234,7 +234,7 @@ private fun SourceList(
     val list = shown.rows
     val srv = shown.server
     val account = srv?.account
-    val folded = viewModel.folded.collectAsState().value ?: return
+    val folded = viewModel.folded.collectAsStateWithLifecycle().value ?: return
     LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
         item(key = "reading-list") {
             ReadingListRow(onOpenReadingList)
@@ -723,7 +723,7 @@ private fun AddSourceDialog(state: AddState, curatedLists: List<CuratedList>, vi
 }
 
 @Composable
-private fun Muted(text: String) {
+internal fun Muted(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
 }
 

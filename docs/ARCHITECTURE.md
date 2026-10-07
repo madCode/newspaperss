@@ -20,7 +20,7 @@ Two Gradle modules (`settings.gradle.kts`):
 flowchart TB
     subgraph app[":app (Android)"]
         ui["ui/: Compose screens + ViewModels"]
-        work["work/: WorkManager workers, EditionScheduler"]
+        work["work/: WorkManager workers, EditionScheduler,<br/>Connectivity (Today's online state)"]
         edition["edition/: EditionRun, EditionBuilder,<br/>ExtractorContentProvider, CoverRenderer"]
         data["data/: Room database, repositories, FeedSync"]
         delivery["delivery/: share, folder, sent callback"]
@@ -32,14 +32,14 @@ flowchart TB
     subgraph core[":core (JVM, no Android)"]
         feed["feed/: FeedParser, FeedFinder, OPML, imports"]
         plan["edition/: EditionPlanner, titles, schedule"]
-        extract["extract/: ArticleExtractor, PageExtractor"]
-        images["images/: ImageRules, ImageBudget"]
-        epub["epub/: EpubWriter"]
+        extract["extract/: ArticleExtractor, PageExtractor, HtmlCleaner"]
+        images["images/: ImageRules, ImageBudget,<br/>ArticleImages, ImageAllowance"]
+        epub["epub/: EpubWriter, ArticleBody"]
         lists["lists/: curated-list scrapers"]
         ttrss["ttrss/: TtrssClient"]
         notes["notes/: NotesWriter"]
         listenScript["listen/: ListenScript, Sentences"]
-        net["net/: HttpClient (OkHttp)"]
+        net["net/: HttpClient (OkHttp), Urls"]
     end
     container --> ui & work & edition & data & delivery & settings & notify & listen
     ui --> data & settings
@@ -63,15 +63,17 @@ can't do without Android are passed in as interfaces:
 ## Wiring
 
 - **`AppContainer`** (`app/AppContainer.kt`) builds one of each service for
-  the app's lifetime, by hand: no Hilt or Dagger. Its constructor takes the
-  HTTP client, database and worker-enqueuing functions as parameters, so
-  tests can swap them.
+  the app's lifetime, by hand: no Hilt or Dagger. Its constructor takes what tests swap: the
+  HTTP client, database, cipher, worker-enqueuing functions and Listen's
+  voice and service binding. Its `appScope` runs work nobody waits on,
+  and logs a failure there rather than crashing.
 - **`NewspaperssApp`** (`app/NewspaperssApp.kt`) creates the container,
-  creates the notification channels, schedules the 12-hour sync and arms
-  the edition timer.
-- Everything else reaches services through
-  `(applicationContext as NewspaperssApp).container`: workers, receivers
-  and the small activities.
+  settles where the feeds live (`settleFeedsFrom`), resumes a feed move
+  left part way, creates the notification channels, schedules the 12-hour
+  sync and arms the edition timer.
+- Everything else reaches services through `context.container`
+  (`app/NewspaperssApp.kt`): workers, receivers, the listening service and
+  the small activities.
 - **Screens** are Jetpack Compose in one activity, `MainActivity`, with
   Navigation Compose. Each ViewModel is created with
   `viewModel { … }`, given the services it needs from the container, and
@@ -157,6 +159,9 @@ The steps, with where they live:
    order, tt-rss last as on Sources, each feed's articles together), `ImageBudget.fit` settles the final image set,
    `CoverRenderer` draws the cover, and `EpubWriter` (`core/epub/`) writes
    the book to `files/editions/`.
+   An article's HTML is cleaned twice on purpose: `HtmlCleaner` when it's
+   extracted, and `ArticleBody` again as the book is written, since the
+   writer can't assume what it's given is safe XHTML.
 7. **Commit.** One Room transaction writes `edition_articles`, sets the
    articles to `IN_EDITION` and the edition to `READY`. Until then no
    article has changed state, so a failure leaves them all for next time.
@@ -201,7 +206,7 @@ flowchart LR
     open["OpenEditionActivity / Open button (Boox)"] --> ms
     email["SendEditionActivity / Send button: mail app opened"] --> me
     me["markEmailedToKindle: only if still READY"] --> md
-    sent["I've sent it (Today, Edition)"] --> ms
+    sent["Mark as sent (Today, Edition)"] --> ms
     ms["markSent: only if still READY"] --> md
     md["markDelivered (one transaction)"]
     md --> arts["articles DELIVERED, stars cleared"]
@@ -269,6 +274,9 @@ flowchart LR
   the player's. It also asks for audio focus and pauses when headphones
   are unplugged. The app binds it (`ListenService.connect`) when Listen is
   first tapped, and Media3 makes it a foreground service while it plays.
+- When an edition's book is deleted (the edition, or old files pruned),
+  `EditionRepository`'s `onFileGone` tells the player, which lets the book
+  go if it's the one loaded; the player isn't made just to be told.
 - **`ListenProgress`** keeps where each of the ten most recent editions
   was left, and which were heard to the end, in SharedPreferences
   (`listening`).
@@ -280,8 +288,8 @@ twice.
 
 | Work | Started by | Unique name, policy | Notes |
 |---|---|---|---|
-| `EditionWorker` | "Make an edition", the timer | `edition-build`, KEEP | One build at a time. Needs a connection. A timed run that reaches no source retries twice (5, then 10 min). |
-| `EditionScheduler.Timer` | `EditionScheduler.reschedule` | `edition-schedule`, REPLACE / APPEND | One-off timer 30 min before the due time; it starts a build and arms the next timer. |
+| `EditionWorker` | "Make an edition", the timer | `edition-build`, KEEP | One build at a time. Needs a connection. A timed run that reaches no source retries twice (5, then 10 min). After 8 minutes it stops fetching and writes the edition with what it has, short of WorkManager's 10-minute limit. |
+| `EditionScheduler.Timer` | `EditionScheduler.reschedule` | `edition-schedule`, REPLACE (re-armed) / APPEND_OR_REPLACE (the next, from the running timer) | One-off timer 30 min before the due time; it starts a build and arms the next timer. |
 | `SyncWorker` (periodic) | App start | `sync-periodic-12h`, KEEP | Every 12 h, connected, battery not low. Only keeps the Sources screen fresh. |
 | `SyncWorker` (now) | Adding a source, refresh | `sync-now`, APPEND_OR_REPLACE | Appended so a new source isn't missed by a sync already running. |
 | `NotesWorker` | First delivery | `notes-<edition>`, KEEP | Saves the notes file to the notes folder. |

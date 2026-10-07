@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui.sources
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +20,6 @@ import com.app.newspaperss.core.plural
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeftOutScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onOpenFeed: (key: String) -> Unit) {
-    val feeds by viewModel.feeds.collectAsState()
-    val detail by viewModel.detail.collectAsState()
+    val feeds by viewModel.feeds.collectAsStateWithLifecycle()
+    val detail by viewModel.detail.collectAsStateWithLifecycle()
     // The account was removed, here or elsewhere.
     LaunchedEffect(detail) { if (detail != null && detail?.source == null) onBack() }
     val leftOut = feeds.filter { !it.inPaper }
@@ -69,8 +69,8 @@ fun LeftOutScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onOpenFe
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotInPaperScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onOpenAccount: () -> Unit) {
-    val outside by viewModel.outside.collectAsState()
-    val detail by viewModel.detail.collectAsState()
+    val outside by viewModel.outside.collectAsStateWithLifecycle()
+    val detail by viewModel.detail.collectAsStateWithLifecycle()
     LaunchedEffect(detail) { if (detail != null && detail?.source == null) onBack() }
     val chosen = detail?.source?.ttrssCategoryTitle
     Scaffold(

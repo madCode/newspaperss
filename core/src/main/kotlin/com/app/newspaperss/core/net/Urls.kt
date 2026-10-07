@@ -20,12 +20,15 @@ fun hostOf(url: String): String {
     return host.removePrefix("www.").ifBlank { url }
 }
 
+/** [uri]'s host for comparing sites: lowercase, without "www.", or null without one. */
+internal fun siteHost(uri: URI): String? = uri.host?.lowercase()?.removePrefix("www.")
+
 /**
  * The domain a site is registered under: "theguardian.co.uk" for "https://www.theguardian.co.uk/x",
  * or null for anything but an http(s) URL with a host. A short list of second-level labels
  * ("co.uk", "com.au") stands in for the public suffix list, which is too big to ship for this.
  */
-fun registrableDomainOf(url: String): String? {
+internal fun registrableDomainOf(url: String): String? {
     val labels = hostLabels(url) ?: return null
     return labels.drop(registrableIndex(labels)).joinToString(".")
 }
@@ -37,7 +40,7 @@ fun registrableDomainOf(url: String): String? {
  * label (blog.example.com, en.example.com) names no one, and common tag values (`utm_source=blog`)
  * would match it, so the registrable name stands in.
  */
-fun siteNameOf(url: String): String? {
+internal fun siteNameOf(url: String): String? {
     val labels = hostLabels(url) ?: return null
     val index = registrableIndex(labels)
     val own = labels.first().takeIf { index > 0 && it.length > 2 && it !in GENERIC_LABELS }
@@ -45,7 +48,7 @@ fun siteNameOf(url: String): String? {
 }
 
 /** Whether [url] has a referral parameter (`src=longreads`, `utm_source=longreads.com`) naming one of [siteNames]. */
-fun creditsSite(url: String, siteNames: Set<String>): Boolean =
+internal fun creditsSite(url: String, siteNames: Set<String>): Boolean =
     queryOf(url).any { (key, value) -> key.lowercase() in CREDIT_KEYS && namesSite(value, siteNames) }
 
 /**
