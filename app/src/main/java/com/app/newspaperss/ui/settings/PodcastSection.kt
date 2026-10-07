@@ -124,15 +124,20 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
                 Button(onClick = { asking = false; vm.downloadKokoro(mobileData = true) }) { Text("Use mobile data") }
             }
         }
-        kokoro is KokoroState.Waiting && kokoro.retrying -> Step("Trying again shortly") {
-            Text("The download stopped part way. It carries on by itself in a few minutes${if (kokoro.wifi) ", on Wi-Fi" else ""}, keeping what's arrived.")
-            Buttons {
-                if (kokoro.wifi) OutlinedButton(onClick = { vm.downloadKokoro(mobileData = true) }) { Text("Use mobile data") }
-                TextButton(onClick = vm::cancelKokoro) { Text("Cancel") }
-            }
-        }
-        kokoro is KokoroState.Waiting -> Step(if (kokoro.wifi) "Waiting for Wi-Fi" else "Waiting for a connection") {
-            Text("Kokoro ($mb) will download by itself${if (kokoro.wifi) " on the next Wi-Fi" else " once the phone is online"}.")
+        kokoro is KokoroState.Waiting -> Step(
+            when {
+                kokoro.retrying -> "Trying again shortly"
+                kokoro.wifi -> "Waiting for Wi-Fi"
+                else -> "Waiting for a connection"
+            },
+        ) {
+            Text(
+                if (kokoro.retrying) {
+                    "The download stopped part way. It carries on by itself in a few minutes${if (kokoro.wifi) ", on Wi-Fi" else ""}, keeping what's arrived."
+                } else {
+                    "Kokoro ($mb) will download by itself${if (kokoro.wifi) " on the next Wi-Fi" else " once the phone is online"}."
+                },
+            )
             Buttons {
                 if (kokoro.wifi) OutlinedButton(onClick = { vm.downloadKokoro(mobileData = true) }) { Text("Use mobile data") }
                 TextButton(onClick = vm::cancelKokoro) { Text("Cancel") }
@@ -151,7 +156,7 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
             Buttons { OutlinedButton(onClick = ::pickPodcast) { Text("Try again") } }
         }
         kokoro is KokoroState.Ready && s.listenVoice == ListenVoice.PODCAST -> Podcast(s, vm, kokoro, mb, samples)
-        kokoro is KokoroState.Ready -> Verdict(s, kokoro, mb, onUse = vm::useKokoro, onRemove = vm::removeKokoro)
+        kokoro is KokoroState.Ready -> CheckResult(s, kokoro, mb, onUse = vm::useKokoro, onRemove = vm::removeKokoro)
     }
 }
 
@@ -194,19 +199,18 @@ private fun Buttons(content: @Composable () -> Unit) {
 
 /** What the check found, in this reader's terms: how long their paper takes to make here. */
 @Composable
-private fun Verdict(s: AppSettings, kokoro: KokoroState.Ready, size: String, onUse: () -> Unit, onRemove: () -> Unit) {
+private fun CheckResult(s: AppSettings, kokoro: KokoroState.Ready, size: String, onUse: () -> Unit, onRemove: () -> Unit) {
     val paper = s.edition.minutes
     val time = SettingsSummary.aboutTime(PodcastPace.minutesToMake(paper, kokoro.pace))
-    when (verdict(s, kokoro)) {
-        Verdict.CAN -> Step("This phone can do it") {
-            Text("Your $paper-minute paper takes $time to make here, while charging." + earlier(s, kokoro))
-            Buttons {
-                Button(onClick = onUse) { Text("Use it") }
-                OutlinedButton(onClick = onRemove) { Text("Remove it") }
-            }
-        }
-        Verdict.SLOW -> Step("This phone is slow at it, but it can") {
-            Text("Your $paper-minute paper takes $time to make here." + earlier(s, kokoro) + " Leave the phone charging overnight.")
+    when (val verdict = verdict(s, kokoro)) {
+        Verdict.CAN, Verdict.SLOW -> Step(if (verdict == Verdict.CAN) "This phone can do it" else "This phone is slow at it, but it can") {
+            Text(
+                if (verdict == Verdict.CAN) {
+                    "Your $paper-minute paper takes $time to make here, while charging." + earlier(s, kokoro)
+                } else {
+                    "Your $paper-minute paper takes $time to make here." + earlier(s, kokoro) + " Leave the phone charging overnight."
+                },
+            )
             Buttons {
                 Button(onClick = onUse) { Text("Use it") }
                 OutlinedButton(onClick = onRemove) { Text("Remove it") }
@@ -245,25 +249,19 @@ private fun Podcast(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState.R
                 sample = { samples.play(context, sampleOf(voice)) },
             )
         }
-        Text(
+        Note(
             "On this phone, your ${s.edition.minutes}-minute paper takes ${SettingsSummary.aboutTime(PodcastPace.minutesToMake(s.edition.minutes, kokoro.pace))} to make.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
+            Modifier.padding(top = 4.dp),
         )
-        Text(
-            "Listen plays an article from its podcast once it's made, and in your phone's voice until then.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        Note("Listen plays an article from its podcast once it's made, and in your phone's voice until then.", Modifier.padding(top = 4.dp))
         TextButton(onClick = vm::removeKokoro, modifier = Modifier.padding(top = 4.dp)) { Text("Remove Kokoro") }
-        Text(
-            "Frees $size. Listen goes back to reading live.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Note("Frees $size. Listen goes back to reading live.")
     }
+}
+
+@Composable
+private fun Note(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier)
 }
 
 private fun verdict(s: AppSettings, kokoro: KokoroState.Ready) = PodcastPace.verdict(s.edition.minutes, kokoro.pace)

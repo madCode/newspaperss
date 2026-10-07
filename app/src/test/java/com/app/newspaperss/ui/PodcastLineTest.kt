@@ -5,8 +5,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.app.newspaperss.core.listen.KokoroFile
-import com.app.newspaperss.listen.KokoroInstall
 import com.app.newspaperss.listen.PodcastStore
 import com.app.newspaperss.listen.Podcasts
 import com.app.newspaperss.settings.ListenVoice
@@ -14,9 +12,11 @@ import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
+import com.app.newspaperss.testutil.kokoroInstall
 import com.app.newspaperss.ui.listen.PodcastLine
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -32,14 +32,10 @@ class PodcastLineTest {
 
     private val settings by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
     private val store by lazy { PodcastStore(tmp.newFolder("podcasts")) }
-    private val install by lazy {
-        KokoroInstall(tmp.newFolder("kokoro")) { listOf(KokoroFile("tokens.txt", 6, "ce013625030ba8dba906f756967f9e9ca394464a")) }.also {
-            it.file("tokens.txt").writeText("hello\n")
-            it.markVerified("tokens.txt")
-        }
-    }
-    private val asked = mutableListOf<Long>()
-    private val podcasts by lazy { Podcasts(store, settings, install) { asked += it; store.want(it, PodcastVoice.HEART) } }
+    private val install by lazy { kokoroInstall(tmp.newFolder("kokoro")) }
+    /** How many times making podcasts was started. */
+    @Volatile private var started = 0
+    private val podcasts by lazy { Podcasts(store, settings, install) { started++ } }
 
     /** Three articles: 8, 6 and 4 minutes to read. */
     private val minutes = listOf(8.0, 6.0, 4.0)
@@ -56,8 +52,9 @@ class PodcastLineTest {
         show()
         waitFor("No podcast for this edition yet")
         compose.onNodeWithText("Make the podcast", substring = true).performClick()
-        idleUntil { asked.isNotEmpty() }
-        assertEquals(listOf(7L), asked)
+        idleUntil { started > 0 }
+        assertEquals(1, started)
+        assertNotNull(store.voice(7))
         // Asked for, it says how it's made.
         waitFor("Waiting to make the podcast")
     }

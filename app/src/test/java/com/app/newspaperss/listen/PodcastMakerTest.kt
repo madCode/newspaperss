@@ -3,7 +3,6 @@ package com.app.newspaperss.listen
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EditionArticle
-import com.app.newspaperss.core.listen.KokoroFile
 import com.app.newspaperss.data.EditionArticleEntity
 import com.app.newspaperss.data.EditionEntity
 import com.app.newspaperss.data.EditionRepository
@@ -13,6 +12,7 @@ import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.DbRule
 import com.app.newspaperss.testutil.TestApp
+import com.app.newspaperss.testutil.kokoroInstall
 import com.app.newspaperss.testutil.writeEpub
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -42,12 +42,7 @@ class PodcastMakerTest {
     private val editionsDir by lazy { tmp.newFolder("editions") }
     private val editions by lazy { EditionRepository(db, editionsDir) }
     private val store by lazy { PodcastStore(tmp.newFolder("podcasts")) }
-    private val install by lazy {
-        KokoroInstall(tmp.newFolder("kokoro")) { listOf(KokoroFile("tokens.txt", 6, "ce013625030ba8dba906f756967f9e9ca394464a")) }.also {
-            it.file("tokens.txt").writeText("hello\n")
-            it.markVerified("tokens.txt")
-        }
-    }
+    private val install by lazy { kokoroInstall(tmp.newFolder("kokoro")) }
 
     /** Everything said, in order, and in which voice. */
     private val said: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
@@ -103,7 +98,8 @@ class PodcastMakerTest {
 
     private var started = 0
     private var pieceSeconds = PodcastMaker.PIECE_SECONDS
-    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds, now = { clock }) { started++ } }
+    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds, now = { clock }) }
+    private val podcasts by lazy { Podcasts(store, settings, install) { started++ } }
 
     private val knots = EditionArticle(
         title = "Counting Knots", sourceTitle = "Quanta", url = "https://example.com/knots",
@@ -130,7 +126,7 @@ class PodcastMakerTest {
         settings.update { it.copy(listenVoice = ListenVoice.PODCAST, podcastVoice = voice, podcastPace = 1.2f) }
     }
 
-    private fun request(id: Long) = runBlocking { maker.request(id) }
+    private fun request(id: Long) = runBlocking { podcasts.request(id) }
 
     private fun make() = runBlocking { maker.makeAll() }
 

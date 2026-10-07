@@ -31,7 +31,7 @@ class SettingsViewModel(
     ttrss: Flow<TtrssStatus> = flowOf(TtrssStatus.NONE),
     /** Says a line in the phone's voice at a speed: Settings › Listening's sample. */
     private val hear: (text: String, speed: Float) -> Unit = { _, _ -> },
-    /** The podcast's voice; null hides the podcast, as release builds do until podcasts play. */
+    /** The podcast's voice; null hides the podcast, as release builds do until it's been tried on a real phone. */
     val podcast: PodcastSetup? = null,
     /** Called after every change so the edition timer follows the schedule. */
     private val onChanged: (Settings) -> Unit,
