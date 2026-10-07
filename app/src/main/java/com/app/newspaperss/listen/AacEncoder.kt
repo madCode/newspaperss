@@ -4,8 +4,19 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import java.io.Closeable
 import java.io.File
 import java.nio.ByteOrder
+
+/** Where encoded audio goes, a block of samples at a time. */
+interface AudioSink : Closeable {
+    fun write(samples: FloatArray)
+}
+
+/** Opens an [AudioSink] writing mono audio at [sampleRate] to [file]. */
+fun interface AudioEncoder {
+    fun open(file: File, sampleRate: Int): AudioSink
+}
 
 /**
  * Speech as AAC in an MP4 file, through Android's own encoder: every phone has one from API 16,
