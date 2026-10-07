@@ -151,15 +151,18 @@ class PodcastSettingsTest {
     @Test
     fun aTooSlowPhoneIsToldSoAndOfferedOnlyTheSpaceBack() {
         ready(4.0f)
-        show()
+        val vm = show()
         pickPodcast()
         waitFor("Too slow on this phone")
         waitFor("25 minutes would take about 2½ hours")
         compose.onAllNodes(hasText("Use it")).fetchSemanticsNodes().let { assertEquals(0, it.size) }
         compose.onNodeWithText("Remove Kokoro (0 MB)").performClick()
-        idleUntil { stopped == 1 }
+        // Waited for on the screen's own state: blocking the main thread for the store would hold
+        // up the removal, which finishes there.
+        idleUntil { vm.settings.value?.podcastPace == null }
+        assertEquals(1, stopped)
         assertFalse(install.dir.exists())
-        assertEquals(ListenVoice.PHONE, runBlocking { store.current().listenVoice })
+        assertEquals(ListenVoice.PHONE, vm.settings.value?.listenVoice)
     }
 
     @Test
