@@ -137,6 +137,7 @@ class MainActivity : ComponentActivity() {
                         offerOpen = settings?.device.offersOpen,
                         kindleReader = settings?.device == com.app.newspaperss.settings.Device.KINDLE,
                         kindleEmail = settings?.kindleEmailTarget,
+                        textSize = settings?.previewTextSize ?: com.app.newspaperss.settings.PreviewTextSize.DEFAULT,
                         opening = opening.value,
                         onOpened = { opening.value = null },
                     )
@@ -159,6 +160,8 @@ private fun App(
     offerOpen: Boolean,
     kindleReader: Boolean,
     kindleEmail: com.app.newspaperss.settings.KindleEmail?,
+    /** Settings › Article text size, known here before any screen draws. */
+    textSize: com.app.newspaperss.settings.PreviewTextSize,
     opening: String? = null,
     onOpened: () -> Unit = {},
 ) {
@@ -242,14 +245,10 @@ private fun App(
                 )
             }
             composable(LISTEN) {
-                val textSize by remember { container.settings.settings.map { it.previewTextSize } }.collectAsStateWithLifecycle(initialValue = null)
-                // Not drawn at Default first: the jump to the real size would leave the sentence off screen.
-                textSize?.let { size ->
-                    ListenScreen(
-                        container.listen, onBack = { nav.navigateUp() }, podcastVoice = container.podcastPlaying, instead = container.podcastInstead,
-                        textSize = size,
-                    )
-                }
+                ListenScreen(
+                    container.listen, onBack = { nav.navigateUp() }, podcastVoice = container.podcastPlaying, instead = container.podcastInstead,
+                    textSize = textSize,
+                )
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
