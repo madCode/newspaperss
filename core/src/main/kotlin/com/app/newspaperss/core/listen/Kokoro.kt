@@ -16,7 +16,8 @@ data class KokoroFile(val path: String, val size: Long, val hash: String) {
             MessageDigest.getInstance("SHA-1").apply { update("blob $size\u0000".toByteArray()) }
         }
 
-    fun matches(digest: MessageDigest): Boolean = digest.digest().joinToString("") { "%02x".format(it) } == hash
+    // Locale.ROOT: hex digits must be ASCII whatever the phone's language.
+    fun matches(digest: MessageDigest): Boolean = digest.digest().joinToString("") { "%02x".format(java.util.Locale.ROOT, it) } == hash
 
     private companion object {
         const val SHA256_HEX = 64
