@@ -1,5 +1,7 @@
 package com.app.newspaperss.edition
 
+import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import com.app.newspaperss.data.EditionRepository
@@ -26,6 +28,8 @@ class EditionRun(
     private val folder: FolderWriter,
     private val notifier: EditionNotifier,
     private val now: () -> Instant = Instant::now,
+    /** An edition was built and delivered (or left to send): its podcast is asked for here. */
+    private val onBuilt: suspend (editionId: Long, scheduled: Boolean) -> Unit = { _, _ -> },
 ) {
     /**
      * @param scheduled true for the timed run. Only then does a shared edition
@@ -47,7 +51,17 @@ class EditionRun(
             BuildResult.Unreachable(synced.sources)
         } else built
         when (result) {
-            is BuildResult.Built -> deliver(result.editionId, s, scheduled)
+            is BuildResult.Built -> {
+                deliver(result.editionId, s, scheduled)
+                // The paper is made and delivered: nothing after it can fail the run.
+                try {
+                    onBuilt(result.editionId, scheduled)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("EditionRun", "After the build: ${e.javaClass.name}")
+                }
+            }
             is BuildResult.Failed -> if (scheduled) notifier.problem("Today's edition couldn't be made", result.reason)
             is BuildResult.Unreachable -> if (scheduled && finalAttempt) notifier.problem("No new edition", result.reason)
             // Quiet, but said: otherwise a timed paper that doesn't come looks like the app broke.

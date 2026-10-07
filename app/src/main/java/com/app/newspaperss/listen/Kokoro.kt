@@ -236,6 +236,12 @@ class KokoroEngine(install: KokoroInstall, voice: PodcastVoice, threads: Int = T
     override fun release() = tts.release()
 
     companion object {
+        /**
+         * Held while a Kokoro is loaded (the check, or a podcast being made): each holds the
+         * 325 MB model, and its native code runs on after a stop until the sentence ends.
+         */
+        val lock = Mutex()
+
         /** Fastest on a Pixel 8's Tensor G3: 1 and 2 threads were slower, and all 9 cores slower still. */
         const val THREADS = 4
 

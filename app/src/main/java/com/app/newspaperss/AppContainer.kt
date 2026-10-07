@@ -41,6 +41,11 @@ import com.app.newspaperss.listen.KokoroEngine
 import com.app.newspaperss.listen.KokoroInstall
 import com.app.newspaperss.listen.PodcastEngine
 import com.app.newspaperss.listen.PodcastSetup
+import com.app.newspaperss.listen.PodcastMaker
+import com.app.newspaperss.listen.PodcastStore
+import com.app.newspaperss.listen.AacEncoder
+import com.app.newspaperss.listen.AudioEncoder
+import com.app.newspaperss.work.PodcastWorker
 import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.work.KokoroWorker
 import okhttp3.OkHttpClient
@@ -74,6 +79,8 @@ class AppContainer(
     val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
     podcastEngine: (KokoroInstall, PodcastVoice) -> PodcastEngine = ::KokoroEngine,
     kokoroSupported: Boolean = KokoroInstall.supported,
+    private val makePodcasts: () -> Unit = { PodcastWorker.enqueue(context) },
+    audioEncoder: AudioEncoder = AacEncoder,
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -91,7 +98,10 @@ class AppContainer(
     // A sent edition's Ready notification comes down: its Send would offer an edition already sent.
     val editions = EditionRepository(db, editionsDir, onDelivered = { notifier.dismissFor(it); saveNotes(it) }, onTtrssChanged = markTtrssRead, kindleSends = kindleSends,
         // Only if Listen has started: it isn't made just to be told.
-        onFileGone = { id -> if (listenMade.isInitialized()) appScope.launch { listen.forget(id) } },
+        onFileGone = { id ->
+            if (listenMade.isInitialized()) appScope.launch { listen.forget(id) }
+            appScope.launch(Dispatchers.IO) { podcasts.delete(id) }
+        },
     )
     val feedFinder = FeedFinder(http)
     private val ttrssAccounts = TtrssAccountStore(context, cipher)
@@ -106,7 +116,10 @@ class AppContainer(
     val settings = SettingsStore(context)
     val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))
     private val folderDelivery = FolderDelivery(context.contentResolver)
-    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier)
+    val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier,
+        // Scheduled editions only: one made by hand gets its podcast when asked.
+        onBuilt = { id, scheduled -> if (scheduled) podcastMaker.request(id) },
+    )
     val notesSaver = NotesSaver(settings, editions, editionNotes, folderDelivery, notifier)
 
     /** Reading editions aloud. Made on first use: the voice takes a moment to start. */
@@ -129,7 +142,14 @@ class AppContainer(
             stop = { KokoroWorker.cancel(context) },
             supported = kokoroSupported,
             engine = { podcastEngine(kokoroInstall, it) },
+            podcasts = podcasts,
+            makePodcasts = makePodcasts,
         )
+    }
+
+    val podcasts = PodcastStore(File(context.filesDir, "podcasts"))
+    val podcastMaker: PodcastMaker by lazy {
+        PodcastMaker(editions, podcasts, kokoroInstall, settings, { podcastEngine(kokoroInstall, it) }, audioEncoder, start = makePodcasts)
     }
 
     // Its own client: the shared one's cache would try to keep a 325 MB model.

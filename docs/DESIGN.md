@@ -670,7 +670,7 @@ whose Kindle and KOReader answers ask for more on the same page).
     A speed asked for by a car or watch becomes the nearest of these.
     Without an engine the page says so and offers Speech Services by Google.
     Debug builds also offer **Make a podcast in a natural voice**, Kokoro
-    (see the backlog; podcasts aren't made yet). Picking it downloads
+    (see the backlog: podcasts are made but not played yet). Picking it downloads
     384 MB, asking first when not on Wi-Fi ("Wait for Wi-Fi" starts it on
     the next Wi-Fi by itself); then a 20-second check times this phone and
     says what your paper would take to make: up to about an hour, "This
@@ -678,7 +678,11 @@ whose Kindle and KOReader answers ask for more on the same page).
     slow", offering only Remove and the paper size that would fit. A 32-bit
     phone sees the option greyed, with why. In use, it lists Heart,
     Michael, Emma and George, each with a clip shipped in the app, and
-    **Remove Kokoro**.
+    **Remove Kokoro**. While it's in use, each scheduled edition's podcast
+    is made after the book, only while the phone charges: unplugged, it
+    stops and keeps what's made. English articles only; the rest are left
+    to the phone's voice. A podcast is deleted with its edition's book, and
+    all of them with Kokoro.
   - **E-reader & delivery:** the e-reader in a dropdown at the top, then
     "How it gets there". They share a page because the e-reader decides
     which delivery options show: **Email it to your Kindle** (shown for a Kindle, or once
