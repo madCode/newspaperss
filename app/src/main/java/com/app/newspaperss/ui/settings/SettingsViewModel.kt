@@ -79,6 +79,8 @@ class SettingsViewModel(
     }
 
     fun listenLive() {
+        // Tapped while it's already chosen (as when stopping a download): nothing to save.
+        if (settings.value?.listenVoice == ListenVoice.PHONE) return
         viewModelScope.launch { store.update { it.copy(listenVoice = ListenVoice.PHONE) } }
     }
 
