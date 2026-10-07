@@ -57,6 +57,8 @@ class PodcastSetup(
     private val engine: (PodcastVoice) -> PodcastEngine,
     private val podcasts: Podcasts,
     private val now: () -> Long = System::nanoTime,
+    /** What the podcast's making did, for Settings to show. */
+    val log: PodcastLog = PodcastLog(null),
 ) {
     /** The download's size; reads the manifest, so not on the main thread. */
     val size: Long get() = install.bytes

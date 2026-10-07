@@ -3,6 +3,11 @@ package com.app.newspaperss.ui.settings
 import java.time.format.FormatStyle
 import java.time.format.DateTimeFormatter
 import android.content.Context
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import android.content.Intent
 import android.media.MediaPlayer
 import android.net.ConnectivityManager
 import androidx.annotation.RawRes
@@ -256,7 +261,45 @@ private fun Podcast(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState.R
         Note("Listen plays an article from its podcast once it's made, and in your phone's voice until then.", Modifier.padding(top = 4.dp))
         TextButton(onClick = vm::removeKokoro, modifier = Modifier.padding(top = 4.dp)) { Text("Remove Kokoro") }
         Note("Frees $size. Listen goes back to reading live.")
+        PodcastLogButton(vm)
     }
+}
+
+/** What the making did, run by run, to share with whoever's fixing it. */
+@Composable
+private fun PodcastLogButton(vm: SettingsViewModel) {
+    val context = LocalContext.current
+    var lines by remember { mutableStateOf<List<String>?>(null) }
+    var open by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(open) { lines = if (open) vm.podcastLog() else null }
+    TextButton(onClick = { open = true }, modifier = Modifier.padding(top = 4.dp)) { Text("Podcast log") }
+    if (!open) return
+    val text = lines?.joinToString("\n")
+    AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text("Podcast log") },
+        text = {
+            Text(
+                when {
+                    text == null -> "Reading…"
+                    text.isEmpty() -> "Nothing made yet."
+                    else -> text
+                },
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                    context.startActivity(Intent.createChooser(send, "Share the podcast log"))
+                },
+                enabled = !text.isNullOrEmpty(),
+            ) { Text("Share") }
+        },
+        dismissButton = { TextButton(onClick = { open = false }) { Text("Close") } },
+    )
 }
 
 @Composable

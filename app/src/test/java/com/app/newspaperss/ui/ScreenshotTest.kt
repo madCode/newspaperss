@@ -71,6 +71,7 @@ import com.app.newspaperss.listen.ListenBook
 import com.app.newspaperss.listen.ListenPlayer
 import com.app.newspaperss.listen.ListenPosition
 import com.app.newspaperss.listen.Listening
+import com.app.newspaperss.listen.PodcastLog
 import com.app.newspaperss.listen.PodcastSetup
 import com.app.newspaperss.listen.PodcastSpeaker
 import com.app.newspaperss.listen.PodcastStore
@@ -958,12 +959,14 @@ class ScreenshotTest {
         pace: Float? = null,
         inUse: Boolean = false,
         install: KokoroInstall = shownKokoro(installed = pace != null),
+        log: PodcastLog = PodcastLog(null),
     ): SettingsViewModel {
         installVoice(ApplicationProvider.getApplicationContext())
         runBlocking { store.update { it.copy(podcastPace = pace, listenVoice = if (inUse) ListenVoice.PODCAST else ListenVoice.PHONE) } }
         val setup = PodcastSetup(
             install, store, work, start = {}, stop = {}, supported = true, engine = { error("not shot") },
             podcasts = Podcasts(PodcastStore(tmp.newFolder()), store, install) {},
+            log = log,
         )
         return SettingsViewModel(store, podcast = setup) {}
     }
@@ -1000,6 +1003,32 @@ class ScreenshotTest {
     fun settingsPodcastInUse() {
         val vm = podcastSettings(pace = 1.2f, inUse = true)
         shoot("07s-settings-podcast-in-use", ready = { vm.kokoro.value is KokoroState.Ready }) { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
+    }
+
+    @Test
+    fun settingsPodcastLog() {
+        val log = PodcastLog(tmp.newFile(), now = { 1_791_000_000_000L })
+        listOf(
+            "Edition 12's podcast asked for, in Heart; made once the phone charges",
+            "Run started (try 1): asking for the foreground, Android 36, battery unrestricted, plugged in",
+            "Kokoro loaded (Heart) in 4s",
+            "Edition 12 page 0: from line 0 of 84",
+            "In the foreground",
+            "Kept page 0 lines 0–21: 124s of audio in 181s",
+            "Page 0 line 30 took 41s (612 characters)",
+            "Stopped: unplugged",
+            "Stopped on page 0 before line 31; 37s of unkept audio dropped",
+        ).forEach(log::add)
+        val vm = podcastSettings(pace = 1.2f, inUse = true, log = log)
+        shoot(
+            "07u-settings-podcast-log",
+            ready = { vm.kokoro.value is KokoroState.Ready },
+            act = {
+                compose.onNodeWithText("Podcast log").performScrollTo().performClick()
+                idleUntil { compose.onAllNodes(hasText("Stopped: unplugged", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+            },
+            dialog = true,
+        ) { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
     }
 
     /** Settings › Where your feeds live, signed in to a tt-rss account. */

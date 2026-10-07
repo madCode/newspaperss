@@ -323,6 +323,11 @@ flowchart LR
     phone's pace: all the time it took, over every run (loading Kokoro,
     encoding, files), per second of speech. The pace sets how early
     scheduled editions start (`PodcastPace.earlier`).
+- **`PodcastLog`** records what the making did: each run's start, whether
+  it got the foreground, why it stopped, each piece kept (seconds of audio
+  and of work), lines over 30 s, and the unkept audio a stop dropped. It
+  keeps the last 400 entries in `files/podcast-log.txt` for Settings ›
+  Listening to show and share, and writes the same to logcat (`PodcastLog`).
 - **`ListenProgress`** keeps where each of the ten most recent editions
   was left, and which were heard to the end, in SharedPreferences
   (`listening`).

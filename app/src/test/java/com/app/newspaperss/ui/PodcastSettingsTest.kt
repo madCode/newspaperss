@@ -20,6 +20,8 @@ import androidx.work.WorkInfo
 import androidx.work.workDataOf
 import com.app.newspaperss.listen.PodcastEngine
 import com.app.newspaperss.listen.PodcastSetup
+import org.junit.Assert.assertTrue
+import com.app.newspaperss.listen.PodcastLog
 import com.app.newspaperss.listen.PodcastStore
 import com.app.newspaperss.listen.Podcasts
 import com.app.newspaperss.settings.ListenVoice
@@ -78,6 +80,7 @@ class PodcastSettingsTest {
     }
 
     private lateinit var setup: PodcastSetup
+    private val log by lazy { PodcastLog(tmp.newFile("podcast-log")) }
 
     private fun show(supported: Boolean = true): SettingsViewModel {
         installVoice(context)
@@ -85,6 +88,7 @@ class PodcastSettingsTest {
             install, store, work, start = { started += it }, stop = { stopped++ }, supported = supported,
             engine = { error("not in these tests") },
             podcasts = Podcasts(PodcastStore(java.io.File(context.filesDir, "podcasts")), store, install) {},
+            log = log,
         )
         val vm = SettingsViewModel(store, podcast = setup) {}
         compose.setContent { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
@@ -194,6 +198,19 @@ class PodcastSettingsTest {
         waitFor("This phone is slow at it, but it can")
         waitFor("Your 30-minute paper takes about 2 hours to make here")
         compose.onNodeWithText("Read live in this phone's voice").assertIsSelected()
+    }
+
+    @Test
+    fun theLogShowsWhatTheMakingDidNewestFirst() {
+        ready(1.2f)
+        runBlocking { store.update { it.copy(listenVoice = ListenVoice.PODCAST) } }
+        log.add("Run started (try 1)")
+        log.add("Stopped: unplugged")
+        show()
+        compose.onNodeWithText("Podcast log").performScrollTo().performClick()
+        waitFor("Stopped: unplugged")
+        val shown = compose.onNode(hasText("Run started", substring = true)).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString()
+        assertTrue(shown, shown.indexOf("Stopped: unplugged") < shown.indexOf("Run started"))
     }
 
     @Test

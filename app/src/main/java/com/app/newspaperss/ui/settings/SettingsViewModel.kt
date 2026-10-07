@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.DayOfWeek
 import java.time.LocalTime
 
@@ -95,6 +96,9 @@ class SettingsViewModel(
     fun useKokoro() {
         viewModelScope.launch { podcast?.use() }
     }
+
+    /** What the podcast's making did, newest first. */
+    suspend fun podcastLog(): List<String> = withContext(Dispatchers.IO) { podcast?.log?.read().orEmpty().asReversed() }
 
     fun removeKokoro() {
         viewModelScope.launch { podcast?.remove() }

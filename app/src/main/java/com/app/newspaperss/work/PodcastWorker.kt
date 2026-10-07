@@ -9,7 +9,6 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
-import android.util.Log
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -37,37 +36,57 @@ import kotlinx.coroutines.launch
  * is Unrestricted, or the app is on screen; otherwise it's made as background work, slowly.
  */
 class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    private val log get() = applicationContext.container.podcastLog
+
     override suspend fun doWork(): Result = try {
         val asked = mayGoForeground()
+        log.add("Run started (try ${runAttemptCount + 1}): ${if (asked) "asking for the foreground" else "in the background"}, ${standing()}")
         if (asked && !goForeground()) {
             enqueue(applicationContext)
         } else {
             val started = SystemClock.elapsedRealtime()
+            var checked = false
             val stopped = makeWhile(CHECK_MS, { applicationContext.container.podcastMaker.makeAll() }, ::noteTimeout) {
+                val foreground = inForeground()
+                if (!checked) {
+                    checked = true
+                    log.add(if (foreground) "In the foreground" else "Not in the foreground")
+                }
                 when {
-                    !plugged() -> false
-                    inForeground() || SystemClock.elapsedRealtime() - started < BACKGROUND_MS -> true
+                    !plugged() -> false.also { log.add("Stopped: unplugged") }
+                    foreground || SystemClock.elapsedRealtime() - started < BACKGROUND_MS -> true
                     else -> {
                         // Asked, and refused silently inside WorkManager's service: Android 15's
                         // 6 hours a day used up, most likely.
                         if (asked) holdOff(TIMED_OUT_MS)
+                        log.add("Stopped at ${BACKGROUND_MS / 60_000} min, not in the foreground" + if (asked) "; not asking again for 12 hours" else "")
                         false
                     }
                 }
             }
+            if (!stopped) log.add("Run ended: nothing left to make")
             if (stopped) enqueue(applicationContext)
         }
         Result.success()
     } catch (e: CancellationException) {
         noteTimeout()
+        log.add("Stopped by Android" + if (Build.VERSION.SDK_INT >= 31) " (reason $stopReason)" else "")
         throw e
     } catch (e: Exception) {
         // Kokoro couldn't load (its files damaged since the check, say): asked again, it tries again.
-        Log.w(TAG, "Podcast stopped: ${e.javaClass.name}")
+        log.add("Run failed: ${e.javaClass.name}: ${e.message}")
         Result.failure()
     } catch (e: LinkageError) {
-        Log.w(TAG, "Kokoro's native code didn't load")
+        log.add("Kokoro's native code didn't load: ${e.javaClass.name}")
         Result.failure()
+    }
+
+    /** What decides whether Android lets the work into the foreground, for the log. */
+    private fun standing(): String {
+        val power = applicationContext.getSystemService(PowerManager::class.java)
+        val battery = if (power.isIgnoringBatteryOptimizations(applicationContext.packageName)) "battery unrestricted" else "battery optimized"
+        val held = if (SystemClock.elapsedRealtime() < holdOffUntil) ", holding off after a refusal" else ""
+        return "Android ${Build.VERSION.SDK_INT}, $battery, ${if (plugged()) "plugged in" else "unplugged"}$held"
     }
 
     /**
@@ -99,7 +118,7 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             throw e
         } catch (e: Exception) {
             // Started from the background after all: the app left the screen just then, say.
-            Log.i(TAG, "Foreground refused: ${e.javaClass.name}")
+            log.add("Foreground refused: ${e.javaClass.name}; in the background for an hour")
             holdOff(HOLD_OFF_MS)
             false
         }
@@ -111,7 +130,10 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
      * finishes its sentence: the next run may start before that.
      */
     private fun noteTimeout() {
-        if (Build.VERSION.SDK_INT >= 31 && stopReason == WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT) holdOff(TIMED_OUT_MS)
+        if (Build.VERSION.SDK_INT >= 31 && stopReason == WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT) {
+            holdOff(TIMED_OUT_MS)
+            log.add("Android's daily time in the foreground used up; not asking again for 12 hours")
+        }
     }
 
     private fun holdOff(ms: Long) {
@@ -134,7 +156,6 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     }
 
     companion object {
-        private const val TAG = "PodcastWorker"
         private const val UNIQUE = "podcast"
         private const val CHECK_MS = 30_000L
 
