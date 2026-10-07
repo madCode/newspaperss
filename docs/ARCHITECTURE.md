@@ -266,8 +266,15 @@ flowchart LR
   saves changes made from its own controls there.
 - **`Speaker`** is the voice. `SystemSpeaker` wraps Android's
   `TextToSpeech`; tests use a fake. Kokoro can't keep up live on a phone,
-  so it makes podcasts ahead of time (below); playing them, with this
-  voice for what isn't made yet, is in the backlog.
+  so it makes podcasts ahead of time (below).
+- **`PodcastSpeaker`** is the `Speaker` the player gets. When an article
+  starts, it picks its voice: the podcast if that article is made and
+  Kokoro is in use, else `SystemSpeaker`; the choice holds until another
+  article starts. Playing a podcast (`MediaPlayerAudio`, pieces one after
+  another), it reports each line's start from the times kept with each
+  piece, so the player tints and saves sentences the same way. Line ids
+  (`LineId`) carry the edition, page and line. Its `voice` is the name the
+  playing screen shows.
 - **`ListenService`** is a Media3 `MediaSessionService`. Its
   `SessionPlayer` (a `SimpleBasePlayer`) shows the player's state to
   Android, an article a track, and turns the lock screen's commands into

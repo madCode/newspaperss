@@ -251,9 +251,8 @@ private fun Podcast(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState.R
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
-        // Until podcasts are played, which comes next, Listen sounds the same.
         Text(
-            "Podcasts are made, but not played yet: until they are, Listen reads live.",
+            "Listen plays an article from its podcast once it's made, and in your phone's voice until then.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),

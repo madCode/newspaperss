@@ -154,7 +154,7 @@ class PodcastSettingsTest {
         // In use: its voices, each with a sample.
         compose.onNodeWithText("Emma").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
         idleUntil { vm.settings.value?.podcastVoice == PodcastVoice.EMMA }
-        waitFor("Podcasts are made, but not played yet")
+        waitFor("Listen plays an article from its podcast once it's made")
     }
 
     @Test

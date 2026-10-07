@@ -242,7 +242,7 @@ private fun App(
                 )
             }
             composable(LISTEN) {
-                ListenScreen(container.listen, onBack = { nav.navigateUp() })
+                ListenScreen(container.listen, onBack = { nav.navigateUp() }, podcastVoice = container.podcastPlaying)
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext
