@@ -3,3 +3,4 @@ First release.
 • Editions sized by reading time, from the sites you pick, your own Tiny Tiny RSS server, or a list from another reader app.
 • Delivered to Kindle (by email or the Kindle app), Kobo, Boox, PocketBook or KOReader.
 • A reading list for links you share to the app.
+• Listen: an edition read aloud in your phone's own voice.

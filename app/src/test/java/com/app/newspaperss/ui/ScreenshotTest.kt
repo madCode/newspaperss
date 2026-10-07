@@ -462,7 +462,11 @@ class ScreenshotTest {
     @Test
     fun listenPlayingThePodcast() = shootListening("11b-listen-podcast", voice = PodcastVoice.HEART)
 
-    private fun shootListening(name: String, voice: PodcastVoice?, instead: PodcastSpeaker.Instead? = null) {
+    /** At Settings › Article text size Larger, as the preview would show it. */
+    @Test
+    fun listenPlayingLargerText() = shootListening("11d-listen-larger-text", voice = null, textSize = PreviewTextSize.LARGER)
+
+    private fun shootListening(name: String, voice: PodcastVoice?, instead: PodcastSpeaker.Instead? = null, textSize: PreviewTextSize = PreviewTextSize.DEFAULT) {
         val files = tmp.newFolder()
         val picture = Bitmap.createBitmap(600, 300, Bitmap.Config.ARGB_8888).apply {
             val canvas = Canvas(this)
@@ -497,7 +501,7 @@ class ScreenshotTest {
         player.start(id, ListenPosition(1, 6))
         idleUntil { player.state.value.script != null }
         speaker.startNext()
-        shoot(name, ready = { player.state.value.at.line == 6 }) { ListenScreen(player, onBack = {}, podcastVoice = MutableStateFlow(voice), instead = MutableStateFlow(instead)) }
+        shoot(name, ready = { player.state.value.at.line == 6 }) { ListenScreen(player, onBack = {}, podcastVoice = MutableStateFlow(voice), instead = MutableStateFlow(instead), textSize = textSize) }
     }
 
     @Test
