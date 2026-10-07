@@ -26,7 +26,7 @@ data class EditionDoc(
     val identifier: String,
     val sections: List<EditionSection>,
     val language: String = "en",
-    val masthead: String = "newspapeRSS",
+    val masthead: String = "NewspapeRSS",
     val modified: Instant = Instant.now(),
     val cover: EpubImage? = null,
     val reflection: String? = null,

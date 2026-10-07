@@ -154,7 +154,7 @@ class CoverRenderer {
         private val SERIF_BOLD = Typeface.create(Typeface.SERIF, Typeface.BOLD)
         private val SANS = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
 
-        private const val MASTHEAD = "newspapeRSS"
+        private const val MASTHEAD = "NewspapeRSS"
 
         // English like the rest of the book's own text.
         private val WEEKDAY = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)

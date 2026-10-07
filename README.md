@@ -1,8 +1,8 @@
-# newspapeRSS
+# NewspapeRSS
 
 Your own newspaper, on your e-reader.
 
-newspapeRSS turns the sites and links you choose into a finite edition
+NewspapeRSS turns the sites and links you choose into a finite edition
 (say, *about 30 minutes, every morning at 6:30*) and delivers it as a clean
 EPUB to your Kindle, Kobo, Boox, PocketBook or KOReader device. No
 algorithm, no account, no endless feed: it arrives, it ends, you're done.
@@ -49,7 +49,7 @@ another reader app's list):
   website (the app finds its feed), import OPML from another reader, or
   connect a Tiny Tiny RSS account.
 - **Save things to read later.** Share a link from any app to "Read in
-  newspapeRSS"; import your Pocket or Instapaper export. Add curated lists
+  NewspapeRSS"; import your Pocket or Instapaper export. Add curated lists
   like Arts & Letters Daily, which picks a few links a day.
 - **A paper that ends.** Each edition fills a reading-time budget, taking
   turns between sites with at most one article from each (you can allow

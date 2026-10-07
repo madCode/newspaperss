@@ -8,14 +8,14 @@ object DeviceTips {
             "When an edition is ready, tap Send and choose the Kindle app (“Send to Kindle”). " +
                 "In its form, turn off “Add to your library” and pick your Kindle to send it straight to the device " +
                 "(it won't sync to your other devices); otherwise it only goes to your library. " +
-                "Changing Author to newspapeRSS keeps your editions together. " +
+                "Changing Author to NewspapeRSS keeps your editions together. " +
                 "If Kindle isn't on your phone, install it from the Play Store and sign in."
         Device.KOBO ->
             "Once, on your Kobo: More \u203a Settings \u203a Dropbox \u203a Link, and sign in. Then, when an edition " +
                 "is ready, tap Send, choose Dropbox and save it in Apps \u203a Rakuten Kobo. It appears on your Kobo " +
                 "when it syncs."
         Device.BOOX ->
-            "Install newspapeRSS on the Boox itself and tap Read to read each edition in its reader, " +
+            "Install NewspapeRSS on the Boox itself and tap Read to read each edition in its reader, " +
                 "or send editions over with BooxDrop."
         Device.POCKETBOOK ->
             "Tap Send, choose your email app and send to your @pbsync.com address (Send-to-PocketBook). " +

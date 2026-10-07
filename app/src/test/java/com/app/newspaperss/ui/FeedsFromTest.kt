@@ -226,13 +226,13 @@ class FeedsFromTest {
         waitFor("Back after a break?")
 
         compose.onNodeWithText("Start fresh").performScrollTo().performClick()
-        waitFor("newspapeRSS can't undo this")
+        waitFor("NewspapeRSS can't undo this")
         compose.onNodeWithText("Cancel").performClick()
         compose.waitForIdle()
         assertTrue("backing out asks nothing of tt-rss", server.caughtUp.isEmpty())
 
         compose.onNodeWithText("Start fresh").performScrollTo().performClick()
-        waitFor("newspapeRSS can't undo this")
+        waitFor("NewspapeRSS can't undo this")
         compose.onNodeWithText("Mark as read").performClick()
         waitFor("only the last two weeks unread")
         assertEquals(1, server.caughtUp.size)

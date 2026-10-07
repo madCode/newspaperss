@@ -1,6 +1,6 @@
 # Privacy policy
 
-newspapeRSS has no accounts, ads, analytics or crash reporting. It doesn't
+NewspapeRSS has no accounts, ads, analytics or crash reporting. It doesn't
 collect anything about you, and nothing you do in it is sent to its makers
 or anyone else.
 
@@ -24,13 +24,13 @@ The app only connects to:
   embeds). These sites see a request from your phone, as they would in a
   browser.
 - **Your own Tiny Tiny RSS server,** if you use one, with the login you
-  give it. newspapeRSS's makers never see it.
+  give it. NewspapeRSS's makers never see it.
 
 ## Sending editions
 
 Editions go where you send them: through an app you pick from Android's
 share sheet, by email from your own mail app (for Send to Kindle), or to a
-folder you choose. newspapeRSS doesn't send them anywhere itself.
+folder you choose. NewspapeRSS doesn't send them anywhere itself.
 
 ## Contact
 

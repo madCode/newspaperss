@@ -18,12 +18,12 @@ object ErrorAnswers {
         return when (code) {
             404, 410 -> when {
                 address != null -> "There's nothing at $address. Check the address."
-                curatedList -> "The list's page isn't where newspapeRSS expects it any more (error $code). An update to newspapeRSS should fix it."
+                curatedList -> "The list's page isn't where NewspapeRSS expects it any more (error $code). An update to NewspapeRSS should fix it."
                 // Adding the same feed address again would fail the same way; the home page finds the new one.
                 else -> "The site's feed isn't there any more (error $code). It may have moved: add the site's home page again to find its new feed."
             }
             in BLOCKED ->
-                "$site turned newspapeRSS away (error $code). Some sites block apps: " +
+                "$site turned NewspapeRSS away (error $code). Some sites block apps: " +
                     if (address != null) "try its feed or RSS link if it lists one, or try again later." else "try again later."
             in 500..599 -> "$site isn't working right now (error $code). Try again later."
             else -> "$site answered with error $code."

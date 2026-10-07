@@ -186,7 +186,7 @@ private fun LeaveDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "newspapeRSS signs out and deletes all tt-rss data including articles, stars, and feed settings. " +
+                    "NewspapeRSS signs out and deletes all tt-rss data including articles, stars, and feed settings. " +
                         "Past editions stay. Nothing changes in tt-rss itself.",
                 )
                 Text(
@@ -254,7 +254,7 @@ private fun StartFresh(source: SourceEntity, working: Boolean, onConfirm: () -> 
             text = {
                 Text(
                     "Every unread article that reached tt-rss more than two weeks ago$scope will be marked read there. " +
-                        "Starred ones too: they stay starred, but read. newspapeRSS can't undo this.",
+                        "Starred ones too: they stay starred, but read. NewspapeRSS can't undo this.",
                 )
             },
             confirmButton = { TextButton(onClick = { confirming = false; onConfirm() }) { Text("Mark as read") } },

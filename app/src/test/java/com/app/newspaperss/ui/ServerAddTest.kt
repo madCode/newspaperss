@@ -256,7 +256,7 @@ class ServerAddTest {
         waitFor("Subscribe in your tt-rss")
         compose.onNodeWithText("Subscribe").performClick()
         waitFor("tt-rss didn't add it")
-        assertTrue(visible("Your tt-rss is too old to add feeds from newspapeRSS."))
+        assertTrue(visible("Your tt-rss is too old to add feeds from NewspapeRSS."))
         assertFalse("a front page isn't offered for the reading list", visible("Save this page"))
     }
 

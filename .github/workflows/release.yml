@@ -57,11 +57,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           tag="$GITHUB_REF_NAME"
-          apk="newspapeRSS-${tag#v}.apk"
-          aab="newspapeRSS-${tag#v}.aab"
+          apk="NewspapeRSS-${tag#v}.apk"
+          aab="NewspapeRSS-${tag#v}.aab"
           cp app/build/outputs/apk/release/app-release.apk "$apk"
           cp app/build/outputs/bundle/release/app-release.aab "$aab"
           code=$(sed -n 's/^ *versionCode = \([0-9]*\)$/\1/p' app/build.gradle.kts)
           notes="fastlane/metadata/android/en-US/changelogs/$code.txt"
-          if [ -f "$notes" ]; then notes_flag=(--notes-file "$notes"); else notes_flag=(--notes "newspapeRSS ${tag#v}"); fi
-          gh release create "$tag" "$apk" "$aab" --draft --verify-tag --title "newspapeRSS ${tag#v}" "${notes_flag[@]}"
+          if [ -f "$notes" ]; then notes_flag=(--notes-file "$notes"); else notes_flag=(--notes "NewspapeRSS ${tag#v}"); fi
+          gh release create "$tag" "$apk" "$aab" --draft --verify-tag --title "NewspapeRSS ${tag#v}" "${notes_flag[@]}"

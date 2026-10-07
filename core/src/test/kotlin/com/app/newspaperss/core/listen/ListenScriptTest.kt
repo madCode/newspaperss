@@ -146,7 +146,7 @@ class ListenScriptTest {
         assertTrue(spoken.toString(), spoken.any { it.startsWith("1 article") })
         assertTrue(spoken.toString(), "To think about" in spoken && "What surprised you?" in spoken)
         // Not the imprint: the masthead and date are for the page.
-        assertTrue(spoken.none { it.contains("newspapeRSS") })
+        assertTrue(spoken.none { it.contains("NewspapeRSS") })
     }
 
     @Test

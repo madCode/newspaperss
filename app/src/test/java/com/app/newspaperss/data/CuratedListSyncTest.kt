@@ -121,7 +121,7 @@ class CuratedListSyncTest {
         http.page(ArtsAndLettersDaily.pageUrl, "", code = 404)
         sync.syncAll()
         assertEquals(
-            "The list's page isn't where newspapeRSS expects it any more (error 404). An update to newspapeRSS should fix it.",
+            "The list's page isn't where NewspapeRSS expects it any more (error 404). An update to NewspapeRSS should fix it.",
             db.sources().byId(id)!!.lastError,
         )
     }
@@ -131,7 +131,7 @@ class CuratedListSyncTest {
         val id = repo.addList(ArtsAndLettersDaily)
         http.page(ArtsAndLettersDaily.pageUrl, "", code = 503)
         sync.syncAll()
-        assertEquals("The site turned newspapeRSS away (error 503). Some sites block apps: try again later.", db.sources().byId(id)!!.lastError)
+        assertEquals("The site turned NewspapeRSS away (error 503). Some sites block apps: try again later.", db.sources().byId(id)!!.lastError)
 
         http.unreachable += ArtsAndLettersDaily.pageUrl
         sync.syncAll()

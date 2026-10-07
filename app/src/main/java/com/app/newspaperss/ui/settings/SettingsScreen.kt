@@ -118,9 +118,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpen: (SettingsPage) -> Unit)
             }
             val context = LocalContext.current
             val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
-            val line = "newspapeRSS $version"
+            val line = "NewspapeRSS $version"
             val copy = {
-                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("newspapeRSS version", line))
+                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("NewspapeRSS version", line))
                 // On every version: an e-reader's Android may show no clipboard notice of its own.
                 Toast.makeText(context, "Version copied", Toast.LENGTH_SHORT).show()
             }
