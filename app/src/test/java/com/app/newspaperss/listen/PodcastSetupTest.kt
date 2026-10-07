@@ -1,5 +1,6 @@
 package com.app.newspaperss.listen
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.work.Constraints
 import androidx.work.NetworkType
@@ -25,8 +26,9 @@ import java.util.UUID
 
 class PodcastSetupTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val stores = TestDataStores()
 
-    private val store by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
+    private val store by lazy { SettingsStore(stores.preferences("s")) }
     private val install by lazy { kokoroInstall(tmp.newFolder("kokoro"), installed = false) }
     private val work = MutableStateFlow<WorkInfo?>(null)
     private val started = mutableListOf<Boolean>()

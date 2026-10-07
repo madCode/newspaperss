@@ -1,5 +1,6 @@
 package com.app.newspaperss.listen
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.epub.EditionArticle
@@ -35,10 +36,11 @@ import java.io.File
 @Config(application = TestApp::class)
 class PodcastMakerTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val stores = TestDataStores()
     @get:Rule val dbRule = DbRule()
     private val db = dbRule.db
 
-    private val settings by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
+    private val settings by lazy { SettingsStore(stores.preferences("s")) }
     private val editionsDir by lazy { tmp.newFolder("editions") }
     private val editions by lazy { EditionRepository(db, editionsDir) }
     private val store by lazy { PodcastStore(tmp.newFolder("podcasts")) }

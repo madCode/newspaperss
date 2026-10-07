@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -64,6 +65,7 @@ class TtrssFeedsTest {
     @get:Rule(order = 0) val closeDb = closeAfter { db.close() }
     @get:Rule(order = 1) val tmp = TemporaryFolder()
     @get:Rule(order = 2) val compose = createComposeRule()
+    @get:Rule(order = 3) val stores = TestDataStores()
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
@@ -94,7 +96,7 @@ class TtrssFeedsTest {
         account
     }
 
-    private val settings by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("settings.preferences_pb") }) }
+    private val settings by lazy { SettingsStore(stores.preferences("settings")) }
 
     private fun sources(from: FeedsFrom): SourcesViewModel {
         runBlocking { settings.update { it.copy(feedsFrom = from) } }

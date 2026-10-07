@@ -1,5 +1,6 @@
 package com.app.newspaperss.settings
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -18,8 +19,9 @@ import java.time.LocalTime
 
 class SettingsStoreTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val stores = TestDataStores()
 
-    private val dataStore by lazy { PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") } }
+    private val dataStore by lazy { stores.preferences("s") }
     private val store by lazy { SettingsStore(dataStore) }
 
     @Test
@@ -73,7 +75,7 @@ class SettingsStoreTest {
         assertEquals(FeedsFrom.SERVER, store.settleFeedsFrom { true })
         assertEquals(FeedsFrom.SERVER, store.current().feedsFrom)
 
-        val other = SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("other.preferences_pb") })
+        val other = SettingsStore(stores.preferences("other"))
         assertEquals(FeedsFrom.PHONE, other.settleFeedsFrom { false })
         assertEquals(FeedsFrom.PHONE, other.current().feedsFrom)
     }

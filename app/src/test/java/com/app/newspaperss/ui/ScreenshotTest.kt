@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.testutil.TestDataStores
 import com.app.newspaperss.testutil.writeEpub
 import android.content.Intent
 import android.content.IntentFilter
@@ -149,10 +150,11 @@ class ScreenshotTest {
     @get:Rule(order = 0) val closeDb = closeAfter { db.close() }
     @get:Rule(order = 1) val tmp = TemporaryFolder()
     @get:Rule(order = 2) val compose = createComposeRule()
+    @get:Rule(order = 3) val stores = TestDataStores()
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
-    private val store by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
+    private val store by lazy { SettingsStore(stores.preferences("s")) }
     private val out = File("build/screenshots").apply { mkdirs() }
 
     /**
@@ -278,7 +280,7 @@ class ScreenshotTest {
     }
 
     private val ttrssHttp = FakeHttp()
-    private val ttrssAccounts by lazy { TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher()) }
+    private val ttrssAccounts by lazy { TtrssAccountStore(stores.preferences("ttrss"), testCipher()) }
     private val ttrss by lazy { TtrssRepository(db, ttrssHttp, ttrssAccounts, SourceRepository(db)) }
 
     /** A sample tt-rss server: 58 feeds in 7 categories. */
@@ -1216,7 +1218,7 @@ class ScreenshotTest {
             ).forEach { (url, title) -> repo.addFeed(url, title) }
             db.sources().all().forEach { db.sources().recordSuccess(it.id, Instant.now(), null, null, it.title) }
         }
-        val moves = FeedMoves(PreferenceDataStoreFactory.create { tmp.newFile("moves.preferences_pb") }, db, ttrss) {}
+        val moves = FeedMoves(stores.preferences("moves"), db, ttrss) {}
         val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         val vm = SourcesViewModel(repo, FeedFinder(ttrssHttp), ttrss, settings = store, moves = moves) {}
         try {
@@ -1277,7 +1279,7 @@ class ScreenshotTest {
             repo.addFeed("https://www.quantamagazine.org/feed/", "Quanta Magazine")
             repo.addFeed("https://feed3.example/rss", "Feed 3")
         }
-        val moves = FeedMoves(PreferenceDataStoreFactory.create { tmp.newFile("moves.preferences_pb") }, db, ttrss) {}
+        val moves = FeedMoves(stores.preferences("moves"), db, ttrss) {}
         val settingsVm = SettingsViewModel(store, ttrss.observeStatus()) {}
         val feeds = FeedsFromViewModel(store, ttrss, moves, repo).apply {
             openSignIn()
