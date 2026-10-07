@@ -213,7 +213,7 @@ class PodcastMaker(
         const val PIECE_SECONDS = 120.0
 
         /** Times saying the same line took the app down before the page is left to the phone's voice. */
-        internal const val CRASHES = 2
+        private const val CRASHES = 2
 
         /** Runs failing on the same page before it's left to the phone's voice. */
         internal const val FAILURES = 3

@@ -210,7 +210,7 @@ interface PodcastEngine {
 }
 
 /** Kokoro through sherpa-onnx. Loading takes a couple of seconds. */
-class KokoroEngine(install: KokoroInstall, voice: PodcastVoice, threads: Int = THREADS) : PodcastEngine {
+class KokoroEngine(install: KokoroInstall, voice: PodcastVoice) : PodcastEngine {
     private val speaker = speakerOf(voice)
     private val british = voice == PodcastVoice.EMMA || voice == PodcastVoice.GEORGE
     private val tts = OfflineTts(
@@ -226,7 +226,7 @@ class KokoroEngine(install: KokoroInstall, voice: PodcastVoice, threads: Int = T
                     // espeak's data has no British voice; plain English with the British word list is.
                     lang = if (british) "en" else "en-us",
                 ),
-                numThreads = threads,
+                numThreads = THREADS,
             ),
         ),
     )
@@ -243,10 +243,10 @@ class KokoroEngine(install: KokoroInstall, voice: PodcastVoice, threads: Int = T
         val lock = Mutex()
 
         /** Fastest on a Pixel 8's Tensor G3: 1 and 2 threads were slower, and all 9 cores slower still. */
-        const val THREADS = 4
+        private const val THREADS = 4
 
         /** The voice's number in the model (its metadata's speaker2id). */
-        fun speakerOf(voice: PodcastVoice) = when (voice) {
+        private fun speakerOf(voice: PodcastVoice) = when (voice) {
             PodcastVoice.HEART -> 3
             PodcastVoice.MICHAEL -> 16
             PodcastVoice.EMMA -> 21

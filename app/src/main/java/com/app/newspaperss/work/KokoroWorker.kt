@@ -64,10 +64,10 @@ class KokoroWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     companion object {
         private const val UNIQUE = "kokoro"
         /** Failures in a row, with nothing arriving in between, before it gives up. */
-        internal const val ATTEMPTS = 6
+        private const val ATTEMPTS = 6
 
         /** A damaged file is fetched again once: twice in a row isn't the connection. */
-        internal const val DAMAGED_ATTEMPTS = 2
+        private const val DAMAGED_ATTEMPTS = 2
 
         /** Wi-Fi only unless [mobileData]; asking again replaces a download waiting for Wi-Fi. */
         fun enqueue(context: Context, mobileData: Boolean) {

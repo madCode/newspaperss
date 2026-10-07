@@ -39,13 +39,11 @@ import com.app.newspaperss.listen.SystemSpeaker
 import com.app.newspaperss.listen.KokoroDownload
 import com.app.newspaperss.listen.KokoroEngine
 import com.app.newspaperss.listen.KokoroInstall
-import com.app.newspaperss.listen.PodcastEngine
 import com.app.newspaperss.listen.PodcastSetup
 import com.app.newspaperss.listen.PodcastMaker
 import com.app.newspaperss.listen.PodcastStore
 import com.app.newspaperss.listen.Podcasts
 import com.app.newspaperss.listen.AacEncoder
-import com.app.newspaperss.listen.AudioEncoder
 import com.app.newspaperss.work.PodcastWorker
 import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.work.KokoroWorker
@@ -70,7 +68,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import com.app.newspaperss.settings.ListenVoice
 import com.app.newspaperss.listen.MediaPlayerAudio
-import com.app.newspaperss.listen.PodcastAudio
 import com.app.newspaperss.listen.PodcastSpeaker
 
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
@@ -84,13 +81,7 @@ class AppContainer(
     saveNotes: (editionId: Long) -> Unit = { NotesWorker.enqueue(context, it) },
     moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
     speaker: () -> Speaker = { SystemSpeaker(context) },
-    podcastAudio: () -> PodcastAudio = { MediaPlayerAudio() },
     private val connectListening: () -> Unit = { ListenService.connect(context) },
-    private val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
-    podcastEngine: (KokoroInstall, PodcastVoice) -> PodcastEngine = ::KokoroEngine,
-    kokoroSupported: Boolean = KokoroInstall.supported,
-    private val makePodcasts: () -> Unit = { PodcastWorker.enqueue(context) },
-    audioEncoder: AudioEncoder = AacEncoder,
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -138,7 +129,7 @@ class AppContainer(
 
     /** Listen's voice: a made podcast where there is one, the phone's elsewhere. */
     private val listenSpeaker by lazy {
-        PodcastSpeaker(speaker(), podcastStore, podcastAudio()) {
+        PodcastSpeaker(speaker(), podcastStore, MediaPlayerAudio()) {
             // Just after the app starts, before the store's first value: read it, or a made
             // article would play in the phone's voice.
             (listenSettings.value ?: runCatching { runBlocking { settings.current() } }.getOrNull())?.listenVoice == ListenVoice.PODCAST
@@ -169,16 +160,18 @@ class AppContainer(
             kokoroInstall, settings, KokoroWorker.observe(context),
             start = { KokoroWorker.enqueue(context, it) },
             stop = { KokoroWorker.cancel(context) },
-            supported = kokoroSupported,
-            engine = { podcastEngine(kokoroInstall, it) },
+            supported = KokoroInstall.supported,
+            engine = podcastEngine,
             podcasts = podcasts,
         )
     }
 
+    private val kokoroInstall = KokoroInstall.of(context)
+    private val podcastEngine = { voice: PodcastVoice -> KokoroEngine(kokoroInstall, voice) }
     private val podcastStore = PodcastStore(File(context.filesDir, "podcasts"))
-    private val podcasts = Podcasts(podcastStore, settings, kokoroInstall, start = makePodcasts)
+    private val podcasts = Podcasts(podcastStore, settings, kokoroInstall, start = { PodcastWorker.enqueue(context) })
     val podcastMaker: PodcastMaker by lazy {
-        PodcastMaker(editions, podcastStore, kokoroInstall, settings, { podcastEngine(kokoroInstall, it) }, audioEncoder)
+        PodcastMaker(editions, podcastStore, kokoroInstall, settings, podcastEngine, AacEncoder)
     }
 
     // Its own client: the shared one's cache would try to keep a 325 MB model.
