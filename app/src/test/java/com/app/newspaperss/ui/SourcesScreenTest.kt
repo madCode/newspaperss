@@ -3,6 +3,8 @@ package com.app.newspaperss.ui
 import com.app.newspaperss.testutil.TestDataStores
 import com.app.newspaperss.testutil.idleUntil
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -69,6 +71,13 @@ class SourcesScreenTest {
 
     private fun waitFor(text: String, present: Boolean = true) = idleUntil {
         compose.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() == present
+    }
+
+    @Test
+    fun addASourceIsAnnouncedByItsLabel() {
+        // What TalkBack reads: the merged node it focuses must carry the label and the click.
+        val label = hasText("Add a source") or hasContentDescription("Add a source")
+        compose.onNode(label and hasClickAction()).assertIsDisplayed()
     }
 
     private fun addSource(input: String) {
