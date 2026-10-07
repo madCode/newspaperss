@@ -66,7 +66,13 @@ class PodcastSettingsTest {
     private val started = mutableListOf<Boolean>()
     private var stopped = 0
 
-    @After fun stopStore() = runBlocking { storeScope.coroutineContext[Job]!!.cancelAndJoin() }
+    @After fun stopStore() {
+        // DataStore runs an update's transform in the caller's context, the screen's main thread: let
+        // one the last tap started finish, or the store waits on a main thread waiting on it.
+        compose.waitForIdle()
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        runBlocking { storeScope.coroutineContext[Job]!!.cancelAndJoin() }
+    }
 
     private fun show(supported: Boolean = true): SettingsViewModel {
         installVoice(context)
