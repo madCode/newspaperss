@@ -18,16 +18,19 @@ import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
-import com.app.newspaperss.core.listen.KokoroFile
-import com.app.newspaperss.listen.KokoroInstall
 import com.app.newspaperss.listen.PodcastEngine
 import com.app.newspaperss.listen.PodcastSetup
+import com.app.newspaperss.listen.PodcastStore
+import com.app.newspaperss.listen.Podcasts
 import com.app.newspaperss.settings.ListenVoice
 import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.TestApp
+import com.app.newspaperss.testutil.finishDownload
 import com.app.newspaperss.testutil.idleUntil
 import com.app.newspaperss.testutil.installVoice
+import com.app.newspaperss.testutil.kokoroInstall
+import com.app.newspaperss.testutil.runningWork
 import com.app.newspaperss.ui.settings.SettingsPage
 import com.app.newspaperss.ui.settings.SettingsPageScreen
 import com.app.newspaperss.ui.settings.SettingsViewModel
@@ -61,7 +64,7 @@ class PodcastSettingsTest {
     // Cancelled before TemporaryFolder deletes the file, as in SettingsScreenTest.
     private val storeScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val store by lazy { SettingsStore(PreferenceDataStoreFactory.create(scope = storeScope) { tmp.newFile("s.preferences_pb") }) }
-    private val install by lazy { KokoroInstall(tmp.newFolder("kokoro")) { listOf(KokoroFile("tokens.txt", 6, "ce013625030ba8dba906f756967f9e9ca394464a")) } }
+    private val install by lazy { kokoroInstall(tmp.newFolder("kokoro"), installed = false) }
     private val work = MutableStateFlow<WorkInfo?>(null)
     private val started = mutableListOf<Boolean>()
     private var stopped = 0
@@ -81,7 +84,7 @@ class PodcastSettingsTest {
         setup = PodcastSetup(
             install, store, work, start = { started += it }, stop = { stopped++ }, supported = supported,
             engine = { error("not in these tests") },
-            podcasts = com.app.newspaperss.listen.Podcasts(com.app.newspaperss.listen.PodcastStore(java.io.File(context.filesDir, "podcasts")), store, install) {},
+            podcasts = Podcasts(PodcastStore(java.io.File(context.filesDir, "podcasts")), store, install) {},
         )
         val vm = SettingsViewModel(store, podcast = setup) {}
         compose.setContent { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
@@ -96,11 +99,8 @@ class PodcastSettingsTest {
     private fun on(type: Int) = shadowOf(context.getSystemService(ConnectivityManager::class.java))
         .setActiveNetworkInfo(ShadowNetworkInfo.newInstance(NetworkInfo.DetailedState.CONNECTED, type, 0, true, NetworkInfo.State.CONNECTED))
 
-    private fun running(vararg progress: Pair<String, Any>) = WorkInfo(UUID.randomUUID(), WorkInfo.State.RUNNING, emptySet(), progress = workDataOf(*progress))
-
     private fun ready(pace: Float) {
-        install.file("tokens.txt").writeText("hello\n")
-        install.markVerified("tokens.txt")
+        install.finishDownload()
         runBlocking { store.update { it.copy(podcastPace = pace) } }
     }
 
@@ -133,7 +133,7 @@ class PodcastSettingsTest {
         show()
         pickPodcast()
         assertEquals(listOf(false), started)
-        work.value = running(PodcastSetup.GOT to 154_000_000L, PodcastSetup.TOTAL to 384_077_374L)
+        work.value = runningWork(PodcastSetup.GOT to 154_000_000L, PodcastSetup.TOTAL to 384_077_374L)
         waitFor("154 of 384 MB")
         compose.onNodeWithText("Make a podcast in a natural voice").assertIsSelected()
         compose.onNodeWithText("Cancel").performClick()
@@ -144,7 +144,7 @@ class PodcastSettingsTest {
     fun afterTheCheckItSaysWhatYourPaperCostsAndCanBeUsed() {
         on(ConnectivityManager.TYPE_WIFI)
         val vm = show()
-        work.value = running(PodcastSetup.PHASE to PodcastSetup.PHASE_CHECK)
+        work.value = runningWork(PodcastSetup.PHASE to PodcastSetup.PHASE_CHECK)
         waitFor("Seeing how fast this phone is")
         // A Pixel 8: 0.8× cool, so 1.2 warm.
         ready(1.2f)
@@ -200,7 +200,7 @@ class PodcastSettingsTest {
     fun choosingToReadLiveDuringTheDownloadStopsIt() {
         on(ConnectivityManager.TYPE_WIFI)
         show()
-        work.value = running(PodcastSetup.GOT to 1_000_000L, PodcastSetup.TOTAL to 384_077_374L)
+        work.value = runningWork(PodcastSetup.GOT to 1_000_000L, PodcastSetup.TOTAL to 384_077_374L)
         waitFor("1 of 384 MB")
         compose.onNodeWithText("Read live in this phone's voice").performClick()
         assertEquals(1, stopped)

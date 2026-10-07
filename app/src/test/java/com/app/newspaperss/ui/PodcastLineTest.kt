@@ -5,8 +5,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.app.newspaperss.core.listen.KokoroFile
-import com.app.newspaperss.listen.KokoroInstall
 import com.app.newspaperss.listen.PodcastStore
 import com.app.newspaperss.listen.Podcasts
 import com.app.newspaperss.settings.ListenVoice
@@ -14,6 +12,7 @@ import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.SettingsStore
 import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.idleUntil
+import com.app.newspaperss.testutil.kokoroInstall
 import com.app.newspaperss.ui.listen.PodcastLine
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -33,12 +32,7 @@ class PodcastLineTest {
 
     private val settings by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
     private val store by lazy { PodcastStore(tmp.newFolder("podcasts")) }
-    private val install by lazy {
-        KokoroInstall(tmp.newFolder("kokoro")) { listOf(KokoroFile("tokens.txt", 6, "ce013625030ba8dba906f756967f9e9ca394464a")) }.also {
-            it.file("tokens.txt").writeText("hello\n")
-            it.markVerified("tokens.txt")
-        }
-    }
+    private val install by lazy { kokoroInstall(tmp.newFolder("kokoro")) }
     /** How many times making podcasts was started. */
     @Volatile private var started = 0
     private val podcasts by lazy { Podcasts(store, settings, install) { started++ } }

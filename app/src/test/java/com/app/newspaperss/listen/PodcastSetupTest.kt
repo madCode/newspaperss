@@ -5,10 +5,12 @@ import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
-import com.app.newspaperss.core.listen.KokoroFile
 import com.app.newspaperss.settings.ListenVoice
 import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.SettingsStore
+import com.app.newspaperss.testutil.finishDownload
+import com.app.newspaperss.testutil.kokoroInstall
+import com.app.newspaperss.testutil.runningWork
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -25,8 +27,7 @@ class PodcastSetupTest {
     @get:Rule val tmp = TemporaryFolder()
 
     private val store by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("s.preferences_pb") }) }
-    private val file = KokoroFile("tokens.txt", 6, "ce013625030ba8dba906f756967f9e9ca394464a")
-    private val install by lazy { KokoroInstall(tmp.newFolder("kokoro")) { listOf(file) } }
+    private val install by lazy { kokoroInstall(tmp.newFolder("kokoro"), installed = false) }
     private val work = MutableStateFlow<WorkInfo?>(null)
     private val started = mutableListOf<Boolean>()
     private var stopped = 0
@@ -60,17 +61,13 @@ class PodcastSetupTest {
         now = { clock },
     )
 
-    private fun info(state: WorkInfo.State, progress: Map<String, Any> = emptyMap(), output: Map<String, Any> = emptyMap(), network: NetworkType = NetworkType.UNMETERED) = WorkInfo(
+    private fun info(state: WorkInfo.State, output: Map<String, Any> = emptyMap(), network: NetworkType = NetworkType.UNMETERED) = WorkInfo(
         UUID.randomUUID(), state, emptySet(),
         outputData = workDataOf(*output.toList().toTypedArray()),
-        progress = workDataOf(*progress.toList().toTypedArray()),
         constraints = Constraints.Builder().setRequiredNetworkType(network).build(),
     )
 
-    private fun installed() {
-        install.file("tokens.txt").writeText("hello\n")
-        install.markVerified("tokens.txt")
-    }
+    private fun installed() = install.finishDownload()
 
     @Test
     fun aThirtyTwoBitPhoneCantHaveIt() = runTest {
@@ -91,9 +88,9 @@ class PodcastSetupTest {
         setup.failed()
         work.value = WorkInfo(UUID.randomUUID(), WorkInfo.State.ENQUEUED, emptySet(), runAttemptCount = 3)
         assertEquals(true, (setup.state.first() as KokoroState.Waiting).retrying)
-        work.value = info(WorkInfo.State.RUNNING, progress = mapOf(PodcastSetup.GOT to 154_000_000L, PodcastSetup.TOTAL to 384_000_000L))
+        work.value = runningWork(PodcastSetup.GOT to 154_000_000L, PodcastSetup.TOTAL to 384_000_000L)
         assertEquals(KokoroState.Downloading(154_000_000L, 384_000_000L), setup.state.first())
-        work.value = info(WorkInfo.State.RUNNING, progress = mapOf(PodcastSetup.PHASE to PodcastSetup.PHASE_CHECK))
+        work.value = runningWork(PodcastSetup.PHASE to PodcastSetup.PHASE_CHECK)
         assertEquals(KokoroState.Checking, setup.state.first())
         work.value = info(WorkInfo.State.FAILED, output = mapOf(PodcastSetup.ERROR to "Couldn't download Kokoro."))
         assertEquals(KokoroState.Failed("Couldn't download Kokoro."), setup.state.first())
@@ -231,7 +228,7 @@ class PodcastSetupTest {
     @Test
     fun kokoroOnThePhoneOrOnItsWayIsLeftAlone() = runTest {
         store.update { it.copy(listenVoice = ListenVoice.PODCAST, podcastPace = 1.2f) }
-        work.value = info(WorkInfo.State.RUNNING)
+        work.value = runningWork()
         setup().settle()
         assertEquals(ListenVoice.PODCAST, store.current().listenVoice)
 
