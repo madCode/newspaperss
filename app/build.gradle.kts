@@ -18,6 +18,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -64,7 +65,13 @@ android {
 
     // Room's exported schemas, for MigrationTestHelper. Robolectric reads the variant's assets, not
     // test-only ones, so they ride in the debug build (a few KB), never in release.
-    sourceSets { getByName("debug").assets.srcDir("$projectDir/schemas") }
+    sourceSets {
+        getByName("debug").assets.srcDir("$projectDir/schemas")
+        // Helpers both kinds of test need. Robolectric and a real device run the same ones, so a
+        // device test doesn't start by copying them.
+        getByName("test").kotlin.srcDir("src/sharedTest/java")
+        getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
+    }
 
     testOptions {
         unitTests {
@@ -136,6 +143,12 @@ dependencies {
     testImplementation(libs.compose.ui.test.junit4)
     // Compose UI test pulls an older Espresso that crashes on API 37.
     testImplementation(libs.espresso.core)
+
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.espresso.core)
 }
 
 // Debug builds only: CI's run number, so each build from CI installs over the one before it.

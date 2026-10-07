@@ -1,0 +1,60 @@
+# The tests a JVM can't answer. Robolectric's WebView is a shadow that never draws, its SQLite
+# isn't the phone's, and native code isn't there at all -- so a green unit suite says nothing
+# about those. Slower than the unit job (an emulator has to boot), so it runs on its own.
+name: Device tests
+
+on:
+  pull_request:
+    paths:
+      - 'app/src/androidTest/**'
+      - 'app/src/sharedTest/**'
+      - 'app/src/main/java/com/app/newspaperss/ui/**'
+      - 'core/src/main/kotlin/**/epub/**'
+      - 'app/build.gradle.kts'
+      - '.github/workflows/device-tests.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  device:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          java-version: '21'
+          distribution: temurin
+
+      # KVM is off by default on the runner, and the emulator is unusably slow without it.
+      - name: Let the runner use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the device tests
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          # 36, not 37: Google hasn't published a 37 system image yet.
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          # The animations a test would otherwise wait on, and a window that never shows.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: ./gradlew :app:connectedDebugAndroidTest
+
+      - name: Keep the report when it fails
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: device-test-report
+          path: app/build/reports/androidTests/
