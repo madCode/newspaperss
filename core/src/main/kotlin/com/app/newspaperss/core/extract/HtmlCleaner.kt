@@ -542,7 +542,7 @@ object HtmlCleaner {
             if (!el.isAttached()) continue
             val attrs = runCatching { Json.parseToJsonElement(el.attr("data-attrs")) as? JsonObject }.getOrNull() ?: continue
             if ((attrs["type"] as? JsonPrimitive)?.contentOrNull == "user" && el.childrenSize() == 0 && el.text().isBlank()) {
-                (attrs["name"] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }?.let { el.text(it) }
+                (attrs["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.takeIf { it.isNotEmpty() }?.let { el.text(it) }
                 continue
             }
             val comment = attrs["comment"] as? JsonObject ?: continue
