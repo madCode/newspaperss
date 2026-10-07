@@ -50,6 +50,9 @@ class ArticleExtractorTest {
         }
         // A tracking tag names nothing on the page.
         assertFalse(ArticleExtractor(http).extract(ExtractInput("$day#ref=rss", "", "<p>$short</p>", null)).usedFeedContent)
+        // An excerpt ending in "Read more" is never the whole entry.
+        val excerpt = "<p>$short <a href=\"$day#a2\">Read more</a></p>"
+        assertFalse(ArticleExtractor(http).extract(ExtractInput("$day#a2", "", excerpt, null)).usedFeedContent)
         // A reading list's teaser isn't on the page it points into: the page is the article.
         assertFalse(ArticleExtractor(http).extract(ExtractInput("$day#a1", "", "<p>An essay on libraries, and budgets.</p>", null)).usedFeedContent)
     }

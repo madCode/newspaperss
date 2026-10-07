@@ -291,13 +291,15 @@ class ArticleExtractor(private val http: HttpClient) {
     }
 
     /**
-     * The address names a spot on the page and all of the feed's text is there: the item is that
-     * entry, not a teaser for something else.
+     * The address names a spot on the page and the feed's text is there, start and end: the item is
+     * that entry, not a teaser for something else. Ends, not the whole text: a site sending a long
+     * near-match of a huge page would make a full search take minutes.
      */
     private fun onThePage(feed: CleanResult, page: PageResult.Fetched): Boolean {
         val pageText = page.anchoredText ?: return false
+        if (feed.teaser) return false
         val feedText = normalized(Jsoup.parse(feed.html).text())
-        return feedText.isNotEmpty() && feedText in pageText
+        return feedText.isNotEmpty() && feedText.take(ARTICLE_TEXT_PROBE) in pageText && feedText.takeLast(ARTICLE_TEXT_PROBE) in pageText
     }
 
     private fun normalized(text: String) = text.lowercase().replace(NOT_LETTERS, "")
