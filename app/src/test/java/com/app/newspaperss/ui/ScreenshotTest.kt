@@ -949,7 +949,7 @@ class ScreenshotTest {
         runBlocking { store.update { it.copy(podcastPace = pace, listenVoice = if (inUse) com.app.newspaperss.settings.ListenVoice.PODCAST else com.app.newspaperss.settings.ListenVoice.PHONE) } }
         val setup = com.app.newspaperss.listen.PodcastSetup(
             install, store, flowOf(work), start = {}, stop = {}, supported = true, engine = { error("not shot") },
-            podcasts = com.app.newspaperss.listen.PodcastStore(tmp.newFolder()), makePodcasts = {},
+            podcasts = com.app.newspaperss.listen.Podcasts(com.app.newspaperss.listen.PodcastStore(tmp.newFolder()), store, install) {},
         )
         return SettingsViewModel(store, podcast = setup) {}
     }
@@ -979,7 +979,7 @@ class ScreenshotTest {
         val install = com.app.newspaperss.listen.KokoroInstall(tmp.newFolder()) {
             listOf(com.app.newspaperss.core.listen.KokoroFile("tokens.txt", 384_077_374L, "0".repeat(40)))
         }
-        val setup = com.app.newspaperss.listen.PodcastSetup(install, store, checked, start = {}, stop = {}, supported = true, engine = { error("not shot") }, podcasts = com.app.newspaperss.listen.PodcastStore(tmp.newFolder()), makePodcasts = {})
+        val setup = com.app.newspaperss.listen.PodcastSetup(install, store, checked, start = {}, stop = {}, supported = true, engine = { error("not shot") }, podcasts = com.app.newspaperss.listen.Podcasts(com.app.newspaperss.listen.PodcastStore(tmp.newFolder()), store, install) {})
         val vm = SettingsViewModel(store, podcast = setup) {}
         shoot("07r-settings-podcast-checked", ready = { vm.kokoro.value is com.app.newspaperss.listen.KokoroState.Checking }, act = {
             install.file("tokens.txt").writeText("a b c\n")

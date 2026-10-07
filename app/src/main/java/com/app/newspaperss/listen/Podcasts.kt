@@ -269,19 +269,7 @@ class PodcastMaker(
     /** Seconds of audio in a piece: kept that often, so a stop loses at most that much work. */
     private val pieceSeconds: Double = PIECE_SECONDS,
     private val now: () -> Long = System::nanoTime,
-    private val start: () -> Unit,
 ) {
-    /**
-     * Asks for [editionId]'s podcast if Kokoro is in use, and starts making it once the phone
-     * charges. The voice is the one chosen now: a podcast keeps the voice it started in.
-     */
-    suspend fun request(editionId: Long) {
-        val s = settings.current()
-        if (s.listenVoice != ListenVoice.PODCAST || !withContext(Dispatchers.IO) { install.complete }) return
-        withContext(Dispatchers.IO) { store.want(editionId, s.podcastVoice) }
-        start()
-    }
-
     /** Makes every podcast asked for, until they're all finished, Kokoro is turned off, or it's stopped. */
     suspend fun makeAll() = withContext(Dispatchers.Default) {
         // A run stopped mid-sentence goes on in native code until the sentence ends; a new run waits
@@ -498,13 +486,13 @@ data class PodcastProgress(
     val makingOther: Boolean,
 )
 
-/** What the edition page shows of an edition's podcast, and asking for one. */
+/** Podcasts as the rest of the app sees them: what's made of each, and asking for one. */
 class Podcasts(
     private val store: PodcastStore,
     private val settings: SettingsStore,
     private val install: KokoroInstall,
-    /** [PodcastMaker.request]. */
-    private val request: suspend (editionId: Long) -> Unit,
+    /** Starts [PodcastMaker] once the phone charges. */
+    private val start: () -> Unit,
 ) {
     /** [editionId]'s podcast, with [articles] articles; null while Kokoro isn't in use. */
     fun observe(editionId: Long, articles: Int): Flow<PodcastProgress?> = combine(store.changes, store.making, settings.settings) { _, making, s ->
@@ -522,6 +510,21 @@ class Podcasts(
         )
     }.flowOn(Dispatchers.IO)
 
-    /** Asks for [editionId]'s podcast, made once the phone charges: for an edition made by hand. */
-    suspend fun make(editionId: Long) = request(editionId)
+    /**
+     * Asks for [editionId]'s podcast if Kokoro is in use, and starts making it once the phone
+     * charges. The voice is the one chosen now: a podcast keeps the voice it started in.
+     */
+    suspend fun request(editionId: Long) {
+        val s = settings.current()
+        if (s.listenVoice != ListenVoice.PODCAST || !withContext(Dispatchers.IO) { install.complete }) return
+        withContext(Dispatchers.IO) { store.want(editionId, s.podcastVoice) }
+        start()
+    }
+
+    /** Starts making the podcasts asked for and not yet finished, if there are any. */
+    suspend fun resume() {
+        if (withContext(Dispatchers.IO) { store.waiting().isNotEmpty() }) start()
+    }
+
+    fun deleteAll() = store.deleteAll()
 }

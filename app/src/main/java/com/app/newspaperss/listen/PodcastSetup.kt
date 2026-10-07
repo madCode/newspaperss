@@ -55,8 +55,7 @@ class PodcastSetup(
     private val stop: () -> Unit,
     private val supported: Boolean,
     private val engine: (PodcastVoice) -> PodcastEngine,
-    private val podcasts: PodcastStore,
-    private val makePodcasts: () -> Unit,
+    private val podcasts: Podcasts,
     private val now: () -> Long = System::nanoTime,
 ) {
     /** The download's size; reads the manifest, so not on the main thread. */
@@ -127,7 +126,7 @@ class PodcastSetup(
     /** Kokoro reads from now on; podcasts asked for before it was turned off carry on being made. */
     suspend fun use() {
         settings.update { it.copy(listenVoice = ListenVoice.PODCAST) }
-        if (withContext(Dispatchers.IO) { podcasts.waiting().isNotEmpty() }) makePodcasts()
+        podcasts.resume()
     }
 
     /**

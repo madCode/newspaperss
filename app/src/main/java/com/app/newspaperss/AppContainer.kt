@@ -86,7 +86,7 @@ class AppContainer(
     speaker: () -> Speaker = { SystemSpeaker(context) },
     podcastAudio: () -> PodcastAudio = { MediaPlayerAudio() },
     private val connectListening: () -> Unit = { ListenService.connect(context) },
-    val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
+    private val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
     podcastEngine: (KokoroInstall, PodcastVoice) -> PodcastEngine = ::KokoroEngine,
     kokoroSupported: Boolean = KokoroInstall.supported,
     private val makePodcasts: () -> Unit = { PodcastWorker.enqueue(context) },
@@ -110,7 +110,7 @@ class AppContainer(
         // Only if Listen has started: it isn't made just to be told.
         onFileGone = { id ->
             if (listenMade.isInitialized()) appScope.launch { listen.forget(id) }
-            appScope.launch(Dispatchers.IO) { podcasts.delete(id) }
+            appScope.launch(Dispatchers.IO) { podcastStore.delete(id) }
         },
     )
     val feedFinder = FeedFinder(http)
@@ -128,7 +128,7 @@ class AppContainer(
     private val folderDelivery = FolderDelivery(context.contentResolver)
     val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier,
         // Scheduled editions only: one made by hand gets its podcast when asked.
-        onBuilt = { id, scheduled -> if (scheduled) podcastMaker.request(id) },
+        onBuilt = { id, scheduled -> if (scheduled) podcasts.request(id) },
     )
     val notesSaver = NotesSaver(settings, editions, editionNotes, folderDelivery, notifier)
 
@@ -138,7 +138,7 @@ class AppContainer(
 
     /** Listen's voice: a made podcast where there is one, the phone's elsewhere. */
     private val listenSpeaker by lazy {
-        PodcastSpeaker(speaker(), podcasts, podcastAudio()) {
+        PodcastSpeaker(speaker(), podcastStore, podcastAudio()) {
             // Just after the app starts, before the store's first value: read it, or a made
             // article would play in the phone's voice.
             (listenSettings.value ?: runCatching { runBlocking { settings.current() } }.getOrNull())?.listenVoice == ListenVoice.PODCAST
@@ -160,7 +160,7 @@ class AppContainer(
     }
     val listen: ListenPlayer by listenMade
     val listening: Listening by lazy {
-        Listening(listen, listenProgress, editions, Podcasts(podcasts, settings, kokoroInstall) { podcastMaker.request(it) }) { connectListening() }
+        Listening(listen, listenProgress, editions, podcasts) { connectListening() }
     }
 
     /** Getting the podcast's voice onto the phone. */
@@ -172,13 +172,13 @@ class AppContainer(
             supported = kokoroSupported,
             engine = { podcastEngine(kokoroInstall, it) },
             podcasts = podcasts,
-            makePodcasts = makePodcasts,
         )
     }
 
-    val podcasts = PodcastStore(File(context.filesDir, "podcasts"))
+    private val podcastStore = PodcastStore(File(context.filesDir, "podcasts"))
+    private val podcasts = Podcasts(podcastStore, settings, kokoroInstall, start = makePodcasts)
     val podcastMaker: PodcastMaker by lazy {
-        PodcastMaker(editions, podcasts, kokoroInstall, settings, { podcastEngine(kokoroInstall, it) }, audioEncoder, start = makePodcasts)
+        PodcastMaker(editions, podcastStore, kokoroInstall, settings, { podcastEngine(kokoroInstall, it) }, audioEncoder)
     }
 
     // Its own client: the shared one's cache would try to keep a 325 MB model.

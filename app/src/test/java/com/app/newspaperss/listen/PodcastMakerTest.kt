@@ -103,7 +103,8 @@ class PodcastMakerTest {
 
     private var started = 0
     private var pieceSeconds = PodcastMaker.PIECE_SECONDS
-    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds, now = { clock }) { started++ } }
+    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds, now = { clock }) }
+    private val podcasts by lazy { Podcasts(store, settings, install) { started++ } }
 
     private val knots = EditionArticle(
         title = "Counting Knots", sourceTitle = "Quanta", url = "https://example.com/knots",
@@ -130,7 +131,7 @@ class PodcastMakerTest {
         settings.update { it.copy(listenVoice = ListenVoice.PODCAST, podcastVoice = voice, podcastPace = 1.2f) }
     }
 
-    private fun request(id: Long) = runBlocking { maker.request(id) }
+    private fun request(id: Long) = runBlocking { podcasts.request(id) }
 
     private fun make() = runBlocking { maker.makeAll() }
 

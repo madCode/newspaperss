@@ -50,7 +50,7 @@ fun PodcastLine(podcasts: Podcasts, editionId: Long, minutes: List<Double>, modi
                 scope.launch {
                     // Asked for and its work started together, even if the page is left meanwhile;
                     // a full disk mustn't take the app down.
-                    runCatching { withContext(NonCancellable) { podcasts.make(editionId) } }
+                    runCatching { withContext(NonCancellable) { podcasts.request(editionId) } }
                 }
             }) { Text("Make the podcast · $making while charging") }
             return@Column

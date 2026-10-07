@@ -32,8 +32,9 @@ class PodcastSetupTest {
     private var stopped = 0
     private var clock = 0L
     private var voiceUsed: PodcastVoice? = null
-    private val podcasts by lazy { PodcastStore(tmp.newFolder("podcasts")) }
+    private val podcastStore by lazy { PodcastStore(tmp.newFolder("podcasts")) }
     private var making = 0
+    private val podcasts by lazy { Podcasts(podcastStore, store, install) { making++ } }
 
     /** A Kokoro that takes 18 s of the fake clock to make 15 s of speech: 1.2× cool. */
     private val engine = object : PodcastEngine {
@@ -56,7 +57,6 @@ class PodcastSetupTest {
         supported = supported,
         engine = { voiceUsed = it; engine },
         podcasts = podcasts,
-        makePodcasts = { making++ },
         now = { clock },
     )
 
@@ -196,13 +196,13 @@ class PodcastSetupTest {
         assertEquals(ListenVoice.PODCAST, store.current().listenVoice)
         // Nothing asked for yet: nothing to make.
         assertEquals(0, making)
-        podcasts.want(7, PodcastVoice.HEART)
+        podcastStore.want(7, PodcastVoice.HEART)
         setup.remove()
         assertEquals(1, stopped)
         assertFalse(install.dir.exists())
         // The podcasts go with the voice that made them.
-        assertTrue(podcasts.waiting().isEmpty())
-        assertNull(podcasts.voice(7))
+        assertTrue(podcastStore.waiting().isEmpty())
+        assertNull(podcastStore.voice(7))
         assertEquals(ListenVoice.PHONE, store.current().listenVoice)
         assertNull(store.current().podcastPace)
         assertEquals(KokoroState.Absent, setup.state.first())
@@ -212,7 +212,7 @@ class PodcastSetupTest {
     fun turningKokoroBackOnCarriesOnWithPodcastsAskedForBefore() = runTest {
         installed()
         store.update { it.copy(podcastPace = 1.2f) }
-        podcasts.want(7, PodcastVoice.HEART)
+        podcastStore.want(7, PodcastVoice.HEART)
         setup().use()
         assertEquals(1, making)
     }
