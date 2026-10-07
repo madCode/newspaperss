@@ -90,6 +90,7 @@ import com.app.newspaperss.ui.sources.NotInPaperScreen
 import com.app.newspaperss.ui.theme.NewspaperssTheme
 import com.app.newspaperss.ui.today.TodayScreen
 import com.app.newspaperss.ui.today.TodayViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import com.app.newspaperss.data.TtrssSubscriptions
@@ -876,6 +877,60 @@ class ScreenshotTest {
         runBlocking { store.update { it.copy(listenSpeed = 1.2f) } }
         val vm = SettingsViewModel(store) {}
         shoot("07o-settings-listening", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
+    }
+
+    /** Settings › Listening with the podcast offered, its work in [work] and Kokoro's files in place if [pace]. */
+    private fun podcastSettings(work: androidx.work.WorkInfo?, pace: Float? = null, inUse: Boolean = false): SettingsViewModel {
+        installVoice(ApplicationProvider.getApplicationContext())
+        val install = com.app.newspaperss.listen.KokoroInstall(tmp.newFolder()) {
+            listOf(com.app.newspaperss.core.listen.KokoroFile("tokens.txt", 384_077_374L, "0".repeat(40)))
+        }
+        if (pace != null) { install.file("tokens.txt").writeText("a b c\n"); install.markVerified("tokens.txt") }
+        runBlocking { store.update { it.copy(podcastPace = pace, listenVoice = if (inUse) com.app.newspaperss.settings.ListenVoice.PODCAST else com.app.newspaperss.settings.ListenVoice.PHONE) } }
+        val setup = com.app.newspaperss.listen.PodcastSetup(
+            install, store, flowOf(work), start = {}, stop = {}, supported = true, engine = { error("not shot") },
+        )
+        return SettingsViewModel(store, podcast = setup) {}
+    }
+
+    private fun running(vararg progress: Pair<String, Any>) =
+        androidx.work.WorkInfo(java.util.UUID.randomUUID(), androidx.work.WorkInfo.State.RUNNING, emptySet(), progress = androidx.work.workDataOf(*progress))
+
+    @Test
+    fun settingsListeningWithThePodcast() {
+        val vm = podcastSettings(null)
+        shoot("07p-settings-podcast-offered", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
+    }
+
+    @Test
+    fun settingsPodcastDownloading() {
+        val vm = podcastSettings(running(com.app.newspaperss.listen.PodcastSetup.GOT to 154_000_000L, com.app.newspaperss.listen.PodcastSetup.TOTAL to 384_077_374L))
+        shoot("07q-settings-podcast-downloading", ready = { vm.kokoro.value is com.app.newspaperss.listen.KokoroState.Downloading }) { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
+    }
+
+    /** The check just finished on a Pixel 8 (0.8× cool): the verdict, before it's used. */
+    @Test
+    fun settingsPodcastChecked() {
+        val checked = MutableStateFlow<androidx.work.WorkInfo?>(running(com.app.newspaperss.listen.PodcastSetup.PHASE to com.app.newspaperss.listen.PodcastSetup.PHASE_CHECK))
+        installVoice(ApplicationProvider.getApplicationContext())
+        val install = com.app.newspaperss.listen.KokoroInstall(tmp.newFolder()) {
+            listOf(com.app.newspaperss.core.listen.KokoroFile("tokens.txt", 384_077_374L, "0".repeat(40)))
+        }
+        val setup = com.app.newspaperss.listen.PodcastSetup(install, store, checked, start = {}, stop = {}, supported = true, engine = { error("not shot") })
+        val vm = SettingsViewModel(store, podcast = setup) {}
+        shoot("07r-settings-podcast-checked", ready = { vm.kokoro.value is com.app.newspaperss.listen.KokoroState.Checking }, act = {
+            install.file("tokens.txt").writeText("a b c\n")
+            install.markVerified("tokens.txt")
+            runBlocking { store.update { it.copy(podcastPace = 1.2f) } }
+            checked.value = null
+            idleUntil { compose.waitForIdle(); vm.kokoro.value is com.app.newspaperss.listen.KokoroState.Ready }
+        }) { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
+    }
+
+    @Test
+    fun settingsPodcastInUse() {
+        val vm = podcastSettings(null, pace = 1.2f, inUse = true)
+        shoot("07s-settings-podcast-in-use", ready = { vm.kokoro.value is com.app.newspaperss.listen.KokoroState.Ready }) { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }
     }
 
     /** Settings › Where your feeds live, signed in to a tt-rss account. */

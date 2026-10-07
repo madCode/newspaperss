@@ -1,6 +1,10 @@
 # Draft of metadata/com.app.newspaperss.yml for a merge request to
 # https://gitlab.com/fdroid/fdroiddata (see docs/RELEASING.md). Not read by
 # anything in this repository.
+# As SherpaTTS, the other sherpa-onnx app on F-Droid: the podcast's voice comes from Hugging Face.
+AntiFeatures:
+  NonFreeNet:
+    en-US: Downloads the podcast voice (Kokoro) from Hugging Face
 Categories:
   - Reading
 License: MIT

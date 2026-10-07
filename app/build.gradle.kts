@@ -79,6 +79,10 @@ android {
 
     packaging {
         resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1", "META-INF/LICENSE*", "META-INF/NOTICE*")
+        // Kokoro needs a 64-bit phone, so its ~20 MB of 32-bit native code would never run.
+        jniLibs.excludes += listOf("armeabi-v7a", "x86").flatMap { abi ->
+            listOf("libonnxruntime.so", "libsherpa-onnx-c-api.so", "libsherpa-onnx-cxx-api.so", "libsherpa-onnx-jni.so").map { "lib/$abi/$it" }
+        }
     }
 
     // F-Droid rejects the encrypted dependency blob Google Play wants.
@@ -114,6 +118,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.coroutines.android)
     implementation(libs.okhttp)
+    implementation(libs.sherpa.onnx) { artifact { type = "aar" } }
     implementation(libs.jsoup)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

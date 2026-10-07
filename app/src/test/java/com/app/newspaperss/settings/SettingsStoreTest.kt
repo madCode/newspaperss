@@ -39,6 +39,9 @@ class SettingsStoreTest {
                 mailApp = "com.example.mail",
                 feedsFrom = FeedsFrom.SERVER,
                 listenSpeed = 1.5f,
+                listenVoice = ListenVoice.PODCAST,
+                podcastVoice = PodcastVoice.GEORGE,
+                podcastPace = 1.8f,
             )
         }
         val s = store.current()
@@ -59,6 +62,9 @@ class SettingsStoreTest {
         assertEquals("com.example.mail", s.mailApp)
         assertEquals(FeedsFrom.SERVER, s.feedsFrom)
         assertEquals(1.5f, s.listenSpeed)
+        assertEquals(ListenVoice.PODCAST, s.listenVoice)
+        assertEquals(PodcastVoice.GEORGE, s.podcastVoice)
+        assertEquals(1.8f, s.podcastPace)
     }
 
     @Test

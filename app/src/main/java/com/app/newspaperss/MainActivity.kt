@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import com.app.newspaperss.ui.listen.ListenScreen
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -309,7 +310,12 @@ private fun App(
 private fun settingsViewModel(container: AppContainer): SettingsViewModel {
     val context = LocalContext.current.applicationContext
     return viewModel {
-        SettingsViewModel(container.settings, container.ttrss.observeStatus(), hear = { text, speed -> container.listen.sample(text, speed) }) {
+        SettingsViewModel(
+            container.settings, container.ttrss.observeStatus(),
+            hear = { text, speed -> container.listen.sample(text, speed) },
+            // Debug builds only until podcasts are made and played: in a release, picking it would do nothing.
+            podcast = container.podcastSetup.takeIf { context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 },
+        ) {
             container.appScope.launch { EditionScheduler.reschedule(context, it) }
         }
     }
