@@ -113,7 +113,7 @@ fun ListenScreen(
     onBack: () -> Unit,
     podcastVoice: StateFlow<PodcastVoice?> = MutableStateFlow(null),
     instead: StateFlow<PodcastSpeaker.Instead?> = MutableStateFlow(null),
-    /** Settings › Article text size, so the article reads at the size it does in the preview. */
+    /** Settings › Article text size: the article scaled by the same share as the preview's text. */
     textSize: PreviewTextSize = PreviewTextSize.DEFAULT,
 ) {
     val state by player.state.collectAsStateWithLifecycle()
@@ -179,7 +179,8 @@ private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer,
     // Jumps, not animated scrolls: animation smears on e-ink.
     // Keyed on the voice's note too, which comes and goes with play and pause and moves every row;
     // not on an error's, which would scroll the reason out of sight.
-    LaunchedEffect(line, following, script, voiceNote != null) {
+    // And on the size: one that changes reflows every block and moves the sentence.
+    LaunchedEffect(line, following, script, voiceNote != null, textSize) {
         if (!following || line == null) return@LaunchedEffect
         list.scrollToItem(notes + line.block)
         // A long paragraph: down to the sentence, a little below the top.
