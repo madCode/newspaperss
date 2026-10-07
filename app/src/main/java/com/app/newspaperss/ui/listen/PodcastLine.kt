@@ -58,20 +58,28 @@ fun PodcastLine(podcasts: Podcasts, editionId: Long, minutes: List<Double>, modi
         // The text says the same: TalkBack reads that, not the bar.
         Row(Modifier.fillMaxWidth().height(6.dp).clearAndSetSemantics {}, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             heard.forEachIndexed { i, weight ->
-                val color = if (p.made.getOrElse(i) { false }) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                Box(Modifier.weight(weight.toFloat().coerceAtLeast(0.1f)).height(6.dp).background(color, MaterialTheme.shapes.extraSmall))
+                // An article being made fills as its pieces are kept, every couple of minutes of audio.
+                val share = p.share.getOrElse(i) { 0.0 }.toFloat()
+                Box(Modifier.weight(weight.toFloat().coerceAtLeast(0.1f)).height(6.dp).background(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.extraSmall)) {
+                    if (share > 0f) Box(Modifier.fillMaxWidth(share).height(6.dp).background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.extraSmall))
+                }
             }
         }
-        val made = heard.filterIndexed { i, _ -> p.made.getOrElse(i) { false } }.sum()
+        val made = heard.indices.sumOf { heard[it] * p.share.getOrElse(it) { 0.0 } }
         val anyMade = p.made.any { it }
         val leftOut = p.leftOut.any { it }
+        val total = ReadingTime.format(heard.sum())
+        // Rounded to whole minutes, nearly done would read as all of it.
+        val sofar = if (ReadingTime.format(made) == total) "Almost all of $total made." else "${ReadingTime.format(made)} of $total made."
+        val rest = if (leftOut) "The rest plays in your phone's voice until it's made, and articles it left out always do." else "The rest plays in your phone's voice until it's made."
         val text = when {
             p.made.all { it } -> "The podcast is ready."
             p.finished && !anyMade -> "The podcast couldn't make any of this edition, so it plays in your phone's voice."
             p.finished -> "The podcast is ready. Articles it left out, not in English or that it couldn't say, play in your phone's voice."
-            !anyMade -> "The podcast is made while the phone charges. Until then, Listen uses your phone's voice."
-            else -> "${ReadingTime.format(made)} of ${ReadingTime.format(heard.sum())} made, while the phone charges. " +
-                if (leftOut) "The rest plays in your phone's voice until it's made, and articles it left out always do." else "The rest plays in your phone's voice until it's made."
+            p.makingNow -> "Making the podcast now. $sofar $rest"
+            p.makingOther -> "Waiting while another edition's podcast is made: this one comes next. " + (if (made > 0.0) "$sofar " else "") + rest
+            made == 0.0 -> "Waiting to make the podcast: it's made while the phone charges, and Android can take a few minutes to start. Until then, Listen uses your phone's voice."
+            else -> "$sofar It carries on while the phone charges. $rest"
         }
         Text(text, style = small, color = soft, modifier = Modifier.padding(top = 6.dp))
     }

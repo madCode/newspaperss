@@ -59,7 +59,7 @@ class PodcastLineTest {
         idleUntil { asked.isNotEmpty() }
         assertEquals(listOf(7L), asked)
         // Asked for, it says how it's made.
-        waitFor("The podcast is made while the phone charges")
+        waitFor("Waiting to make the podcast")
     }
 
     @Test
@@ -74,6 +74,27 @@ class PodcastLineTest {
         store.complete(7, 2)
         store.finish(7)
         waitFor("The podcast is ready.")
+    }
+
+    @Test
+    fun whileItsBeingMadeItSaysSoAndTheArticleFillsAsPiecesAreKept() {
+        store.want(7, PodcastVoice.HEART)
+        show()
+        waitFor("Waiting to make the podcast")
+        // The phone charges: the first article, of four lines, has its first two made.
+        store.making(7)
+        waitFor("Making the podcast now")
+        store.lines(7, 0, 4)
+        val scratch = store.scratch(7, 0, 0).apply { writeText("audio") }
+        store.keep(7, 0, 0, scratch, listOf(0.0, 2.0))
+        // Half of its 12 minutes to hear.
+        waitFor("6 min of 27 min made.")
+        // Unplugged: it says it carries on later.
+        store.making(null)
+        waitFor("It carries on while the phone charges")
+        // Another edition's being made first.
+        store.making(8)
+        waitFor("Waiting while another edition's podcast is made")
     }
 
     @Test

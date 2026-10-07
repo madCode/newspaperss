@@ -421,7 +421,7 @@ class ScreenshotTest {
             com.app.newspaperss.listen.Podcasts(made, store, install) {},
         ) {}
         shoot("05i-edition-detail-podcast", ready = {
-            vm.detail.value?.contents?.isNotEmpty() == true && compose.onAllNodes(hasText("made, while the phone charges", substring = true)).fetchSemanticsNodes().isNotEmpty()
+            vm.detail.value?.contents?.isNotEmpty() == true && compose.onAllNodes(hasText("It carries on while the phone charges", substring = true)).fetchSemanticsNodes().isNotEmpty()
         }) { EditionDetailScreen(vm, onBack = {}, listening = listening) }
     }
 
