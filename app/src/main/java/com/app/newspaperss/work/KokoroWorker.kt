@@ -11,7 +11,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.app.newspaperss.NewspaperssApp
+import com.app.newspaperss.container
 import com.app.newspaperss.listen.KokoroDownload
 import com.app.newspaperss.listen.PodcastSetup
 import kotlinx.coroutines.CancellationException
@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
  */
 class KokoroWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val container = (applicationContext as NewspaperssApp).container
+        val container = applicationContext.container
         return try {
             container.podcastSetup.downloadAndCheck(
                 container.kokoroDownload(),
@@ -45,7 +45,7 @@ class KokoroWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             // lost) doesn't, so the run count can't be used.
             // Stopping closes the connection, which ends the read with an IOException: not a failure.
             if (isStopped) throw CancellationException("Stopped")
-            val failures = container.kokoroInstall.failed()
+            val failures = container.podcastSetup.failed()
             when {
                 failures < ATTEMPTS -> Result.retry()
                 e is KokoroDownload.DamagedException -> fail("Kokoro kept arriving damaged. Try again later.")

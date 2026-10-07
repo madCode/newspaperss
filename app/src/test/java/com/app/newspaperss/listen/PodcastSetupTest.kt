@@ -123,12 +123,22 @@ class PodcastSetupTest {
         installed()
         val setup = setup()
         // As if the app died in the middle of the last check.
-        install.startCheck()
+        install.dir.mkdirs()
+        java.io.File(install.dir, ".checking").createNewFile()
         assertTrue(runCatching { check(setup) }.exceptionOrNull() is IllegalStateException)
         assertNull(voiceUsed)
         setup.download(mobileData = false)
         check(setup)
         assertEquals(PodcastVoice.HEART, voiceUsed)
+    }
+
+    @Test
+    fun failuresCountUntilAskedAfresh() {
+        val setup = setup()
+        assertEquals(1, setup.failed())
+        assertEquals(2, setup.failed())
+        setup.download(mobileData = false)
+        assertEquals(1, setup.failed())
     }
 
     @Test

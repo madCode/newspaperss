@@ -136,14 +136,6 @@ class KokoroDownloadTest {
         assertFalse(install.dir.exists())
     }
 
-    @Test
-    fun failuresCountUntilAFileArrives() {
-        serve()
-        assertEquals(1, install.failed())
-        assertEquals(2, install.failed())
-        download()
-        assertEquals(1, install.failed())
-    }
 
     @Test
     fun removingDeletesItAll() {

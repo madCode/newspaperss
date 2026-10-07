@@ -303,6 +303,7 @@ twice.
 | `TtrssMarkReadWorker` | Delivery, mark not sent | `ttrss-mark-read-<edition>`, REPLACE | Up to 4 attempts. Reads the edition's state when it runs. |
 | `ReadingListTitleWorker` | New untitled links | `reading-list-titles`, APPEND_OR_REPLACE | Batches of 20, one batch at a time. |
 | `MoveFeedsWorker` | Moving phone feeds to tt-rss; app start, if a move is stored | `move-feeds`, APPEND_OR_REPLACE | Connected. Runs `FeedMoves.run`; what's left is in DataStore, so a run stopped part way carries on in the next. Appended so a run finishing up can't swallow a new move. |
+| `KokoroWorker` | Settings › Listening, picking the podcast | `kokoro`, REPLACE | Downloads Kokoro on Wi-Fi (any connection if the reader chose mobile data), then the speed check. Resumes across WorkManager's 10-minute limit; gives up after 6 failures with nothing arriving between them. |
 
 Timed editions use a chain of one-off timers, not periodic work, because
 periodic work can't say "6:30 on weekdays" and its start time drifts

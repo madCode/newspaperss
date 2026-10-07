@@ -42,9 +42,6 @@ class KokoroInstall(val dir: File, manifest: () -> List<KokoroFile>) {
 
     fun file(path: String) = File(dir, path)
 
-    private val failures = File(dir, ".failures")
-    private val checking = File(dir, ".checking")
-
     /** Files that matched the manifest and are still there. */
     @Synchronized
     fun verifiedPaths(): Set<String> = if (verified.exists()) verified.readLines().filter { file(it).exists() }.toSet() else emptySet()
@@ -54,42 +51,9 @@ class KokoroInstall(val dir: File, manifest: () -> List<KokoroFile>) {
         // Removed meanwhile: don't bring the folder back for one file.
         if (!dir.exists()) return
         verified.appendText(path + "\n")
-        failures.delete()
     }
 
     val complete: Boolean get() = verifiedPaths().containsAll(files.map { it.path })
-
-    /**
-     * Counts a failed run and returns how many have failed since a file last arrived. Android's own
-     * stops (its time limit on work, Wi-Fi lost) aren't failures, so its run count can't be used.
-     */
-    @Synchronized
-    fun failed(): Int {
-        dir.mkdirs()
-        val count = (failures.takeIf { it.exists() }?.readText()?.toIntOrNull() ?: 0) + 1
-        failures.writeText(count.toString())
-        return count
-    }
-
-    @Synchronized
-    fun clearFailures() {
-        failures.delete()
-    }
-
-    /**
-     * Marks the speed check as under way, returning false if it already was: a check that took the
-     * app down (sherpa can abort in native code) isn't run again on the next start.
-     */
-    @Synchronized
-    fun startCheck(): Boolean {
-        dir.mkdirs()
-        return checking.createNewFile()
-    }
-
-    @Synchronized
-    fun endCheck() {
-        checking.delete()
-    }
 
     @Synchronized
     fun remove() {
@@ -236,7 +200,8 @@ interface PodcastEngine {
 
 /** Kokoro through sherpa-onnx. Loading takes a couple of seconds. */
 class KokoroEngine(install: KokoroInstall, voice: PodcastVoice, threads: Int = THREADS) : PodcastEngine {
-    private val speaker = voice.speaker
+    private val speaker = speakerOf(voice)
+    private val british = voice == PodcastVoice.EMMA || voice == PodcastVoice.GEORGE
     private val tts = OfflineTts(
         null,
         OfflineTtsConfig(
@@ -246,9 +211,9 @@ class KokoroEngine(install: KokoroInstall, voice: PodcastVoice, threads: Int = T
                     voices = install.file("voices.bin").path,
                     tokens = install.file("tokens.txt").path,
                     dataDir = install.file("espeak-ng-data").path,
-                    lexicon = install.file(if (voice.british) "lexicon-gb-en.txt" else "lexicon-us-en.txt").path,
+                    lexicon = install.file(if (british) "lexicon-gb-en.txt" else "lexicon-us-en.txt").path,
                     // espeak's data has no British voice; plain English with the British word list is.
-                    lang = if (voice.british) "en" else "en-us",
+                    lang = if (british) "en" else "en-us",
                 ),
                 numThreads = threads,
             ),
@@ -262,5 +227,13 @@ class KokoroEngine(install: KokoroInstall, voice: PodcastVoice, threads: Int = T
     companion object {
         /** Fastest on a Pixel 8's Tensor G3: 1 and 2 threads were slower, and all 9 cores slower still. */
         const val THREADS = 4
+
+        /** The voice's number in the model (its metadata's speaker2id). */
+        fun speakerOf(voice: PodcastVoice) = when (voice) {
+            PodcastVoice.HEART -> 3
+            PodcastVoice.MICHAEL -> 16
+            PodcastVoice.EMMA -> 21
+            PodcastVoice.GEORGE -> 26
+        }
     }
 }

@@ -10,6 +10,7 @@ import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
+import java.io.File
 import kotlinx.coroutines.withContext
 
 /** Where getting Kokoro onto this phone stands, for Settings › Listening. */
@@ -80,10 +81,26 @@ class PodcastSetup(
 
     /** Downloads Kokoro, on Wi-Fi only unless [mobileData], then checks it. */
     fun download(mobileData: Boolean) {
-        // Asked for afresh: earlier failures don't count against it.
-        install.clearFailures()
-        install.endCheck()
+        // Asked for afresh: earlier failures don't count against it, nor a check that went wrong.
+        failures.delete()
+        checking.delete()
         start(mobileData)
+    }
+
+    // Beside the files, so Remove clears them too.
+    private val failures get() = File(install.dir, ".failures")
+    private val checking get() = File(install.dir, ".checking")
+
+    /**
+     * Counts a failed run and returns how many have failed since anything last arrived. Android's
+     * own stops (its time limit on work, Wi-Fi lost) aren't failures, so its run count can't be used.
+     */
+    @Synchronized
+    fun failed(): Int {
+        install.dir.mkdirs()
+        val count = (failures.takeIf { it.exists() }?.readText()?.toIntOrNull() ?: 0) + 1
+        failures.writeText(count.toString())
+        return count
     }
 
     /** Stops a download, keeping what's arrived for next time. */
@@ -104,7 +121,16 @@ class PodcastSetup(
      */
     suspend fun downloadAndCheck(download: KokoroDownload, onProgress: (got: Long, total: Long) -> Unit, onChecking: suspend () -> Unit) {
         var shown = -1L
+        var from = -1L
         download.run { got, total ->
+            when {
+                from < 0 -> from = got
+                // Something arrived: failures before it are no longer "in a row".
+                from in 0 until got -> {
+                    failures.delete()
+                    from = Long.MAX_VALUE
+                }
+            }
             // In whole percent: every 64 KB would flood WorkManager's database, and redraw an e-ink screen.
             val percent = got * 100 / total.coerceAtLeast(1)
             if (percent != shown) {
@@ -113,7 +139,10 @@ class PodcastSetup(
             }
         }
         onChecking()
-        if (!install.startCheck()) throw IllegalStateException("The last check stopped the app")
+        // Marked first: sherpa can abort in native code, and a check that took the app down
+        // isn't run again on the next start, only when asked afresh.
+        install.dir.mkdirs()
+        if (!checking.createNewFile()) throw IllegalStateException("The last check stopped the app")
         val kokoro = engine(settings.current().podcastVoice)
         try {
             val started = now()
@@ -124,7 +153,7 @@ class PodcastSetup(
         } finally {
             kokoro.release()
         }
-        install.endCheck()
+        checking.delete()
     }
 
     companion object {

@@ -81,15 +81,12 @@ enum class PreviewTextSize(val label: String, val percent: Int) {
 /** How Listen reads: live in the phone's voice, or a podcast made ahead in Kokoro's. */
 enum class ListenVoice { PHONE, PODCAST }
 
-/**
- * Kokoro's voices offered for the podcast. [speaker] is the voice's number in the model; British
- * voices take the British word list, and espeak's plain English, as it has no British voice.
- */
-enum class PodcastVoice(val label: String, val accent: String, val speaker: Int, val british: Boolean) {
-    HEART("Heart", "American", 3, false),
-    MICHAEL("Michael", "American", 16, false),
-    EMMA("Emma", "British", 21, true),
-    GEORGE("George", "British", 26, true),
+/** Kokoro's voices offered for the podcast; [com.app.newspaperss.listen.KokoroEngine] maps them to the model's. */
+enum class PodcastVoice(val label: String, val accent: String) {
+    HEART("Heart", "American"),
+    MICHAEL("Michael", "American"),
+    EMMA("Emma", "British"),
+    GEORGE("George", "British"),
 }
 
 data class Settings(
