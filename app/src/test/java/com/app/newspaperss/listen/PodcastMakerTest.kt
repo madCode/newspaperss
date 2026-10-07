@@ -303,11 +303,19 @@ class PodcastMakerTest {
         val id = edition("Thursday", knots)
         request(id)
         val job = Job()
-        afterLine = { if (it == "Then a teacher counted.") job.cancel() }
+        var makingSeen: Long? = null
+        afterLine = {
+            makingSeen = store.making.value
+            if (it == "Then a teacher counted.") job.cancel()
+        }
         runBlocking { runCatching { withContext(job) { maker.makeAll() } } }
         // The line under way when it stopped is finished and kept too.
         assertEquals(listOf(0, 1, 2, 3), store.pieces(id, 0).map { it.firstLine })
         assertFalse(store.made(id, 0))
+        // Four of its five lines: the edition page fills its article that far.
+        assertEquals(0.8, store.share(id, 0), 0.001)
+        assertEquals(id, makingSeen)
+        assertNull(store.making.value)
 
         afterLine = {}
         said.clear()

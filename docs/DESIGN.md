@@ -695,7 +695,9 @@ whose Kindle and KOReader answers ask for more on the same page).
     the source, and a quiet line when an article of an edition with a
     podcast plays in the phone's voice (not made yet, or left out).
     Under Listen on the edition page, a bar of its articles fills as each
-    is made, with how many minutes are made; an edition without a podcast
+    is made (an article being made fills as each ~2-minute piece is kept),
+    with how many minutes are made, and whether it's being made now or
+    waiting for the phone to charge; an edition without a podcast
     (made by hand, say) offers **Make the podcast**, made while charging.
   - **E-reader & delivery:** the e-reader in a dropdown at the top, then
     "How it gets there". They share a page because the e-reader decides

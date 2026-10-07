@@ -42,6 +42,28 @@ class PodcastStore(val dir: File) {
 
     private fun changed() = _changes.update { it + 1 }
 
+    private val _making = MutableStateFlow<Long?>(null)
+
+    /** The edition whose podcast is being made right now, in this process; null when none is. */
+    val making: StateFlow<Long?> = _making.asStateFlow()
+
+    fun making(editionId: Long?) {
+        _making.value = editionId
+    }
+
+    /** Notes how many lines [page] has, so how far it's made can be shown. */
+    @Synchronized
+    fun lines(editionId: Long, page: Int, lines: Int) {
+        folder(editionId).takeIf { it.exists() }?.let { File(it, "$page.$LINES").writeText(lines.toString()) }
+    }
+
+    /** How much of [page] is made, 0 to 1: whole once it's made, by its lines while it's being made. */
+    fun share(editionId: Long, page: Int): Double {
+        if (made(editionId, page)) return 1.0
+        val lines = File(folder(editionId), "$page.$LINES").takeIf { it.exists() }?.readText()?.toIntOrNull() ?: return 0.0
+        return (linesMade(editionId, page).toDouble() / lines).coerceIn(0.0, 1.0)
+    }
+
     private fun folder(editionId: Long) = File(dir, editionId.toString())
 
     private fun voiceFile(editionId: Long) = File(folder(editionId), VOICE)
@@ -212,6 +234,7 @@ class PodcastStore(val dir: File) {
         const val SAYING = "saying"
         const val FAILED = "failed"
         const val COST = "cost"
+        const val LINES = "lines"
         const val PART = "part"
     }
 }
@@ -288,6 +311,7 @@ class PodcastMaker(
             while (true) {
                 val editionId = store.waiting().firstOrNull() ?: break
                 if (!inUse()) break
+                store.making(editionId)
                 val book = ListenBook.open(editions, editionId)
                 if (book == null) {
                     // Its book is gone, so is the podcast's reason to be.
@@ -317,6 +341,7 @@ class PodcastMaker(
                 }
             }
         } finally {
+            store.making(null)
             kokoro?.second?.release()
         }
     }
@@ -342,6 +367,7 @@ class PodcastMaker(
             return
         }
         val lines = script.lines
+        store.lines(editionId, page, lines.size)
         val (deadAt, deaths) = store.deaths(editionId, page)
         var piece: Piece? = null
         try {
@@ -453,10 +479,20 @@ class PodcastMaker(
  * @param made for each article, in book order, whether it plays from the podcast.
  * @param leftOut for each article, whether the podcast left it to the phone's voice: not in
  *   English, or something Kokoro couldn't say.
+ * @param share for each article, how much of it is made, 0 to 1.
+ * @param makingNow whether it's being made right now (the phone is charging).
  * @param asked whether a podcast was asked for: made with a scheduled edition, or by hand.
  * @param pace this phone's, to say how long making one would take.
  */
-data class PodcastProgress(val asked: Boolean, val made: List<Boolean>, val finished: Boolean, val pace: Double, val leftOut: List<Boolean>)
+data class PodcastProgress(
+    val asked: Boolean,
+    val made: List<Boolean>,
+    val finished: Boolean,
+    val pace: Double,
+    val leftOut: List<Boolean>,
+    val share: List<Double>,
+    val makingNow: Boolean,
+)
 
 /** What the edition page shows of an edition's podcast, and asking for one. */
 class Podcasts(
@@ -467,7 +503,7 @@ class Podcasts(
     private val request: suspend (editionId: Long) -> Unit,
 ) {
     /** [editionId]'s podcast, with [articles] articles; null while Kokoro isn't in use. */
-    fun observe(editionId: Long, articles: Int): Flow<PodcastProgress?> = combine(store.changes, settings.settings) { _, s ->
+    fun observe(editionId: Long, articles: Int): Flow<PodcastProgress?> = combine(store.changes, store.making, settings.settings) { _, making, s ->
         val pace = s.podcastPace
         if (s.listenVoice != ListenVoice.PODCAST || pace == null || !install.complete) return@combine null
         PodcastProgress(
@@ -476,6 +512,8 @@ class Podcasts(
             leftOut = (0 until articles).map { store.live(editionId, it) },
             finished = store.finished(editionId),
             pace = pace.toDouble(),
+            share = (0 until articles).map { store.share(editionId, it) },
+            makingNow = making == editionId,
         )
     }.flowOn(Dispatchers.IO)
 
