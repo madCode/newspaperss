@@ -79,6 +79,10 @@ module so it's all unit-tested without Android.
   preview. If the page can't be fetched (or is over 5 MB, too big to parse
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
+- **Posts on a shared page.** An item linking to its spot on a page
+  (`05.html#a1`, one of a day's posts on a blog) is just its
+  feed text, when the page has that spot and the item's text: the page
+  holds the day's other posts too.
 - **Paid posts.** A post for paying subscribers goes in as its free part,
   with a note saying so. It's known by what the platform puts on the page
   in place of the rest: Ghost's upgrade box or Substack's paywall. Not
@@ -183,7 +187,8 @@ module so it's all unit-tested without Android.
     at the whole footnote, so a Kindle's popup shows its text, and markers
     side by side are split with a comma ("3, 4"). Substack
     Notes quoted where the post embeds them (from Substack's own feed: tt-rss
-    strips the Note's text);
+    strips the Note's text), and @-mentions keep the name the page's script
+    would have filled in;
   - "That's all for today", a chapter in the contents, with the day's
     totals and a question to think about, one of a short list of open
     questions that suit any paper ("What surprised you?"). It usually differs from

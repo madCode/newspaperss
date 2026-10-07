@@ -11,8 +11,8 @@ dependencies {
     kover(project(":core"))
 }
 
-// A floor, not a target: coverage was 92.5% of lines when it was set, so this only fails a
-// change that lets it slide.
+// A floor, not a target, kept near actual: each point of slack is ~105 lines that can arrive with
+// no tests. It measures the total, so it catches a slide rather than new code on its own.
 kover {
     reports {
         // Generated code (Room's DAOs, Compose's lambda holders) isn't ours to cover, and counting
@@ -24,7 +24,7 @@ kover {
         }
         verify {
             rule {
-                minBound(90)
+                minBound(93)
             }
         }
     }

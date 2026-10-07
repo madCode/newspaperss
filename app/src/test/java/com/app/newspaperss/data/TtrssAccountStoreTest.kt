@@ -1,5 +1,6 @@
 package com.app.newspaperss.data
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.app.newspaperss.testutil.testCipher
 import kotlinx.coroutines.test.runTest
@@ -16,9 +17,9 @@ import javax.crypto.spec.SecretKeySpec
 // Keystore key lookup in AesGcmCipher.androidKeystore() goes untested.
 class TtrssAccountStoreTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val stores = TestDataStores()
 
-    private val file by lazy { tmp.newFile("ttrss.preferences_pb") }
-    private val dataStore by lazy { PreferenceDataStoreFactory.create { file } }
+    private val dataStore by lazy { stores.preferences("ttrss") }
     private fun store(cipher: SecretCipher = testCipher()) = TtrssAccountStore(dataStore, cipher)
     private val account = TtrssAccount("https://rss.example.com/api/", "reader", "päss \"Zq9x\"")
 
@@ -28,7 +29,7 @@ class TtrssAccountStoreTest {
         assertEquals(StoredAccount.None, s.load())
         s.save(account)
         assertEquals(StoredAccount.Ready(account), s.load())
-        assertFalse(String(file.readBytes(), Charsets.ISO_8859_1).contains("Zq9x"))
+        assertFalse(String(stores.file("ttrss").readBytes(), Charsets.ISO_8859_1).contains("Zq9x"))
         assertFalse(account.toString().contains(account.password))
     }
 

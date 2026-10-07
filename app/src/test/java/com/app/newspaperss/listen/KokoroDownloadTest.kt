@@ -16,6 +16,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.net.URLDecoder
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicLong
 
 class KokoroDownloadTest {
     @get:Rule val tmp = TemporaryFolder()
@@ -74,11 +76,18 @@ class KokoroDownloadTest {
     @Test
     fun everyFileArrivesCheckedAndTheProgressReachesTheWhole() {
         serve()
-        var last = 0L to 0L
-        download { got, total -> last = got to total }
+        // Lanes report from their own threads: the report carrying the whole needn't be the last
+        // to run, so track the peak rather than the final one.
+        val reached = AtomicLong(0)
+        val wholes = Collections.synchronizedSet(mutableSetOf<Long>())
+        download { got, total ->
+            reached.accumulateAndGet(got) { seen, now -> maxOf(seen, now) }
+            wholes += total
+        }
         assertTrue(install.complete)
         content.forEach { (path, bytes) -> assertTrue(path, install.file(path).readBytes().contentEquals(bytes)) }
-        assertEquals(install.bytes to install.bytes, last)
+        assertEquals(install.bytes, reached.get())
+        assertEquals(setOf(install.bytes), wholes)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.app.newspaperss.data
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.core.extract.ContentMode
@@ -36,17 +37,18 @@ import java.time.ZoneOffset
 @Config(application = TestApp::class)
 class FeedMovesTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val stores = TestDataStores()
     @get:Rule val dbRule = DbRule()
     private val db = dbRule.db
     private val http = FakeHttp()
     private val server = FakeTtrss(http)
     private val now = Instant.parse("2026-10-03T06:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
-    private val accounts by lazy { TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher()) }
+    private val accounts by lazy { TtrssAccountStore(stores.preferences("ttrss"), testCipher()) }
     private val sources by lazy { SourceRepository(db, clock) }
     private val ttrss by lazy { TtrssRepository(db, http, accounts, sources, clock) }
     private val sync by lazy { FeedSync(db, http, clock, Duration.ofDays(7), accounts) }
-    private val movesData by lazy { PreferenceDataStoreFactory.create { tmp.newFile("moves.preferences_pb") } }
+    private val movesData by lazy { stores.preferences("moves") }
     private var scheduled = 0
     private val moves by lazy { FeedMoves(movesData, db, ttrss, clock) { scheduled++ } }
     private val science = TtrssCategory(4, "Science")

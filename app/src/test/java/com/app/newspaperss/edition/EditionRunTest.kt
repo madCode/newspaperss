@@ -1,5 +1,6 @@
 package com.app.newspaperss.edition
 
+import com.app.newspaperss.testutil.TestDataStores
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.app.newspaperss.data.ArticleState
@@ -31,11 +32,12 @@ import java.time.Instant
 @Config(application = TestApp::class)
 class EditionRunTest {
     @get:Rule val tmp = TemporaryFolder()
+    @get:Rule val stores = TestDataStores()
 
     @get:Rule val dbRule = DbRule()
     private val db = dbRule.db
     private val http = FakeHttp()
-    private val settings by lazy { SettingsStore(PreferenceDataStoreFactory.create { tmp.newFile("settings.preferences_pb") }) }
+    private val settings by lazy { SettingsStore(stores.preferences("settings")) }
     private val editions by lazy { EditionRepository(db, tmp.newFolder("editions")) }
     private val notices = mutableListOf<String>()
     private val notifier = object : EditionNotifier {

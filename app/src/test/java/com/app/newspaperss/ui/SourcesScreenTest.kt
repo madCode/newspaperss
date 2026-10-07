@@ -1,5 +1,6 @@
 package com.app.newspaperss.ui
 
+import com.app.newspaperss.testutil.TestDataStores
 import com.app.newspaperss.testutil.idleUntil
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
@@ -45,6 +46,7 @@ class SourcesScreenTest {
     @get:Rule(order = 0) val closeDb = closeAfter { db.close() }
     @get:Rule(order = 1) val tmp = TemporaryFolder()
     @get:Rule(order = 2) val compose = createComposeRule()
+    @get:Rule(order = 3) val stores = TestDataStores()
 
     private val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java)
         .allowMainThreadQueries().build()
@@ -55,7 +57,7 @@ class SourcesScreenTest {
     @Before
     fun show() {
         val sources = SourceRepository(db)
-        val accounts = TtrssAccountStore(PreferenceDataStoreFactory.create { tmp.newFile("ttrss.preferences_pb") }, testCipher())
+        val accounts = TtrssAccountStore(stores.preferences("ttrss"), testCipher())
         val vm = SourcesViewModel(
             sources, FeedFinder(http), TtrssRepository(db, http, accounts, sources),
             saveToReadingList = { com.app.newspaperss.data.ReadingListRepository(db).save(it) },

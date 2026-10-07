@@ -532,14 +532,20 @@ object HtmlCleaner {
      * Substack embeds a Note as an empty element its page script fills in from `data-attrs`. Read
      * without the script, it's an empty div that goes (its class, "comment", reads as a comments
      * box, and tt-rss strips classes anyway), leaving the sentence that introduced it hanging. Its
-     * text and author make a quote instead.
+     * text and author make a quote instead. An @-mention is filled in the same way, so in the feed
+     * it's an empty span and "As Jane Doe points out" would read "As points out": it gets the name.
      */
     private fun expandSubstackNotes(body: Element) {
         // The last quote placed after each paragraph, so several from one paragraph keep their order.
         val placedAfter = mutableMapOf<Element, Element>()
         for (el in body.select("[data-attrs]")) {
             if (!el.isAttached()) continue
-            val comment = runCatching { Json.parseToJsonElement(el.attr("data-attrs")) as? JsonObject }.getOrNull()?.get("comment") as? JsonObject ?: continue
+            val attrs = runCatching { Json.parseToJsonElement(el.attr("data-attrs")) as? JsonObject }.getOrNull() ?: continue
+            if ((attrs["type"] as? JsonPrimitive)?.contentOrNull == "user" && el.childrenSize() == 0 && el.text().isBlank()) {
+                (attrs["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.takeIf { it.isNotEmpty() }?.let { el.text(it) }
+                continue
+            }
+            val comment = attrs["comment"] as? JsonObject ?: continue
             val text = (comment["body"] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() } ?: continue
             val quote = Element("blockquote")
             text.split(NEWLINES).map { it.trim() }.filter { it.isNotEmpty() }.forEach { quote.appendElement("p").text(it) }

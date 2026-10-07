@@ -34,6 +34,29 @@ class ArticleExtractorTest {
     private fun input(feedHtml: String?, mode: ContentMode = ContentMode.AUTO, feedTitle: String = "The Quiet Joy of Reading Slowly") =
         ExtractInput(url, feedTitle, feedHtml, feedAuthor = null, mode = mode)
 
+    /** A blog's day page holds several posts; an untitled one linking to its spot there is only its own text. */
+    @Test
+    fun aPostLinkingToItsSpotOnADayPageIsItsFeedText() = runTest {
+        val day = "https://example.com/2026/10/05.html"
+        val short = "What's the best way to block a browser from a website? Is there a meta code for that?"
+        val dayPage = page("<html><body><div><a name=\"a1\"></a><p>${sentence.repeat(40)}</p></div>" +
+            "<div><a name=\"a2\"></a><p>$short</p></div></body></html>", finalUrl = day)
+        val http = FakeHttp(listOf("$day#a2", "$day#ref=rss", "$day#a1").associateWith { dayPage })
+        for (mode in listOf(ContentMode.AUTO, ContentMode.PAGE)) {
+            val article = ArticleExtractor(http).extract(ExtractInput("$day#a2", "", "<p>$short</p>", null, mode = mode))
+            assertTrue(mode.name, article.usedFeedContent)
+            assertFalse(mode.name, article.html.contains("committee"))
+            assertNull("it says nothing about the source", FullTextCheck.evidence(article))
+        }
+        // A tracking tag names nothing on the page.
+        assertFalse(ArticleExtractor(http).extract(ExtractInput("$day#ref=rss", "", "<p>$short</p>", null)).usedFeedContent)
+        // An excerpt ending in "Read more" is never the whole entry.
+        val excerpt = "<p>$short <a href=\"$day#a2\">Read more</a></p>"
+        assertFalse(ArticleExtractor(http).extract(ExtractInput("$day#a2", "", excerpt, null)).usedFeedContent)
+        // A reading list's teaser isn't on the page it points into: the page is the article.
+        assertFalse(ArticleExtractor(http).extract(ExtractInput("$day#a1", "", "<p>An essay on libraries, and budgets.</p>", null)).usedFeedContent)
+    }
+
     @Test
     fun readingThePageCountsThePicturesInEachVersion() = runTest {
         val http = FakeHttp(mapOf(url to page()))
