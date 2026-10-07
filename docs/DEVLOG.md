@@ -24,8 +24,9 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Cycle 1 (#163), data and background work:** builds stop fetching after 8 minutes rather than hitting WorkManager's limit and starting over; folder delivery can't be cancelled between copying and marking delivered; the time zone is read per build; indexes for two watched queries.
 - **Cycle 2 (#164), `:core`:** windows-1252 pages labelled Latin-1, cancellable fetches, ASCII chapter names on any locale, international domains kept, entity-expansion feeds refused, linear regexes.
 - **Cycle 3 (#165), the screens:** two crashes (notification settings, folder grants), feed links limited to the web, the preview keeping its place, lifecycle-aware screens, headings for TalkBack.
-- **Cycle 4, Listen, build and docs:** Listen lets go of a deleted book, CI checkouts hold no token, docs brought up to date.
+- **Cycle 4 (#166), Listen, build and docs:** Listen lets go of a deleted book, CI checkouts hold no token, docs brought up to date.
 - **Left for you:** timed and manual builds can swallow each other (cycle 1); turning on R8 for release; pinning CI actions by SHA; a debug key anyone can sign with.
+- **Afterwards:** the PR review now also covers rotation and a killed app, untrusted feeds and links, other locales, and what else deletes the same data, where most of the audit's bugs came from. Two whole-codebase passes are in the backlog to recur: security and supply chain, and architecture and test health.
 
 ## Day 6 · Sat 3 Oct
 
