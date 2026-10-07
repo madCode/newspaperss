@@ -450,22 +450,29 @@ class PodcastMakerTest {
     private fun long(sentences: Int) = knots.copy(bodyHtml = "<p>" + (1..sentences).joinToString(" ") { "${"x".repeat(498)}$it." } + "</p>")
 
     @Test
-    fun aPodcastTeachesThePaceItWasMadeAt() {
+    fun aPodcastTeachesThePaceItWasMadeAtOverAllItsRuns() {
         inUse()
-        // Ten minutes of speech, made at 1.5× where the check guessed 1.2×.
+        // Ten minutes of speech, made at 1.5× where the check guessed 1.2×, in two runs: Android
+        // stops each after 10 minutes.
         val id = edition("Thursday", long(125))
         request(id)
+        val job = Job()
+        afterLine = { if (said.size == 60) job.cancel() }
+        pieceSeconds = 60.0
+        runBlocking { runCatching { withContext(job) { maker.makeAll() } } }
+        assertFalse(runBlocking { settings.current() }.podcastPaceMeasured)
+        afterLine = {}
         make()
 
         val s = runBlocking { settings.current() }
-        assertEquals(1.5f, s.podcastPace!!, 0.01f)
+        assertEquals(1.5f, s.podcastPace!!, 0.02f)
         assertTrue(s.podcastPaceMeasured)
 
         // The next, at 1.1×, moves it halfway there.
         paceNow = 1.1
         request(edition("Friday", long(125)))
         make()
-        assertEquals(1.3f, runBlocking { settings.current() }.podcastPace!!, 0.01f)
+        assertEquals(1.3f, runBlocking { settings.current() }.podcastPace!!, 0.02f)
     }
 
     @Test

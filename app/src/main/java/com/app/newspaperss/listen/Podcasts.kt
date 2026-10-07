@@ -8,7 +8,6 @@ import com.app.newspaperss.settings.PodcastVoice
 import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import com.app.newspaperss.core.listen.PodcastPace
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -106,6 +105,19 @@ class PodcastStore(val dir: File) {
     @Synchronized
     fun finish(editionId: Long) = mark(editionId, FINISHED)
 
+    /** Adds to what making [editionId]'s podcast has cost: time spent, and seconds of speech made. */
+    @Synchronized
+    fun addCost(editionId: Long, nanos: Long, speechSeconds: Double) {
+        val folder = folder(editionId).takeIf { it.exists() } ?: return
+        val (n, s) = cost(editionId)
+        File(folder, COST).writeText("${n + nanos} ${"%.3f".format(Locale.ROOT, s + speechSeconds)}")
+    }
+
+    /** What making [editionId]'s podcast has cost so far, over every run: nanoseconds, and seconds of speech. */
+    fun cost(editionId: Long): Pair<Long, Double> =
+        File(folder(editionId), COST).takeIf { it.exists() }?.readText()?.split(' ')
+            ?.let { (it.getOrNull(0)?.toLongOrNull() ?: 0L) to (it.getOrNull(1)?.toDoubleOrNull() ?: 0.0) } ?: (0L to 0.0)
+
     private fun mark(editionId: Long, name: String) {
         folder(editionId).takeIf { it.exists() }?.let { File(it, name).createNewFile() }
     }
@@ -174,6 +186,7 @@ class PodcastStore(val dir: File) {
         const val LIVE = "live"
         const val SAYING = "saying"
         const val FAILED = "failed"
+        const val COST = "cost"
         const val PART = "part"
     }
 }
@@ -208,10 +221,6 @@ class PodcastMaker(
     private val now: () -> Long = System::nanoTime,
     private val start: () -> Unit,
 ) {
-    // This run's work and what it made, to learn this phone's real pace from.
-    private var workNanos = 0L
-    private var madeSeconds = 0.0
-
     /**
      * Asks for [editionId]'s podcast if Kokoro is in use, and starts making it once the phone
      * charges. The voice is the one chosen now: a podcast keeps the voice it started in.
@@ -229,25 +238,21 @@ class PodcastMaker(
         // for it, rather than loading Kokoro twice and writing the same piece.
         KokoroEngine.lock.withLock {
             store.dropScratch()
-            workNanos = 0L
-            madeSeconds = 0.0
-            try {
-                makeUnderLock()
-            } finally {
-                // Stopped too: an unplugged phone has still shown its pace. Failing to keep it
-                // mustn't hide why the run ended.
-                withContext(NonCancellable) { runCatching { learnPace() } }
-            }
+            makeUnderLock()
         }
     }
 
-    /** Keeps this phone's pace from what this run made, so scheduled editions start as early as it needs. */
-    private suspend fun learnPace() {
-        if (madeSeconds < PodcastPace.LEARN_FROM_SECONDS) return
-        val work = workNanos / 1e9
+    /**
+     * Keeps this phone's pace from what a finished podcast cost, over all the runs it took, so
+     * scheduled editions start as early as it needs. One run alone is cut off by Android's
+     * 10-minute limit, and is mostly a cool phone's.
+     */
+    private suspend fun learnPace(editionId: Long) {
+        val (nanos, speech) = store.cost(editionId)
+        if (speech < PodcastPace.LEARN_FROM_SECONDS) return
         settings.update { s ->
             val last = s.podcastPace ?: return@update s
-            s.copy(podcastPace = PodcastPace.learn(last.toDouble(), s.podcastPaceMeasured, work, madeSeconds).toFloat(), podcastPaceMeasured = true)
+            s.copy(podcastPace = PodcastPace.learn(last.toDouble(), s.podcastPaceMeasured, nanos / 1e9, speech).toFloat(), podcastPaceMeasured = true)
         }
     }
 
@@ -277,11 +282,13 @@ class PodcastMaker(
                             // Loading is part of what a podcast costs: each of Android's stops means another.
                             val began = now()
                             kokoro = voice to engine(voice)
-                            workNanos += now() - began
+                            store.addCost(editionId, now() - began, 0.0)
                         }
                         makePage(editionId, page, script(book, page), kokoro!!.second)
                     }
                     store.finish(editionId)
+                    // Failing to keep the pace mustn't stop the podcasts behind this one.
+                    runCatching { learnPace(editionId) }
                 }
             }
         } finally {
@@ -384,8 +391,7 @@ class PodcastMaker(
             val began = now()
             sink.close()
             store.keep(editionId, page, firstLine, file, starts)
-            workNanos += work + now() - began
-            madeSeconds += spoken.toDouble() / rate
+            store.addCost(editionId, work + now() - began, spoken.toDouble() / rate)
         }
 
         fun drop() {

@@ -304,9 +304,10 @@ flowchart LR
     included: a stopped run's native code runs on until its sentence ends.
   - Turning Kokoro off stops the making after the current page; removing it
     deletes the podcasts.
-  - Each run that makes 5 minutes or more teaches the phone's pace
-    (Kokoro's time per second of audio), which sets how early scheduled
-    editions start (`PodcastPace.earlier`).
+  - Each finished podcast with 10 minutes of speech or more teaches the
+    phone's pace: all the time it took, over every run (loading Kokoro,
+    encoding, files), per second of speech. The pace sets how early
+    scheduled editions start (`PodcastPace.earlier`).
 - **`ListenProgress`** keeps where each of the ten most recent editions
   was left, and which were heard to the end, in SharedPreferences
   (`listening`).
@@ -336,9 +337,11 @@ a timer is pure logic in `ScheduleTimer` (`core/edition/Schedule.kt`).
 The pending and last due times are kept in SharedPreferences
 (`edition-schedule`), with when the pending timer fires: the podcast's
 pace can move the start of an edition whose due time stays put, which
-re-arms it. The app re-arms whenever the lead changes. While the podcast
-is in use, an edition started up to 3½ hours before its due time isn't
-armed again, since a pace learned during its lead can shorten the lead.
+re-arms it. The app re-arms whenever the lead changes. The last edition
+started isn't armed again while it's being made: from when its timer
+fired (kept as `LAST_START`) until as long after it was due as it started
+before, so turning the podcast off or moving the time during a long lead
+doesn't make a second paper.
 
 ## Data model
 

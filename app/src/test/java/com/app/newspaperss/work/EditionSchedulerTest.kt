@@ -249,4 +249,17 @@ class EditionSchedulerTest {
 
         assertEquals(morning.withHour(8).withMinute(0).toInstant().toEpochMilli() + day, prefs.getLong(EditionScheduler.PENDING, 0))
     }
+
+    @Test
+    fun movingTheTimeLaterDuringALongLeadDoesntMakeASecondPaperToday() = runTest {
+        // Started at 4:50 for 6:30; at 5:30 the reader moves the time to 7:15.
+        prefs.edit {
+            putLong(EditionScheduler.LAST_DUE, sixThirty)
+            putLong(EditionScheduler.LAST_START, startsAt(4, 50))
+        }
+        val later = podcast.copy(schedule = Schedule(time = LocalTime.of(7, 15)))
+        EditionScheduler.reschedule(context, later, morning.withMinute(30))
+
+        assertEquals(morning.withHour(7).withMinute(15).toInstant().toEpochMilli() + day, prefs.getLong(EditionScheduler.PENDING, 0))
+    }
 }

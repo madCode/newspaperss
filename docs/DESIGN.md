@@ -208,7 +208,7 @@ module so it's all unit-tested without Android.
 - **With the podcast, they start earlier still** (debug builds): by the
   time this phone takes to make your paper's podcast, × 1.25 for room to
   spare, in whole 5 minutes, up to 3 hours. Once real podcasts have timed
-  the phone (each moves the pace halfway to its own), the margin is × 1.1.
+  the phone (each finished one moves the pace halfway to its own), the margin is × 1.1.
   The start shows under Ready by on Schedule ("Starts at 4:50 AM, for the
   podcast", and to leave the phone charging), in the Schedule summary, in
   Today's next-edition line and in the speed check's verdict.

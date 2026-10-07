@@ -104,17 +104,20 @@ object EditionScheduler {
 
     /**
      * The next due time, skipping the last edition started while it's being made: from when its
-     * timer fired until [LEAD] after it was due. Otherwise, with the time moved from 6:30 to 6:45
-     * during its lead, 6:45 would be a second paper; and so would 6:30 again, with the podcast
-     * turned off during a lead it had made longer. Outside that span, [lastDueMs] is ignored, so
-     * a clock set far ahead and then corrected can't hold back timed editions until that date.
+     * timer fired until as long after it was due as it started before (at least [LEAD]).
+     * Otherwise, with the time moved from 6:30 to 6:45 during its lead, 6:45 would be a second
+     * paper; and so would 6:30 again, with the podcast turned off during a lead it had made
+     * longer. Outside that span, [lastDueMs] is ignored, so a clock set far ahead and then
+     * corrected can't hold back timed editions until that date.
      *
      * @param lastStartMs when the last timer fired; before that was kept, [LEAD] before its due time.
      */
     internal fun nextDue(settings: Settings, now: ZonedDateTime, lastDueMs: Long, lastStartMs: Long = lastDueMs): Instant? {
         val lastDue = Instant.ofEpochMilli(lastDueMs)
-        val from = minOf(Instant.ofEpochMilli(lastStartMs), lastDue.minus(LEAD))
-        val until = lastDue.plus(LEAD)
+        val lead = maxOf(LEAD, Duration.between(Instant.ofEpochMilli(lastStartMs), lastDue))
+        // A little before it too: the clock set back a few minutes just after the timer fired.
+        val from = lastDue.minus(lead).minus(LEAD)
+        val until = lastDue.plus(lead)
         val nearLast = !now.toInstant().isBefore(from) && !now.toInstant().isAfter(until)
         val after = if (nearLast) until.atZone(now.zone) else now
         return settings.schedule.nextAfter(after)?.toInstant()
