@@ -6,6 +6,8 @@
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/epub+zip" />
+                <!-- Reading notes travel the same way, as markdown. -->
+                <data android:mimeType="text/markdown" />
             </intent-filter>
         </activity>
     </application>

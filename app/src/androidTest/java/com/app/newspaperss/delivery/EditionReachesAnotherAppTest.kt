@@ -49,6 +49,17 @@ class EditionReachesAnotherAppTest {
         shell("logcat -c")
     }
 
+    /** The last RESULT the sink logged, or "" if it never reported. */
+    private fun sinkResult(): String {
+        val deadline = System.currentTimeMillis() + 30_000
+        while (System.currentTimeMillis() < deadline) {
+            val line = shell("logcat -d -s EpubSink").lineSequence().lastOrNull { "RESULT" in it }.orEmpty()
+            if (line.isNotEmpty()) return line
+            Thread.sleep(500)
+        }
+        return ""
+    }
+
     @Test fun anotherAppCanReadTheWholeEditionThroughTheGrant() {
         // In the editions folder, because file_paths.xml exposes only that and notes/: the
         // FileProvider refuses anywhere else, which is the point of scoping it.
@@ -63,13 +74,7 @@ class EditionReachesAnotherAppTest {
             share.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(share)
 
-            var line = ""
-            val deadline = System.currentTimeMillis() + 30_000
-            while (System.currentTimeMillis() < deadline && line.isEmpty()) {
-                line = shell("logcat -d -s EpubSink").lineSequence().lastOrNull { "RESULT" in it }.orEmpty()
-                if (line.isEmpty()) Thread.sleep(500)
-            }
-
+            val line = sinkResult()
             assertTrue("the sink never reported: it may not have started", line.isNotEmpty())
             assertTrue("the sink couldn't read it: $line", "RESULT bytes=" in line)
             assertEquals(
@@ -80,6 +85,30 @@ class EditionReachesAnotherAppTest {
             assertTrue("what arrived isn't a zip, so not a whole epub: $line", "zip=true" in line)
         } finally {
             epub.delete()
+        }
+    }
+
+    @Test fun anotherAppCanReadTheNotesThroughTheGrant() {
+        // Notes go out as markdown from files/notes/, the other folder file_paths.xml exposes.
+        val notes = File(context.filesDir, "notes").apply { mkdirs() }
+        val file = File(notes, "reach-test notes.md").apply { writeText("# A heron\n\nIt stood there.\n") }
+        try {
+            val chooser = EditionIntents.shareNotes(context, file, "A heron on the roof")
+            val share = chooser.getParcelableExtra(Intent.EXTRA_INTENT) ?: chooser
+            share.setPackage(sink)
+            share.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(share)
+
+            val line = sinkResult()
+            assertTrue("the sink never reported for notes", line.isNotEmpty())
+            assertTrue("the sink couldn't read the notes: $line", "RESULT bytes=" in line)
+            assertEquals(
+                "not the whole notes file arrived",
+                file.length(),
+                Regex("bytes=(\\d+)").find(line)!!.groupValues[1].toLong(),
+            )
+        } finally {
+            file.delete()
         }
     }
 }
