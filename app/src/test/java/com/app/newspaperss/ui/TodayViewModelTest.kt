@@ -59,6 +59,12 @@ class TodayViewModelTest {
         assertEquals("Tomorrow at 6:30\u202fAM \u00b7 about 30 min", TodayViewModel.nextEdition(on, now.withHour(6).withMinute(10), started))
         val weekends = on.copy(schedule = on.schedule.copy(days = setOf(java.time.DayOfWeek.SATURDAY)))
         assertEquals("Saturday at 6:30\u202fAM \u00b7 about 30 min", TodayViewModel.nextEdition(weekends, now))
+        // With the podcast, when to have the phone charging.
+        val podcast = on.copy(listenVoice = com.app.newspaperss.settings.ListenVoice.PODCAST, podcastPace = 1.2f)
+        assertEquals(
+            "Tomorrow at 6:30\u202fAM \u00b7 about 30 min, with its podcast. It starts at 4:50\u202fAM: leave your phone charging",
+            TodayViewModel.nextEdition(podcast, now),
+        )
         } finally {
             java.util.Locale.setDefault(saved)
         }

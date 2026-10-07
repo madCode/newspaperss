@@ -218,6 +218,30 @@ class PodcastSetupTest {
     }
 
     @Test
+    fun restoredOntoAPhoneWithoutKokoroItReadsLiveAgain() = runTest {
+        // Settings come back from a backup; Kokoro's 384 MB doesn't.
+        store.update { it.copy(listenVoice = ListenVoice.PODCAST, podcastPace = 1.6f, podcastPaceMeasured = true) }
+        setup().settle()
+        val s = store.current()
+        assertEquals(ListenVoice.PHONE, s.listenVoice)
+        assertNull(s.podcastPace)
+        assertFalse(s.podcastPaceMeasured)
+    }
+
+    @Test
+    fun kokoroOnThePhoneOrOnItsWayIsLeftAlone() = runTest {
+        store.update { it.copy(listenVoice = ListenVoice.PODCAST, podcastPace = 1.2f) }
+        work.value = info(WorkInfo.State.RUNNING)
+        setup().settle()
+        assertEquals(ListenVoice.PODCAST, store.current().listenVoice)
+
+        work.value = null
+        installed()
+        setup().settle()
+        assertEquals(1.2f, store.current().podcastPace)
+    }
+
+    @Test
     fun downloadingAsksForWifiUnlessToldOtherwise() {
         val setup = setup()
         setup.download(mobileData = false)

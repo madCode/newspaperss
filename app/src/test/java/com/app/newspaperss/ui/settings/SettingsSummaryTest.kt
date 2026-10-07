@@ -35,6 +35,15 @@ class SettingsSummaryTest {
     }
 
     @Test
+    fun withThePodcastTheScheduleSaysWhenThePaperStarts() {
+        val podcast = Settings(scheduleEnabled = true, listenVoice = ListenVoice.PODCAST, podcastPace = 1.2f)
+        assertEquals("Ready by 6:30 AM, every day · starts 4:50 AM for the podcast", schedule(podcast).text.replace('\u202F', ' '))
+        // Ready soon after midnight, it starts the evening before.
+        val late = podcast.copy(schedule = Schedule(LocalTime.of(0, 30)))
+        assertEquals("Ready by 12:30 AM, every day · starts 10:50 PM the day before for the podcast", schedule(late).text.replace('\u202F', ' '))
+    }
+
+    @Test
     fun theScheduleNamesItsDaysTheShortestWay() {
         assertEquals("Off: make editions from Today", schedule(Settings(scheduleEnabled = false)).text)
         assertEquals("Ready by 6:30 AM, every day", schedule(Settings(scheduleEnabled = true)).text)

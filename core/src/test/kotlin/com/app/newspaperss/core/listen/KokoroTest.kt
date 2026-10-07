@@ -48,4 +48,20 @@ class KokoroTest {
         assertEquals(25, PodcastPace.longestPaper(4.0))
         assertEquals(Verdict.SLOW, PodcastPace.verdict(PodcastPace.longestPaper(4.0), 4.0))
     }
+
+    @Test
+    fun aScheduledPaperStartsEarlierByTheTimeItsPodcastTakesWithRoomToSpare() {
+        // A Pixel 8, checked: 54 minutes for a 30-minute paper, × 1.25, to the next 5 minutes.
+        assertEquals(70, PodcastPace.earlier(30, PodcastPace.fromSample(0.8), measured = false))
+        // Timed by real podcasts, the margin is smaller.
+        assertEquals(60, PodcastPace.earlier(30, PodcastPace.fromSample(0.8), measured = true))
+        // Never more than 3 hours.
+        assertEquals(180, PodcastPace.earlier(60, 4.0, measured = false))
+    }
+
+    @Test
+    fun theFirstRealPodcastReplacesTheChecksGuessAndLaterOnesAverage() {
+        assertEquals(1.6, PodcastPace.learn(1.2, lastMeasured = false, workSeconds = 2880.0, audioSeconds = 1800.0), 0.001)
+        assertEquals(1.4, PodcastPace.learn(1.6, lastMeasured = true, workSeconds = 2160.0, audioSeconds = 1800.0), 0.001)
+    }
 }

@@ -122,6 +122,8 @@ data class Settings(
      * been checked on it. See [com.app.newspaperss.core.listen.PodcastPace].
      */
     val podcastPace: Float? = null,
+    /** Whether [podcastPace] comes from real podcasts made on this phone, not only the check. */
+    val podcastPaceMeasured: Boolean = false,
 ) {
     /**
      * The setup chosen, or before it's settled, the one [SettingsStore.settleFeedsFrom] will
@@ -171,6 +173,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val listenVoice = stringPreferencesKey("listen_voice")
         val podcastVoice = stringPreferencesKey("podcast_voice")
         val podcastPace = floatPreferencesKey("podcast_pace")
+        val podcastPaceMeasured = booleanPreferencesKey("podcast_pace_measured")
         /** Notes saved beside editions in the delivery folder; read as that folder being the notes folder. */
         val legacyNotesWithEdition = booleanPreferencesKey("delivery_notes_with_edition")
     }
@@ -206,6 +209,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             prefs[Keys.listenVoice] = s.listenVoice.name
             prefs[Keys.podcastVoice] = s.podcastVoice.name
             if (s.podcastPace != null) prefs[Keys.podcastPace] = s.podcastPace else prefs.remove(Keys.podcastPace)
+            prefs[Keys.podcastPaceMeasured] = s.podcastPaceMeasured
             prefs.remove(Keys.legacyNotesWithEdition)
         }
     }
@@ -258,6 +262,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             listenVoice = p[Keys.listenVoice]?.let { runCatching { ListenVoice.valueOf(it) }.getOrNull() } ?: d.listenVoice,
             podcastVoice = p[Keys.podcastVoice]?.let { runCatching { PodcastVoice.valueOf(it) }.getOrNull() } ?: d.podcastVoice,
             podcastPace = p[Keys.podcastPace],
+            podcastPaceMeasured = p[Keys.podcastPaceMeasured] ?: d.podcastPaceMeasured,
         )
     }
 }

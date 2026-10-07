@@ -71,4 +71,35 @@ object PodcastPace {
 
     /** The longest paper, in reading minutes, this phone can make within [LIMIT_MINUTES]. */
     fun longestPaper(pace: Double): Int = (LIMIT_MINUTES / pace / ListenTime.fromReading(1.0)).toInt()
+
+    /** Room to spare on the estimate: more while it's the check's guess, less once real podcasts have timed it. */
+    const val MARGIN = 1.25
+    const val MEASURED_MARGIN = 1.1
+
+    /** The most a paper starts earlier for its podcast. */
+    const val MOST_EARLIER = 180
+
+    /**
+     * Minutes earlier a scheduled paper starts so its podcast is made by the time it's due: the
+     * time to make it with room to spare, in whole 5 minutes so the start is a time to remember.
+     */
+    fun earlier(readingMinutes: Int, pace: Double, measured: Boolean): Int {
+        val minutes = minutesToMake(readingMinutes, pace) * if (measured) MEASURED_MARGIN else MARGIN
+        return minOf(Math.ceil(minutes / 5).toInt() * 5, MOST_EARLIER)
+    }
+
+    /**
+     * The pace to keep after a podcast took [workSeconds] to make [audioSeconds]: that one's,
+     * the first time, then halfway between it and the last, so it follows the last few.
+     */
+    fun learn(last: Double, lastMeasured: Boolean, workSeconds: Double, audioSeconds: Double): Double {
+        val made = workSeconds / audioSeconds
+        return if (lastMeasured) (last + made) / 2 else made
+    }
+
+    /**
+     * Less speech than this in a run says little about the pace: a Pixel 8 took 7 minutes to warm
+     * up, and a cool phone is faster.
+     */
+    const val LEARN_FROM_SECONDS = 600.0
 }

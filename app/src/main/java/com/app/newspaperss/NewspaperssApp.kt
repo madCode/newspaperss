@@ -4,6 +4,8 @@ import android.content.Context
 import android.app.Application
 import com.app.newspaperss.work.EditionScheduler
 import com.app.newspaperss.work.SyncWorker
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 open class NewspaperssApp : Application() {
@@ -26,8 +28,14 @@ open class NewspaperssApp : Application() {
         container.notifier.createChannels()
         SyncWorker.schedulePeriodic(this)
         // Arms the timer if none is pending (first run, after an update or a
-        // restore); a pending or overdue one is left alone.
-        container.appScope.launch { EditionScheduler.reschedule(this@NewspaperssApp, container.settings.current()) }
+        // restore); a pending or overdue one is left alone. Again whenever the head start
+        // for the podcast changes: its pace learned from a podcast, or Kokoro turned on or off.
+        container.appScope.launch {
+            runCatching { container.podcastSetup.settle() }
+            container.settings.settings.map { EditionScheduler.lead(it) }.distinctUntilChanged().collect {
+                EditionScheduler.reschedule(this@NewspaperssApp, container.settings.current())
+            }
+        }
     }
 }
 

@@ -205,6 +205,13 @@ module so it's all unit-tested without Android.
   should be *ready*. A chain of one-off timers fires 30 minutes early,
   because Android's Doze can hold background work; the delay then eats lead
   time, not your morning. A clock or time-zone change re-arms the timer.
+- **With the podcast, they start earlier still** (debug builds): by the
+  time this phone takes to make your paper's podcast, × 1.25 for room to
+  spare, in whole 5 minutes, up to 3 hours. Once real podcasts have timed
+  the phone (each finished one moves the pace halfway to its own), the margin is × 1.1.
+  The start shows under Ready by on Schedule ("Starts at 4:50 AM, for the
+  podcast", and to leave the phone charging), in the Schedule summary, in
+  Today's next-edition line and in the speed check's verdict.
 - **Feeds sync right before each build,** and in the background every 12
   hours when the battery isn't low.
 - **No edition is never silent.** A timed run with nothing new sends a quiet

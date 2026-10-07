@@ -326,6 +326,20 @@ class ScreenshotTest {
         shoot("05-today", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
     }
 
+    /** The evening before, with the podcast in use on a Pixel 8: when the paper starts, and to leave the phone charging. */
+    @Test
+    fun todayWithThePodcast() {
+        runBlocking {
+            val latest = db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = Instant.parse("2026-09-29T06:30:00Z"), status = EditionStatus.DELIVERED, fileName = "x.epub", articleCount = 8, minutes = 33.4))
+            db.editions().insertArticles(sampleArticles(latest))
+        }
+        val files = tmp.newFolder().apply { resolve("x.epub").writeText("epub") }
+        val podcast = com.app.newspaperss.settings.Settings(scheduleEnabled = true, listenVoice = com.app.newspaperss.settings.ListenVoice.PODCAST, podcastPace = 1.2f)
+        val evening = java.time.ZonedDateTime.of(2026, 9, 29, 21, 0, 0, 0, java.time.ZoneOffset.UTC)
+        val vm = TodayViewModel(EditionRepository(db, files), flowOf(null), settings = flowOf(podcast), now = { evening }) {}
+        shoot("05h-today-podcast", ready = { vm.state.value.next != null && vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
+    }
+
     /** Eight sample articles for an edition's card, the second one starred. */
     private fun sampleArticles(edition: Long) = listOf(
         "BBC News" to "Flooding forces thousands from their homes in northern Italy" to 3.0,
@@ -841,6 +855,14 @@ class ScreenshotTest {
         shoot("07d-settings-schedule", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.SCHEDULE, onBack = {}) }
     }
 
+    /** Kokoro in use on a Pixel 8: the paper starts 70 minutes earlier, and the page says when. */
+    @Test
+    fun settingsScheduleWithThePodcast() {
+        runBlocking { store.update { it.copy(scheduleEnabled = true, listenVoice = com.app.newspaperss.settings.ListenVoice.PODCAST, podcastPace = 1.2f) } }
+        val vm = SettingsViewModel(store) {}
+        shoot("07t-settings-schedule-podcast", ready = { vm.settings.value != null }) { SettingsPageScreen(vm, SettingsPage.SCHEDULE, onBack = {}) }
+    }
+
     @Test
     fun settingsDelivery() {
         runBlocking { store.update { it.copy(device = Device.KINDLE, delivery = DeliveryMethod.KINDLE_EMAIL, kindleEmail = "name_abc123@kindle.com") } }
@@ -913,6 +935,8 @@ class ScreenshotTest {
     @Test
     fun settingsPodcastChecked() {
         val checked = MutableStateFlow<androidx.work.WorkInfo?>(running(com.app.newspaperss.listen.PodcastSetup.PHASE to com.app.newspaperss.listen.PodcastSetup.PHASE_CHECK))
+        // Scheduled editions, so the verdict says how much earlier they'd start.
+        runBlocking { store.update { it.copy(scheduleEnabled = true) } }
         installVoice(ApplicationProvider.getApplicationContext())
         val install = com.app.newspaperss.listen.KokoroInstall(tmp.newFolder()) {
             listOf(com.app.newspaperss.core.listen.KokoroFile("tokens.txt", 384_077_374L, "0".repeat(40)))

@@ -63,6 +63,8 @@ class PodcastMakerTest {
         object : PodcastEngine {
             override fun speak(text: String): Speech {
                 if (slow) Thread.sleep(5)
+                // Each line takes [paceNow] times as long to make as to hear.
+                clock += (text.length * 10.0 / RATE * paceNow * 1e9).toLong()
                 said += text
                 afterLine(text)
                 return Speech(FloatArray(if (text == silentFor) 0 else text.length * 10), RATE)
@@ -77,6 +79,8 @@ class PodcastMakerTest {
     private var mostLoaded = 0
     private var slow = false
     private var diskFull = false
+    private var clock = 0L
+    private var paceNow = 1.5
     private var silentFor: String? = null
     /** The first line said into a piece the encoder will fail to finish. */
     private var encoderBrokenOn: String? = null
@@ -99,7 +103,7 @@ class PodcastMakerTest {
 
     private var started = 0
     private var pieceSeconds = PodcastMaker.PIECE_SECONDS
-    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds) { started++ } }
+    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds, now = { clock }) { started++ } }
 
     private val knots = EditionArticle(
         title = "Counting Knots", sourceTitle = "Quanta", url = "https://example.com/knots",
@@ -440,6 +444,45 @@ class PodcastMakerTest {
         assertTrue(PodcastMaker.english("EN"))
         assertFalse(PodcastMaker.english("fr"))
         assertFalse(PodcastMaker.english("ja-JP"))
+    }
+
+    /** An article of [sentences] five-second sentences. */
+    private fun long(sentences: Int) = knots.copy(bodyHtml = "<p>" + (1..sentences).joinToString(" ") { "${"x".repeat(498)}$it." } + "</p>")
+
+    @Test
+    fun aPodcastTeachesThePaceItWasMadeAtOverAllItsRuns() {
+        inUse()
+        // Ten minutes of speech, made at 1.5× where the check guessed 1.2×, in two runs: Android
+        // stops each after 10 minutes.
+        val id = edition("Thursday", long(125))
+        request(id)
+        val job = Job()
+        afterLine = { if (said.size == 60) job.cancel() }
+        pieceSeconds = 60.0
+        runBlocking { runCatching { withContext(job) { maker.makeAll() } } }
+        assertFalse(runBlocking { settings.current() }.podcastPaceMeasured)
+        afterLine = {}
+        make()
+
+        val s = runBlocking { settings.current() }
+        assertEquals(1.5f, s.podcastPace!!, 0.02f)
+        assertTrue(s.podcastPaceMeasured)
+
+        // The next, at 1.1×, moves it halfway there.
+        paceNow = 1.1
+        request(edition("Friday", long(125)))
+        make()
+        assertEquals(1.3f, runBlocking { settings.current() }.podcastPace!!, 0.02f)
+    }
+
+    @Test
+    fun aShortRunTeachesNothing() {
+        inUse()
+        request(edition("Thursday", knots))
+        make()
+        val s = runBlocking { settings.current() }
+        assertEquals(1.2f, s.podcastPace!!, 0.001f)
+        assertFalse(s.podcastPaceMeasured)
     }
 
     private companion object {

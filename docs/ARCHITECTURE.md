@@ -304,6 +304,10 @@ flowchart LR
     included: a stopped run's native code runs on until its sentence ends.
   - Turning Kokoro off stops the making after the current page; removing it
     deletes the podcasts.
+  - Each finished podcast with 10 minutes of speech or more teaches the
+    phone's pace: all the time it took, over every run (loading Kokoro,
+    encoding, files), per second of speech. The pace sets how early
+    scheduled editions start (`PodcastPace.earlier`).
 - **`ListenProgress`** keeps where each of the ten most recent editions
   was left, and which were heard to the end, in SharedPreferences
   (`listening`).
@@ -316,7 +320,7 @@ twice.
 | Work | Started by | Unique name, policy | Notes |
 |---|---|---|---|
 | `EditionWorker` | "Make an edition", the timer | `edition-build`, KEEP | One build at a time. Needs a connection. A timed run that reaches no source retries twice (5, then 10 min). After 8 minutes it stops fetching and writes the edition with what it has, short of WorkManager's 10-minute limit. |
-| `EditionScheduler.Timer` | `EditionScheduler.reschedule` | `edition-schedule`, REPLACE (re-armed) / APPEND_OR_REPLACE (the next, from the running timer) | One-off timer 30 min before the due time; it starts a build and arms the next timer. |
+| `EditionScheduler.Timer` | `EditionScheduler.reschedule` | `edition-schedule`, REPLACE (re-armed) / APPEND_OR_REPLACE (the next, from the running timer) | One-off timer 30 min before the due time (`lead`: more with the podcast); it starts a build and arms the next timer. |
 | `SyncWorker` (periodic) | App start | `sync-periodic-12h`, KEEP | Every 12 h, connected, battery not low. Only keeps the Sources screen fresh. |
 | `SyncWorker` (now) | Adding a source, refresh | `sync-now`, APPEND_OR_REPLACE | Appended so a new source isn't missed by a sync already running. |
 | `NotesWorker` | First delivery | `notes-<edition>`, KEEP | Saves the notes file to the notes folder. |
@@ -331,7 +335,13 @@ periodic work can't say "6:30 on weekdays" and its start time drifts
 (`app/work/EditionScheduler.kt`). The decision to keep, cancel or re-arm
 a timer is pure logic in `ScheduleTimer` (`core/edition/Schedule.kt`).
 The pending and last due times are kept in SharedPreferences
-(`edition-schedule`).
+(`edition-schedule`), with when the pending timer fires: the podcast's
+pace can move the start of an edition whose due time stays put, which
+re-arms it. The app re-arms whenever the lead changes. The last edition
+started isn't armed again while it's being made: from when its timer
+fired (kept as `LAST_START`) until as long after it was due as it started
+before, so turning the podcast off or moving the time during a long lead
+doesn't make a second paper.
 
 ## Data model
 
