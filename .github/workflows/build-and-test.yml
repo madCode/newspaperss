@@ -20,6 +20,8 @@ jobs:
         with:
           # The build runs plugins and dependencies' code: it gets no token to push with.
           persist-credentials: false
+          # Changed-line coverage diffs against the base branch, which needs a merge base.
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           java-version: '21'
@@ -27,6 +29,10 @@ jobs:
           cache: gradle
       - name: Build, unit tests and coverage
         run: ./gradlew build koverXmlReport koverHtmlReport koverVerify
+      - name: Coverage of the lines this branch changed
+        if: github.event_name == 'pull_request'
+        run: python3 tools/changed-line-coverage.py 80 "origin/${{ github.base_ref }}"
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
