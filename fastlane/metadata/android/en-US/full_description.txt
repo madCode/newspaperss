@@ -20,6 +20,10 @@ NewspapeRSS turns the sites and links you choose into a finite edition (say, abo
 • Emailed straight to your Kindle, sent through the app of your choice, saved to a synced folder for KOReader, or opened on a Boox.
 • Articles are used up only once the edition is delivered. If one never arrives, mark it as not sent and its articles go back.
 
+<b>Or listen</b>
+• Listen reads an edition aloud in your phone's own voice, article by article, and keeps going with the screen off.
+• Follow along on the article's text, tap a sentence to hear it from there, and pick up where you stopped.
+
 <b>Calm by design</b>
 • No unread counts, no infinite timeline, no animations to smear on an e-ink screen.
 • Optional Markdown reading notes for Obsidian, Logseq or any notes app.
