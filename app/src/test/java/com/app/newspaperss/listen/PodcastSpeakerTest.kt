@@ -245,6 +245,21 @@ class PodcastSpeakerTest {
     }
 
     @Test
+    fun itSaysWhyAnArticleOfAnEditionWithAPodcastPlaysInThePhonesVoice() {
+        made(page = 0)
+        store.leaveLive(7, 1)
+        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
+        assertNull(speaker.instead.value)
+        speaker.speak(id(0, page = 1), "Le Monde", null, 1f, flush = true)
+        assertEquals(PodcastSpeaker.Instead.LEFT_OUT, speaker.instead.value)
+        speaker.speak(id(0, page = 2), "Rest of World", null, 1f, flush = true)
+        assertEquals(PodcastSpeaker.Instead.NOT_MADE_YET, speaker.instead.value)
+        // An edition without a podcast needs no word about it.
+        speaker.speak(LineId(1, 8, 0, 0, 5).toString(), "Nautilus", null, 1f, flush = true)
+        assertNull(speaker.instead.value)
+    }
+
+    @Test
     fun theListenPlayerFollowsThePodcastThenReadsTheNextArticleInThePhonesVoice() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val editionsDir = tmp.newFolder("editions")

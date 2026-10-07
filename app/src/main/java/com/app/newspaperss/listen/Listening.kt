@@ -13,6 +13,8 @@ class Listening(
     val player: ListenPlayer,
     private val progress: ListenProgress,
     private val editions: EditionRepository,
+    /** Podcasts made ahead, shown under Listen while Kokoro is in use; null without them. */
+    val podcasts: Podcasts? = null,
     /** Binds the service that keeps it playing with the screen off. */
     private val connect: () -> Unit,
 ) {

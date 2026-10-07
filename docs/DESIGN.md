@@ -692,7 +692,11 @@ whose Kindle and KOReader answers ask for more on the same page).
     all of them with Kokoro. Listen plays an article from its podcast once
     it's made, and in the phone's voice until then; the voice changes only
     between articles. The playing screen shows the podcast voice's name by
-    the source.
+    the source, and a quiet line when an article of an edition with a
+    podcast plays in the phone's voice (not made yet, or left out).
+    Under Listen on the edition page, a bar of its articles fills as each
+    is made, with how many minutes are made; an edition without a podcast
+    (made by hand, say) offers **Make the podcast**, made while charging.
   - **E-reader & delivery:** the e-reader in a dropdown at the top, then
     "How it gets there". They share a page because the e-reader decides
     which delivery options show: **Email it to your Kindle** (shown for a Kindle, or once

@@ -58,6 +58,19 @@ class PodcastSpeaker(
     /** The podcast's voice while an article plays from it; null in the phone's voice. */
     val voice: StateFlow<PodcastVoice?> = _voice.asStateFlow()
 
+    private val _instead = MutableStateFlow<Instead?>(null)
+
+    /** Why an article of an edition with a podcast plays in the phone's voice; null otherwise. */
+    val instead: StateFlow<Instead?> = _instead.asStateFlow()
+
+    enum class Instead {
+        /** The podcast hasn't reached it yet. */
+        NOT_MADE_YET,
+
+        /** The podcast left it to the phone's voice: not in English, or something Kokoro couldn't say. */
+        LEFT_OUT,
+    }
+
     /** The article the voice was chosen for, and its pieces if it plays from the podcast. */
     private var article: Pair<Long, Int>? = null
     private var pieces: List<PodcastPiece> = emptyList()
@@ -119,6 +132,11 @@ class PodcastSpeaker(
         // differently would otherwise tint the wrong ones, and never reach the article's end.
         pieces = made.takeIf { it.isNotEmpty() && it.last().firstLine + it.last().starts.size == lines }.orEmpty()
         chosen = if (pieces.isEmpty()) null else podcasts.voice(editionId)
+        _instead.value = when {
+            pieces.isNotEmpty() || !inUse() || podcasts.voice(editionId) == null -> null
+            podcasts.live(editionId, page) -> Instead.LEFT_OUT
+            else -> Instead.NOT_MADE_YET
+        }
     }
 
     private fun toPhone() {

@@ -68,6 +68,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.border
 import com.app.newspaperss.settings.PodcastVoice
+import com.app.newspaperss.listen.PodcastSpeaker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.semantics.contentDescription
@@ -105,9 +106,21 @@ import kotlin.math.roundToInt
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ListenScreen(player: ListenPlayer, onBack: () -> Unit, podcastVoice: StateFlow<PodcastVoice?> = MutableStateFlow(null)) {
+fun ListenScreen(
+    player: ListenPlayer,
+    onBack: () -> Unit,
+    podcastVoice: StateFlow<PodcastVoice?> = MutableStateFlow(null),
+    instead: StateFlow<PodcastSpeaker.Instead?> = MutableStateFlow(null),
+) {
     val state by player.state.collectAsStateWithLifecycle()
     val voice by podcastVoice.collectAsStateWithLifecycle()
+    val why by instead.collectAsStateWithLifecycle()
+    // One quiet line where the voice changes; nothing is said aloud about it.
+    val voiceNote = when (why) {
+        PodcastSpeaker.Instead.NOT_MADE_YET -> "From here, your phone's voice: the podcast hasn't reached this article yet."
+        PodcastSpeaker.Instead.LEFT_OUT -> "This article plays in your phone's voice: the podcast left it out, as it's not in English or couldn't be made."
+        null -> null
+    }
     var contents by remember { mutableStateOf(false) }
     val title = when {
         state.pages.isEmpty() -> "Listening"
@@ -134,7 +147,8 @@ fun ListenScreen(player: ListenPlayer, onBack: () -> Unit, podcastVoice: StateFl
                 state.error != null && script == null -> Message(state.error!!)
                 state.editionId == null -> Message("Nothing is playing. Open an edition and tap Listen.")
                 script == null -> Message("Opening…")
-                else -> Page(state, script, player)
+                // Only while playing, as the voice's name: paused, the next article's voice isn't chosen yet.
+                else -> Page(state, script, player, voiceNote.takeIf { state.playing })
             }
         }
     }
@@ -147,7 +161,7 @@ private fun Message(text: String) {
 }
 
 @Composable
-private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer) {
+private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer, voiceNote: String?) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     // Following the voice until the reader scrolls away; the chip brings them back.
@@ -156,7 +170,7 @@ private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer)
     LaunchedEffect(dragged) { if (dragged) following = false }
     val layouts = remember(script) { mutableStateMapOf<Int, TextLayoutResult>() }
     // Notes above the article take the first rows.
-    val notes = listOfNotNull(state.missingLanguage, state.error).size
+    val notes = listOfNotNull(voiceNote, state.missingLanguage, state.error).size
     val line = script.lines.getOrNull(state.at.line)
     // Jumps, not animated scrolls: animation smears on e-ink.
     LaunchedEffect(line, following, script) {
@@ -171,6 +185,18 @@ private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer)
     }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)) {
+            voiceNote?.let {
+                item {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
             state.missingLanguage?.let { tag -> item { MissingVoice(tag) } }
             state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 12.dp)) } }
             itemsIndexed(script.blocks) { index, block ->

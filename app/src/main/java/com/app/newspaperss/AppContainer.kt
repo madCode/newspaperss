@@ -43,6 +43,7 @@ import com.app.newspaperss.listen.PodcastEngine
 import com.app.newspaperss.listen.PodcastSetup
 import com.app.newspaperss.listen.PodcastMaker
 import com.app.newspaperss.listen.PodcastStore
+import com.app.newspaperss.listen.Podcasts
 import com.app.newspaperss.listen.AacEncoder
 import com.app.newspaperss.listen.AudioEncoder
 import com.app.newspaperss.work.PodcastWorker
@@ -147,6 +148,9 @@ class AppContainer(
     /** The podcast's voice while an article plays from it; null in the phone's voice. */
     val podcastPlaying: StateFlow<PodcastVoice?> get() = listenSpeaker.voice
 
+    /** Why an article plays in the phone's voice in an edition that has a podcast. */
+    val podcastInstead: StateFlow<PodcastSpeaker.Instead?> get() = listenSpeaker.instead
+
     private val listenMade: Lazy<ListenPlayer> = lazy {
         ListenPlayer(
             listenSpeaker, listenProgress, open = { ListenBook.open(editions, it) }, appScope,
@@ -155,7 +159,9 @@ class AppContainer(
         )
     }
     val listen: ListenPlayer by listenMade
-    val listening: Listening by lazy { Listening(listen, listenProgress, editions) { connectListening() } }
+    val listening: Listening by lazy {
+        Listening(listen, listenProgress, editions, Podcasts(podcasts, settings, kokoroInstall) { podcastMaker.request(it) }) { connectListening() }
+    }
 
     /** Getting the podcast's voice onto the phone. */
     val podcastSetup: PodcastSetup by lazy {
