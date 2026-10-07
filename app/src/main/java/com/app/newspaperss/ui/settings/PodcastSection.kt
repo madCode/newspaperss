@@ -57,6 +57,8 @@ private val INDENT = 44.dp
 internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: KokoroState?, size: Long?, phoneVoice: String?, onGetPhoneVoice: () -> Unit) {
     val context = LocalContext.current
     var asking by rememberSaveable { mutableStateOf(false) }
+    // Choosing to read live puts a failed setup aside for this visit.
+    var failureSeen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(kokoro) {
         if (kokoro !is KokoroState.Absent && kokoro !is KokoroState.Failed) asking = false
     }
@@ -68,7 +70,10 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
         when (kokoro) {
             // Too slow, its verdict is already showing, with Remove.
             is KokoroState.Ready -> if (verdict(s, kokoro) != Verdict.TOO_SLOW) vm.useKokoro()
-            KokoroState.Absent, is KokoroState.Failed -> if (onWifi(context)) vm.downloadKokoro(mobileData = false) else asking = true
+            KokoroState.Absent, is KokoroState.Failed -> {
+                failureSeen = false
+                if (onWifi(context)) vm.downloadKokoro(mobileData = false) else asking = true
+            }
             else -> {}
         }
     }
@@ -80,6 +85,7 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
             detail = phoneVoice ?: "No voice on this phone",
             onSelect = {
                 asking = false
+                failureSeen = true
                 // Choosing to read live while Kokoro downloads stops it; what's arrived is kept.
                 if (busy) vm.cancelKokoro()
                 vm.listenLive()
@@ -112,8 +118,11 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
             }
         }
         kokoro is KokoroState.Waiting && kokoro.retrying -> Step("Trying again shortly") {
-            Text("The download stopped part way. It carries on by itself in a few minutes, keeping what's arrived.")
-            TextButton(onClick = vm::cancelKokoro) { Text("Cancel") }
+            Text("The download stopped part way. It carries on by itself in a few minutes${if (kokoro.wifi) ", on Wi-Fi" else ""}, keeping what's arrived.")
+            Buttons {
+                if (kokoro.wifi) OutlinedButton(onClick = { vm.downloadKokoro(mobileData = true) }) { Text("Use mobile data") }
+                TextButton(onClick = vm::cancelKokoro) { Text("Cancel") }
+            }
         }
         kokoro is KokoroState.Waiting -> Step(if (kokoro.wifi) "Waiting for Wi-Fi" else "Waiting for a connection") {
             Text("Kokoro ($mb) will download by itself${if (kokoro.wifi) " on the next Wi-Fi" else " once the phone is online"}.")
@@ -130,7 +139,7 @@ internal fun ListeningVoices(s: AppSettings, vm: SettingsViewModel, kokoro: Koko
         kokoro is KokoroState.Checking -> Step("Seeing how fast this phone is…") {
             Text("About 20 seconds. Kokoro is making a short paragraph.")
         }
-        kokoro is KokoroState.Failed -> Step("Kokoro isn't set up") {
+        kokoro is KokoroState.Failed && !failureSeen -> Step("Kokoro isn't set up") {
             Text(kokoro.message)
             Buttons { OutlinedButton(onClick = ::pickPodcast) { Text("Try again") } }
         }

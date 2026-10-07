@@ -69,7 +69,8 @@ class PodcastSetup(
             }
             WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> return KokoroState.Waiting(
                 wifi = info.constraints.requiredNetworkType == NetworkType.UNMETERED,
-                retrying = info.runAttemptCount > 0,
+                // Its own record, not WorkManager's run count, which Android's stops also raise.
+                retrying = failures.exists() || damagedRuns.exists(),
             )
             else -> {}
         }
@@ -83,6 +84,7 @@ class PodcastSetup(
     fun download(mobileData: Boolean) {
         // Asked for afresh: earlier failures don't count against it, nor a check that went wrong.
         failures.delete()
+        damagedRuns.delete()
         checking.delete()
         start(mobileData)
     }
@@ -90,16 +92,26 @@ class PodcastSetup(
     // Beside the files, so Remove clears them too.
     private val failures get() = File(install.dir, ".failures")
     private val checking get() = File(install.dir, ".checking")
+    private val damagedRuns get() = File(install.dir, ".damaged")
 
     /**
      * Counts a failed run and returns how many have failed since anything last arrived. Android's
      * own stops (its time limit on work, Wi-Fi lost) aren't failures, so its run count can't be used.
      */
     @Synchronized
-    fun failed(): Int {
+    fun failed(): Int = count(failures)
+
+    /**
+     * Counts a run that ended with a file arriving damaged. Unlike [failed], bytes arriving don't
+     * reset it: a damaged file arrives in full each time, and would otherwise be fetched forever.
+     */
+    @Synchronized
+    fun damaged(): Int = count(damagedRuns)
+
+    private fun count(file: File): Int {
         install.dir.mkdirs()
-        val count = (failures.takeIf { it.exists() }?.readText()?.toIntOrNull() ?: 0) + 1
-        failures.writeText(count.toString())
+        val count = (file.takeIf { it.exists() }?.readText()?.toIntOrNull() ?: 0) + 1
+        file.writeText(count.toString())
         return count
     }
 
@@ -122,7 +134,9 @@ class PodcastSetup(
     suspend fun downloadAndCheck(download: KokoroDownload, onProgress: (got: Long, total: Long) -> Unit, onChecking: suspend () -> Unit) {
         var shown = -1L
         var from = -1L
-        download.run { got, total ->
+        val lock = Any()
+        // Eight files arrive at once: one at a time here, so progress can't step backwards.
+        download.run { got, total -> synchronized(lock) {
             when {
                 from < 0 -> from = got
                 // Something arrived: failures before it are no longer "in a row".
@@ -133,11 +147,11 @@ class PodcastSetup(
             }
             // In whole percent: every 64 KB would flood WorkManager's database, and redraw an e-ink screen.
             val percent = got * 100 / total.coerceAtLeast(1)
-            if (percent != shown) {
+            if (percent > shown) {
                 shown = percent
                 onProgress(got, total)
             }
-        }
+        } }
         onChecking()
         // Marked first: sherpa can abort in native code, and a check that took the app down
         // isn't run again on the next start, only when asked afresh.
@@ -152,8 +166,10 @@ class PodcastSetup(
             settings.update { it.copy(podcastPace = pace.toFloat()) }
         } finally {
             kokoro.release()
+            // Only a crash in native code skips this, which is what the marker is for: a stop or
+            // an error here mustn't read as one next time.
+            checking.delete()
         }
-        checking.delete()
     }
 
     companion object {

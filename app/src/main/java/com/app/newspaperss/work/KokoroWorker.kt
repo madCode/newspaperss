@@ -45,10 +45,10 @@ class KokoroWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             // lost) doesn't, so the run count can't be used.
             // Stopping closes the connection, which ends the read with an IOException: not a failure.
             if (isStopped) throw CancellationException("Stopped")
-            val failures = container.podcastSetup.failed()
             when {
-                failures < ATTEMPTS -> Result.retry()
-                e is KokoroDownload.DamagedException -> fail("Kokoro kept arriving damaged. Try again later.")
+                e is KokoroDownload.DamagedException ->
+                    if (container.podcastSetup.damaged() < DAMAGED_ATTEMPTS) Result.retry() else fail("Kokoro kept arriving damaged. Try again later.")
+                container.podcastSetup.failed() < ATTEMPTS -> Result.retry()
                 else -> fail("Couldn't download Kokoro. Check your connection and try again.")
             }
         } catch (e: Exception) {
@@ -65,6 +65,9 @@ class KokoroWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         private const val UNIQUE = "kokoro"
         /** Failures in a row, with nothing arriving in between, before it gives up. */
         internal const val ATTEMPTS = 6
+
+        /** A damaged file is fetched again once: twice in a row isn't the connection. */
+        internal const val DAMAGED_ATTEMPTS = 2
 
         /** Wi-Fi only unless [mobileData]; asking again replaces a download waiting for Wi-Fi. */
         fun enqueue(context: Context, mobileData: Boolean) {

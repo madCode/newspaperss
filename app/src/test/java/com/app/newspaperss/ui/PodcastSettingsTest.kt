@@ -74,9 +74,11 @@ class PodcastSettingsTest {
         runBlocking { storeScope.coroutineContext[Job]!!.cancelAndJoin() }
     }
 
+    private lateinit var setup: PodcastSetup
+
     private fun show(supported: Boolean = true): SettingsViewModel {
         installVoice(context)
-        val setup = PodcastSetup(
+        setup = PodcastSetup(
             install, store, work, start = { started += it }, stop = { stopped++ }, supported = supported,
             engine = { error("not in these tests") },
         )
@@ -202,11 +204,23 @@ class PodcastSettingsTest {
     }
 
     @Test
-    fun aRetryIsntWaitingForWifi() {
+    fun aRetryIsntWaitingForWifiButCanStillUseMobileData() {
         show()
+        setup.failed()
         work.value = WorkInfo(UUID.randomUUID(), WorkInfo.State.ENQUEUED, emptySet(), runAttemptCount = 1, constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build())
         waitFor("Trying again shortly")
         assertEquals(0, compose.onAllNodes(hasText("Waiting for Wi-Fi")).fetchSemanticsNodes().size)
+        compose.onNodeWithText("Use mobile data").performClick()
+        assertEquals(listOf(true), started)
+    }
+
+    @Test
+    fun choosingToReadLivePutsAFailureAside() {
+        show()
+        work.value = WorkInfo(UUID.randomUUID(), WorkInfo.State.FAILED, emptySet(), outputData = workDataOf(PodcastSetup.ERROR to "Couldn't download Kokoro."))
+        waitFor("Couldn't download Kokoro.")
+        compose.onNodeWithText("Read live in this phone's voice").performClick()
+        idleUntil { compose.onAllNodes(hasText("Couldn't download Kokoro.")).fetchSemanticsNodes().isEmpty() }
     }
 
     @Test

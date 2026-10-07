@@ -15,6 +15,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -84,7 +85,9 @@ class KokoroDownload(
         val done = install.verifiedPaths()
         val got = AtomicLong(install.files.filter { it.path in done }.sumOf { it.size })
         install.dir.mkdirs()
-        val needed = install.bytes - got.get()
+        // What's still to come: a part already on disk counts as there.
+        val needed = install.files.filter { it.path !in done }
+            .sumOf { it.size - File(install.file(it.path).path + ".part").length().coerceAtMost(it.size) }
         if (install.dir.usableSpace < needed + SPARE) throw NoSpaceException(needed + SPARE)
         onProgress(got.get(), install.bytes)
         val lanes = Semaphore(LANES)
@@ -127,7 +130,8 @@ class KokoroDownload(
         val call = client.newCall(request)
         coroutineScope {
             // Cancelling the work closes the connection, so a read waiting on it ends now, not at its timeout.
-            val watch = launch { try { awaitCancellation() } finally { call.cancel() } }
+            // Started at once, so a cancellation that comes before it would have been dispatched isn't missed.
+            val watch = launch(start = CoroutineStart.UNDISPATCHED) { try { awaitCancellation() } finally { call.cancel() } }
             try {
                 call.execute().use { response ->
                     if (!response.isSuccessful) throw IOException("Hugging Face answered ${response.code} for ${file.path}")

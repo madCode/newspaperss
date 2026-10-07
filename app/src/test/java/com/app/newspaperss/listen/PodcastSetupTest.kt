@@ -37,6 +37,7 @@ class PodcastSetupTest {
     private val engine = object : PodcastEngine {
         var released = false
         override fun speak(text: String): Speech {
+            if (broken) throw IllegalStateException("bad config")
             clock += 18_000_000_000L
             return Speech(FloatArray(if (silent) 0 else 15 * 24_000), 24_000)
         }
@@ -44,6 +45,7 @@ class PodcastSetupTest {
     }
 
     private var silent = false
+    private var broken = false
 
     private fun setup(supported: Boolean = true) = PodcastSetup(
         install, store, work,
@@ -79,8 +81,11 @@ class PodcastSetupTest {
         assertEquals(KokoroState.Waiting(wifi = true), setup.state.first())
         work.value = info(WorkInfo.State.ENQUEUED, network = NetworkType.CONNECTED)
         assertEquals(KokoroState.Waiting(wifi = false), setup.state.first())
-        // Waiting after a failed try is a wait whatever the connection, not one for Wi-Fi.
+        // Android stopping the work raises its run count too: that alone isn't a retry.
         work.value = WorkInfo(UUID.randomUUID(), WorkInfo.State.ENQUEUED, emptySet(), runAttemptCount = 2)
+        assertEquals(false, (setup.state.first() as KokoroState.Waiting).retrying)
+        setup.failed()
+        work.value = WorkInfo(UUID.randomUUID(), WorkInfo.State.ENQUEUED, emptySet(), runAttemptCount = 3)
         assertEquals(true, (setup.state.first() as KokoroState.Waiting).retrying)
         work.value = info(WorkInfo.State.RUNNING, progress = mapOf(PodcastSetup.GOT to 154_000_000L, PodcastSetup.TOTAL to 384_000_000L))
         assertEquals(KokoroState.Downloading(154_000_000L, 384_000_000L), setup.state.first())
@@ -130,6 +135,27 @@ class PodcastSetupTest {
         setup.download(mobileData = false)
         check(setup)
         assertEquals(PodcastVoice.HEART, voiceUsed)
+    }
+
+    @Test
+    fun aCheckThatFailsNormallyDoesntLookLikeACrashNextTime() {
+        installed()
+        val setup = setup()
+        broken = true
+        assertTrue(runCatching { check(setup) }.exceptionOrNull() is IllegalStateException)
+        broken = false
+        check(setup)
+        assertEquals(1.8f, kotlinx.coroutines.runBlocking { store.current().podcastPace }!!, 0.001f)
+    }
+
+    @Test
+    fun damagedRunsCountApartFromOtherFailures() {
+        val setup = setup()
+        setup.failed()
+        assertEquals(1, setup.damaged())
+        assertEquals(2, setup.damaged())
+        setup.download(mobileData = false)
+        assertEquals(1, setup.damaged())
     }
 
     @Test
