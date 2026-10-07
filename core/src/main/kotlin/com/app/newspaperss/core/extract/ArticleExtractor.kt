@@ -135,6 +135,10 @@ class ArticleExtractor(private val http: HttpClient) {
         if (feed != null && (input.mode == ContentMode.FEED || (input.mode == ContentMode.AUTO && feedWords >= FULL_TEXT_WORDS && !feed.teaser))) {
             return fromFeed(feed, null, null)
         }
+        // A link to a spot on a page (one of a day's posts on a blog like Scripting News) is one entry
+        // among others: the page would bring all of them, losing their titles to the cleaner, and the
+        // feed's text is the entry. Whatever the source's mode, and saying nothing about it.
+        if (feed != null && input.feedUrl == null && pointsIntoPage(input.url)) return fromFeed(feed, null, null)
 
         return when (val page = fetchPage(input).also { if (it is PageResult.Fetched) onPage(it) }) {
             is PageResult.Failed ->
@@ -309,6 +313,15 @@ class ArticleExtractor(private val http: HttpClient) {
             title, feedAuthor ?: page.content.author, clean, usedFeed = false, note = null, feedWords = feedWords, pageWords = page.clean.wordCount,
             declaredLanguage = page.content.language,
         )
+    }
+
+    /**
+     * The address names a spot on its page (`day.html#a165533`), not an app route (`#/post/1`,
+     * `#!post`), a tracking tag (`#ref=rss`) or a text highlight (`#:~:text=`).
+     */
+    private fun pointsIntoPage(url: String): Boolean {
+        val fragment = url.substringAfter('#', "")
+        return fragment.isNotEmpty() && fragment[0] !in "/!:" && '=' !in fragment && '&' !in fragment
     }
 
     /** The feed's title, else the page's, else one made from the address. */

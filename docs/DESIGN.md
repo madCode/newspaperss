@@ -79,6 +79,9 @@ module so it's all unit-tested without Android.
   preview. If the page can't be fetched (or is over 5 MB, too big to parse
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
+- **Posts on a shared page.** An item linking to its spot on a page
+  (`05.html#a165533`, one of a day's posts on Scripting News) is just its
+  feed text: the page holds the day's other posts too.
 - **Paid posts.** A post for paying subscribers goes in as its free part,
   with a note saying so. It's known by what the platform puts on the page
   in place of the rest: Ghost's upgrade box or Substack's paywall. Not
