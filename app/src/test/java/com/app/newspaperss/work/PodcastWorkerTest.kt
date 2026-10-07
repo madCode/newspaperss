@@ -11,15 +11,22 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ForegroundInfo
 import androidx.work.ForegroundUpdater
 import androidx.work.ListenableWorker
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import androidx.work.impl.foreground.SystemForegroundService
 import androidx.work.testing.TestListenableWorkerBuilder
+import androidx.work.testing.WorkManagerTestInitHelper
 import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.testutil.TestApp
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -39,14 +46,29 @@ class PodcastWorkerTest {
         Futures.immediateFuture(null)
     }
 
+    private val notYet = Long.MIN_VALUE / 2
+
     @Before fun setUp() {
-        PodcastWorker.refused = false
+        WorkManagerTestInitHelper.initializeTestWorkManager(app)
+        PodcastWorker.refusedAt = notYet
         app.container.notifier.createChannels()
     }
 
     @After fun tearDown() {
-        PodcastWorker.refused = false
+        PodcastWorker.refusedAt = notYet
+        WorkManagerTestInitHelper.closeWorkDatabase()
     }
+
+    private fun queued() = WorkManager.getInstance(app).getWorkInfosForUniqueWork("podcast").get()
+        .count { it.state == WorkInfo.State.ENQUEUED }
+
+    private fun onScreen(yes: Boolean) = shadowOf(app.getSystemService(ActivityManager::class.java)).setProcesses(
+        listOf(
+            ActivityManager.RunningAppProcessInfo(app.packageName, Process.myPid(), arrayOf(app.packageName)).apply {
+                importance = if (yes) ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND else ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED
+            },
+        ),
+    )
 
     private fun unrestricted(yes: Boolean) =
         shadowOf(app.getSystemService(PowerManager::class.java)).setIgnoringBatteryOptimizations(app.packageName, yes)
@@ -73,13 +95,7 @@ class PodcastWorkerTest {
     @Test
     fun restrictedAndOffScreenItDoesntAskButStillMakesIt() = runTest {
         unrestricted(false)
-        shadowOf(app.getSystemService(ActivityManager::class.java)).setProcesses(
-            listOf(
-                ActivityManager.RunningAppProcessInfo(app.packageName, Process.myPid(), arrayOf(app.packageName)).apply {
-                    importance = ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED
-                },
-            ),
-        )
+        onScreen(false)
 
         assertTrue(run(allowed) is ListenableWorker.Result.Success)
         // Asked and refused, WorkManager would ignore the phone being unplugged.
@@ -87,16 +103,49 @@ class PodcastWorkerTest {
     }
 
     @Test
-    fun refusedItRetriesAndTheNextRunStaysInTheBackground() = runTest {
+    fun restrictedButOnScreenItAsks() = runTest {
+        unrestricted(false)
+        onScreen(true)
+
+        assertTrue(run(allowed) is ListenableWorker.Result.Success)
+        assertTrue(shown != null)
+    }
+
+    @Test
+    fun refusedItEndsAndTheNextRunStaysInTheBackground() = runTest {
         unrestricted(true)
         // What Android 12 and later say when foreground work starts from the background.
         val refused = ForegroundUpdater { _: Context, _: UUID, _: ForegroundInfo ->
             Futures.immediateFailedFuture<Void>(IllegalStateException("startForegroundService() not allowed"))
                 as ListenableFuture<Void>
         }
-        assertTrue(run(refused) is ListenableWorker.Result.Retry)
+        // Ended, so WorkManager lets go of the half-foreground work, and queued to go on.
+        assertTrue(run(refused) is ListenableWorker.Result.Success)
+        assertEquals(1, queued())
 
         assertTrue(run(allowed) is ListenableWorker.Result.Success)
         assertNull(shown)
+    }
+
+    @Test
+    fun makingStopsWhenItShouldntGoOnAndSaysSo() = runTest {
+        var going = true
+        var made = false
+        val stopped = async {
+            PodcastWorker.makeWhile(1_000, {
+                delay(10_000)
+                made = true
+            }) { going }
+        }
+        advanceTimeBy(2_500)
+        going = false
+        advanceTimeBy(1_000)
+        assertTrue(stopped.await())
+        assertFalse(made)
+    }
+
+    @Test
+    fun makingThatFinishesIsntStopped() = runTest {
+        assertFalse(PodcastWorker.makeWhile(1_000, { delay(2_500) }) { true })
     }
 }

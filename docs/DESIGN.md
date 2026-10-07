@@ -690,8 +690,9 @@ whose Kindle and KOReader answers ask for more on the same page).
     stops and keeps what's made. It's made in the foreground, with a
     quiet "Making the podcast" notification (if notifications are on):
     Android lets long work run only so. From Android 12 that's allowed
-    overnight only if the app's battery use is Unrestricted; otherwise
-    it's made a few minutes at a time, slowly.
+    overnight only if the app's battery use is Unrestricted, and from
+    Android 15 for 6 hours a day; otherwise it's made a few minutes at a
+    time, slowly.
     English articles only; the rest are left
     to the phone's voice. A podcast is deleted with its edition's book, and
     all of them with Kokoro. Listen plays an article from its podcast once
