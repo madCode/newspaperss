@@ -265,9 +265,9 @@ flowchart LR
   reached. Its speed is Settings' `listenSpeed`: it follows the store and
   saves changes made from its own controls there.
 - **`Speaker`** is the voice. `SystemSpeaker` wraps Android's
-  `TextToSpeech`; tests use a fake. Kokoro (in the backlog) can't keep up
-  live on a phone, so it would play audio made ahead of time, with this
-  voice for what isn't made yet.
+  `TextToSpeech`; tests use a fake. Kokoro can't keep up live on a phone,
+  so it makes podcasts ahead of time (below); playing them, with this
+  voice for what isn't made yet, is in the backlog.
 - **`ListenService`** is a Media3 `MediaSessionService`. Its
   `SessionPlayer` (a `SimpleBasePlayer`) shows the player's state to
   Android, an article a track, and turns the lock screen's commands into
@@ -276,7 +276,8 @@ flowchart LR
   first tapped, and Media3 makes it a foreground service while it plays.
 - When an edition's book is deleted (the edition, or old files pruned),
   `EditionRepository`'s `onFileGone` tells the player, which lets the book
-  go if it's the one loaded; the player isn't made just to be told.
+  go if it's the one loaded; the player isn't made just to be told. Its
+  podcast is deleted too.
 - **`PodcastSetup`** gets Kokoro onto the phone for the podcast (in the
   backlog). `KokoroWorker` runs `KokoroDownload`, which fetches the files
   the manifest `assets/kokoro/files.tsv` pins (a Hugging Face revision,
@@ -284,6 +285,16 @@ flowchart LR
   and checking each, into `files/kokoro`; then it times `KokoroEngine`
   (sherpa-onnx) making a paragraph and keeps the pace in Settings. The
   setup reads its state back from WorkManager and the files.
+- **`PodcastMaker`** makes podcasts. `EditionRun`'s `onBuilt` asks for a
+  scheduled edition's, if Kokoro is in use; `PodcastWorker` makes it while
+  the phone charges. It reads the book a page at a time (articles, then
+  the closing page), says each line with `KokoroEngine`, and encodes the
+  page with `AacEncoder` (AAC in MP4, through `MediaCodec`). `PodcastStore`
+  keeps each page whole or not at all, with each line's start time; a page
+  not in English, or one Kokoro fails on, is marked for the phone's voice.
+  The newest edition asked for goes first. A podcast keeps the voice it
+  started in. Turning Kokoro off stops the making after the current page;
+  removing Kokoro deletes the podcasts.
 - **`ListenProgress`** keeps where each of the ten most recent editions
   was left, and which were heard to the end, in SharedPreferences
   (`listening`).
@@ -304,6 +315,7 @@ twice.
 | `ReadingListTitleWorker` | New untitled links | `reading-list-titles`, APPEND_OR_REPLACE | Batches of 20, one batch at a time. |
 | `MoveFeedsWorker` | Moving phone feeds to tt-rss; app start, if a move is stored | `move-feeds`, APPEND_OR_REPLACE | Connected. Runs `FeedMoves.run`; what's left is in DataStore, so a run stopped part way carries on in the next. Appended so a run finishing up can't swallow a new move. |
 | `KokoroWorker` | Settings › Listening, picking the podcast | `kokoro`, REPLACE | Downloads Kokoro on Wi-Fi (any connection if the reader chose mobile data), then the speed check. Resumes across WorkManager's 10-minute limit; gives up after 6 failures with nothing arriving between them. |
+| `PodcastWorker` | A scheduled edition built with Kokoro in use; turning Kokoro back on | `podcast`, APPEND_OR_REPLACE | Only while charging. Unplugged, or at WorkManager's 10-minute limit, it stops and carries on from the next page when it runs again. Appended so a run finishing up can't swallow a new edition. |
 
 Timed editions use a chain of one-off timers, not periodic work, because
 periodic work can't say "6:30 on weekdays" and its start time drifts
@@ -438,11 +450,12 @@ stays as a `DELETED` row to keep its title taken.
 | Timer state | SharedPreferences `edition-schedule` | `app/work/EditionScheduler.kt` |
 | Where listening stopped | SharedPreferences `listening` | `app/listen/ListenProgress.kt` |
 | Kokoro, the podcast's voice (384 MB) | `files/kokoro`, checked files in `.verified` | `app/listen/Kokoro.kt` |
+| Podcasts, about 7 MB per 30 minutes | `files/podcasts/<edition>/`: each page's `.m4a` and `.starts`, the voice, `finished` | `app/listen/Podcasts.kt` |
 | EPUBs | `files/editions/`; only the newest 14 keep their file (unsent ones always do) | `EditionRepository.pruneFiles` |
 | Notes files | `files/notes/` | `app/edition/EditionNotes.kt` |
 | HTTP cache | `cache/http`, used to revalidate feeds | `AppContainer`, `core/net/HttpClient.kt` |
 
-Auto Backup leaves out the EPUBs, the timer state and the tt-rss account
+Auto Backup leaves out the EPUBs, Kokoro, podcasts, the timer state and the tt-rss account
 (`app/src/main/res/xml/backup_rules.xml`).
 
 **Where the feeds come from** is the setting `feedsFrom` (`PHONE` or

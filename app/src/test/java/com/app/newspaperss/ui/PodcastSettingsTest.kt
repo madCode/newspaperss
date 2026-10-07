@@ -81,6 +81,7 @@ class PodcastSettingsTest {
         setup = PodcastSetup(
             install, store, work, start = { started += it }, stop = { stopped++ }, supported = supported,
             engine = { error("not in these tests") },
+            podcasts = com.app.newspaperss.listen.PodcastStore(java.io.File(context.filesDir, "podcasts")), makePodcasts = {},
         )
         val vm = SettingsViewModel(store, podcast = setup) {}
         compose.setContent { SettingsPageScreen(vm, SettingsPage.LISTENING, onBack = {}) }

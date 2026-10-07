@@ -55,6 +55,8 @@ class PodcastSetup(
     private val stop: () -> Unit,
     private val supported: Boolean,
     private val engine: (PodcastVoice) -> PodcastEngine,
+    private val podcasts: PodcastStore,
+    private val makePodcasts: () -> Unit,
     private val now: () -> Long = System::nanoTime,
 ) {
     /** The download's size; reads the manifest, so not on the main thread. */
@@ -122,12 +124,17 @@ class PodcastSetup(
     /** Stops a download, keeping what's arrived for next time. */
     fun cancel() = stop()
 
-    suspend fun use() = settings.update { it.copy(listenVoice = ListenVoice.PODCAST) }
+    /** Kokoro reads from now on; podcasts asked for before it was turned off carry on being made. */
+    suspend fun use() {
+        settings.update { it.copy(listenVoice = ListenVoice.PODCAST) }
+        if (withContext(Dispatchers.IO) { podcasts.waiting().isNotEmpty() }) makePodcasts()
+    }
 
-    /** Deletes Kokoro and goes back to reading live. */
+    /** Deletes Kokoro and the podcasts made with it, and goes back to reading live. */
     suspend fun remove() {
         stop()
         install.remove()
+        withContext(Dispatchers.IO) { podcasts.deleteAll() }
         settings.update { it.copy(listenVoice = ListenVoice.PHONE, podcastPace = null) }
     }
 

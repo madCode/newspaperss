@@ -60,8 +60,10 @@ class EditionRunTest {
             settings, FeedSync(db, http), EditionBuilder(db, content, editions.editionsDir), editions,
             { file, uri, name, mime -> saved += "$uri/$name ($mime):${file.length() > 0}"; folderErrors[mime] }, notifier,
             now = { clock },
+            onBuilt = { id, scheduled -> built += id to scheduled },
         )
     }
+    private val built = mutableListOf<Pair<Long, Boolean>>()
 
     private suspend fun oneSource() {
         SourceRepository(db).addFeed("https://example.com/feed", "Blog")
@@ -96,6 +98,20 @@ class EditionRunTest {
         run.run(scheduled = false)
 
         assertEquals(BuildResult.NothingNew, run.run(scheduled = false))
+    }
+
+    @Test
+    fun aBuiltEditionIsPassedOnAfterItsDelivered() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Kobo") }
+        val result = run.run(scheduled = true) as BuildResult.Built
+
+        // Delivered first: the podcast asked for here never holds up the paper.
+        assertEquals(listOf("delivered to Kobo"), notices)
+        assertEquals(listOf(result.editionId to true), built)
+        // Nothing new: nothing to pass on.
+        run.run(scheduled = false)
+        assertEquals(1, built.size)
     }
 
     @Test
