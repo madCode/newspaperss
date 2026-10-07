@@ -81,6 +81,20 @@ class DebugUpdatesTest {
     }
 
     @Test
+    fun aRefusalWaitsThreeHoursLikeAnAnswer() = runTest {
+        http.page(DebugUpdates.RELEASE_API, "rate limited", code = 403)
+        val updates = updates(installed = 455)
+        updates.checkIfDue()
+        release(464)
+        updates.checkIfDue()
+        assertEquals("not again on the next return to the app", 1, asked)
+        assertNull(updates.newer.value)
+        clock += DebugUpdates.INTERVAL_MILLIS
+        updates.checkIfDue()
+        assertEquals(464, updates.newer.value)
+    }
+
+    @Test
     fun aLocalOrReleaseBuildNeverAsks() = runTest {
         release(464)
         val updates = updates(installed = DebugUpdates.buildOf("0.1.0-debug"))

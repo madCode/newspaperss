@@ -25,6 +25,9 @@ The app only connects to:
   browser.
 - **Your own Tiny Tiny RSS server,** if you use one, with the login you
   give it. NewspapeRSS's makers never see it.
+- **GitHub, in test builds only:** a debug build from the project's own
+  builds asks GitHub at most every three hours whether a newer one is out.
+  GitHub sees the request from your phone. Release builds never ask.
 
 ## Sending editions
 

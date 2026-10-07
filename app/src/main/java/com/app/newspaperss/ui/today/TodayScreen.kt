@@ -1,5 +1,7 @@
 package com.app.newspaperss.ui.today
 
+import android.content.ClipboardManager
+import android.content.ClipData
 import com.app.newspaperss.ui.edition.articlesAndMinutes
 import com.app.newspaperss.ui.edition.minutesLabel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -90,7 +92,13 @@ fun TodayScreen(viewModel: TodayViewModel, today: LocalDate = LocalDate.now(), n
         item(key = "masthead") { Masthead(today, Modifier.padding(top = 24.dp, bottom = 16.dp)) }
         newerBuild?.let { build ->
             item(key = "newerBuild") {
-                TextButton(onClick = { openInBrowser(context, DebugUpdates.DOWNLOAD) }, modifier = Modifier.padding(bottom = 8.dp)) {
+                val download = {
+                    if (!openInBrowser(context, DebugUpdates.DOWNLOAD)) {
+                        context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Download link", DebugUpdates.DOWNLOAD))
+                        Toast.makeText(context, "No browser here. The download link is copied", Toast.LENGTH_LONG).show()
+                    }
+                }
+                TextButton(onClick = download, modifier = Modifier.padding(bottom = 8.dp)) {
                     Text("Test build $build is out. Download it", textAlign = TextAlign.Center)
                 }
             }

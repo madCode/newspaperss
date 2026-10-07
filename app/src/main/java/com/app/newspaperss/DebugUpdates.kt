@@ -33,11 +33,14 @@ class DebugUpdates(
         val response = try {
             http.get(RELEASE_API)
         } catch (_: IOException) {
+            // Not counted: offline, it asks again next time the app comes to the front.
             return
         }
-        // Not recorded as checked: offline, it asks again next time the app opens.
+        // Any answer counts, refusals too: retried on every return to the app, a rate limit
+        // (60 an hour per address) would stay used up.
+        prefs.edit().putLong(CHECKED, now()).apply()
         val latest = response.takeIf { it.isSuccessful }?.let { latestBuild(it.body) } ?: return
-        prefs.edit().putLong(CHECKED, now()).putInt(LATEST, latest).apply()
+        prefs.edit().putInt(LATEST, latest).apply()
         newerBuild.value = newer(latest)
     }
 
