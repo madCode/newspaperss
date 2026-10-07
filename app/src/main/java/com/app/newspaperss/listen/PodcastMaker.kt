@@ -67,8 +67,15 @@ class PodcastMaker(
         var kokoro: Pair<PodcastVoice, PodcastEngine>? = null
         try {
             while (true) {
-                val editionId = store.waiting().firstOrNull() ?: break
-                if (!inUse()) break
+                val editionId = store.waiting().firstOrNull()
+                if (editionId == null) {
+                    log.add("Nothing left to make")
+                    break
+                }
+                if (!inUse()) {
+                    log.add("Stopped: Kokoro turned off or removed")
+                    break
+                }
                 store.making(editionId)
                 val book = ListenBook.open(editions, editionId)
                 if (book == null) {
@@ -80,7 +87,10 @@ class PodcastMaker(
                 book.use {
                     for (page in book.pages.indices) {
                         if (store.settled(editionId, page)) continue
-                        if (!inUse()) return
+                        if (!inUse()) {
+                            log.add("Stopped: Kokoro turned off or removed")
+                            return
+                        }
                         // A newer edition asked for since: it goes first, and this one carries on after.
                         if (store.waiting().firstOrNull() != editionId) return@use
                         if (kokoro?.first != voice) {
@@ -170,7 +180,7 @@ class PodcastMaker(
             log.add("Page $page left to the phone's voice: ${e.cause?.message ?: e.cause?.javaClass?.name}")
             store.leaveLive(editionId, page)
         } catch (e: CancellationException) {
-            log.add("Stopped on page $page before line $next; ${piece?.seconds?.toInt() ?: 0}s of unkept audio dropped")
+            log.add("Stopped on page $page before line $next; ${piece?.seconds?.toInt() ?: 0}s of unkept audio dropped, resumes at line ${piece?.firstLine ?: next}")
             throw e
         } catch (e: IOException) {
             // A full disk, most likely: tried again later, as it is.

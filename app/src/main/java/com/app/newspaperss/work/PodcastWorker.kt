@@ -38,6 +38,10 @@ import kotlinx.coroutines.launch
 class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     private val log get() = applicationContext.container.podcastLog
 
+    /** Noted from the guard as the stop comes, and again as the run ends: once is enough. */
+    @Volatile
+    private var timedOut = false
+
     override suspend fun doWork(): Result = try {
         val asked = mayGoForeground()
         log.add("Run started (try ${runAttemptCount + 1}): ${if (asked) "asking for the foreground" else "in the background"}, ${standing()}")
@@ -64,7 +68,7 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                     }
                 }
             }
-            if (!stopped) log.add("Run ended: nothing left to make")
+            if (!stopped) log.add("Run ended")
             if (stopped) enqueue(applicationContext)
         }
         Result.success()
@@ -74,7 +78,8 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         throw e
     } catch (e: Exception) {
         // Kokoro couldn't load (its files damaged since the check, say): asked again, it tries again.
-        log.add("Run failed: ${e.javaClass.name}: ${e.message}")
+        // The class only: a message could carry anything, and the log is shared.
+        log.add("Run failed: ${e.javaClass.name}")
         Result.failure()
     } catch (e: LinkageError) {
         log.add("Kokoro's native code didn't load: ${e.javaClass.name}")
@@ -130,7 +135,8 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
      * finishes its sentence: the next run may start before that.
      */
     private fun noteTimeout() {
-        if (Build.VERSION.SDK_INT >= 31 && stopReason == WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT) {
+        if (Build.VERSION.SDK_INT >= 31 && stopReason == WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT && !timedOut) {
+            timedOut = true
             holdOff(TIMED_OUT_MS)
             log.add("Android's daily time in the foreground used up; not asking again for 12 hours")
         }

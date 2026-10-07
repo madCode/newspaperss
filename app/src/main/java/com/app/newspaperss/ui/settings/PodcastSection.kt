@@ -293,7 +293,8 @@ private fun PodcastLogButton(vm: SettingsViewModel) {
             TextButton(
                 onClick = {
                     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
-                    context.startActivity(Intent.createChooser(send, "Share the podcast log"))
+                    // E-reader firmware may lack the chooser.
+                    runCatching { context.startActivity(Intent.createChooser(send, "Share the podcast log")) }
                 },
                 enabled = !text.isNullOrEmpty(),
             ) { Text("Share") }

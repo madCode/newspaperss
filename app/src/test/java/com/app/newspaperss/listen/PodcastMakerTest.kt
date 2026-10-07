@@ -210,7 +210,7 @@ class PodcastMakerTest {
         assertTrue(entries.toString(), entries.any { it.contains("Kept page 0 lines 0–4") })
         assertTrue(entries.toString(), entries.any { it.contains("Page 0 made") })
         // Where it left off, and what it lost by stopping: the clue to runs that never keep a piece.
-        assertTrue(entries.toString(), entries.last().contains("Stopped on page 1 before line 1"))
+        assertTrue(entries.toString(), entries.last().contains("Stopped on page 1 before line 1; 0s of unkept audio dropped, resumes at line 0"))
     }
 
     @Test
@@ -267,6 +267,8 @@ class PodcastMakerTest {
         assertTrue(store.made(id, 0))
         assertFalse(store.settled(id, 1))
         assertEquals(listOf(id), store.waiting())
+        // Not "nothing left": the log is read to tell the two apart.
+        assertTrue(log.read().toString(), log.read().last().endsWith("Stopped: Kokoro turned off or removed"))
     }
 
     @Test
