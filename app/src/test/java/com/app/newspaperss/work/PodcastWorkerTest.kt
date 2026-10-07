@@ -169,4 +169,14 @@ class PodcastWorkerTest {
         assertFalse(sentenceDone)
         work.join()
     }
+
+    @Test
+    fun stoppedFromOutsideBetweenSentencesItSaysSoToo() = runTest {
+        var told = false
+        val work = launch { PodcastWorker.makeWhile(1_000, { delay(10_000) }, { told = true }) { true } }
+        advanceTimeBy(2_500)
+        work.cancel()
+        work.join()
+        assertTrue(told)
+    }
 }

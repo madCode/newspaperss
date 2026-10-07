@@ -59,6 +59,7 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         }
         Result.success()
     } catch (e: CancellationException) {
+        noteTimeout()
         throw e
     } catch (e: Exception) {
         // Kokoro couldn't load (its files damaged since the check, say): asked again, it tries again.
@@ -157,10 +158,11 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
          * Runs [make] while [keepGoing], checked every [checkMs]; true if it was stopped. Here as
          * well as in WorkManager: work that went foreground in WorkManager's eyes but not
          * Android's is never stopped by WorkManager. [cancelled] is called as soon as the work is
-         * cancelled from outside, while [make] may still be finishing.
+         * cancelled, while [make] may still be finishing: from outside, or by [make] failing.
          */
         internal suspend fun makeWhile(checkMs: Long, make: suspend () -> Unit, cancelled: () -> Unit, keepGoing: () -> Boolean): Boolean = coroutineScope {
             var stopped = false
+            var finished = false
             val making = launch { make() }
             val guard = launch {
                 try {
@@ -173,10 +175,11 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                         }
                     }
                 } finally {
-                    if (!making.isCompleted && !stopped) cancelled()
+                    if (!finished && !stopped) cancelled()
                 }
             }
             making.join()
+            finished = true
             guard.cancel()
             stopped
         }
