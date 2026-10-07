@@ -1,0 +1,77 @@
+# The two whole-codebase passes docs/BACKLOG.md asks for, on a clock rather than when someone
+# remembers. A PR review sees one diff; these see what only the whole tree shows.
+# Findings become an issue, not a PR: each wants checking before anything is changed.
+name: Recurring review
+
+on:
+  schedule:
+    # Security on the 1st, architecture on the 15th: far enough apart that one is always recent.
+    - cron: '17 4 1 * *'
+    - cron: '17 4 15 * *'
+  workflow_dispatch:
+    inputs:
+      pass:
+        description: Which pass to run
+        required: true
+        type: choice
+        options: [security, architecture]
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Which pass
+        id: which
+        env:
+          DISPATCHED: ${{ inputs.pass }}
+          CRON: ${{ github.event.schedule }}
+        run: |
+          if [ -n "$DISPATCHED" ]; then pass="$DISPATCHED"
+          elif [ "$CRON" = '17 4 1 * *' ]; then pass=security
+          else pass=architecture
+          fi
+          echo "pass=$pass" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PASS: ${{ steps.which.outputs.pass }}
+
+            Run the "${{ steps.which.outputs.pass }}" whole-codebase pass from the Recurring
+            reviews section of docs/BACKLOG.md. Read CLAUDE.md and docs/ARCHITECTURE.md first.
+            The backlog says what each pass covers; it is the specification, so follow it rather
+            than a generic checklist.
+
+            For security: hostile feeds and pages (entity expansion, slow regexes, huge inputs),
+            links and intents that leave the app, what CI's jobs can write, signing keys, and
+            whether actions and dependencies are pinned.
+
+            For architecture: duplication and code that has grown complicated, how features fit
+            together (what one feature deletes that another still uses), tests that can never
+            fail, waits that flake under load, and copied test helpers.
+
+            Report findings as `file:line`, each with the input or state that produces the wrong
+            result, most severe first. Make no edits and open no pull request.
+
+            Then open ONE issue with `gh issue create`, labelled `audit`, titled
+            "<pass> pass: <n> findings" (or "<pass> pass: nothing worth changing"). Put the
+            findings in it, worst first, and say plainly which you are unsure about. A pass that
+            finds little should say so in a few lines: padding it makes the next one easier to
+            ignore.
+
+            Do not repeat a finding that an open `audit` issue already lists -- check first with
+            `gh issue list --label audit --state open`.
+
+          claude_args: |
+            --allowedTools "Bash(gh issue create:*),Bash(gh issue list:*),Bash(gh label create:*),Bash(git log:*),Bash(git diff:*),Read,Grep,Glob"
