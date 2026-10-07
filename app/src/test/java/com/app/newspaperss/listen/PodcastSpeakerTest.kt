@@ -187,6 +187,34 @@ class PodcastSpeakerTest {
     }
 
     @Test
+    fun aNextPieceThatCantBePlayedCarriesOnFromTheSentenceAfterTheLastHeard() {
+        made()
+        listen()
+        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
+        speaker.speak(id(1), "Counting Knots", null, 1f, flush = false)
+        audio.listener!!.onPosition(4_600)
+        speaker.speak(id(3), "It took a week.", null, 1f, flush = false)
+        // The first piece played through; the second fails to start.
+        audio.listener!!.onEnded()
+        audio.listener!!.onError()
+
+        assertEquals(listOf("It took a week."), phone.said.map { it.text })
+        assertEquals(id(3), phone.said.single().id)
+    }
+
+    @Test
+    fun theVoicesNameGoesWhenListeningStops() {
+        made()
+        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
+        assertEquals(PodcastVoice.EMMA, speaker.voice.value)
+        speaker.stop()
+        assertNull(speaker.voice.value)
+        // Played again, from the same article.
+        speaker.speak(id(1, generation = 2), "Counting Knots", null, 1f, flush = true)
+        assertEquals(PodcastVoice.EMMA, speaker.voice.value)
+    }
+
+    @Test
     fun kokoroTurnedOffPartWayIsHeardAtTheNextPlay() {
         made()
         speaker.speak(id(0), "Quanta", null, 1f, flush = true)

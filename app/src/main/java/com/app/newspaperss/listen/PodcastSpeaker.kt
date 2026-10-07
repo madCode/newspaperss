@@ -72,6 +72,10 @@ class PodcastSpeaker(
     private var piece = 0
     private var reported = -1
     private var rate = 1f
+    /** The voice the article was chosen to play in: shown while it plays. */
+    private var chosen: PodcastVoice? = null
+    /** A piece ended and the next is starting: every line reported so far was heard to its end. */
+    private var between = false
 
     init {
         audio.listener = object : PodcastAudio.Listener {
@@ -94,9 +98,13 @@ class PodcastSpeaker(
         // Kokoro turned off, or removed with its podcasts, since the article started: the phone's
         // voice from here, rather than a file that's gone.
         if (flush && pieces.isNotEmpty() && !(inUse() && pieces.all { it.audio.exists() })) toPhone()
-        if (pieces.isEmpty()) return phone.speak(id, text, language, rate, flush)
+        if (pieces.isEmpty()) {
+            _voice.value = null
+            return phone.speak(id, text, language, rate, flush)
+        }
         // Already on its way: the audio reaches it.
         if (!flush) return true
+        _voice.value = chosen
         phone.stop()
         play(line, rate)
         return true
@@ -110,12 +118,13 @@ class PodcastSpeaker(
         // Made from the same lines as the player reads: an update that splits sentences
         // differently would otherwise tint the wrong ones, and never reach the article's end.
         pieces = made.takeIf { it.isNotEmpty() && it.last().firstLine + it.last().starts.size == lines }.orEmpty()
-        _voice.value = if (pieces.isEmpty()) null else podcasts.voice(editionId)
+        chosen = if (pieces.isEmpty()) null else podcasts.voice(editionId)
     }
 
     private fun toPhone() {
         stopAudio()
         pieces = emptyList()
+        chosen = null
         _voice.value = null
     }
 
@@ -125,7 +134,8 @@ class PodcastSpeaker(
      */
     private fun audioFailed() {
         val at = playing ?: return
-        val line = reported.coerceAtLeast(at.line)
+        // Failing to start the next piece, the last line reported was heard whole: on from the next.
+        val line = if (between) reported + 1 else reported.coerceAtLeast(at.line)
         toPhone()
         val now = asked[line]
         if (now == null) {
@@ -144,6 +154,7 @@ class PodcastSpeaker(
         playing = from
         piece = index
         reported = from.line - 1
+        between = false
         this.rate = rate
         // Its lines are reported from the audio's first tick, not from inside this call.
         audio.play(pieces[index].audio, (start * 1000).toLong(), rate)
@@ -156,6 +167,7 @@ class PodcastSpeaker(
         val seconds = ms / 1000.0
         val upTo = current.firstLine + current.starts.indexOfLast { it <= seconds + EARLY }
         while (reported < upTo) {
+            between = false
             reported++
             if (reported >= at.line) listener?.onStart(at.copy(line = reported).toString())
         }
@@ -167,6 +179,7 @@ class PodcastSpeaker(
         reach(Long.MAX_VALUE / 2)
         if (piece < pieces.lastIndex) {
             piece++
+            between = true
             audio.play(pieces[piece].audio, 0, rate)
             return
         }
@@ -183,6 +196,7 @@ class PodcastSpeaker(
 
     override fun stop() {
         stopAudio()
+        _voice.value = null
         phone.stop()
     }
 
@@ -257,25 +271,36 @@ class MediaPlayerAudio : PodcastAudio {
             }
             // Setting a speed starts playback, so only once the seek has landed: before, a moment
             // from the piece's start would be heard.
-            val begin = {
-                if (plays == play) {
+            player = p
+            var begun = false
+            val begin = begin@{
+                if (plays != play || begun) return@begin
+                begun = true
+                try {
                     p.playbackParams = p.playbackParams.setSpeed(speed)
                     p.start()
                     main.post(tick)
+                } catch (e: Exception) {
+                    // A speed this phone's audio can't play, or a player that failed while seeking.
+                    main.removeCallbacks(tick)
+                    if (player === p) player = null
+                    p.release()
+                    later { onError() }
                 }
             }
             if (fromMs > 0) {
                 p.setOnSeekCompleteListener { begin() }
                 p.seekTo(fromMs, MediaPlayer.SEEK_CLOSEST)
+                // A seek that never says it's done mustn't leave Listen silent.
+                main.postDelayed({ begin() }, SEEK_WAIT_MS)
             } else {
                 begin()
             }
         } catch (e: Exception) {
+            if (player === p) player = null
             p.release()
             later { onError() }
-            return
         }
-        player = p
     }
 
     override fun stop() {
@@ -289,5 +314,6 @@ class MediaPlayerAudio : PodcastAudio {
 
     private companion object {
         const val TICK_MS = 50L
+        const val SEEK_WAIT_MS = 2_000L
     }
 }

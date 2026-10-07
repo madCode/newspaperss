@@ -140,7 +140,7 @@ class AppContainer(
         PodcastSpeaker(speaker(), podcasts, podcastAudio()) {
             // Just after the app starts, before the store's first value: read it, or a made
             // article would play in the phone's voice.
-            (listenSettings.value ?: runBlocking { settings.current() }).listenVoice == ListenVoice.PODCAST
+            (listenSettings.value ?: runCatching { runBlocking { settings.current() } }.getOrNull())?.listenVoice == ListenVoice.PODCAST
         }
     }
 
