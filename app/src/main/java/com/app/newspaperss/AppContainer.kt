@@ -82,6 +82,11 @@ class AppContainer(
     moveFeeds: () -> Unit = { MoveFeedsWorker.enqueue(context) },
     speaker: () -> Speaker = { SystemSpeaker(context) },
     private val connectListening: () -> Unit = { ListenService.connect(context) },
+    private val kokoroInstall: KokoroInstall = KokoroInstall.of(context),
+    // Its own client: the shared one's cache would try to keep a 325 MB model. A test passes one
+    // pointed at its own server, since the real files are 325 MB and come from Hugging Face.
+    private val newKokoroDownload: (KokoroInstall) -> KokoroDownload =
+        { KokoroDownload(OkHttpClient.Builder().readTimeout(1, TimeUnit.MINUTES).build(), it) },
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -166,7 +171,6 @@ class AppContainer(
         )
     }
 
-    private val kokoroInstall = KokoroInstall.of(context)
     private val podcastEngine = { voice: PodcastVoice -> KokoroEngine(kokoroInstall, voice) }
     private val podcastStore = PodcastStore(File(context.filesDir, "podcasts"))
     private val podcasts = Podcasts(podcastStore, settings, kokoroInstall, start = { PodcastWorker.enqueue(context) })
@@ -174,8 +178,7 @@ class AppContainer(
         PodcastMaker(editions, podcastStore, kokoroInstall, settings, podcastEngine, AacEncoder)
     }
 
-    // Its own client: the shared one's cache would try to keep a 325 MB model.
-    fun kokoroDownload() = KokoroDownload(OkHttpClient.Builder().readTimeout(1, TimeUnit.MINUTES).build(), kokoroInstall)
+    fun kokoroDownload() = newKokoroDownload(kokoroInstall)
 
     /** See [SettingsStore.settleFeedsFrom]: a tt-rss source from before the choice means the server setup. */
     suspend fun settleFeedsFrom() = settings.settleFeedsFrom { db.sources().ofKind(SourceKind.TTRSS).isNotEmpty() }
