@@ -12,7 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import kotlinx.coroutines.withContext
@@ -164,9 +163,10 @@ class PodcastSetup(
             }
         } }
         onChecking()
-        // One check at a time: a cancelled one keeps speaking (native code doesn't stop), and two
-        // at once would hold the model twice and time each other too slow.
-        checkLock.withLock {
+        // One Kokoro at a time, a podcast being made included: a cancelled check keeps speaking
+        // (native code doesn't stop), and two at once would hold the model twice and time each
+        // other too slow.
+        KokoroEngine.lock.withLock {
             // Marked first, counting checks that started and never finished: sherpa can abort in
             // native code, and two in a row that took the app down aren't run again on the next
             // start, only when asked afresh. One could be the app swiped away.
@@ -193,8 +193,6 @@ class PodcastSetup(
     }
 
     companion object {
-        private val checkLock = Mutex()
-
         /** Checks that took the app down in a row before it's taken as Kokoro crashing this phone. */
         private const val CHECK_TRIES = 2
 

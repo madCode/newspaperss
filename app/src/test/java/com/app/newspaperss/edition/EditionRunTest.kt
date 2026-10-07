@@ -60,10 +60,14 @@ class EditionRunTest {
             settings, FeedSync(db, http), EditionBuilder(db, content, editions.editionsDir), editions,
             { file, uri, name, mime -> saved += "$uri/$name ($mime):${file.length() > 0}"; folderErrors[mime] }, notifier,
             now = { clock },
-            onBuilt = { id, scheduled -> built += id to scheduled },
+            onBuilt = { id, scheduled ->
+                built += id to scheduled
+                if (podcastFails) throw java.io.IOException("No space left on device")
+            },
         )
     }
     private val built = mutableListOf<Pair<Long, Boolean>>()
+    private var podcastFails = false
 
     private suspend fun oneSource() {
         SourceRepository(db).addFeed("https://example.com/feed", "Blog")
@@ -112,6 +116,15 @@ class EditionRunTest {
         // Nothing new: nothing to pass on.
         run.run(scheduled = false)
         assertEquals(1, built.size)
+    }
+
+    @Test
+    fun aPodcastThatCantBeAskedForDoesntFailTheEdition() = runTest {
+        oneSource()
+        settings.update { it.copy(delivery = DeliveryMethod.FOLDER, folderUri = "content://tree", folderName = "Kobo") }
+        podcastFails = true
+        assertTrue(run.run(scheduled = true) is BuildResult.Built)
+        assertEquals(listOf("delivered to Kobo"), notices)
     }
 
     @Test

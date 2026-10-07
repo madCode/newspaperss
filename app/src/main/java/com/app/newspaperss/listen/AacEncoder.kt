@@ -15,7 +15,7 @@ object AacEncoder : AudioEncoder {
     private const val BITRATE = 32_000
     private const val TIMEOUT_US = 10_000L
 
-    /** Waits of [TIMEOUT_US] at the end before giving up: 5 seconds. */
+    /** Waits of [TIMEOUT_US] in a row before giving up on a stuck encoder: 5 seconds. */
     private const val WAITS = 500
 
     override fun open(file: File, sampleRate: Int): AudioSink {
@@ -31,7 +31,13 @@ object AacEncoder : AudioEncoder {
             codec.release()
             throw e
         }
-        return Sink(codec, MediaMuxer(file.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4), sampleRate)
+        val muxer = try {
+            MediaMuxer(file.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        } catch (e: Exception) {
+            codec.release()
+            throw e
+        }
+        return Sink(codec, muxer, sampleRate)
     }
 
     private class Sink(private val codec: MediaCodec, private val muxer: MediaMuxer, private val rate: Int) : AudioSink {
@@ -42,12 +48,15 @@ object AacEncoder : AudioEncoder {
 
         override fun write(samples: FloatArray) {
             var at = 0
+            var waits = 0
             while (at < samples.size) {
                 val index = codec.dequeueInputBuffer(TIMEOUT_US)
                 if (index < 0) {
+                    check(++waits <= WAITS) { "The encoder took no more" }
                     drain(false)
                     continue
                 }
+                waits = 0
                 // PCM is in the phone's byte order; a ByteBuffer starts big-endian.
                 val buffer = codec.getInputBuffer(index)!!.order(ByteOrder.nativeOrder())
                 buffer.clear()

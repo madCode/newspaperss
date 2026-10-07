@@ -288,13 +288,21 @@ flowchart LR
 - **`PodcastMaker`** makes podcasts. `EditionRun`'s `onBuilt` asks for a
   scheduled edition's, if Kokoro is in use; `PodcastWorker` makes it while
   the phone charges. It reads the book a page at a time (articles, then
-  the closing page), says each line with `KokoroEngine`, and encodes the
-  page with `AacEncoder` (AAC in MP4, through `MediaCodec`). `PodcastStore`
-  keeps each page whole or not at all, with each line's start time; a page
-  not in English, or one Kokoro fails on, is marked for the phone's voice.
-  The newest edition asked for goes first. A podcast keeps the voice it
-  started in. Turning Kokoro off stops the making after the current page;
-  removing Kokoro deletes the podcasts.
+  the closing page), says each line with `KokoroEngine`, and encodes it
+  with `AacEncoder` (AAC in MP4, through `MediaCodec`).
+  - `PodcastStore` keeps a page in pieces of about 2 minutes, each whole or
+    not at all, with each line's start time. Work stopped part way (Android
+    stops it after 10 minutes) carries on from the last piece.
+  - A page not in English, or with a line Kokoro fails on, is left to the
+    phone's voice. So is one where the app died twice at the same line: a
+    crash in Kokoro's native code would otherwise repeat on every charge.
+  - A disk or encoder failure stops the run without settling the page, so
+    it's tried again with the next edition.
+  - The newest edition goes first. A podcast keeps the voice it started in.
+  - `KokoroEngine.lock` keeps one Kokoro loaded at a time, the speed check
+    included: a stopped run's native code runs on until its sentence ends.
+  - Turning Kokoro off stops the making after the current page; removing it
+    deletes the podcasts.
 - **`ListenProgress`** keeps where each of the ten most recent editions
   was left, and which were heard to the end, in SharedPreferences
   (`listening`).
@@ -315,7 +323,7 @@ twice.
 | `ReadingListTitleWorker` | New untitled links | `reading-list-titles`, APPEND_OR_REPLACE | Batches of 20, one batch at a time. |
 | `MoveFeedsWorker` | Moving phone feeds to tt-rss; app start, if a move is stored | `move-feeds`, APPEND_OR_REPLACE | Connected. Runs `FeedMoves.run`; what's left is in DataStore, so a run stopped part way carries on in the next. Appended so a run finishing up can't swallow a new move. |
 | `KokoroWorker` | Settings › Listening, picking the podcast | `kokoro`, REPLACE | Downloads Kokoro on Wi-Fi (any connection if the reader chose mobile data), then the speed check. Resumes across WorkManager's 10-minute limit; gives up after 6 failures with nothing arriving between them. |
-| `PodcastWorker` | A scheduled edition built with Kokoro in use; turning Kokoro back on | `podcast`, APPEND_OR_REPLACE | Only while charging. Unplugged, or at WorkManager's 10-minute limit, it stops and carries on from the next page when it runs again. Appended so a run finishing up can't swallow a new edition. |
+| `PodcastWorker` | A scheduled edition built with Kokoro in use; turning Kokoro back on | `podcast`, APPEND_OR_REPLACE | Only while charging. Unplugged, or at WorkManager's 10-minute limit, it stops and carries on from the last piece kept when it runs again. Appended so a run finishing up can't swallow a new edition. |
 
 Timed editions use a chain of one-off timers, not periodic work, because
 periodic work can't say "6:30 on weekdays" and its start time drifts
@@ -450,7 +458,7 @@ stays as a `DELETED` row to keep its title taken.
 | Timer state | SharedPreferences `edition-schedule` | `app/work/EditionScheduler.kt` |
 | Where listening stopped | SharedPreferences `listening` | `app/listen/ListenProgress.kt` |
 | Kokoro, the podcast's voice (384 MB) | `files/kokoro`, checked files in `.verified` | `app/listen/Kokoro.kt` |
-| Podcasts, about 7 MB per 30 minutes | `files/podcasts/<edition>/`: each page's `.m4a` and `.starts`, the voice, `finished` | `app/listen/Podcasts.kt` |
+| Podcasts, about 7 MB per 30 minutes | `files/podcasts/<edition>/`: each page's pieces (`<page>-<first line>.m4a` and `.starts`), `.made` or `.live` per page, the voice, `finished` | `app/listen/Podcasts.kt` |
 | EPUBs | `files/editions/`; only the newest 14 keep their file (unsent ones always do) | `EditionRepository.pruneFiles` |
 | Notes files | `files/notes/` | `app/edition/EditionNotes.kt` |
 | HTTP cache | `cache/http`, used to revalidate feeds | `AppContainer`, `core/net/HttpClient.kt` |

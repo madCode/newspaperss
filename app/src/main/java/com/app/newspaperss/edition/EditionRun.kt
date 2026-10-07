@@ -1,5 +1,7 @@
 package com.app.newspaperss.edition
 
+import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import com.app.newspaperss.data.EditionRepository
@@ -51,7 +53,14 @@ class EditionRun(
         when (result) {
             is BuildResult.Built -> {
                 deliver(result.editionId, s, scheduled)
-                onBuilt(result.editionId, scheduled)
+                // The paper is made and delivered: nothing after it can fail the run.
+                try {
+                    onBuilt(result.editionId, scheduled)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("EditionRun", "After the build: ${e.javaClass.name}")
+                }
             }
             is BuildResult.Failed -> if (scheduled) notifier.problem("Today's edition couldn't be made", result.reason)
             is BuildResult.Unreachable -> if (scheduled && finalAttempt) notifier.problem("No new edition", result.reason)

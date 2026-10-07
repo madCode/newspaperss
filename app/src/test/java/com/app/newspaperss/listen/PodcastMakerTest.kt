@@ -16,11 +16,11 @@ import com.app.newspaperss.testutil.TestApp
 import com.app.newspaperss.testutil.writeEpub
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -50,8 +50,8 @@ class PodcastMakerTest {
     }
 
     /** Everything said, in order, and in which voice. */
-    private val said = mutableListOf<String>()
-    private val voices = mutableListOf<PodcastVoice>()
+    private val said: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+    private val voices: MutableList<PodcastVoice> = java.util.Collections.synchronizedList(mutableListOf())
     private var released = 0
     /** Called after each line is said, to stop or change things part way. */
     private var afterLine: (String) -> Unit = {}
@@ -59,15 +59,24 @@ class PodcastMakerTest {
     /** A Kokoro making ten samples a character, at 1000 a second. */
     private val engine = { voice: PodcastVoice ->
         voices += voice
+        mostLoaded = maxOf(mostLoaded, loaded.incrementAndGet())
         object : PodcastEngine {
             override fun speak(text: String): Speech {
+                if (slow) Thread.sleep(5)
                 said += text
                 afterLine(text)
                 return Speech(FloatArray(text.length * 10), RATE)
             }
-            override fun release() { released++ }
+            override fun release() {
+                released++
+                loaded.decrementAndGet()
+            }
         }
     }
+    private val loaded = java.util.concurrent.atomic.AtomicInteger()
+    private var mostLoaded = 0
+    private var slow = false
+    private var diskFull = false
 
     /** Writes the samples' count, so a page's file says how much went into it. */
     private val encoder = AudioEncoder { file, rate ->
@@ -75,12 +84,16 @@ class PodcastMakerTest {
         object : AudioSink {
             var count = 0
             override fun write(samples: FloatArray) { count += samples.size }
-            override fun close() = file.writeText(count.toString())
+            override fun close() {
+                if (diskFull) throw java.io.IOException("No space left on device")
+                file.writeText(count.toString())
+            }
         }
     }
 
     private var started = 0
-    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder) { started++ } }
+    private var pieceSeconds = PodcastMaker.PIECE_SECONDS
+    private val maker by lazy { PodcastMaker(editions, store, install, settings, engine, encoder, pieceSeconds) { started++ } }
 
     private val knots = EditionArticle(
         title = "Counting Knots", sourceTitle = "Quanta", url = "https://example.com/knots",
@@ -122,17 +135,17 @@ class PodcastMakerTest {
         assertTrue(store.finished(id))
         assertTrue(store.waiting().isEmpty())
         // Two articles, then the closing page.
-        assertNotNull(store.audio(id, 0))
-        assertNotNull(store.audio(id, 1))
-        assertNotNull(store.audio(id, 2))
+        assertTrue((0..2).all { store.made(id, it) })
         assertEquals(listOf("Quanta", "Counting Knots", "Nobody knew.", "Then a teacher counted.", "It took a week."), said.take(5))
         // Each line starts where the last ended: straight after it within a paragraph, after a
         // breath between them. "Quanta" is 60 samples, "Nobody knew." 120.
-        val starts = store.starts(id, 0)!!
+        val piece = store.pieces(id, 0).single()
+        assertEquals(5, piece.starts.size)
+        val starts = piece.starts
         assertEquals(0.0, starts[0], 0.0)
         assertEquals(0.06 + 0.35, starts[1], 0.001)
         assertEquals(0.12, starts[3] - starts[2], 0.001)
-        val samples = store.audio(id, 0)!!.readText().toInt()
+        val samples = piece.audio.readText().toInt()
         assertTrue("the breaths are in the audio too", samples > said.take(5).sumOf { it.length * 10 })
         assertEquals(listOf(PodcastVoice.HEART), voices)
         assertEquals(1, released)
@@ -146,10 +159,10 @@ class PodcastMakerTest {
         make()
 
         assertTrue(store.finished(id))
-        assertNull(store.audio(id, 1))
-        assertTrue(store.settled(id, 1))
+        assertTrue(store.live(id, 1))
+        assertTrue(store.pieces(id, 1).isEmpty())
         assertFalse(said.any { "peloton" in it })
-        assertNotNull(store.audio(id, 2))
+        assertTrue(store.made(id, 2))
     }
 
     @Test
@@ -162,9 +175,9 @@ class PodcastMakerTest {
         afterLine = { if (it == "Rest of World") job.cancel() }
         val stopped = runBlocking { runCatching { withContext(job) { maker.makeAll() } }.exceptionOrNull() }
         assertTrue(stopped is CancellationException)
-        assertNotNull(store.audio(id, 0))
-        assertNull(store.audio(id, 1))
+        assertTrue(store.made(id, 0))
         assertFalse(store.settled(id, 1))
+        assertTrue(store.pieces(id, 1).isEmpty())
         assertFalse(store.finished(id))
         assertTrue("no half-made page is left", store.dir.list()!!.none { it.endsWith(".part") })
 
@@ -226,7 +239,7 @@ class PodcastMakerTest {
         make()
 
         // The page under way is finished, and no more.
-        assertNotNull(store.audio(id, 0))
+        assertTrue(store.made(id, 0))
         assertFalse(store.settled(id, 1))
         assertEquals(listOf(id), store.waiting())
     }
@@ -267,9 +280,104 @@ class PodcastMakerTest {
         make()
 
         assertTrue(store.finished(id))
-        assertNull(store.audio(id, 0))
-        assertTrue(store.settled(id, 0))
-        assertNotNull(store.audio(id, 1))
+        assertTrue(store.live(id, 0))
+        assertTrue(store.pieces(id, 0).isEmpty())
+        assertTrue(store.made(id, 1))
+    }
+
+    @Test
+    fun aLongPageStoppedPartWayCarriesOnFromTheLastPieceKept() {
+        inUse()
+        // A piece a line, as if each line were two minutes long.
+        pieceSeconds = 0.001
+        val id = edition("Thursday", knots)
+        request(id)
+        val job = Job()
+        afterLine = { if (it == "Then a teacher counted.") job.cancel() }
+        runBlocking { runCatching { withContext(job) { maker.makeAll() } } }
+        // The line under way when it stopped is finished and kept too.
+        assertEquals(listOf(0, 1, 2, 3), store.pieces(id, 0).map { it.firstLine })
+        assertFalse(store.made(id, 0))
+
+        afterLine = {}
+        said.clear()
+        make()
+        assertTrue(store.made(id, 0))
+        assertEquals("It took a week.", said.first())
+        assertEquals((0..4).toList(), store.pieces(id, 0).map { it.firstLine })
+        // The new paragraph's breath is at the start of its piece.
+        assertEquals(0.35, store.pieces(id, 0)[4].starts.single(), 0.001)
+    }
+
+    @Test
+    fun aPageThatTookTheAppDownTwiceIsLeftToThePhonesVoice() {
+        inUse()
+        val id = edition("Thursday", knots, lagos)
+        request(id)
+        // Two runs that died in Kokoro's native code at the same place.
+        store.startTry(id, 0, 0)
+        store.startTry(id, 0, 0)
+        make()
+
+        assertTrue(store.live(id, 0))
+        assertFalse(said.contains("Counting Knots"))
+        assertTrue(store.made(id, 1))
+        assertTrue(store.finished(id))
+    }
+
+    @Test
+    fun onceIsntTakenForACrashNorIsDyingSomewhereElse() {
+        inUse()
+        val id = edition("Thursday", knots)
+        request(id)
+        // Killed once (swiped away, say), then once more after it got further.
+        store.startTry(id, 0, 0)
+        store.startTry(id, 0, 2)
+        make()
+
+        assertTrue(store.made(id, 0))
+    }
+
+    @Test
+    fun aFullDiskStopsTheMakingWithoutLeavingPagesToThePhonesVoice() {
+        inUse()
+        val id = edition("Thursday", knots, lagos)
+        request(id)
+        diskFull = true
+        val failed = runCatching { make() }.exceptionOrNull()
+        assertTrue(failed is java.io.IOException)
+        assertFalse(store.settled(id, 0))
+        assertFalse(store.finished(id))
+        assertTrue("no half-written piece is left", store.dir.list()!!.none { it.endsWith(".part") })
+
+        diskFull = false
+        make()
+        assertTrue(store.made(id, 0))
+        assertTrue(store.finished(id))
+    }
+
+    @Test
+    fun oneKokoroAtATime() {
+        inUse()
+        val id = edition("Thursday", knots, lagos)
+        request(id)
+        slow = true
+        runBlocking(kotlinx.coroutines.Dispatchers.Default) {
+            val runs = List(2) { async { maker.makeAll() } }
+            runs.forEach { it.await() }
+        }
+        assertEquals(1, mostLoaded)
+        assertTrue(store.finished(id))
+    }
+
+    @Test
+    fun aVoiceLeftUnwrittenIsWrittenWhenAskedAgain() {
+        inUse()
+        val id = edition("Thursday", lagos)
+        File(store.dir, "$id").mkdirs()
+        File(store.dir, "$id/voice").writeText("")
+        request(id)
+        assertEquals(PodcastVoice.HEART, store.voice(id))
     }
 
     @Test
