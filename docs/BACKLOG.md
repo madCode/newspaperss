@@ -93,7 +93,7 @@ Whole-codebase passes for what a review of one PR can't see. Each follows the au
 - [ ] **Architecture and test health**, every 30–40 cycles or before a release: duplication and code that has grown complicated, how features fit together (what one feature deletes that another still uses), tests that can never fail, waits that flake under load, and copied test helpers
 
 ### Tech debt
-- [ ] Test DataStores made without a scope can fail under full-suite load (DataStore "Unable to rename …tmp", a write still running when the temp folder is deleted). `SettingsScreenTest` has one now; `TtrssFeedsTest`, `SourcesScreenTest`, `SettingsStoreTest`, `TtrssSyncTest`, `FeedMovesTest` and `ScreenshotTest` don't. One shared helper that cancels the scope before cleanup
+- [ ] Test DataStores made without a scope can fail under full-suite load (DataStore "Unable to rename …tmp", a write still running when the temp folder is deleted). **18 sites across 13 files**, more than the six first listed here: `EditionRunTest`, `FeedMovesTest` (2), `NotesSaverTest`, `PodcastLineTest`, `PodcastMakerTest`, `PodcastSetupTest`, `ScreenshotTest` (4), `SettingsStoreTest` (2), `SourcesScreenTest`, `TtrssAccountStoreTest`, `TtrssFeedsTest`, `TtrssSubscribeTest`, `TtrssSyncTest`. Six files already pass a scope and cancel it (`SettingsScreenTest` is the pattern). One shared helper, as a rule rather than a field: the cancel has to happen before `TemporaryFolder` deletes, and two `@get:Rule` fields have no defined order, so it wants `RuleChain.outerRule(tmp).around(stores)`
 - [ ] Screenshots read the real clock (titles from today's weekday, "2 days ago"), so the same screen rendered on another day differs. A fixed clock, here and in the screens' "ago" lines
 
 ### Later
