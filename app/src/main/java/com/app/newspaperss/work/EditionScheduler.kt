@@ -2,6 +2,7 @@ package com.app.newspaperss.work
 
 import com.app.newspaperss.container
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -72,7 +73,7 @@ object EditionScheduler {
         // a stale one would stop timed editions for good: it only counts while the work exists.
         val armed = work.getWorkInfosForUniqueWorkFlow(UNIQUE).first().any { !it.state.isFinished }
         val pending = prefs.getLong(PENDING, 0L).takeIf { armed && it > 0 }?.let(Instant::ofEpochMilli)
-        val target = if (settings.scheduleEnabled) nextDue(settings, now, prefs.getLong(LAST_DUE, 0L), prefs.getLong(LAST_START, prefs.getLong(LAST_DUE, 0L))) else null
+        val target = if (settings.scheduleEnabled) nextDue(settings, now, prefs.getLong(LAST_DUE, 0L), lastStart(prefs)) else null
         val action = ScheduleTimer.decide(pending, target, now.toInstant())
         val start = target?.let { startOf(it, settings) }
         // The same edition, starting at another time: the podcast's pace, or turning it on or off,
@@ -82,25 +83,33 @@ object EditionScheduler {
         when {
             action is TimerAction.Arm || moved -> {
                 work.enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.REPLACE, timer(target!!, start!!, now.toInstant()))
-                prefs.edit {
-                    putLong(PENDING, target.toEpochMilli())
-                    putLong(PENDING_START, start.toEpochMilli())
-                }
+                arm(prefs, target, start)
             }
             action == TimerAction.Cancel -> {
                 work.cancelUniqueWork(UNIQUE)
-                prefs.edit {
-                    remove(PENDING)
-                    remove(PENDING_START)
-                }
+                disarm(prefs)
             }
         }
     }
 
+    /** Notes the timer just set: for the edition due at [due], firing at [start]. */
+    private fun arm(prefs: SharedPreferences, due: Instant, start: Instant) = prefs.edit {
+        putLong(PENDING, due.toEpochMilli())
+        putLong(PENDING_START, start.toEpochMilli())
+    }
+
+    private fun disarm(prefs: SharedPreferences) = prefs.edit {
+        remove(PENDING)
+        remove(PENDING_START)
+    }
+
+    /** When the last edition's timer fired, or its due time where that wasn't kept. */
+    private fun lastStart(prefs: SharedPreferences): Long = prefs.getLong(LAST_START, prefs.getLong(LAST_DUE, 0L))
+
     fun lastDue(context: Context): Long =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(LAST_DUE, 0L)
 
-    fun lastStart(context: Context): Long = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).let { it.getLong(LAST_START, it.getLong(LAST_DUE, 0L)) }
+    fun lastStart(context: Context): Long = lastStart(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE))
 
     /**
      * The next due time, skipping the last edition started while it's being made: from when its
@@ -149,15 +158,9 @@ object EditionScheduler {
                     // Appended rather than replaced: REPLACE on our own name would cancel this running worker.
                     WorkManager.getInstance(applicationContext)
                         .enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.APPEND_OR_REPLACE, timer(next, start, now.toInstant()))
-                    prefs.edit {
-                        putLong(PENDING, next.toEpochMilli())
-                        putLong(PENDING_START, start.toEpochMilli())
-                    }
+                    arm(prefs, next, start)
                 } else {
-                    prefs.edit {
-                        remove(PENDING)
-                        remove(PENDING_START)
-                    }
+                    disarm(prefs)
                 }
             }
             return Result.success()

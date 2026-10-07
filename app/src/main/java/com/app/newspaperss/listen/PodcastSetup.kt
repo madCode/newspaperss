@@ -140,7 +140,7 @@ class PodcastSetup(
         if (s.listenVoice != ListenVoice.PODCAST && s.podcastPace == null) return
         if (work.first()?.state?.isFinished == false) return
         if (withContext(Dispatchers.IO) { install.complete }) return
-        settings.update { it.copy(listenVoice = ListenVoice.PHONE, podcastPace = null, podcastPaceMeasured = false) }
+        backToPhone()
     }
 
     /** Deletes Kokoro and the podcasts made with it, and goes back to reading live. */
@@ -148,8 +148,12 @@ class PodcastSetup(
         stop()
         install.remove()
         withContext(Dispatchers.IO) { podcasts.deleteAll() }
-        settings.update { it.copy(listenVoice = ListenVoice.PHONE, podcastPace = null, podcastPaceMeasured = false) }
+        backToPhone()
     }
+
+    /** Reads live, and forgets this phone's pace: it was Kokoro's, and Kokoro is gone. */
+    private suspend fun backToPhone() =
+        settings.update { it.copy(listenVoice = ListenVoice.PHONE, podcastPace = null, podcastPaceMeasured = false) }
 
     /**
      * The work: download what's missing, then time Kokoro making [SAMPLE] and keep the pace it
