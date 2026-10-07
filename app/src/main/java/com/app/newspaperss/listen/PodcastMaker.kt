@@ -64,6 +64,7 @@ class PodcastMaker(
             while (true) {
                 val editionId = store.waiting().firstOrNull() ?: break
                 if (!inUse()) break
+                store.making(editionId)
                 val book = ListenBook.open(editions, editionId)
                 if (book == null) {
                     // Its book is gone, so is the podcast's reason to be.
@@ -93,6 +94,7 @@ class PodcastMaker(
                 }
             }
         } finally {
+            store.making(null)
             kokoro?.second?.release()
         }
     }
@@ -118,6 +120,7 @@ class PodcastMaker(
             return
         }
         val lines = script.lines
+        store.lines(editionId, page, lines.size)
         val (deadAt, deaths) = store.deaths(editionId, page)
         var piece: Piece? = null
         try {

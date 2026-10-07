@@ -27,6 +27,30 @@ class PodcastStore(val dir: File) {
 
     private fun changed() = _changes.update { it + 1 }
 
+    private val _making = MutableStateFlow<Long?>(null)
+
+    /** The edition whose podcast is being made right now, in this process; null when none is. */
+    val making: StateFlow<Long?> = _making.asStateFlow()
+
+    fun making(editionId: Long?) {
+        _making.value = editionId
+    }
+
+    /** Notes how many lines [page] has, so how far it's made can be shown. */
+    @Synchronized
+    fun lines(editionId: Long, page: Int, lines: Int) {
+        write(editionId, "$page.$LINES", lines.toString())
+        // Pieces kept before the count was known show from now, not from the next piece.
+        changed()
+    }
+
+    /** How much of [page] is made, 0 to 1: whole once it's made, by its lines while it's being made. */
+    fun share(editionId: Long, page: Int): Double {
+        if (made(editionId, page)) return 1.0
+        val lines = read(editionId, "$page.$LINES")?.toIntOrNull()?.takeIf { it > 0 } ?: return 0.0
+        return (linesMade(editionId, page).toDouble() / lines).coerceIn(0.0, 1.0)
+    }
+
     private fun folder(editionId: Long) = File(dir, editionId.toString())
 
     /** Asks for [editionId]'s podcast in [voice]. Asked again, it keeps the voice it was started in. */
@@ -196,6 +220,7 @@ class PodcastStore(val dir: File) {
         const val SAYING = "saying"
         const val FAILED = "failed"
         const val COST = "cost"
+        const val LINES = "lines"
         const val PART = "part"
     }
 }
