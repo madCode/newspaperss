@@ -20,10 +20,14 @@ import com.app.newspaperss.notify.Notifier
 import com.app.newspaperss.testutil.TestApp
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -46,16 +50,14 @@ class PodcastWorkerTest {
         Futures.immediateFuture(null)
     }
 
-    private val notYet = Long.MIN_VALUE / 2
-
     @Before fun setUp() {
         WorkManagerTestInitHelper.initializeTestWorkManager(app)
-        PodcastWorker.refusedAt = notYet
+        PodcastWorker.holdOffUntil = 0
         app.container.notifier.createChannels()
     }
 
     @After fun tearDown() {
-        PodcastWorker.refusedAt = notYet
+        PodcastWorker.holdOffUntil = 0
         WorkManagerTestInitHelper.closeWorkDatabase()
     }
 
@@ -135,7 +137,7 @@ class PodcastWorkerTest {
             PodcastWorker.makeWhile(1_000, {
                 delay(10_000)
                 made = true
-            }) { going }
+            }, {}) { going }
         }
         advanceTimeBy(2_500)
         going = false
@@ -146,6 +148,25 @@ class PodcastWorkerTest {
 
     @Test
     fun makingThatFinishesIsntStopped() = runTest {
-        assertFalse(PodcastWorker.makeWhile(1_000, { delay(2_500) }) { true })
+        assertFalse(PodcastWorker.makeWhile(1_000, { delay(2_500) }, {}) { true })
+    }
+
+    @Test
+    fun stoppedFromOutsideItSaysSoBeforeTheSentenceEnds() = runTest {
+        var told = false
+        var sentenceDone = false
+        val work = launch {
+            PodcastWorker.makeWhile(1_000, {
+                // Kokoro's native code finishes its sentence whatever the coroutine says.
+                withContext(NonCancellable) { delay(10_000) }
+                sentenceDone = true
+            }, { told = true }) { true }
+        }
+        advanceTimeBy(2_500)
+        work.cancel()
+        runCurrent()
+        assertTrue(told)
+        assertFalse(sentenceDone)
+        work.join()
     }
 }

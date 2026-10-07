@@ -38,22 +38,27 @@ import kotlinx.coroutines.launch
  */
 class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
-        if (mayGoForeground() && !goForeground()) {
+        val asked = mayGoForeground()
+        if (asked && !goForeground()) {
             enqueue(applicationContext)
         } else {
             val started = SystemClock.elapsedRealtime()
-            val stopped = makeWhile(CHECK_MS, { applicationContext.container.podcastMaker.makeAll() }) {
-                plugged() && (inForeground() || SystemClock.elapsedRealtime() - started < BACKGROUND_MS)
+            val stopped = makeWhile(CHECK_MS, { applicationContext.container.podcastMaker.makeAll() }, ::noteTimeout) {
+                when {
+                    !plugged() -> false
+                    inForeground() || SystemClock.elapsedRealtime() - started < BACKGROUND_MS -> true
+                    else -> {
+                        // Asked, and refused silently inside WorkManager's service: Android 15's
+                        // 6 hours a day used up, most likely.
+                        if (asked) holdOff(TIMED_OUT_MS)
+                        false
+                    }
+                }
             }
             if (stopped) enqueue(applicationContext)
         }
         Result.success()
     } catch (e: CancellationException) {
-        // Android 15's 6 hours a day in the foreground used up: asking again soon would be
-        // refused silently, inside WorkManager's service.
-        if (Build.VERSION.SDK_INT >= 31 && stopReason == WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT) {
-            refusedAt = SystemClock.elapsedRealtime() + TIMED_OUT_MS - HOLD_OFF_MS
-        }
         throw e
     } catch (e: Exception) {
         // Kokoro couldn't load (its files damaged since the check, say): asked again, it tries again.
@@ -70,11 +75,12 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
      * the phone being unplugged and its own 10-minute limit.
      */
     private fun mayGoForeground(): Boolean {
-        if (SystemClock.elapsedRealtime() - refusedAt < HOLD_OFF_MS) return false
+        if (SystemClock.elapsedRealtime() < holdOffUntil) return false
         if (Build.VERSION.SDK_INT < 31) return true
         val power = applicationContext.getSystemService(PowerManager::class.java)
         if (power.isIgnoringBatteryOptimizations(applicationContext.packageName)) return true
-        return importance() <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+        val me = ActivityManager.RunningAppProcessInfo().also { ActivityManager.getMyMemoryState(it) }
+        return me.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
     }
 
     /** False if Android refused: this run ends, so WorkManager lets go of it, and the next runs in the background. */
@@ -93,18 +99,32 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         } catch (e: Exception) {
             // Started from the background after all: the app left the screen just then, say.
             Log.i(TAG, "Foreground refused: ${e.javaClass.name}")
-            refusedAt = SystemClock.elapsedRealtime()
+            holdOff(HOLD_OFF_MS)
             false
         }
     }
 
     /**
-     * Android can refuse the foreground silently too, inside WorkManager's service (past Android
-     * 15's 6 hours a day, say): only the process's standing shows whether it really is.
+     * Stopped by WorkManager with Android 15's 6 hours a day in the foreground used up: asking
+     * again soon would be refused silently. Noted as soon as the stop comes, not once Kokoro
+     * finishes its sentence: the next run may start before that.
      */
-    private fun inForeground() = importance() <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE
+    private fun noteTimeout() {
+        if (Build.VERSION.SDK_INT >= 31 && stopReason == WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT) holdOff(TIMED_OUT_MS)
+    }
 
-    private fun importance() = ActivityManager.RunningAppProcessInfo().also { ActivityManager.getMyMemoryState(it) }.importance
+    private fun holdOff(ms: Long) {
+        holdOffUntil = SystemClock.elapsedRealtime() + ms
+    }
+
+    /**
+     * Whether WorkManager's service really is in the foreground: Android can refuse it silently,
+     * inside the service. Not the process's standing, which the app's own player or screen lifts.
+     */
+    @Suppress("DEPRECATION") // Still lists the app's own services.
+    private fun inForeground() = applicationContext.getSystemService(ActivityManager::class.java)
+        .getRunningServices(Int.MAX_VALUE)
+        .any { it.foreground && it.service.className == FOREGROUND_SERVICE }
 
     /** Plugged in, charging or not: a phone holding its charge at 80% overnight still counts. */
     private fun plugged(): Boolean {
@@ -117,6 +137,9 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         private const val UNIQUE = "podcast"
         private const val CHECK_MS = 30_000L
 
+        /** WorkManager's, by name: the class is internal to it. */
+        private const val FOREGROUND_SERVICE = "androidx.work.impl.foreground.SystemForegroundService"
+
         /** Short of WorkManager's 10 minutes, when the work isn't really in the foreground. */
         private const val BACKGROUND_MS = 9 * 60_000L
 
@@ -126,26 +149,31 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         /** After the foreground's daily time ran out: Android counts it over a day. */
         private const val TIMED_OUT_MS = 12 * 60 * 60_000L
 
-        /** When Android last refused the foreground, for [HOLD_OFF_MS]. Kept only while the app runs. */
+        /** Until when the work doesn't ask for the foreground, after a refusal. Kept only while the app runs. */
         @Volatile
-        internal var refusedAt = Long.MIN_VALUE / 2
+        internal var holdOffUntil = 0L
 
         /**
          * Runs [make] while [keepGoing], checked every [checkMs]; true if it was stopped. Here as
          * well as in WorkManager: work that went foreground in WorkManager's eyes but not
-         * Android's is never stopped by WorkManager.
+         * Android's is never stopped by WorkManager. [cancelled] is called as soon as the work is
+         * cancelled from outside, while [make] may still be finishing.
          */
-        internal suspend fun makeWhile(checkMs: Long, make: suspend () -> Unit, keepGoing: () -> Boolean): Boolean = coroutineScope {
+        internal suspend fun makeWhile(checkMs: Long, make: suspend () -> Unit, cancelled: () -> Unit, keepGoing: () -> Boolean): Boolean = coroutineScope {
             var stopped = false
             val making = launch { make() }
             val guard = launch {
-                while (true) {
-                    delay(checkMs)
-                    if (!keepGoing()) {
-                        stopped = true
-                        making.cancel()
-                        break
+                try {
+                    while (true) {
+                        delay(checkMs)
+                        if (!keepGoing()) {
+                            stopped = true
+                            making.cancel()
+                            break
+                        }
                     }
+                } finally {
+                    if (!making.isCompleted && !stopped) cancelled()
                 }
             }
             making.join()
