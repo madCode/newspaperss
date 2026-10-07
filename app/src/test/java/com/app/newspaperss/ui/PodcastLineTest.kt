@@ -82,7 +82,7 @@ class PodcastLineTest {
         store.complete(7, 0)
         store.leaveLive(7, 1)
         show()
-        waitFor("articles not in English always do")
+        waitFor("articles it left out always do")
         store.complete(7, 2)
         store.finish(7)
         waitFor("Articles it left out")

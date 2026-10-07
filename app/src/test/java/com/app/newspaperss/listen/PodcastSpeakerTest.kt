@@ -187,6 +187,10 @@ class PodcastSpeakerTest {
         val before = heard.size
         audio.listener!!.onPosition(5_000)
         assertEquals(before, heard.size)
+        // Played again, it stays in the phone's voice rather than failing the same way.
+        speaker.speak(id(0, generation = 2), "Quanta", null, 1f, flush = true)
+        assertEquals(1, audio.played.size)
+        assertEquals("Quanta", phone.said.last().text)
     }
 
     @Test

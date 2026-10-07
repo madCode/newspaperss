@@ -81,6 +81,9 @@ class PodcastSpeaker(
 
     private class Asked(val text: String, val language: String?, val rate: Float)
 
+    /** Articles whose podcast failed to play: the phone's voice for them, not the same failure each play. */
+    private val failed = mutableSetOf<Pair<Long, Int>>()
+
     /** What's playing: the line it started from, the piece, and the last line reported. */
     private var playing: LineId? = null
     private var piece = 0
@@ -130,7 +133,7 @@ class PodcastSpeaker(
         article = here
         asked.clear()
         val (editionId, page) = here
-        val made = if (inUse() && podcasts.made(editionId, page)) podcasts.pieces(editionId, page) else emptyList()
+        val made = if (inUse() && podcasts.made(editionId, page) && here !in failed) podcasts.pieces(editionId, page) else emptyList()
         // Made from the same lines as the player reads: an update that splits sentences
         // differently would otherwise tint the wrong ones, and never reach the article's end.
         pieces = made.takeIf { it.isNotEmpty() && it.last().firstLine + it.last().starts.size == lines }.orEmpty()
@@ -158,6 +161,7 @@ class PodcastSpeaker(
         val at = playing ?: return
         // Failing to start the next piece, the last line reported was heard whole: on from the next.
         val line = if (between) reported + 1 else reported.coerceAtLeast(at.line)
+        article?.let { failed += it }
         toPhone()
         val now = asked[line]
         if (now == null) {

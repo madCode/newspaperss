@@ -67,11 +67,11 @@ fun PodcastLine(podcasts: Podcasts, editionId: Long, minutes: List<Double>, modi
         val leftOut = p.leftOut.any { it }
         val text = when {
             p.made.all { it } -> "The podcast is ready."
-            p.finished && !anyMade -> "The podcast couldn't make any of this edition, as it's English only: it plays in your phone's voice."
-            p.finished -> "The podcast is ready. Articles it left out, not being in English, play in your phone's voice."
+            p.finished && !anyMade -> "The podcast couldn't make any of this edition, so it plays in your phone's voice."
+            p.finished -> "The podcast is ready. Articles it left out, not in English or that it couldn't say, play in your phone's voice."
             !anyMade -> "The podcast is made while the phone charges. Until then, Listen uses your phone's voice."
             else -> "${ReadingTime.format(made)} of ${ReadingTime.format(heard.sum())} made, while the phone charges. " +
-                if (leftOut) "The rest plays in your phone's voice until it's made, and articles not in English always do." else "The rest plays in your phone's voice until it's made."
+                if (leftOut) "The rest plays in your phone's voice until it's made, and articles it left out always do." else "The rest plays in your phone's voice until it's made."
         }
         Text(text, style = small, color = soft, modifier = Modifier.padding(top = 6.dp))
     }

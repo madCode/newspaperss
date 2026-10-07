@@ -173,8 +173,9 @@ private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer,
     val notes = listOfNotNull(voiceNote, state.missingLanguage, state.error).size
     val line = script.lines.getOrNull(state.at.line)
     // Jumps, not animated scrolls: animation smears on e-ink.
-    // Keyed on the notes too: one coming or going (the voice's note, as play and pause) moves every row.
-    LaunchedEffect(line, following, script, notes) {
+    // Keyed on the voice's note too, which comes and goes with play and pause and moves every row;
+    // not on an error's, which would scroll the reason out of sight.
+    LaunchedEffect(line, following, script, voiceNote != null) {
         if (!following || line == null) return@LaunchedEffect
         list.scrollToItem(notes + line.block)
         // A long paragraph: down to the sentence, a little below the top.
