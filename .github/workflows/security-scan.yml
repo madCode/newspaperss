@@ -33,6 +33,7 @@ jobs:
           # can be reached from.
           advanced-security: false
           persona: regular
+          config: zizmor.yml
 
   posture:
     name: scorecard

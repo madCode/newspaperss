@@ -24,7 +24,8 @@ jobs:
         with:
           java-version: '21'
           distribution: temurin
-          cache: gradle
+          # No Gradle cache here. A cache entry written by a less-trusted run could be restored
+          # into the build that gets signed, and a release is rare enough not to need the minute.
       # A tag that doesn't match versionName would publish one version under another's name.
       - name: Check the tag matches the app's version
         run: |
