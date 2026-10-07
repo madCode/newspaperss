@@ -278,9 +278,12 @@ flowchart LR
   a podcast made from other lines isn't used. Its `voice` is the name the
   playing screen shows, and `instead` why an article of an edition with a
   podcast plays in the phone's voice.
-- **`Podcasts`** is what the edition page shows of a podcast: which
-  articles are made, followed through `PodcastStore.changes`, and **Make
-  the podcast** for an edition without one (`PodcastMaker.request`).
+- **`Podcasts`** is how the rest of the app reaches podcasts. It shows
+  the edition page which articles are made, followed through
+  `PodcastStore.changes`. It asks for a podcast: a scheduled edition's
+  from `EditionRun`'s `onBuilt`, or one made by hand from **Make the
+  podcast**. It starts the work again when Kokoro is turned back on, and
+  deletes every podcast when Kokoro is removed.
 - **`ListenService`** is a Media3 `MediaSessionService`. Its
   `SessionPlayer` (a `SimpleBasePlayer`) shows the player's state to
   Android, an article a track, and turns the lock screen's commands into
@@ -291,16 +294,15 @@ flowchart LR
   `EditionRepository`'s `onFileGone` tells the player, which lets the book
   go if it's the one loaded; the player isn't made just to be told. Its
   podcast is deleted too.
-- **`PodcastSetup`** gets Kokoro onto the phone for the podcast (in the
-  backlog). `KokoroWorker` runs `KokoroDownload`, which fetches the files
+- **`PodcastSetup`** gets Kokoro onto the phone for the podcast.
+  `KokoroWorker` runs `KokoroDownload`, which fetches the files
   the manifest `assets/kokoro/files.tsv` pins (a Hugging Face revision,
   each file's size and hash) eight at a time, resuming a stopped file
   and checking each, into `files/kokoro`; then it times `KokoroEngine`
   (sherpa-onnx) making a paragraph and keeps the pace in Settings. The
   setup reads its state back from WorkManager and the files.
-- **`PodcastMaker`** makes podcasts. `EditionRun`'s `onBuilt` asks for a
-  scheduled edition's, if Kokoro is in use; `PodcastWorker` makes it while
-  the phone charges. It reads the book a page at a time (articles, then
+- **`PodcastMaker`** makes the podcasts `Podcasts` asked for, run by
+  `PodcastWorker` while the phone charges. It reads the book a page at a time (articles, then
   the closing page), says each line with `KokoroEngine`, and encodes it
   with `AacEncoder` (AAC in MP4, through `MediaCodec`).
   - `PodcastStore` keeps a page in pieces of about 2 minutes, each whole or
@@ -482,7 +484,7 @@ stays as a `DELETED` row to keep its title taken.
 | Timer state | SharedPreferences `edition-schedule` | `app/work/EditionScheduler.kt` |
 | Where listening stopped | SharedPreferences `listening` | `app/listen/ListenProgress.kt` |
 | Kokoro, the podcast's voice (384 MB) | `files/kokoro`, checked files in `.verified` | `app/listen/Kokoro.kt` |
-| Podcasts, about 7 MB per 30 minutes | `files/podcasts/<edition>/`: each page's pieces (`<page>-<first line>.m4a` and `.starts`), `.made` or `.live` per page, the voice, `finished` | `app/listen/Podcasts.kt` |
+| Podcasts, about 7 MB per 30 minutes | `files/podcasts/<edition>/`: each page's pieces (`<page>-<first line>.m4a` and `.starts`) and per-page markers, the voice, what making it cost, `finished` | `app/listen/PodcastStore.kt` |
 | EPUBs | `files/editions/`; only the newest 14 keep their file (unsent ones always do) | `EditionRepository.pruneFiles` |
 | Notes files | `files/notes/` | `app/edition/EditionNotes.kt` |
 | HTTP cache | `cache/http`, used to revalidate feeds | `AppContainer`, `core/net/HttpClient.kt` |

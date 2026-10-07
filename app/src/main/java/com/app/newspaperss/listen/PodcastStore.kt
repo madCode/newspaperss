@@ -64,7 +64,6 @@ class PodcastStore(val dir: File) {
     /** How many of [page]'s lines are made: where making it carries on from. */
     fun linesMade(editionId: Long, page: Int): Int = pieces(editionId, page).lastOrNull()?.let { it.firstLine + it.starts.size } ?: 0
 
-    /** Whether all of [page] is made. */
     fun made(editionId: Long, page: Int): Boolean = File(folder(editionId), "$page.$MADE").exists()
 
     /** Whether [page] is left to the phone's voice: not English, or something Kokoro couldn't say. */

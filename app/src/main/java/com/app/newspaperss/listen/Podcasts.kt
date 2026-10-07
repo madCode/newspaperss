@@ -19,7 +19,7 @@ import kotlinx.coroutines.withContext
  */
 data class PodcastProgress(val asked: Boolean, val made: List<Boolean>, val finished: Boolean, val pace: Double, val leftOut: List<Boolean>)
 
-/** Podcasts as the rest of the app sees them: what's made of each, and asking for one. */
+/** Podcasts as the rest of the app sees them: what's made of each, asking for one, and deleting them. */
 class Podcasts(
     private val store: PodcastStore,
     private val settings: SettingsStore,
@@ -51,7 +51,6 @@ class Podcasts(
         start()
     }
 
-    /** Starts making the podcasts asked for and not yet finished, if there are any. */
     suspend fun resume() {
         if (withContext(Dispatchers.IO) { store.waiting().isNotEmpty() }) start()
     }

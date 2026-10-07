@@ -313,7 +313,7 @@ private fun settingsViewModel(container: AppContainer): SettingsViewModel {
         SettingsViewModel(
             container.settings, container.ttrss.observeStatus(),
             hear = { text, speed -> container.listen.sample(text, speed) },
-            // Debug builds only until podcasts are made and played: in a release, picking it would do nothing.
+            // Debug builds only until a real morning has been tried with it on a phone (see docs/BACKLOG.md).
             podcast = container.podcastSetup.takeIf { context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 },
         ) {
             container.appScope.launch { EditionScheduler.reschedule(context, it) }
