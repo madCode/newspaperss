@@ -16,7 +16,8 @@ import java.util.Locale
  * is there whole or not at all.
  *
  * A folder is made only when a podcast is asked for, and once deleted (with its edition, or with
- * Kokoro) nothing writes into it again: a piece finishing after that is dropped.
+ * Kokoro) nothing writes into it again: a piece finishing after that is dropped. [write] is where
+ * that's kept, and [keep] for the audio.
  */
 class PodcastStore(val dir: File) {
     private val _changes = MutableStateFlow(0)
@@ -28,14 +29,12 @@ class PodcastStore(val dir: File) {
 
     private fun folder(editionId: Long) = File(dir, editionId.toString())
 
-    private fun voiceFile(editionId: Long) = File(folder(editionId), VOICE)
-
     /** Asks for [editionId]'s podcast in [voice]. Asked again, it keeps the voice it was started in. */
     @Synchronized
     fun want(editionId: Long, voice: PodcastVoice) {
         folder(editionId).mkdirs()
         // Rewritten if unreadable: the app may have died as it was first written.
-        if (voice(editionId) == null) voiceFile(editionId).writeText(voice.name)
+        if (voice(editionId) == null) write(editionId, VOICE, voice.name)
         changed()
     }
 
@@ -46,7 +45,7 @@ class PodcastStore(val dir: File) {
         .sortedDescending()
 
     fun voice(editionId: Long): PodcastVoice? =
-        voiceFile(editionId).takeIf { it.exists() }?.readText()?.let { name -> PodcastVoice.entries.firstOrNull { it.name == name } }
+        read(editionId, VOICE)?.let { name -> PodcastVoice.entries.firstOrNull { it.name == name } }
 
     /** [page]'s audio made so far, in order. */
     fun pieces(editionId: Long, page: Int): List<PodcastPiece> {
@@ -55,8 +54,8 @@ class PodcastStore(val dir: File) {
             .filter { it.name.startsWith(prefix) && it.name.endsWith(".$AUDIO") }
             .mapNotNull { audio ->
                 val first = audio.name.removePrefix(prefix).removeSuffix(".$AUDIO").toIntOrNull() ?: return@mapNotNull null
-                val starts = File(audio.parentFile, audio.name.removeSuffix(AUDIO) + STARTS).takeIf { it.exists() }
-                    ?.readLines()?.mapNotNull { it.toDoubleOrNull() } ?: return@mapNotNull null
+                val starts = read(editionId, audio.name.removeSuffix(AUDIO) + STARTS)
+                    ?.lines()?.mapNotNull { it.toDoubleOrNull() } ?: return@mapNotNull null
                 PodcastPiece(audio, first, starts)
             }
             .sortedBy { it.firstLine }
@@ -87,14 +86,14 @@ class PodcastStore(val dir: File) {
             return
         }
         val name = "$page$SEP$firstLine"
-        File(folder, "$name.$STARTS").writeText(starts.joinToString("\n", postfix = "\n") { "%.3f".format(Locale.ROOT, it) })
+        write(editionId, "$name.$STARTS", starts.joinToString("\n", postfix = "\n") { "%.3f".format(Locale.ROOT, it) })
         if (!made.renameTo(File(folder, "$name.$AUDIO"))) throw IOException("Couldn't keep $name")
         changed()
     }
 
     @Synchronized
     fun complete(editionId: Long, page: Int) {
-        mark(editionId, "$page.$MADE")
+        write(editionId, "$page.$MADE", "")
         changed()
     }
 
@@ -102,32 +101,27 @@ class PodcastStore(val dir: File) {
     @Synchronized
     fun leaveLive(editionId: Long, page: Int) {
         folder(editionId).listFiles { file -> file.name.startsWith("$page$SEP") }?.forEach { it.delete() }
-        mark(editionId, "$page.$LIVE")
+        write(editionId, "$page.$LIVE", "")
         changed()
     }
 
     @Synchronized
     fun finish(editionId: Long) {
-        mark(editionId, FINISHED)
+        write(editionId, FINISHED, "")
         changed()
     }
 
     /** Adds to what making [editionId]'s podcast has cost: time spent, and seconds of speech made. */
     @Synchronized
     fun addCost(editionId: Long, nanos: Long, speechSeconds: Double) {
-        val folder = folder(editionId).takeIf { it.exists() } ?: return
         val (n, s) = cost(editionId)
-        File(folder, COST).writeText("${n + nanos} ${"%.3f".format(Locale.ROOT, s + speechSeconds)}")
+        write(editionId, COST, "${n + nanos} ${"%.3f".format(Locale.ROOT, s + speechSeconds)}")
     }
 
     /** What making [editionId]'s podcast has cost so far, over every run: nanoseconds, and seconds of speech. */
     fun cost(editionId: Long): Pair<Long, Double> =
-        File(folder(editionId), COST).takeIf { it.exists() }?.readText()?.split(' ')
+        read(editionId, COST)?.split(' ')
             ?.let { (it.getOrNull(0)?.toLongOrNull() ?: 0L) to (it.getOrNull(1)?.toDoubleOrNull() ?: 0.0) } ?: (0L to 0.0)
-
-    private fun mark(editionId: Long, name: String) {
-        folder(editionId).takeIf { it.exists() }?.let { File(it, name).createNewFile() }
-    }
 
     /**
      * The line of [page] the app died saying, and how many tries in a row it has: (-1, 0) if none.
@@ -135,7 +129,7 @@ class PodcastStore(val dir: File) {
      */
     @Synchronized
     fun deaths(editionId: Long, page: Int): Pair<Int, Int> =
-        File(folder(editionId), "$page.$SAYING").takeIf { it.exists() }?.readText()?.split(' ')?.mapNotNull { it.toIntOrNull() }
+        read(editionId, "$page.$SAYING")?.split(' ')?.mapNotNull { it.toIntOrNull() }
             ?.takeIf { it.size == 2 }?.let { it[0] to it[1] } ?: (-1 to 0)
 
     /**
@@ -145,7 +139,7 @@ class PodcastStore(val dir: File) {
      */
     @Synchronized
     fun saying(editionId: Long, page: Int, line: Int, death: Int) {
-        folder(editionId).takeIf { it.exists() }?.let { File(it, "$page.$SAYING").writeText("$line $death") }
+        write(editionId, "$page.$SAYING", "$line $death")
     }
 
     @Synchronized
@@ -156,9 +150,8 @@ class PodcastStore(val dir: File) {
     /** Counts a run that failed on [page] for some other reason than a full disk, and returns how many have. */
     @Synchronized
     fun failed(editionId: Long, page: Int): Int {
-        val file = File(folder(editionId), "$page.$FAILED")
-        val count = (file.takeIf { it.exists() }?.readText()?.toIntOrNull() ?: 0) + 1
-        if (folder(editionId).exists()) file.writeText(count.toString())
+        val count = (read(editionId, "$page.$FAILED")?.toIntOrNull() ?: 0) + 1
+        write(editionId, "$page.$FAILED", count.toString())
         return count
     }
 
@@ -171,6 +164,14 @@ class PodcastStore(val dir: File) {
     /** Pieces left half-written by an app that died: only called with nothing being made. */
     fun dropScratch() {
         dir.listFiles { file -> file.name.endsWith(".$PART") }?.forEach { it.delete() }
+    }
+
+    private fun read(editionId: Long, name: String): String? = File(folder(editionId), name).takeIf { it.exists() }?.readText()
+
+    /** Does nothing once [editionId]'s folder is deleted, so nothing finishing late brings it back. */
+    private fun write(editionId: Long, name: String, text: String) {
+        val folder = folder(editionId)
+        if (folder.exists()) File(folder, name).writeText(text)
     }
 
     @Synchronized
