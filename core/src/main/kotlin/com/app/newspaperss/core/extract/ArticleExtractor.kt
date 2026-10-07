@@ -142,6 +142,10 @@ class ArticleExtractor(private val http: HttpClient) {
                 else failed(input, page.reason, page.blocked, page.failure)
             is PageResult.Fetched -> {
                 val words = page.clean.wordCount
+                // The page holds this item among others (one of a day's posts on a blog's page for the day,
+                // the link naming its spot): the page would bring all of them, and the feed's text is
+                // the entry. Whatever the mode, and saying nothing about the source's full text.
+                if (input.feedUrl == null && feed != null && onThePage(feed, page)) return fromFeed(feed, null, null)
                 if (input.feedUrl != null && feed != null) return linkPost(input, page, feedWords) { note, siteName ->
                     fromFeed(feed, note, words, declaredLanguage = page.content.language, siteName = siteName)
                 }
@@ -209,7 +213,8 @@ class ArticleExtractor(private val http: HttpClient) {
     }
 
     private sealed interface PageResult {
-        class Fetched(val content: PageContent, val clean: CleanResult, val url: String) : PageResult
+        /** @param anchoredText the whole page's text, [normalized], when it has the element the address's fragment names. */
+        class Fetched(val content: PageContent, val clean: CleanResult, val url: String, val anchoredText: String? = null) : PageResult
         class Failed(val reason: String, val blocked: Boolean = false, permanent: Boolean = false) : PageResult {
             val failure: PageFailure? = when {
                 blocked -> null
@@ -228,7 +233,13 @@ class ArticleExtractor(private val http: HttpClient) {
         unusable(response)?.let { return it }
         val content = PageExtractor.extract(response.body, response.finalUrl)
         val title = input.feedTitle.ifBlank { content.title.orEmpty() }
-        return PageResult.Fetched(content, HtmlCleaner.clean(content.html, response.finalUrl, title), response.finalUrl)
+        val fragment = input.url.substringAfter('#', "")
+        // A tracking tag (#ref=rss) names nothing on the page. Searched before parsing: pages can be megabytes.
+        // The whole page, not the extracted article: extraction may settle on a longer entry than this one.
+        val anchoredText = response.body.takeIf {
+            fragment.isNotEmpty() && Regex("""\b(?:id|name)\s*=\s*["']?${Regex.escape(fragment)}["'\s>]""").containsMatchIn(it)
+        }?.let { normalized(Jsoup.parse(it).text()) }
+        return PageResult.Fetched(content, HtmlCleaner.clean(content.html, response.finalUrl, title), response.finalUrl, anchoredText)
     }
 
     private fun unusable(response: HttpResponse): PageResult.Failed? {
@@ -277,6 +288,18 @@ class ArticleExtractor(private val http: HttpClient) {
         // A stretch from the middle: the cleaner may have dropped a label or two at the start.
         val probe = pageText.substring(pageText.length / 4).take(ARTICLE_TEXT_PROBE)
         return probe !in articleText
+    }
+
+    /**
+     * The address names a spot on the page and the feed's text is there, start and end: the item is
+     * that entry, not a teaser for something else. Ends, not the whole text: a site sending a long
+     * near-match of a huge page would make a full search take minutes.
+     */
+    private fun onThePage(feed: CleanResult, page: PageResult.Fetched): Boolean {
+        val pageText = page.anchoredText ?: return false
+        if (feed.teaser) return false
+        val feedText = normalized(Jsoup.parse(feed.html).text())
+        return feedText.isNotEmpty() && feedText.take(ARTICLE_TEXT_PROBE) in pageText && feedText.takeLast(ARTICLE_TEXT_PROBE) in pageText
     }
 
     private fun normalized(text: String) = text.lowercase().replace(NOT_LETTERS, "")
