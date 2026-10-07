@@ -496,8 +496,8 @@ whose Kindle and KOReader answers ask for more on the same page).
     ⏮ ⏭ move by article (⏮ restarts the article after its first few
     sentences). Speed steps through 1×, 1.2×, 1.5× and 0.8×, and is kept:
     it's the same speed as Settings › Listening.
-  - The playing screen is the article's text, the sentence being read
-    tinted, following the voice. Scrolling away stops it following, and
+  - The playing screen is the article's text, at Settings › Article text
+    size, the sentence being read tinted, following the voice. Scrolling away stops it following, and
     "Back to where it's reading" returns. Tapping a sentence reads from
     there. The bar under it is the edition, one piece per article.
   - It keeps playing with the screen off, with Android's media controls on

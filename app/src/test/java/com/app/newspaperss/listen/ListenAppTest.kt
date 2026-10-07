@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.speech.tts.TextToSpeech
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -202,6 +204,24 @@ class ListenAppTest {
         compose.onNodeWithContentDescription("Contents").performClick()
         compose.onNode(hasText("Lagos Drivers Built Their Own App") and hasAnyAncestor(isDialog())).performClick()
         idleUntil { player.state.value.at.page == 1 }
+    }
+
+    @Test
+    fun theArticleIsReadAtTheArticleTextSize() {
+        startAndWait(edition())
+        var size by androidx.compose.runtime.mutableStateOf(com.app.newspaperss.settings.PreviewTextSize.DEFAULT)
+        compose.setContent { ListenScreen(player, onBack = {}, textSize = size) }
+        fun laidOut(): androidx.compose.ui.text.TextLayoutResult {
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            compose.onNodeWithText("The count took a week.").fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!.invoke(results)
+            return results.single()
+        }
+        val usual = laidOut().layoutInput.style.fontSize.value
+        size = com.app.newspaperss.settings.PreviewTextSize.LARGEST
+        compose.waitForIdle()
+        // Largest is 175%, as in the preview.
+        assertEquals(usual * 1.75f, laidOut().layoutInput.style.fontSize.value, 0.01f)
     }
 
     @Test

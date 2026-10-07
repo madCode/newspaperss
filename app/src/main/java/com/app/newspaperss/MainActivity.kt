@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.ui.listen.ListenScreen
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -242,7 +243,11 @@ private fun App(
                 )
             }
             composable(LISTEN) {
-                ListenScreen(container.listen, onBack = { nav.navigateUp() }, podcastVoice = container.podcastPlaying, instead = container.podcastInstead)
+                val textSize by remember { container.settings.settings.map { it.previewTextSize } }.collectAsStateWithLifecycle(initialValue = null)
+                ListenScreen(
+                    container.listen, onBack = { nav.navigateUp() }, podcastVoice = container.podcastPlaying, instead = container.podcastInstead,
+                    textSize = textSize ?: PreviewTextSize.DEFAULT,
+                )
             }
             composable(Tab.SOURCES.route) {
                 val context = LocalContext.current.applicationContext

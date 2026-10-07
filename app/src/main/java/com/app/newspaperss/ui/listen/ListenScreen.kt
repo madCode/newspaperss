@@ -68,6 +68,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.border
 import com.app.newspaperss.settings.PodcastVoice
+import com.app.newspaperss.settings.PreviewTextSize
 import com.app.newspaperss.listen.PodcastSpeaker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,6 +77,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
@@ -111,6 +113,8 @@ fun ListenScreen(
     onBack: () -> Unit,
     podcastVoice: StateFlow<PodcastVoice?> = MutableStateFlow(null),
     instead: StateFlow<PodcastSpeaker.Instead?> = MutableStateFlow(null),
+    /** Settings › Article text size, so the article reads at the size it does in the preview. */
+    textSize: PreviewTextSize = PreviewTextSize.DEFAULT,
 ) {
     val state by player.state.collectAsStateWithLifecycle()
     val voice by podcastVoice.collectAsStateWithLifecycle()
@@ -148,7 +152,7 @@ fun ListenScreen(
                 state.editionId == null -> Message("Nothing is playing. Open an edition and tap Listen.")
                 script == null -> Message("Opening…")
                 // Only while playing, as the voice's name: paused, the next article's voice isn't chosen yet.
-                else -> Page(state, script, player, voiceNote.takeIf { state.playing })
+                else -> Page(state, script, player, voiceNote.takeIf { state.playing }, textSize)
             }
         }
     }
@@ -161,7 +165,7 @@ private fun Message(text: String) {
 }
 
 @Composable
-private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer, voiceNote: String?) {
+private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer, voiceNote: String?, textSize: PreviewTextSize) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     // Following the voice until the reader scrolls away; the chip brings them back.
@@ -205,11 +209,11 @@ private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer,
                 val current = line?.block == index
                 when (block) {
                     is Block.Text -> TextBlock(
-                        block, if (current) line!!.index else null,
+                        block, if (current) line!!.index else null, textSize,
                         onLayout = { layouts[index] = it },
                         onTap = { sentence -> player.seek(ListenPosition(state.at.page, script.lines.indexOfFirst { it.block == index && it.index == sentence })) },
                     )
-                    is Block.Image -> ImageBlock(block, current, player) { player.seek(ListenPosition(state.at.page, script.lines.indexOfFirst { it.block == index })) }
+                    is Block.Image -> ImageBlock(block, current, player, textSize) { player.seek(ListenPosition(state.at.page, script.lines.indexOfFirst { it.block == index })) }
                 }
             }
             if (state.finished) {
@@ -226,6 +230,9 @@ private fun Page(state: ListenState, script: ListenScript, player: ListenPlayer,
     }
 }
 
+/** [this] at the article text size, on top of Android's font size as every size here is. */
+private fun TextStyle.sized(size: PreviewTextSize) = copy(fontSize = fontSize * size.percent / 100, lineHeight = lineHeight * size.percent / 100)
+
 /** Each sentence's characters in its block's text, which is the sentences joined by spaces. */
 internal fun sentenceRanges(block: Block): List<IntRange> {
     if (block !is Block.Text) return emptyList()
@@ -234,7 +241,7 @@ internal fun sentenceRanges(block: Block): List<IntRange> {
 }
 
 @Composable
-private fun TextBlock(block: Block.Text, current: Int?, onLayout: (TextLayoutResult) -> Unit, onTap: (Int) -> Unit) {
+private fun TextBlock(block: Block.Text, current: Int?, textSize: PreviewTextSize, onLayout: (TextLayoutResult) -> Unit, onTap: (Int) -> Unit) {
     val typography = MaterialTheme.typography
     val style = when (block.kind) {
         Kind.KICKER -> typography.labelLarge
@@ -243,7 +250,7 @@ private fun TextBlock(block: Block.Text, current: Int?, onLayout: (TextLayoutRes
         Kind.HEADING -> typography.titleMedium
         Kind.QUOTE -> typography.bodyLarge.copy(fontStyle = FontStyle.Italic)
         Kind.PARAGRAPH, Kind.ITEM -> typography.bodyLarge
-    }
+    }.sized(textSize)
     val tint = MaterialTheme.colorScheme.secondaryContainer
     val ranges = remember(block) { sentenceRanges(block) }
     // Rebuilt only when this block's sentence changes, not for every sentence read elsewhere.
@@ -286,7 +293,7 @@ private fun TextBlock(block: Block.Text, current: Int?, onLayout: (TextLayoutRes
 }
 
 @Composable
-private fun ImageBlock(block: Block.Image, current: Boolean, player: ListenPlayer, onTap: () -> Unit) {
+private fun ImageBlock(block: Block.Image, current: Boolean, player: ListenPlayer, textSize: PreviewTextSize, onTap: () -> Unit) {
     val bitmap by produceState<ImageBitmap?>(null, block.src) {
         value = withContext(Dispatchers.IO) {
             player.image(block.src)?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }
@@ -302,7 +309,7 @@ private fun ImageBlock(block: Block.Image, current: Boolean, player: ListenPlaye
             Image(it, contentDescription = null, modifier = frame.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit)
         }
         val caption = block.description ?: "An image without a description"
-        val captionStyle = MaterialTheme.typography.bodySmall
+        val captionStyle = MaterialTheme.typography.bodySmall.sized(textSize)
         Text(
             caption,
             style = captionStyle,
