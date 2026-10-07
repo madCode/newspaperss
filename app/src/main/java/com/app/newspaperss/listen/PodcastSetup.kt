@@ -10,7 +10,7 @@ import com.app.newspaperss.settings.SettingsStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 
 /** Where getting Kokoro onto this phone stands, for Settings › Listening. */
 sealed interface KokoroState {
@@ -55,8 +55,8 @@ class PodcastSetup(
     /** The download's size; reads the manifest, so not on the main thread. */
     val size: Long get() = install.bytes
 
-    // Off the main thread: each emission reads which files are in place.
-    val state: Flow<KokoroState> = combine(settings.settings, work) { s, info -> stateOf(s, info) }.flowOn(Dispatchers.IO)
+    // Each emission reads which files are in place: that much off the main thread.
+    val state: Flow<KokoroState> = combine(settings.settings, work) { s, info -> withContext(Dispatchers.IO) { stateOf(s, info) } }
 
     private fun stateOf(s: Settings, info: WorkInfo?): KokoroState {
         if (!supported) return KokoroState.Unsupported
