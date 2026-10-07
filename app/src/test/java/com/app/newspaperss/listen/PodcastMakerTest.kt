@@ -65,7 +65,7 @@ class PodcastMakerTest {
                 if (slow) Thread.sleep(5)
                 said += text
                 afterLine(text)
-                return Speech(FloatArray(text.length * 10), RATE)
+                return Speech(FloatArray(if (text == silentFor) 0 else text.length * 10), RATE)
             }
             override fun release() {
                 released++
@@ -77,15 +77,21 @@ class PodcastMakerTest {
     private var mostLoaded = 0
     private var slow = false
     private var diskFull = false
+    private var silentFor: String? = null
+    /** The first line said into a piece the encoder will fail to finish. */
+    private var encoderBrokenOn: String? = null
 
     /** Writes the samples' count, so a page's file says how much went into it. */
     private val encoder = AudioEncoder { file, rate ->
         assertEquals(RATE, rate)
+        val broken = encoderBrokenOn != null && said.lastOrNull() == encoderBrokenOn
         object : AudioSink {
             var count = 0
             override fun write(samples: FloatArray) { count += samples.size }
             override fun close() {
                 if (diskFull) throw java.io.IOException("No space left on device")
+                // As MediaMuxer does, given nothing to put in the file.
+                check(count > 0 && !broken) { "Failed to stop the muxer" }
                 file.writeText(count.toString())
             }
         }
@@ -310,32 +316,79 @@ class PodcastMakerTest {
     }
 
     @Test
-    fun aPageThatTookTheAppDownTwiceIsLeftToThePhonesVoice() {
+    fun aLineThatTookTheAppDownTwiceLeavesItsPageToThePhonesVoice() {
         inUse()
         val id = edition("Thursday", knots, lagos)
         request(id)
-        // Two runs that died in Kokoro's native code at the same place.
-        store.startTry(id, 0, 0)
-        store.startTry(id, 0, 0)
+        // Two runs died in Kokoro's native code saying the fourth line.
+        store.saying(id, 0, 3, 2)
         make()
 
         assertTrue(store.live(id, 0))
-        assertFalse(said.contains("Counting Knots"))
+        assertFalse(said.contains("Then a teacher counted."))
         assertTrue(store.made(id, 1))
         assertTrue(store.finished(id))
     }
 
     @Test
-    fun onceIsntTakenForACrashNorIsDyingSomewhereElse() {
+    fun dyingOnceIsntTakenForACrash() {
         inUse()
         val id = edition("Thursday", knots)
         request(id)
-        // Killed once (swiped away, say), then once more after it got further.
-        store.startTry(id, 0, 0)
-        store.startTry(id, 0, 2)
+        // Killed once (swiped away, say) saying the fourth line.
+        store.saying(id, 0, 3, 1)
         make()
 
         assertTrue(store.made(id, 0))
+        assertEquals(-1 to 0, store.deaths(id, 0))
+    }
+
+    @Test
+    fun dyingTwiceAtDifferentLinesIsntACrash() {
+        inUse()
+        pieceSeconds = 0.001
+        val id = edition("Thursday", knots)
+        request(id)
+        // Died once on the second line; the next run gets past it and dies on the fourth.
+        store.saying(id, 0, 1, 1)
+        val job = Job()
+        afterLine = { if (it == "Counting Knots") job.cancel() }
+        runBlocking { runCatching { withContext(job) { maker.makeAll() } } }
+        store.saying(id, 0, 3, 1)
+        afterLine = {}
+        make()
+
+        assertTrue(store.made(id, 0))
+    }
+
+    @Test
+    fun aPageTheEncoderKeepsFailingOnIsGivenUpAfterAFewRuns() {
+        inUse()
+        val id = edition("Thursday", knots, lagos)
+        request(id)
+        encoderBrokenOn = "Quanta"
+        repeat(PodcastMaker.FAILURES - 1) { assertTrue(runCatching { make() }.exceptionOrNull() is IllegalStateException) }
+        assertFalse(store.settled(id, 0))
+        make()
+
+        assertTrue(store.live(id, 0))
+        assertTrue(store.made(id, 1))
+        assertTrue(store.finished(id))
+    }
+
+    @Test
+    fun aPieceKokoroMadeNoSoundForIsStillKept() {
+        inUse()
+        // A piece a line, ending on a line of only symbols, which Kokoro makes nothing of.
+        pieceSeconds = 0.001
+        silentFor = "* * *"
+        val id = edition("Thursday", knots.copy(bodyHtml = "<p>The end. * * *</p>"))
+        request(id)
+        make()
+
+        assertTrue(store.made(id, 0))
+        assertEquals(listOf("The end.", "* * *"), said.subList(2, 4))
+        assertEquals(4, store.pieces(id, 0).size)
     }
 
     @Test

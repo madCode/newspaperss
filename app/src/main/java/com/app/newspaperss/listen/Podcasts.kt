@@ -97,10 +97,7 @@ class PodcastStore(val dir: File) {
     /** Leaves [page] to the phone's voice, dropping any of it made: an article doesn't change voice part way. */
     @Synchronized
     fun leaveLive(editionId: Long, page: Int) {
-        pieces(editionId, page).forEach {
-            it.audio.delete()
-            File(it.audio.parentFile, it.audio.name.removeSuffix(AUDIO) + STARTS).delete()
-        }
+        folder(editionId).listFiles { file -> file.name.startsWith("$page$SEP") }?.forEach { it.delete() }
         mark(editionId, "$page.$LIVE")
     }
 
@@ -112,23 +109,36 @@ class PodcastStore(val dir: File) {
     }
 
     /**
-     * Counts a try at [page] from [fromLine], and returns how many tries before it started there
-     * and never ended: only the app dying skips [endTry]. Kokoro's native code can take the app
-     * down, and a line that does would otherwise do it on every charge.
+     * The line of [page] the app died saying, and how many tries in a row it has: (-1, 0) if none.
+     * Only the app dying leaves this behind; see [saying].
      */
     @Synchronized
-    fun startTry(editionId: Long, page: Int, fromLine: Int): Int {
-        val file = File(folder(editionId), "$page.$TRYING")
-        val (line, count) = file.takeIf { it.exists() }?.readText()?.split(' ')?.mapNotNull { it.toIntOrNull() }
+    fun deaths(editionId: Long, page: Int): Pair<Int, Int> =
+        File(folder(editionId), "$page.$SAYING").takeIf { it.exists() }?.readText()?.split(' ')?.mapNotNull { it.toIntOrNull() }
             ?.takeIf { it.size == 2 }?.let { it[0] to it[1] } ?: (-1 to 0)
-        val earlier = if (line == fromLine) count else 0
-        if (folder(editionId).exists()) file.writeText("$fromLine ${earlier + 1}")
-        return earlier
+
+    /**
+     * Notes that [line] is being said, and that if the app dies saying it, it's the [death]th time
+     * in a row. Kokoro's native code can take the app down, and a line that does would otherwise
+     * do it on every charge. [said] clears it.
+     */
+    @Synchronized
+    fun saying(editionId: Long, page: Int, line: Int, death: Int) {
+        folder(editionId).takeIf { it.exists() }?.let { File(it, "$page.$SAYING").writeText("$line $death") }
     }
 
     @Synchronized
-    fun endTry(editionId: Long, page: Int) {
-        File(folder(editionId), "$page.$TRYING").delete()
+    fun said(editionId: Long, page: Int) {
+        File(folder(editionId), "$page.$SAYING").delete()
+    }
+
+    /** Counts a run that failed on [page] for some other reason than a full disk, and returns how many have. */
+    @Synchronized
+    fun failed(editionId: Long, page: Int): Int {
+        val file = File(folder(editionId), "$page.$FAILED")
+        val count = (file.takeIf { it.exists() }?.readText()?.toIntOrNull() ?: 0) + 1
+        if (folder(editionId).exists()) file.writeText(count.toString())
+        return count
     }
 
     /** Somewhere to write a piece before it's kept: inside [dir], so keeping it is a rename. */
@@ -160,7 +170,8 @@ class PodcastStore(val dir: File) {
         const val STARTS = "starts"
         const val MADE = "made"
         const val LIVE = "live"
-        const val TRYING = "trying"
+        const val SAYING = "saying"
+        const val FAILED = "failed"
         const val PART = "part"
     }
 }
@@ -271,18 +282,15 @@ class PodcastMaker(
             return
         }
         val lines = script.lines
-        val from = store.linesMade(editionId, page)
-        if (store.startTry(editionId, page, from) >= CRASHES) {
-            Log.w(TAG, "Page $page took the app down from line $from; left to the phone's voice")
-            store.leaveLive(editionId, page)
-            store.endTry(editionId, page)
-            return
-        }
+        val (deadAt, deaths) = store.deaths(editionId, page)
         var piece: Piece? = null
         try {
-            for (i in from until lines.size) {
+            for (i in store.linesMade(editionId, page) until lines.size) {
                 // Native code can't be stopped mid-sentence: between sentences is the soonest.
                 currentCoroutineContext().ensureActive()
+                val death = if (i == deadAt) deaths + 1 else 1
+                if (death > CRASHES) throw Unsayable(IllegalStateException("Line $i took the app down $deaths times"))
+                store.saying(editionId, page, i, death)
                 val speech = try {
                     kokoro.speak(lines[i].spoken)
                 } catch (e: Exception) {
@@ -303,11 +311,22 @@ class PodcastMaker(
         } catch (e: Unsayable) {
             // Something in this page Kokoro couldn't say: the phone's voice reads it, rather than
             // the podcast stopping at it every time.
-            Log.w(TAG, "Page $page left to the phone's voice: ${e.cause?.javaClass?.name}")
+            Log.w(TAG, "Page $page left to the phone's voice: ${e.cause?.message ?: e.cause?.javaClass?.name}")
+            store.leaveLive(editionId, page)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            // A full disk, most likely: tried again later, as it is.
+            throw e
+        } catch (e: Exception) {
+            // The encoder, say, failing the same way each time: given up after a few runs, so
+            // the pages after it, and older podcasts, aren't held up for good.
+            if (store.failed(editionId, page) < FAILURES) throw e
+            Log.w(TAG, "Page $page left to the phone's voice: ${e.javaClass.name}")
             store.leaveLive(editionId, page)
         } finally {
             piece?.drop()
-            store.endTry(editionId, page)
+            store.said(editionId, page)
         }
     }
 
@@ -324,6 +343,9 @@ class PodcastMaker(
         }
 
         fun keep(editionId: Long, page: Int) {
+            // Lines Kokoro made nothing of (a row of symbols): an encoder given no audio at all
+            // can't finish its file.
+            if (samples == 0L) write(FloatArray(rate / 10))
             sink.close()
             store.keep(editionId, page, firstLine, file, starts)
         }
@@ -345,8 +367,11 @@ class PodcastMaker(
 
         const val PIECE_SECONDS = 120.0
 
-        /** Tries at the same place that took the app down before the page is left to the phone's voice. */
+        /** Times saying the same line took the app down before the page is left to the phone's voice. */
         internal const val CRASHES = 2
+
+        /** Runs failing on the same page before it's left to the phone's voice. */
+        internal const val FAILURES = 3
 
         /** Kokoro's voices here are English ones; a page with no language is taken to be English. */
         fun english(language: String?): Boolean = language == null || Locale.forLanguageTag(language).language == "en"

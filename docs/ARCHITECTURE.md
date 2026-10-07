@@ -294,10 +294,11 @@ flowchart LR
     not at all, with each line's start time. Work stopped part way (Android
     stops it after 10 minutes) carries on from the last piece.
   - A page not in English, or with a line Kokoro fails on, is left to the
-    phone's voice. So is one where the app died twice at the same line: a
-    crash in Kokoro's native code would otherwise repeat on every charge.
-  - A disk or encoder failure stops the run without settling the page, so
-    it's tried again with the next edition.
+    phone's voice. So is one where the app died twice saying the same line:
+    a crash in Kokoro's native code would otherwise repeat on every charge.
+  - A full disk stops the run without settling the page, so it's tried
+    again with the next edition. Any other failure is too, but after three
+    runs failing on one page it's left to the phone's voice.
   - The newest edition goes first. A podcast keeps the voice it started in.
   - `KokoroEngine.lock` keeps one Kokoro loaded at a time, the speed check
     included: a stopped run's native code runs on until its sentence ends.
