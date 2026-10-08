@@ -5,7 +5,6 @@
 <head><title>Extraction sweep: public feeds</title></head>
 <body>
 <outline text="Platforms">
-  <outline text="beehiiv: Workweek" xmlUrl="https://rss.beehiiv.com/feeds/2D2ypiqH3a.xml"/>
   <outline text="Tumblr: staff" xmlUrl="https://staff.tumblr.com/rss"/>
   <outline text="WordPress.com: Longreads" xmlUrl="https://longreads.com/feed/"/>
   <outline text="Squarespace: Seth Godin" xmlUrl="https://seths.blog/feed/"/>
@@ -13,15 +12,13 @@
   <outline text="Jekyll: GitHub blog" xmlUrl="https://github.blog/feed/"/>
   <outline text="Drupal: Drupal.org news" xmlUrl="https://www.drupal.org/planet/rss.xml"/>
   <outline text="Write.as" xmlUrl="https://write.as/matt/feed/"/>
-  <outline text="Bear Blog" xmlUrl="https://herman.bearblog.dev/feed/"/>
-  <outline text="Mataroa" xmlUrl="https://sive.rs/en.atom"/>
+  <outline text="Microblog: Derek Sivers" xmlUrl="https://sive.rs/en.atom"/>
   <outline text="Substack: Astral Codex Ten" xmlUrl="https://www.astralcodexten.com/feed"/>
-  <outline text="Ghost: The Atlantic-style 404 Media" xmlUrl="https://www.404media.co/rss/"/>
+  <outline text="Ghost: 404 Media" xmlUrl="https://www.404media.co/rss/"/>
 </outline>
 <outline text="News">
   <outline text="The Guardian" xmlUrl="https://www.theguardian.com/world/rss"/>
   <outline text="BBC News" xmlUrl="https://feeds.bbci.co.uk/news/rss.xml"/>
-  <outline text="NPR" xmlUrl="https://feeds.npr.org/1001/rss.xml"/>
   <outline text="Ars Technica" xmlUrl="https://feeds.arstechnica.com/arstechnica/index"/>
   <outline text="The Verge" xmlUrl="https://www.theverge.com/rss/index.xml"/>
   <outline text="ProPublica" xmlUrl="https://www.propublica.org/feeds/propublica/main"/>
@@ -44,7 +41,7 @@
 <outline text="Notes, sidenotes, long form">
   <outline text="Gwern" xmlUrl="https://gwern.substack.com/feed"/>
   <outline text="Daring Fireball" xmlUrl="https://daringfireball.net/feeds/main"/>
-  <outline text="Paul Graham" xmlUrl="http://www.aaronsw.com/2002/feeds/pgessays.rss"/>
+  <outline text="Paul Graham" xmlUrl="https://www.paulgraham.com/rss.html"/>
   <outline text="Simon Willison" xmlUrl="https://simonwillison.net/atom/everything/"/>
   <outline text="LessWrong" xmlUrl="https://www.lesswrong.com/feed.xml?view=curated-rss"/>
   <outline text="The Marginalian" xmlUrl="https://www.themarginalian.org/feed/"/>
