@@ -11,6 +11,9 @@ import java.nio.ByteOrder
 /** Where encoded audio goes, a block of samples at a time. */
 interface AudioSink : Closeable {
     fun write(samples: FloatArray)
+
+    /** After [close], what went into the file, for the podcast log; null if there's nothing to say. */
+    val report: String? get() = null
 }
 
 /** Opens an [AudioSink] writing mono audio at [sampleRate] to [file]. */
@@ -57,6 +60,13 @@ object AacEncoder : AudioEncoder {
         private var fed = 0L
         private var closed = false
 
+        // What reached the file, to tell audio lost in encoding from silence Kokoro made.
+        private var frames = 0
+        private var lost = 0
+        private var lastUs = -1L
+        private var longestStepUs = 0L
+        private var backwards = 0
+
         override fun write(samples: FloatArray) {
             var at = 0
             var waits = 0
@@ -97,8 +107,18 @@ object AacEncoder : AudioEncoder {
                     index >= 0 -> {
                         val data = codec.getOutputBuffer(index)!!
                         // The codec's own setup data is in the track's format already.
-                        if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0 && track >= 0) {
-                            muxer.writeSampleData(track, data, info)
+                        if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0) {
+                            if (track >= 0) {
+                                muxer.writeSampleData(track, data, info)
+                                frames++
+                                if (lastUs >= 0) {
+                                    if (info.presentationTimeUs <= lastUs) backwards++
+                                    longestStepUs = maxOf(longestStepUs, info.presentationTimeUs - lastUs)
+                                }
+                                lastUs = info.presentationTimeUs
+                            } else {
+                                lost++
+                            }
                         }
                         codec.releaseOutputBuffer(index, false)
                         if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
@@ -107,6 +127,13 @@ object AacEncoder : AudioEncoder {
                 }
             }
         }
+
+        /** An AAC frame holds 1024 samples, so a step between frames much longer than that is audio lost. */
+        override val report: String
+            get() = "encoder: ${fed} samples in, $frames frames out of ${(fed + 1023) / 1024}, " +
+                "longest step ${longestStepUs / 1000} ms (a frame is ${1024_000 / rate} ms)" +
+                (if (lost > 0) ", $lost frames before the file was ready" else "") +
+                (if (backwards > 0) ", $backwards frames out of order" else "")
 
         override fun close() {
             if (closed) return

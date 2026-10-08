@@ -2,6 +2,7 @@ package com.app.newspaperss.listen
 
 import com.app.newspaperss.core.listen.ListenScript
 import com.app.newspaperss.core.listen.PodcastPace
+import com.app.newspaperss.core.listen.SpeechCheck
 import com.app.newspaperss.data.EditionRepository
 import com.app.newspaperss.settings.ListenVoice
 import com.app.newspaperss.settings.PodcastVoice
@@ -159,6 +160,9 @@ class PodcastMaker(
                 val current = piece ?: Piece(i, store.scratch(editionId, page, i), speech.sampleRate).also { piece = it }
                 if (i > 0 && lines[i - 1].block != lines[i].block) current.write(FloatArray((current.rate * PAUSE).toInt()))
                 current.starts += current.seconds
+                SpeechCheck.problems(speech.samples, speech.sampleRate, lines[i].spoken.length)?.let {
+                    log.add("Page $page line $i, ${"%.1f".format(Locale.ROOT, current.seconds)}s into piece ${current.firstLine}: $it (“${lines[i].spoken.take(40)}”)")
+                }
                 current.write(speech.samples)
                 current.spoken += speech.samples.size
                 current.work += now() - began
@@ -224,7 +228,7 @@ class PodcastMaker(
             sink.close()
             store.keep(editionId, page, firstLine, file, starts)
             store.addCost(editionId, work + now() - began, spoken.toDouble() / rate)
-            log.add("Kept page $page lines $firstLine–${firstLine + starts.size - 1}: ${seconds.toInt()}s of audio in ${seconds(work + now() - began)}s")
+            log.add("Kept page $page lines $firstLine–${firstLine + starts.size - 1}: ${seconds.toInt()}s of audio in ${seconds(work + now() - began)}s" + (sink.report?.let { "; $it" } ?: ""))
         }
 
         fun drop() {
