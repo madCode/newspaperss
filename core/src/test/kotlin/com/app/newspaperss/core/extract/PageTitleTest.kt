@@ -33,6 +33,9 @@ class PageTitleTest {
         assertEquals("The Long Goodbye: Britain after Brexit", PageTitle.of(subtitle, "https://review.example.com/goodbye"))
         val card = """<html><head><meta property="og:title" content="Climate Change: What You Need to Know - Opinion"></head>
             <body><div itemprop="headline">Climate Change</div></body></html>"""
+        val time = """<html><head><meta property="og:title" content="Climate Change Explained: Why It's Time to Act Now">
+            <script type="application/ld+json">{"@type":"NewsArticle","headline":"Climate Change Explained"}</script></head></html>"""
+        assertEquals("a site's name inside another word", "Climate Change Explained: Why It's Time to Act Now", PageTitle.of(time, "https://time.com/climate"))
         assertEquals("a related card's headline", "Climate Change: What You Need to Know - Opinion", PageTitle.of(card, "https://news.example.com/c"))
         val cut = """<html><head><meta property="og:title" content="Why the library wing went over budget and what the committee plans next">
             <script type="application/ld+json">{"@type":"NewsArticle","headline":"Why the library wing went over budget and what"}</script></head></html>"""

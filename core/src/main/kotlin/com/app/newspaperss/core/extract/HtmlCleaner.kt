@@ -56,6 +56,7 @@ object HtmlCleaner {
         removeHidden(body)
         keepVideosAsLinks(body)
         keepFootnoteContainers(body)
+        keepQuoteCredits(body)
         body.select(REMOVE_TAGS.joinToString(",")).remove()
         expandSubstackNotes(body)
         removeScreenReaderOnly(body)
@@ -270,6 +271,11 @@ object HtmlCleaner {
         }
     }
 
+    /** A `<footer>` in a quote or figure is its credit ("— Ada Lovelace, Notes"), not the page's footer. */
+    internal fun keepQuoteCredits(root: Element) {
+        root.select("blockquote footer, figure footer").forEach { it.tagName("div") }
+    }
+
     /**
      * Writes out in capitals what a page sets in small capitals, as the EPUB doesn't keep the
      * styling. Sites that write "nato" or "us" in lower case for small capitals would otherwise
@@ -345,10 +351,17 @@ object HtmlCleaner {
         val total = countWords(body).coerceAtLeast(1)
         for (el in body.select("*")) {
             if (el === body || el.tagName() == "img" || !el.isAttached()) continue
-            val isJunk = el.attr("role") in JUNK_ROLES || classAndIdTokens(el).any { it in JUNK_TOKENS }
+            val isJunk = el.attr("role") in JUNK_ROLES || classAndIdTokens(el).any { it in JUNK_TOKENS } || isSiteFooter(el)
             if (isJunk && isSmallPart(el, total)) el.remove()
         }
     }
+
+    /**
+     * A page's footer by its whole class or id (Substack's is a `div.footer`). Not a word of one:
+     * "blockquote-footer" holds a quote's credit, "post-footer" can hold notes.
+     */
+    private fun isSiteFooter(el: Element): Boolean =
+        (el.classNames() + el.id()).any { it.lowercase() in SITE_FOOTERS } && el.parents().none { it.tagName() == "blockquote" || it.tagName() == "figure" }
 
     /** Safety net: an unlucky class name must never take most of the article with it. */
     internal fun isSmallPart(el: Element, totalWords: Int) = countWords(el).toDouble() / totalWords < SAFETY_NET_SHARE
@@ -847,7 +860,7 @@ object HtmlCleaner {
         "ad", "ads", "advert", "advertisement", "adsbygoogle", "promo", "promotion", "newsletter", "subscribe",
         "subscription", "signup", "share", "sharing", "social", "related", "recommended", "recommendations",
         "comments", "comment", "sidebar", "popup", "modal", "cookie", "cookies", "banner", "sponsored",
-        "outbrain", "taboola", "breadcrumb", "breadcrumbs", "toolbar", "footer",
+        "outbrain", "taboola", "breadcrumb", "breadcrumbs", "toolbar",
     )
     private val SCREEN_READER_ONLY = setOf(
         "screen-reader-text", "screen-reader-only", "sr-only", "sr-text", "visually-hidden", "visuallyhidden", "a11y-hidden",
@@ -909,6 +922,7 @@ object HtmlCleaner {
         RegexOption.IGNORE_CASE,
     )
 
+    private val SITE_FOOTERS = setOf("footer", "site-footer", "page-footer", "publication-footer")
     private val LETTER_OR_DIGIT = Regex("[\\p{L}\\p{N}]")
     private val PAYWALL_LINK = Regex("subscribe|sign up|join|log ?in|forgot", RegexOption.IGNORE_CASE)
 
@@ -921,9 +935,9 @@ object HtmlCleaner {
 
     // Substack's own wording anywhere in the block; the rest only as the block's opening.
     private val SUBSCRIBE_PITCH = Regex(
-        "consider becoming a (free or )?paid subscriber|is a reader-supported publication|subscribe to our (free )?newsletter|" +
+        "consider becoming a (free or )?paid subscriber|is a reader-supported publication|" +
             "subscribe (for free )?to receive new posts and support|" +
-            "^(subscribe to .{1,60} to keep reading|subscribe to .{1,60}\\bnewsletter\\b|this post is for (paid |paying )?subscribers|" +
+            "^(subscribe to .{1,60} to keep reading|subscribe to .{1,60}\\bnewsletter\\b|(enjoying [^?]{1,60}\\? )?subscribe to our (free )?newsletter|this post is for (paid |paying )?subscribers|" +
             "this (premium )?(article|post|story) is (only )?available (only )?to (paid |paying )?(subscribers|members)|" +
             "([^.!?]{1,30}[.!?] )?subscribe to [^.!?]{1,60}:$)",
         RegexOption.IGNORE_CASE,

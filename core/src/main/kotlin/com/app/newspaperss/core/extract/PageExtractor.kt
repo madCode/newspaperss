@@ -81,17 +81,19 @@ internal object PageExtractor {
         // Not schema.org's isAccessibleForFree: metered sites set it false and serve the whole story.
         // After the overlays go, so a sign-in dialog inside the article doesn't count.
         val paywalled = doc.selectFirst(PAYWALL) != null || signInPaywall(doc)
+        HtmlCleaner.removeScreenReaderOnly(doc.body())
+        // Readability drops every <footer> and <aside>, footnotes and quotes' credits too.
+        HtmlCleaner.keepFootnoteContainers(doc.body())
+        HtmlCleaner.keepQuoteCredits(doc.body())
+        // Readability drops classes and styles, and with them the small capitals.
+        HtmlCleaner.capitalizeSmallCaps(doc.body())
+        // After the passes above, as Readability's pick it's compared with comes after them too.
         val pitches = doc.select(PAYWALL_PITCH)
         // What comes before the pitch in its box, the free part, if the box holds it at all.
         val freePart = pitches.firstOrNull()?.let { pitch ->
             Element("div").apply { pitch.parent()?.children()?.takeWhile { it !== pitch }?.forEach { appendChild(it.clone()) } }
         }
         pitches.remove()
-        HtmlCleaner.removeScreenReaderOnly(doc.body())
-        // Readability drops every <footer> and <aside>, footnotes too.
-        HtmlCleaner.keepFootnoteContainers(doc.body())
-        // Readability drops classes and styles, and with them the small capitals.
-        HtmlCleaner.capitalizeSmallCaps(doc.body())
 
         val readability = runCatching { Readability4JExtended(url, doc.clone()).parse() }.getOrNull()
         val author = listOfNotNull(
@@ -226,9 +228,15 @@ internal object PageExtractor {
         val before = title.substring(0, at)
         val after = title.substring(at + headline.length)
         if (!((before.isEmpty() || WRAPPER_BEFORE.matches(before)) && (after.isEmpty() || WRAPPER_AFTER.matches(after)))) return false
-        val extra = key(before + after)
-        val hostWords = runCatching { URI(names.last()).host }.getOrNull().orEmpty().lowercase().split('.', '-').filter { it.length > 2 && it !in HOST_NOISE }
-        return names.dropLast(1).map(::key).any { it.length > 3 && it in extra } || hostWords.any { it in extra }
+        // The extra must be mostly names, numbers and dates: "Why It's Time to Act Now" (on
+        // time.com) has the site's name in it, but it's a subtitle.
+        val extra = words(before + after)
+        val hostWords = runCatching { URI(names.last()).host }.getOrNull().orEmpty().lowercase().split('.', '-')
+            .filter { it.length > 2 && it !in HOST_NOISE && it != "the" }
+        val nameWords = names.dropLast(1).flatMap(::words).filter { it.length > 1 }.toSet() + hostWords
+        val named = extra.count { it in nameWords }
+        val other = extra.count { it !in nameWords && !it.all(Char::isDigit) && it !in MONTHS }
+        return named > 0 && other <= WRAPPER_OTHER_WORDS
     }
 
     /** Removes a trailing site or author name: "E-reader - Wikipedia" becomes "E-reader". */
@@ -257,6 +265,8 @@ internal object PageExtractor {
     }
 
     private fun key(s: String) = s.lowercase().replace(NON_ALNUM, "")
+
+    private fun words(s: String) = s.lowercase().split(NON_ALNUM).filter { it.isNotEmpty() }
 
     private fun Document.metaContent(name: String): String? =
         selectFirst("meta[property=\"$name\"], meta[name=\"$name\"]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
@@ -297,6 +307,11 @@ internal object PageExtractor {
     // class/id substrings of cookie and consent banners, including common consent-management plugins.
     private val OVERLAY_MARKERS = listOf("cookie", "consent", "gdpr", "cmplz", "onetrust", "didomi", "usercentrics", "truste")
     private val DIALOG_ROLES = setOf("dialog", "alertdialog")
+    private const val WRAPPER_OTHER_WORDS = 2
+    private val MONTHS = setOf(
+        "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+        "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec", "issue", "vol", "no",
+    )
     private val PAYWALL_OFFER = Regex("\\bsubscri|\\bbuy\\b|\\bpurchase\\b", RegexOption.IGNORE_CASE)
     private val TITLE_SEPARATORS = Regex("\\s+[|\\-–—:·•]\\s+")
     private val WRAPPER_BEFORE = Regex(".*\\S\\s*[,|\\-–—:·•]\\s+")

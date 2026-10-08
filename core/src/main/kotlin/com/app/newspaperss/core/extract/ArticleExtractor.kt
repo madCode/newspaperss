@@ -252,7 +252,8 @@ class ArticleExtractor(private val http: HttpClient) {
         val from = runCatching { URI(requested) }.getOrNull() ?: return false
         val to = runCatching { URI(final) }.getOrNull() ?: return false
         val path = to.path.orEmpty().trimEnd('/')
-        return from.host.equals(to.host, ignoreCase = true) && from.path.orEmpty().trimEnd('/').startsWith("$path/")
+        // Not the front page: a removed post sent home isn't one of its posts.
+        return path.isNotEmpty() && from.host.equals(to.host, ignoreCase = true) && from.path.orEmpty().trimEnd('/').startsWith("$path/")
     }
 
     private fun unusable(response: HttpResponse): PageResult.Failed? {

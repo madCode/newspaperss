@@ -465,6 +465,8 @@ class HtmlCleanerTest {
             """<a href="https://substack.com/tos">Terms</a></div><div><a href="https://substack.com/signup">Start your Substack</a>""" +
             """<a href="https://substack.com/app/app-store-redirect">Get the app</a></div></div>"""
         assertEquals("<p>$longText</p>".trim(), clean("<p>$longText</p>$footer").trim())
+        val quote = """<blockquote class="blockquote"><p>We may say most aptly.</p><footer class="blockquote-footer">Ada Lovelace, <cite>Notes</cite></footer></blockquote>"""
+        assertTrue("a quote's credit stays", "Ada Lovelace" in clean("<p>$longText</p>$quote"))
     }
 
     /** A magazine's line asking for sign-ups, at the end of an article or in a box within it. */
@@ -476,8 +478,10 @@ class HtmlCleanerTest {
         )) {
             assertEquals(pitch, "<p>$longText</p>".trim(), clean("<p>$longText</p>$pitch").trim())
         }
-        val aboutNewsletters = "<p>I subscribe to a newsletter about birds, and it changed how I walk.</p>"
-        assertTrue("an author's own sentence about a newsletter stays", "birds" in clean("<p>$longText</p>$aboutNewsletters"))
+        for (own in listOf(
+            "<p>I subscribe to a newsletter about birds, and it changed how I walk.</p>",
+            "<p>When we asked readers last spring to subscribe to our newsletter, almost two thousand of you did, and the replies changed how we report.</p>",
+        )) assertTrue("an author's own sentence about a newsletter stays", own.substring(3, 20) in clean("<p>$longText</p>$own"))
     }
 
     @Test
