@@ -368,10 +368,13 @@ class TtrssFeedsTest {
     @Test
     fun theFeedsTtrssCantFetchAreNamed() {
         assertNull(cantFetchLine(emptyList()))
-        assertEquals("⚠ tt-rss can't fetch one of your feeds: Aeon. Check its address in tt-rss.", cantFetchLine(listOf("Aeon")))
-        assertEquals("⚠ tt-rss can't fetch 2 of your feeds: Aeon and Wired. Check their addresses in tt-rss.", cantFetchLine(listOf("Aeon", "Wired")))
+        assertEquals("⚠ tt-rss couldn't fetch one of your feeds last time it tried: Aeon. If this stays, check its address in tt-rss.", cantFetchLine(listOf("Aeon")))
         assertEquals(
-            "⚠ tt-rss can't fetch 5 of your feeds: A, B, C and 2 more. Check their addresses in tt-rss.",
+            "⚠ tt-rss couldn't fetch 2 of your feeds last time it tried: Aeon and Wired. If this stays, check their addresses in tt-rss.",
+            cantFetchLine(listOf("Aeon", "Wired")),
+        )
+        assertEquals(
+            "⚠ tt-rss couldn't fetch 5 of your feeds last time it tried: A, B, C and 2 more. If this stays, check their addresses in tt-rss.",
             cantFetchLine(listOf("A", "B", "C", "D", "E")),
         )
     }
@@ -388,7 +391,7 @@ class TtrssFeedsTest {
         assertEquals("Full page", feedNote(feed(PublicationEntity(1, "7", chosenMode = ContentMode.PAGE))))
         // A feed tt-rss can't fetch says so first; waiting for a first fetch that failed is the same news.
         assertEquals(
-            "tt-rss can't fetch it · Full page",
+            "tt-rss couldn't fetch it last time · Full page",
             feedNote(feed(PublicationEntity(1, "7", chosenMode = ContentMode.PAGE, awaitingFirstFetch = true, serverError = "HTTP Code: 404"))),
         )
         assertTrue(sameFeed("https://www.Example.com/feed/", "http://example.com/feed"))

@@ -484,5 +484,9 @@ class TtrssClientTest {
         val errors = client().allFeeds().map { it.lastError }
         assertEquals(listOf(null, "HTTP Code: 404 Not Found", null), errors.take(3))
         assertEquals(200, errors[3]!!.length)
+        // Cut short, an emoji at the edge goes whole rather than leaving half of itself.
+        server.reply(loggedIn)
+        server.reply(ok("""[{"id":9,"title":"Emoji","unread":0,"last_error":"${"x".repeat(199)}😀 and more"}]"""))
+        assertEquals("x".repeat(199), client().allFeeds().single().lastError)
     }
 }

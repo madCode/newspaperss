@@ -177,7 +177,7 @@ class TtrssClient(
                     id, text("title") ?: "", text("unread")?.toIntOrNull() ?: 0,
                     feedUrl = text("feed_url")?.takeIf { it.isNotBlank() }, categoryId = text("cat_id")?.toIntOrNull(),
                     lastUpdated = text("last_updated")?.toLongOrNull(),
-                    lastError = text("last_error")?.replace(Regex("\\s+"), " ")?.trim()?.take(MAX_ERROR_CHARS)?.ifBlank { null },
+                    lastError = text("last_error")?.replace(Regex("\\s+"), " ")?.trim()?.let(::shortened)?.ifBlank { null },
                 ),
             )
         }
@@ -398,6 +398,13 @@ class TtrssClient(
         /** getFeeds' "every feed, without tt-rss's virtual ones". */
         private const val ALL_FEEDS = -3
         const val MAX_LIMIT = 200
+
+        /** At most [MAX_ERROR_CHARS], without cutting an emoji or other two-unit character in half. */
+        private fun shortened(s: String): String {
+            if (s.length <= MAX_ERROR_CHARS) return s
+            val end = if (s[MAX_ERROR_CHARS - 1].isHighSurrogate()) MAX_ERROR_CHARS - 1 else MAX_ERROR_CHARS
+            return s.substring(0, end)
+        }
         // tt-rss keeps up to its fetcher's whole message; a line on a phone is enough.
         private const val MAX_ERROR_CHARS = 200
         private const val FIELD_UNREAD = 2

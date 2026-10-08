@@ -106,11 +106,12 @@ interface SourceDao {
     @Query("UPDATE sources SET feedsListedAt = :at WHERE id = :id")
     suspend fun setFeedsListed(id: Long, at: Instant)
 
-    @Query("UPDATE publications SET listed = 0, outsideCategory = 0 WHERE sourceId = :sourceId")
+    // The error goes too: a feed no longer in the list isn't tt-rss's to fetch.
+    @Query("UPDATE publications SET listed = 0, outsideCategory = 0, serverError = NULL WHERE sourceId = :sourceId")
     suspend fun unlistPublications(sourceId: Long)
 
-    /** What tt-rss said about fetching a feed the last time it was asked. */
-    @Query("UPDATE publications SET serverError = :error WHERE sourceId = :sourceId AND `key` = :key")
+    /** What tt-rss said about fetching a feed the last time it was asked; unchanged, nothing is written, so screens don't redraw. */
+    @Query("UPDATE publications SET serverError = :error WHERE sourceId = :sourceId AND `key` = :key AND serverError IS NOT :error")
     suspend fun setServerError(sourceId: Long, key: String, error: String?)
 
     /** tt-rss has fetched these feeds: they have unread articles there. */

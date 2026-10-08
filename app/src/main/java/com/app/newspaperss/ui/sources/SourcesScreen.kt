@@ -209,7 +209,7 @@ fun SourcesScreen(
                     else account?.let { accountProblem(it, locale, is24Hour) }?.let { AccountProblemBanner(it, onOpenAccount) }
                         // The account itself is fine but some of its feeds aren't: named here, as their
                         // rows can be under folded categories, and each is fixed in tt-rss.
-                        ?: srv?.cantFetch?.let(::cantFetchLine)?.let { AccountProblemBanner(it, onOpen = null) }
+                        ?: srv?.cantFetch?.let(::cantFetchLine)?.let { AccountProblemBanner(it, onOpen = null, announce = false) }
                 }
                 SourceList(shown, viewModel, onOpenReadingList, onOpenSource, onOpenFeed, onOpenLeftOut, onOpenNotInPaper)
             }
@@ -329,7 +329,7 @@ private fun EmptySources(modifier: Modifier) {
 
 /** The problem with the tt-rss account, and the way to Settings, where it's put right. */
 @Composable
-private fun AccountProblemBanner(problem: String, onOpen: (() -> Unit)?) {
+private fun AccountProblemBanner(problem: String, onOpen: (() -> Unit)?, announce: Boolean = true) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.medium,
@@ -337,7 +337,8 @@ private fun AccountProblemBanner(problem: String, onOpen: (() -> Unit)?) {
     ) {
         Column(Modifier.padding(16.dp)) {
             // A heading, so TalkBack can jump to it, and announced when it appears while Sources is open.
-            Text(problem, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite })
+            // Announced when the account fails; a standing list of feeds, which changes as they do, isn't.
+            Text(problem, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { heading(); if (announce) liveRegion = LiveRegionMode.Polite })
             if (onOpen != null) {
                 OutlinedButton(onClick = onOpen, modifier = Modifier.padding(top = 8.dp).semantics { contentDescription = "Your tt-rss settings" }) {
                     Text("Settings")
@@ -508,7 +509,7 @@ internal fun cantFetchLine(titles: List<String>): String? {
     }
     val feeds = if (titles.size == 1) "one of your feeds" else "${titles.size} of your feeds"
     val their = if (titles.size == 1) "its address" else "their addresses"
-    return "⚠ tt-rss can't fetch $feeds: $list. Check $their in tt-rss."
+    return "⚠ tt-rss couldn't fetch $feeds last time it tried: $list. If this stays, check $their in tt-rss."
 }
 
 private const val MAX_NAMED_FEEDS = 3
@@ -527,8 +528,11 @@ private fun failingSinceLine(since: Instant, locale: Locale, is24Hour: Boolean, 
 /** A feed just subscribed to in tt-rss, which has nothing to give until tt-rss's own schedule fetches it. */
 internal const val WAITING_FOR_FIRST_FETCH = "Not fetched by tt-rss yet"
 
-/** A feed tt-rss's own fetcher fails on: dead, moved, or turning the server away. */
-internal const val SERVER_CANT_FETCH = "tt-rss can't fetch it"
+/**
+ * A feed tt-rss's own fetcher failed on the last time it tried: dead, moved, turning the server
+ * away, or just a timeout that the next try gets past. "Last time": tt-rss reports even a one-off.
+ */
+internal const val SERVER_CANT_FETCH = "tt-rss couldn't fetch it last time"
 
 /**
  * A line under a feed only when it has something to say: tt-rss failing to fetch it, a first

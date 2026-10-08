@@ -193,6 +193,15 @@ class TtrssSyncTest {
         server.add(2, "Back again", feedId = 7, feedTitle = "Moved Magazine")
         sync.syncAll()
         assertNull(db.sources().publication(source.id, "7")!!.serverError)
+
+        // Unsubscribed in tt-rss with its error standing: the next day's list drops the feed, and the error with it.
+        server.fetchErrors[8] = "HTTP Code: 410"
+        sync.syncAll()
+        assertEquals("HTTP Code: 410", db.sources().publication(source.id, "8")!!.serverError)
+        server.feeds.remove(8)
+        server.unread.removeAll { it.feedId == 8 }
+        FeedSync(db, http, Clock.fixed(now.plus(Duration.ofDays(1)), ZoneOffset.UTC), Duration.ofDays(7), accounts).syncAll()
+        assertNull(db.sources().publication(source.id, "8")!!.serverError)
     }
 
     @Test
