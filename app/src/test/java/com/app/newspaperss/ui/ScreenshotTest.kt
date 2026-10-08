@@ -885,6 +885,21 @@ class ScreenshotTest {
         shoot("08h-left-out-list", ready = { vm.feeds.value.any { !it.inPaper } }) { LeftOutScreen(vm, onBack = {}, onOpenFeed = {}) }
     }
 
+    /** A failing feed's page from the top, where its own address is offered to check. */
+    @Test
+    fun sourceDetailFailing() {
+        val repo = SourceRepository(db)
+        val id = runBlocking {
+            val id = repo.addFeed("https://example.org/weekly/rss.xml", "Example Weekly")
+            db.sources().recordSuccess(id, Instant.now().minus(Duration.ofDays(6)), null, "https://example.org", "")
+            db.sources().recordFailure(id, Instant.now().minus(Duration.ofDays(5)), "Couldn't read this feed: the site sent a web page.")
+            db.sources().recordFailure(id, Instant.now().minusSeconds(3_600), "Couldn't read this feed: the site sent a web page.")
+            id
+        }
+        val vm = SourceDetailViewModel(repo, id, flowOf(1))
+        shoot("06g-source-detail-failing", ready = { vm.detail.value?.source?.lastError != null }) { SourceDetailScreen(vm, onBack = {}) }
+    }
+
     /** A phone feed's page from the top: its settings. */
     @Test
     fun phoneFeedSettings() {

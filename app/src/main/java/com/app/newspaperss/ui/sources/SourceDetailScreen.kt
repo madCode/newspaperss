@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -69,12 +70,15 @@ import com.app.newspaperss.data.SourceKind
 import com.app.newspaperss.data.SourceRepository
 import com.app.newspaperss.ui.components.BUILDING_NOTE
 import com.app.newspaperss.ui.components.historyLine
+import com.app.newspaperss.ui.components.isWebAddress
 import com.app.newspaperss.ui.settings.SettingsViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /** One source's health and its recent articles, so the reader can see what it has been sending. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -136,6 +140,13 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     val publication = detail?.text
     val knownTitle = publication?.title ?: articles.firstNotNullOfOrNull { it.originTitle }
     val feedTitle = knownTitle ?: "A feed"
+    val scope = rememberCoroutineScope()
+    // One at a time: tapping again replaces the last, rather than queueing in front of an Undo.
+    var copiedNote by remember { mutableStateOf<Job?>(null) }
+    val onCopied: (String) -> Unit = { message ->
+        copiedNote?.cancel()
+        copiedNote = scope.launch { snackbar.showSnackbar(message, duration = SnackbarDuration.Long) }
+    }
     Scaffold(
         topBar = {
             if (selecting) {
@@ -184,7 +195,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                         ArticleCap(publication?.maxArticles, detail?.defaultMax ?: 1, viewModel::stepMaxArticles, viewModel::followEditionMax)
                     }
                     if (viewModel.isFeed) {
-                        FeedHeader(publication)
+                        FeedHeader(publication, onCopied)
                         val leftOut = publication?.leftOut == true
                         FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (leftOut) {
@@ -196,7 +207,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
                         }
                         if (!leftOut) cap()
                     } else {
-                        Health(source, publication, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour)
+                        Health(source, publication, articles.maxOfOrNull { it.discoveredAt }, locale, is24Hour, onCopied)
                         FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = viewModel::togglePaused) { Text(if (source.paused) "Resume" else "Pause") }
                             if (source.kind == SourceKind.FEED) OutlinedButton(onClick = { choosingMode = true }) { Text("Article text: ${modeName(publication)}") }
@@ -277,18 +288,27 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
     }
 }
 
-/** A tt-rss feed's account and category, its address, and where its article text comes from. */
+/**
+ * A tt-rss feed's address, then whether it's waiting or left out, then the details: its account
+ * and category, and where its article text comes from.
+ */
 @Composable
-private fun FeedHeader(publication: PublicationEntity?) {
+private fun FeedHeader(publication: PublicationEntity?, onCopied: (String) -> Unit) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(listOfNotNull("In your tt-rss", publication?.category?.let { "category $it" }).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = muted)
-        publication?.feedUrl?.let { Text(SourceRepository.hostOf(it), style = MaterialTheme.typography.bodyMedium, color = muted) }
-        if (publication?.awaitingFirstFetch == true) Text("$WAITING_FOR_FIRST_FETCH. Its first articles come once tt-rss has fetched it, usually within the hour.")
-        if (publication?.leftOut == true) {
-            Text("Left out of the paper. It stays in your tt-rss and isn't fetched. Starred articles from it still go in.")
-        } else {
-            Text(textLine(publication), style = MaterialTheme.typography.bodyMedium, color = muted)
+    val details = MaterialTheme.typography.bodySmall
+    Column(Modifier.padding(16.dp)) {
+        publication?.feedUrl?.let { url ->
+            AddressLink(url, SourceRepository.hostOf(url), MaterialTheme.typography.bodyMedium, onCopied, Modifier.padding(bottom = 12.dp))
+        }
+        val state = when {
+            publication?.leftOut == true -> "Left out of the paper. It stays in your tt-rss and isn't fetched. Starred articles from it still go in."
+            publication?.awaitingFirstFetch == true -> "$WAITING_FOR_FIRST_FETCH. Its first articles come once tt-rss has fetched it, usually within the hour."
+            else -> null
+        }
+        state?.let { Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 12.dp)) }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(listOfNotNull("In your tt-rss", publication?.category?.let { "category $it" }).joinToString(" · "), style = details, color = muted)
+            if (publication?.leftOut != true) Text(textLine(publication), style = details, color = muted)
         }
     }
 }
@@ -306,15 +326,29 @@ private fun LeaveOutDialog(title: String, onConfirm: () -> Unit, onDismiss: () -
     )
 }
 
+/**
+ * A source's site, then how it's doing, then the details. A feed that's failing or has sent
+ * nothing yet also shows its own address, since that's what to check, not the site's front page.
+ */
 @Composable
-private fun Health(source: SourceEntity, learned: PublicationEntity?, lastNew: Instant?, locale: Locale, is24Hour: Boolean) {
+private fun Health(source: SourceEntity, learned: PublicationEntity?, lastNew: Instant?, locale: Locale, is24Hour: Boolean, onCopied: (String) -> Unit) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(SourceRepository.hostOf(source.siteUrl ?: source.url), style = MaterialTheme.typography.bodyMedium, color = muted)
-        Text(statusLine(source, lastNew), color = if (hasProblem(source)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-        if (!source.paused) failingLine(source.failingSince, locale)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        lastCheckedLine(source.lastFetchedAt, locale, is24Hour)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = muted) }
-        if (source.kind == SourceKind.FEED) Text(textLine(learned), style = MaterialTheme.typography.bodyMedium, color = muted)
+    val details = MaterialTheme.typography.bodySmall
+    // The feed's own address when the site's isn't one to open, as a hostile feed's may not be.
+    val site = listOfNotNull(source.siteUrl, source.url).firstOrNull(::isWebAddress) ?: source.siteUrl ?: source.url
+    Column(Modifier.padding(16.dp)) {
+        AddressLink(site, SourceRepository.hostOf(site), MaterialTheme.typography.bodyMedium, onCopied)
+        Column(Modifier.padding(top = 12.dp)) {
+            Text(statusLine(source, lastNew), style = MaterialTheme.typography.bodyLarge, color = if (hasProblem(source)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+            if (!source.paused) failingLine(source.failingSince, locale)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
+        }
+        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            lastCheckedLine(source.lastFetchedAt, locale, is24Hour)?.let { Text(it, style = details, color = muted) }
+            if (source.kind == SourceKind.FEED) {
+                Text(textLine(learned), style = details, color = muted)
+                if (hasProblem(source) || lastNew == null) AddressLink(source.url, shownAddress(source.url), details, onCopied, label = "Feed:")
+            }
+        }
     }
 }
 
