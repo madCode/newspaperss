@@ -83,6 +83,8 @@ class ListenPlayer(
     /** A page is being read out of the book: until it is, the script and position are the old page's. */
     private var turning = false
     private var turns = 0
+    /** The pause between articles is playing: the position is already the next article's start. */
+    private var chiming = false
     private var savingSpeed = 0
 
     init {
@@ -133,8 +135,8 @@ class ListenPlayer(
             return
         }
         _state.update { it.copy(playing = true, error = null) }
-        // Mid-turn, the new page starts itself once it's read.
-        if (!turning) speakFrom(current.at.line)
+        // Mid-turn, the new page starts itself once it's read; mid-pause, once the pause ends.
+        if (!turning && !chiming) speakFrom(current.at.line)
     }
 
     fun pause() {
@@ -151,6 +153,8 @@ class ListenPlayer(
     fun back() {
         val current = _state.value
         if (turning) return
+        // In the pause, the last thing heard is the article before's end.
+        if (chiming) return move(ListenPosition(current.at.page - 1, Int.MAX_VALUE), play = true)
         val script = current.script ?: return
         val restart = current.playing && now() - lineStartedAt >= BACK_GRACE_MS
         val line = if (restart) current.at.line else current.at.line - 1
@@ -165,6 +169,8 @@ class ListenPlayer(
     fun forward() {
         val current = _state.value
         if (turning) return
+        // In the pause, on to the next article's first sentence, not past it.
+        if (chiming) return speakFrom(current.at.line)
         val script = current.script ?: return
         if (current.at.line < script.lines.lastIndex) goToLine(current.at.line + 1, script) else nextPage(current.playing)
     }
@@ -234,7 +240,8 @@ class ListenPlayer(
     private fun applySpeed(speed: Float) {
         if (speed == _state.value.speed) return
         _state.update { it.copy(speed = speed) }
-        if (_state.value.playing && !turning) speakFrom(_state.value.at.line)
+        // Mid-pause, the next article starts at the new speed when the pause ends.
+        if (_state.value.playing && !turning && !chiming) speakFrom(_state.value.at.line)
     }
 
     private fun nextPage(play: Boolean, chimeFirst: Boolean = false) {
@@ -294,7 +301,12 @@ class ListenPlayer(
         }
         // A pause, skip or stop during the chime moves the generation on, and the chime with it.
         val chimed = generation
-        chime.play { if (generation == chimed && _state.value.playing) speakFrom(at.line) }
+        chiming = true
+        chime.play {
+            if (generation != chimed || !_state.value.playing) return@play
+            chiming = false
+            speakFrom(at.line)
+        }
     }
 
     private fun finish() {
@@ -307,6 +319,7 @@ class ListenPlayer(
     private fun silence() {
         generation++
         queued = -1
+        chiming = false
         chime.stop()
         speaker.stop()
     }

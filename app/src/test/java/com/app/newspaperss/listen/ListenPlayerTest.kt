@@ -48,12 +48,16 @@ class ListenPlayerTest {
             read = { pages.getOrNull(it) }, onClose = { closed++ },
         )
     }
-    /** A chime that rings until the test says it's done. */
+    /**
+     * A chime that rings until the test says it's done. Stopped, it keeps its callback, as a
+     * finish already posted would still arrive: the player must ignore it.
+     */
     private class HeldChime : Chime {
         var ringing: (() -> Unit)? = null
+        var stopped = false
         var rung = 0
-        override fun play(done: () -> Unit) { rung++; ringing = done }
-        override fun stop() { ringing = null }
+        override fun play(done: () -> Unit) { rung++; ringing = done; stopped = false }
+        override fun stop() { stopped = true }
         override fun release() = stop()
         fun end() = ringing?.also { ringing = null }?.invoke()
     }
@@ -68,7 +72,7 @@ class ListenPlayerTest {
         // The line being read and the next, so there's no gap between them.
         assertEquals(listOf("A one.", "A two."), speaker.queue.map { it.text })
         val heard = mutableListOf<String>()
-        while (speaker.queue.isNotEmpty() || chime.ringing != null) {
+        while (speaker.queue.isNotEmpty() || (chime.ringing != null && !chime.stopped)) {
             if (speaker.queue.isEmpty()) chime.end() else heard += speaker.sayNext()
         }
         assertEquals(listOf("A one.", "A two.", "A three.", "B one.", "B two.", "That's all for today."), heard)
@@ -103,11 +107,47 @@ class ListenPlayerTest {
         player.start(7)
         speaker.sayNext()
         player.pause()
-        assertNull("pausing stops the chime", chime.ringing)
-        assertTrue(speaker.queue.isEmpty())
+        assertTrue("pausing stops the chime", chime.stopped)
+        chime.end() // its finish, already on its way
+        assertTrue("a pause holds", speaker.queue.isEmpty())
         player.play()
         assertEquals("B one.", speaker.queue.first().text)
         assertEquals(1, chime.rung)
+    }
+
+    @Test
+    fun backDuringThePauseGoesToTheEndOfTheArticleJustHeard() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext()
+        clock = 10_000
+        player.back()
+        assertEquals("A three.", speaker.queue.first().text)
+        assertEquals(ListenPosition(0, 2), state.at)
+    }
+
+    @Test
+    fun forwardDuringThePauseStartsTheNextArticleFromItsFirstSentence() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext()
+        player.forward()
+        assertTrue(chime.stopped)
+        assertEquals("B one.", speaker.queue.first().text)
+    }
+
+    @Test
+    fun aSpeedChangeOrAnotherPlayDuringThePauseLetsItFinish() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext()
+        player.setSpeed(1.5f)
+        player.play()
+        assertFalse(chime.stopped)
+        assertTrue(speaker.queue.isEmpty())
+        chime.end()
+        assertEquals("B one.", speaker.queue.first().text)
+        assertEquals(1.5f, speaker.queue.first().rate)
     }
 
     @Test
