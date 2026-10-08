@@ -174,9 +174,16 @@ class FeedFinder(private val http: HttpClient) {
             return if (host.contains('.') || host.startsWith("localhost")) withScheme else null
         }
 
+        /**
+         * The feeds a page's `<link>`s name: rel="alternate" with a feed's type, or HTML's
+         * rel="feed", whose type is often left out (tt-rss reads both).
+         */
         internal fun advertisedFeeds(html: String, pageUrl: String): List<FoundFeed> =
-            Jsoup.parse(html, pageUrl).select("link[rel~=(?i)alternate][href]")
-                .filter { it.attr("type").lowercase().substringBefore(';').trim() in FEED_TYPES }
+            Jsoup.parse(html, pageUrl).select("link[href]")
+                .filter { link ->
+                    val rel = link.attr("rel").lowercase().split(Regex("\\s+"))
+                    "feed" in rel || "alternate" in rel && link.attr("type").lowercase().substringBefore(';').trim() in FEED_TYPES
+                }
                 // Comment feeds are rarely what someone subscribing to a site wants, and WordPress's
                 // REST API (type application/json) is a page's data, not a feed.
                 .filterNot { it.attr("title").contains("comments", ignoreCase = true) || "/wp-json/" in it.attr("href") }

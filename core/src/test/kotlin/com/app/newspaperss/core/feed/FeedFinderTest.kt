@@ -62,6 +62,13 @@ class FeedFinderTest {
         assertTrue(FeedFinder(redirecting).find("away.example") is FindResult.NotFound)
     }
 
+    /** HTML's rel="feed" names a feed with or without a type; rel="alternate" needs a feed's type. */
+    @Test
+    fun aRelFeedLinkIsAFeed() {
+        val head = """<link rel="feed" href="/posts.xml" title="Posts"><link rel="alternate" href="/fr/" hreflang="fr">"""
+        assertEquals(listOf("https://hand.example/posts.xml"), FeedFinder.advertisedFeeds(head, "https://hand.example/").map { it.url })
+    }
+
     /** A WordPress page's REST API link is typed as JSON but isn't a feed. */
     @Test
     fun wordPressApiLinksArentFeeds() {
