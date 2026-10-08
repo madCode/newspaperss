@@ -66,9 +66,9 @@ class FeedSync(
         if (source.kind == SourceKind.LIST) return syncList(source)
         val now = clock.instant()
         val error = try {
-            val response = http.get(source.url)
+            val response = http.getFeed(source.url)
             if (response.isSuccessful) {
-                val feed = FeedParser.parse(response.body, response.finalUrl)
+                val feed = FeedParser.parse(response.body, response.finalUrl, response.truncated)
                 val added = db.articles().insertFetched(
                     feed.items.map {
                         ArticleEntity(

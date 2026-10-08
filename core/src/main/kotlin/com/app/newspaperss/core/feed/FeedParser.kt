@@ -35,10 +35,12 @@ object FeedParser {
     /**
      * @param body the response body.
      * @param feedUrl where it was fetched from; relative links resolve against it.
+     * @param truncated [body] is only the start of the feed (see [com.app.newspaperss.core.net.HttpClient.getFeed]):
+     *   the items read before the cut are the feed. Not for a JSON Feed, which can't be read in part.
      */
-    fun parse(body: String, feedUrl: String): Feed {
+    fun parse(body: String, feedUrl: String, truncated: Boolean = false): Feed {
         val text = body.trimStart('﻿', ' ', '\t', '\r', '\n')
-        val feed = if (text.startsWith("{")) parseJson(text, feedUrl) else parseXml(text, feedUrl)
+        val feed = if (text.startsWith("{")) parseJson(text, feedUrl) else parseXml(text, feedUrl, truncated)
         return feed.copy(items = ownAddresses(feed.items))
     }
     /**
@@ -67,7 +69,7 @@ object FeedParser {
         return Regex("<(rss|feed|rdf:RDF)[\\s>]", RegexOption.IGNORE_CASE).containsMatchIn(head)
     }
 
-    private fun parseXml(text: String, feedUrl: String): Feed {
+    private fun parseXml(text: String, feedUrl: String, truncated: Boolean): Feed {
         // Entities that expand into other entities are refused before parsing: nested, they can
         // grow to gigabytes ("billion laughs"). Plain ones (an old CMS declaring &nbsp;) are read.
         val root = ROOT.find(text)?.range?.first ?: text.length
@@ -84,19 +86,33 @@ object FeedParser {
         }
         parser.setInput(StringReader(text))
         try {
-            return XmlFeedReader(parser, feedUrl).read()
+            return XmlFeedReader(parser, feedUrl, truncated).read()
         } catch (e: XmlPullParserException) {
             throw FeedParseException("Not a readable feed: ${e.message}", e)
         }
     }
 
-    private class XmlFeedReader(private val p: XmlPullParser, private val feedUrl: String) {
+    private class XmlFeedReader(private val p: XmlPullParser, private val feedUrl: String, private val truncated: Boolean) {
         private var feedTitle: String? = null
         private var siteUrl: String? = null
         private val items = mutableListOf<FeedItem>()
         private var sawRoot = false
 
         fun read(): Feed {
+            try {
+                readAll()
+            } catch (e: XmlPullParserException) {
+                // The relaxed parser takes the end of the text as the document's, but a cut inside
+                // a tag ("<descri") is an error. The items before it are whole.
+                if (!truncated || items.isEmpty()) throw e
+            }
+            if (!sawRoot) throw FeedParseException("Empty document")
+            // The relaxed parser closes what the cut left open, so the last item read may be only
+            // part of one: it goes. A whole one lost from a feed this long costs nothing.
+            return Feed(feedTitle, siteUrl, if (truncated) items.dropLast(1) else items)
+        }
+
+        private fun readAll() {
             while (p.next() != XmlPullParser.END_DOCUMENT) {
                 if (p.eventType != XmlPullParser.START_TAG) continue
                 val name = p.name
@@ -113,8 +129,6 @@ object FeedParser {
                     name == "link" && siteUrl == null && p.depth <= 3 -> readLink()?.let { siteUrl = it }
                 }
             }
-            if (!sawRoot) throw FeedParseException("Empty document")
-            return Feed(feedTitle, siteUrl, items)
         }
 
         private fun readItem(tag: String): FeedItem? {

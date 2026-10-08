@@ -11,8 +11,15 @@ import org.junit.Test
 import java.io.IOException
 
 class FeedFinderTest {
-    private class FakeHttp(private val pages: Map<String, String>, private val codes: Map<String, Int> = emptyMap()) : HttpClient {
+    private class FakeHttp(
+        private val pages: Map<String, String>,
+        private val codes: Map<String, Int> = emptyMap(),
+        private val cutShort: Set<String> = emptySet(),
+    ) : HttpClient {
         val requested = mutableListOf<String>()
+        override suspend fun getFeed(url: String): HttpResponse = get(url).let {
+            if (url in cutShort) HttpResponse(it.code, it.finalUrl, it.contentType, it.body, truncated = true) else it
+        }
         override suspend fun get(url: String): HttpResponse {
             requested += url
             if (url.contains("unreachable")) throw IOException("no route")
@@ -25,6 +32,20 @@ class FeedFinderTest {
     }
 
     private val feedXml = "<rss version=\"2.0\"><channel><title>Site feed</title></channel></rss>"
+
+    /** A feed over the size limit comes cut short, and is still a feed; a page that big is not a site. */
+    @Test
+    fun aFeedTooLargeToReadWholeIsStillFound() = runTest {
+        val feed = "https://big.example/index.xml"
+        val page = "https://big.example/video"
+        val http = FakeHttp(
+            mapOf(feed to "<rss version=\"2.0\"><channel><title>Big</title><item><title>One</title></item><item><title>Tw", page to "<html><body>"),
+            cutShort = setOf(feed, page),
+        )
+        val found = FeedFinder(http).find(feed) as FindResult.Found
+        assertEquals("Big", found.feeds.single().title)
+        assertTrue(FeedFinder(http).find(page) is FindResult.NotFound)
+    }
 
     @Test
     fun bareDomainWithAdvertisedFeeds() = runTest {

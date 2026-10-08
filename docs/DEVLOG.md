@@ -20,7 +20,8 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Shipped:** all of the above fixed. The corpus gains NLR, Stratechery, Jane Friedman and Hamilton Nolan, with checks that the notes come along. The reading list itself stays out of the repository.
 - **Then, from you:** comb the web for a more varied set. `tools/sweep-feeds.opml` now lists 40 public feeds picked for variety; running it found a microblog whose posts all link to (or redirect to) the one page holding them all, Substack's site footer in a paid teaser, and newsletter pitches at the end of magazine articles. Fixed. Le Monde, El País, NHK and Tumblr turned the sandbox away, so they're unchecked.
 - **Review:** the fresh-eyes review found the free-part rule could throw away a MemberPress page's free text, a short post opening with a pitch could vanish, the notes check was quadratic on a hostile page, a note could become a paragraph inside a paragraph, "invisible" hid Tailwind's visible text, a log-in-to-comment form counted as a paywall, and the title rule dropped real subtitles. Its second look caught a quote's credit lost with its `<footer>`, a pitch rule hitting authors' own sentences, and a site's name found inside a subtitle ("time" on time.com). All fixed, each with a test.
-- **Left:** a feed over 5 MB and a bot check answering a feed with a 202, both in the backlog; "send this article for a look", a proposal waiting for you.
+- **Then, from you:** handle the feed refused as too large. A feed over the 10 MB limit (a static site's whole archive) is now read up to the limit, its whole items kept and the last, maybe cut, left out; adding the feed works the same way. Pages keep their limit.
+- **Left:** a bot check answering a feed with a 202, in the backlog; "send this article for a look", a proposal waiting for you.
 
 ## Tue 6 Oct
 

@@ -29,16 +29,18 @@ class FeedFinder(private val http: HttpClient) {
     suspend fun find(input: String): FindResult {
         val url = normalize(input) ?: return FindResult.NotFound("That doesn't look like a web address.")
         val response = try {
-            http.get(url)
+            http.getFeed(url)
         } catch (e: IOException) {
             return FindResult.NotFound("Couldn't reach $url. Check the address and your connection.")
         }
         if (!response.isSuccessful) return FindResult.NotFound(ErrorAnswers.message(response.code, url))
 
         if (FeedParser.looksLikeFeed(response.body)) {
-            val title = runCatching { FeedParser.parse(response.body, response.finalUrl).title }.getOrNull()
+            val title = runCatching { FeedParser.parse(response.body, response.finalUrl, response.truncated).title }.getOrNull()
             return FindResult.Found(listOf(FoundFeed(response.finalUrl, title)))
         }
+        // Only a feed may come cut short: a page that big is a video or a file, not a site.
+        if (response.truncated) return FindResult.NotFound("$url is too large to be a web page or a feed.")
 
         val page = response.finalUrl.takeIf { articleLike(url, it, response.contentType) }
         val advertised = advertisedFeeds(response.body, response.finalUrl)
@@ -47,18 +49,18 @@ class FeedFinder(private val http: HttpClient) {
         // Some sites only link their feed from the page (a webcomic's "RSS" button), with no
         // <link rel="alternate"> in the head.
         for (candidate in linkedFeeds(response.body, response.finalUrl).take(MAX_LINKED_TRIES)) {
-            val r = try { http.get(candidate) } catch (_: IOException) { continue }
+            val r = try { http.getFeed(candidate) } catch (_: IOException) { continue }
             if (r.isSuccessful && FeedParser.looksLikeFeed(r.body)) {
-                val title = runCatching { FeedParser.parse(r.body, r.finalUrl).title }.getOrNull()
+                val title = runCatching { FeedParser.parse(r.body, r.finalUrl, r.truncated).title }.getOrNull()
                 return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)), page)
             }
         }
 
         for (path in COMMON_PATHS) {
             val candidate = resolveUrl(response.finalUrl, path)
-            val r = try { http.get(candidate) } catch (_: IOException) { continue }
+            val r = try { http.getFeed(candidate) } catch (_: IOException) { continue }
             if (r.isSuccessful && FeedParser.looksLikeFeed(r.body)) {
-                val title = runCatching { FeedParser.parse(r.body, r.finalUrl).title }.getOrNull()
+                val title = runCatching { FeedParser.parse(r.body, r.finalUrl, r.truncated).title }.getOrNull()
                 return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)), page)
             }
         }

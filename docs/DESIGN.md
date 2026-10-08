@@ -234,6 +234,10 @@ module so it's all unit-tested without Android.
 - **Fetching is polite and cheap.** An HTTP cache revalidates every feed
   (If-None-Match / If-Modified-Since), so an unchanged feed costs a small
   "not modified" reply. Requests use a browser-like mobile user agent.
+- **A feed over 10 MB is read up to 10 MB.** Some static sites put every
+  post they ever wrote in one feed, newest first; its start is plenty. The
+  last item before the cut may be only part of one, so it's left out. A
+  page or a JSON Feed that big is refused.
 
 ## 6. Delivery
 

@@ -37,9 +37,9 @@ fun main(args: Array<String>) = runBlocking(Dispatchers.IO) {
         async {
             gate.withPermit {
                 val parsed = runCatching {
-                    val response = http.get(feed.url)
+                    val response = http.getFeed(feed.url)
                     check(response.isSuccessful) { "feed answered ${response.code}" }
-                    FeedParser.parse(response.body, response.finalUrl)
+                    FeedParser.parse(response.body, response.finalUrl, response.truncated)
                 }.getOrElse { return@withPermit listOf("${feed.url}\t\t\t\tfeed: ${it.message}") }
                 parsed.items.take(perFeed).map { item ->
                     val site = parsed.siteUrl ?: feed.url

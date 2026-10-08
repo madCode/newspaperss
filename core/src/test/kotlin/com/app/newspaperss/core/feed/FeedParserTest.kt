@@ -90,6 +90,16 @@ class FeedParserTest {
         assertEquals(Instant.parse("2026-09-01T10:00:00Z"), e.published)
     }
 
+    /** A feed cut short at the size limit keeps its whole items, not the one the cut went through. */
+    @Test
+    fun aFeedCutShortKeepsItsWholeItems() {
+        val items = (1..3).joinToString("") { "<item><title>Post $it</title><link>https://c.example/$it</link><description>Text $it.</description></item>" }
+        val start = "<rss version=\"2.0\"><channel><title>C</title>$items<item><title>Post 4</title><link>https://c.example/4</link>"
+        for (cut in listOf("$start<description>The first half of a long po", "$start<descri")) {
+            assertEquals(cut, listOf("Post 1", "Post 2", "Post 3"), FeedParser.parse(cut, "https://c.example/feed", truncated = true).items.map { it.title })
+        }
+    }
+
     /** Shaped like sive.rs: every short post links to the page holding them all; its own page is its id. */
     @Test
     fun microblogEntriesSharingOneLinkTakeTheirIds() {
