@@ -600,7 +600,7 @@ whose Kindle and KOReader answers ask for more on the same page).
     feed, the article-text setting; **Remove source** is in its ⋮ menu. A
     tt-rss account has no page of its own: its settings, and leaving it,
     are in Settings, and each of its feeds has a page.
-  - A source's page opens with its site's address as a link (↗), then
+  - A source's page opens with its site's address as an underlined link (↗), then
     how it's doing (red when there's a problem), then small grey details.
     When it's failing or has no articles yet, the details end with
     **Feed: <address> ↗**, the feed's own address, since that's what to

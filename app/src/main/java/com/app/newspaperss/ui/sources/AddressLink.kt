@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -29,7 +30,7 @@ import com.app.newspaperss.ui.components.isWebAddress
 import com.app.newspaperss.ui.components.openInBrowser
 
 /**
- * A web address on a source's page, in the accent colour with an "opens elsewhere" mark. A tap
+ * A web address on a source's page, underlined, with an "opens elsewhere" mark. A tap
  * opens it in the browser; with no browser to take it (some e-readers), or on a long press, it's
  * copied instead and [onCopied] gets the message to show. Anything but a web address is plain
  * muted text, so a hostile feed's `intent:` link is neither opened nor offered.
@@ -48,7 +49,9 @@ internal fun AddressLink(url: String, shownAs: String, textStyle: TextStyle, onC
         return
     }
     val context = LocalContext.current
-    val accent = MaterialTheme.colorScheme.primary
+    // Ink and an underline, not the accent: the brick-red accent next to a failing source's red
+    // status reads as part of the error, and on e-ink a tint alone is too faint to see.
+    val ink = MaterialTheme.colorScheme.onSurface
     val copy = { noBrowser: Boolean ->
         context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Address", url.trim()))
         onCopied(if (noBrowser) "No browser here. Copied $shown" else "Copied $shown")
@@ -67,10 +70,10 @@ internal fun AddressLink(url: String, shownAs: String, textStyle: TextStyle, onC
         Text(
             buildAnnotatedString {
                 label?.let { withStyle(SpanStyle(color = muted)) { append("$it ") } }
-                append(shown)
+                withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { append(shown) }
             },
             style = style,
-            color = accent,
+            color = ink,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
@@ -79,7 +82,7 @@ internal fun AddressLink(url: String, shownAs: String, textStyle: TextStyle, onC
         Icon(
             Icons.AutoMirrored.Filled.OpenInNew,
             contentDescription = null,
-            tint = accent,
+            tint = ink,
             modifier = Modifier.padding(start = 4.dp).size(with(LocalDensity.current) { style.fontSize.toDp() }),
         )
     }
