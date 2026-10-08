@@ -648,6 +648,10 @@ whose Kindle and KOReader answers ask for more on the same page).
   - **Without a server**, **Add a source** finds a site's feed and adds it
     to the phone, offers the curated lists, or saves a page with no feed to
     the reading list. The ⋮ menu imports or exports OPML.
+  - **The finder** looks for a feed in turn: the address itself, the feeds
+    the page advertises, feed links on the page, the usual feed addresses,
+    and, from a site's front page, the feeds advertised by the section most
+    of its links go into (a HubSpot magazine's `/news`).
   - **With a server**, **Add a site** puts the site into tt-rss, so other
     reader apps get it too:
     - The phone finds the feed first, with the same finder (and "Which

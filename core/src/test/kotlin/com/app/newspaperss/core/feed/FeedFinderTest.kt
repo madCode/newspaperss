@@ -33,6 +33,21 @@ class FeedFinderTest {
 
     private val feedXml = "<rss version=\"2.0\"><channel><title>Site feed</title></channel></rss>"
 
+    /** Shaped like Current Affairs on HubSpot: the front page advertises nothing, its blog's page does. */
+    @Test
+    fun aFeedAdvertisedOnlyOnTheSitesBlogPageIsFound() = runTest {
+        val links = (1..12).joinToString("") { "<a href=\"/news/story-$it?hsLang=en\">Story $it</a>" } +
+            (1..20).joinToString("") { "<img src=\"/hubfs/pic-$it.jpg\"><a href=\"/hubfs/pic-$it.jpg\">pic</a>" } + "<a href=\"/about\">About</a>"
+        val blog = """<html><head><link rel="alternate" type="application/rss+xml" href="https://mag.example/news/rss.xml"></head></html>"""
+        val http = FakeHttp(mapOf("https://mag.example" to "<html><body>$links</body></html>", "https://mag.example/news" to blog))
+        val found = FeedFinder(http).find("mag.example") as FindResult.Found
+        assertEquals("https://mag.example/news/rss.xml", found.feeds.single().url)
+        // Only from a front page: an article's links are the article's.
+        assertNull(FeedFinder.mainSection("<html><body>$links</body></html>", "https://mag.example/news/story-1"))
+        // And only with a clear section: a few links say nothing.
+        assertNull(FeedFinder.mainSection("<a href=\"/news/a\">A</a><a href=\"/news/b\">B</a>", "https://mag.example/"))
+    }
+
     /** A feed over the size limit comes cut short, and is still a feed; a page that big is not a site. */
     @Test
     fun aFeedTooLargeToReadWholeIsStillFound() = runTest {

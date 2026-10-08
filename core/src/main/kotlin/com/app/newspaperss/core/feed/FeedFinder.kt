@@ -62,6 +62,16 @@ class FeedFinder(private val http: HttpClient) {
                 feedAt(r, page)?.let { return it }
             }
         }
+
+        // Some sites advertise their feed only on their blog's own page (HubSpot's /news/rss.xml
+        // in /news's head): from a front page, look there too.
+        mainSection(response.body, response.finalUrl)?.let { section ->
+            val r = try { http.get(section) } catch (_: IOException) { null }
+            if (r != null && r.isSuccessful) {
+                val found = advertisedFeeds(r.body, r.finalUrl)
+                if (found.isNotEmpty()) return FindResult.Found(found, page)
+            }
+        }
         return FindResult.NotFound("No feed found at $url.", page = page)
     }
 
@@ -97,6 +107,30 @@ class FeedFinder(private val http: HttpClient) {
         )
 
         private const val MAX_LINKED_TRIES = 3
+        private const val MIN_SECTION_LINKS = 10
+        // Folders of files and listings, never the site's writing.
+        private val NOT_SECTIONS = setOf(
+            "hubfs", "wp-content", "wp-includes", "assets", "static", "cdn-cgi", "_next", "images", "img", "css", "js", "fonts",
+            "tag", "tags", "category", "categories", "author", "authors", "page", "search", "about", "contact", "login", "account",
+        )
+
+        /**
+         * The section of the site most of a front page's own links go into ("/news", where 143 of
+         * a magazine's links point), as an address; null on any other page, or with no clear one.
+         */
+        internal fun mainSection(html: String, pageUrl: String): String? {
+            val page = runCatching { URI(pageUrl) }.getOrNull() ?: return null
+            if (!page.path.isNullOrEmpty() && page.path != "/") return null
+            val host = siteHost(page) ?: return null
+            val counts = Jsoup.parse(html, pageUrl).select("a[href]").mapNotNull { a ->
+                val link = runCatching { URI(a.absUrl("href")) }.getOrNull() ?: return@mapNotNull null
+                if (siteHost(link) != host) return@mapNotNull null
+                link.path.orEmpty().split('/').getOrNull(1)?.lowercase()?.takeIf { it.isNotEmpty() && '.' !in it && it !in NOT_SECTIONS }
+            }.groupingBy { it }.eachCount()
+            val (section, links) = counts.maxByOrNull { it.value } ?: return null
+            if (links < MIN_SECTION_LINKS) return null
+            return resolveUrl(pageUrl, "/$section")
+        }
         private val FEED_LINK_NAMES = setOf("rss", "feed", "atom", "rss.xml", "feed.xml", "atom.xml", "index.xml", "rss2")
 
         /**
