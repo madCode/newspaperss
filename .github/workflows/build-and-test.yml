@@ -84,12 +84,6 @@ jobs:
   # https://github.com/madCode/newspaperss/releases/download/latest-debug/newspapeRSS-debug.apk
   # Its own job so only these few lines, not the build and its dependencies, get a token that can write.
   publish-debug:
-    # One at a time: every push to main updates the same latest-debug release, and several
-    # merges close together had their uploads collide on it. Later pushes wait rather than
-    # cancel, so the newest build is the one left on the release.
-    concurrency:
-      group: latest-debug
-      cancel-in-progress: false
     needs: build
     # Not on a re-run: an older run's number is a lower version code, which phones that
     # already have a newer build can't install.
@@ -97,10 +91,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # One at a time, newest wins: two quick merges would otherwise race to update the release.
+    # One at a time. Cancelling the older run isn't enough: cancellation isn't instant, so two
+    # jobs overlap long enough to collide on the same release's assets, which is what the 403s
+    # in #210 were. A later push waits and then publishes, so the newest build is the one left.
     concurrency:
       group: latest-debug
-      cancel-in-progress: true
+      cancel-in-progress: false
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
