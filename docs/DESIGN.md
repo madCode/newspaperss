@@ -474,6 +474,8 @@ whose Kindle and KOReader answers ask for more on the same page).
   book's, short ones too (the book has it only after long ones, and without the arrow),
   and the last in "That's all for today." The whole line is the link. It opens the next
   article in place; the title and **Share** follow the page on screen.
+  The headphones in the top bar (**Listen from here**) start Listen at the
+  article on screen, from its beginning, and open the playing screen.
   **Share** in the top bar sends the article's original link to Android's share sheet;
   it's hidden when an article has no web link. Selected text shared from the
   page carries that link too, on its own line under the quote, with the

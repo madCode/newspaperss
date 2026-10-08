@@ -52,6 +52,13 @@ class EpubPages(private val file: File) : Closeable {
     companion object {
         fun articleHref(position: Int) = EpubWriter.articleHref(position)
 
+        /** The article [path] (a page's path in the book) is, or null if it's another page: the contents, the end. */
+        fun articleAt(path: String): Int? =
+            ARTICLE_PAGE.matchEntire(path)?.groupValues?.get(1)?.toIntOrNull()?.minus(1)?.takeIf { it >= 0 }
+
+        // EpubWriter.articleHref's form.
+        private val ARTICLE_PAGE = Regex("article-(\\d{3,})\\.xhtml")
+
         fun mimeOf(path: String) = when (path.substringAfterLast('.').lowercase()) {
             "css" -> "text/css"
             "jpg", "jpeg" -> "image/jpeg"

@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -333,6 +334,46 @@ class ArticlePreviewScreenTest {
         @Suppress("DEPRECATION")
         val send = shadowOf(compose.activity).nextStartedActivity.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
         return send.getStringExtra(Intent.EXTRA_SUBJECT) to send.getStringExtra(Intent.EXTRA_TEXT)
+    }
+
+    @Test
+    fun listenFromHereStartsTheArticleOnScreen() {
+        val file = tmp.newFile("l.epub")
+        val articles = listOf("One", "Two").map {
+            EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 30.0)
+        }
+        file.writeEpub(articles)
+        val asked = mutableListOf<Int>()
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}, onListen = { asked += it }) }
+        idleUntil { compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Listen from here").performClick()
+
+        // Followed "Next" to the second article: Listen starts there, not where the preview opened.
+        val view = webView()
+        val client = shadowOf(view).webViewClient
+        client.doUpdateVisitedHistory(view, BOOK_ORIGIN + EpubPages.articleHref(1) + "#a2-fn1", false)
+        idleUntil { compose.onNode(hasText("Two")).isDisplayed() }
+        idleUntil { compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Listen from here").performClick()
+        assertEquals(listOf(0, 1), asked)
+
+        fun offered() = compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().isNotEmpty()
+        // The paper's closing page isn't an article to listen from; nor is a page the book doesn't
+        // have, which a link in a feed's article could point the preview at.
+        for (page in listOf("end.xhtml", "article-999.xhtml", "x/article-002.xhtml", "article-2.xhtml")) {
+            client.doUpdateVisitedHistory(view, BOOK_ORIGIN + page, false)
+            compose.waitForIdle()
+            idleUntil { !offered() }
+        }
+    }
+
+    @Test
+    fun withoutListeningThereIsNoListenButton() {
+        val file = tmp.newFile("q.epub")
+        file.writeEpub(listOf(EditionArticle(title = "One", sourceTitle = "S", url = "https://a.example/1", bodyHtml = "<p>x</p>", minutes = 2.0)))
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}) }
+        webView()
+        assertEquals(0, compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().size)
     }
 
     @Test

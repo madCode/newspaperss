@@ -563,7 +563,7 @@ class ScreenshotTest {
         file.writeEpub(listOf(article), title = "Tuesday Morning Edition")
         // The page itself is a WebView, which Robolectric doesn't draw; this shoots the top bar.
         shoot("05c-article-preview", ready = { compose.onAllNodes(hasText("Opening…")).fetchSemanticsNodes().isEmpty() }) {
-            ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {})
+            ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {}, onListen = {})
         }
     }
 
@@ -575,7 +575,7 @@ class ScreenshotTest {
         val article = EditionArticle(title = "The quiet return of the night train", sourceTitle = "The Example Review", url = "https://example.com/night-train", bodyHtml = "<p>Sleeper services are coming back.</p>", minutes = 4.0)
         file.writeEpub(listOf(article), title = "Tuesday Morning Edition")
         shoot("05d-article-preview-200", ready = { compose.onAllNodes(hasText("Opening…")).fetchSemanticsNodes().isEmpty() }) {
-            ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {}, textSize = PreviewTextSize.LARGEST)
+            ArticlePreviewScreen(loadFile = { file }, position = 0, title = article.title, onBack = {}, textSize = PreviewTextSize.LARGEST, onListen = {})
         }
     }
 
