@@ -857,7 +857,7 @@ class ScreenshotTest {
     fun ttrssFeedPageTtrssCantFetch() {
         val vm = feedPage("6")
         runBlocking { db.sources().setServerError(db.sources().ofKind(com.app.newspaperss.data.SourceKind.TTRSS).single().id, "6", "HTTP Code: 404") }
-        shoot("08n-ttrss-feed-cant-fetch", ready = { vm.detail.value?.text?.serverError != null }) { SourceDetailScreen(vm, onBack = {}) }
+        shoot("08p-ttrss-feed-cant-fetch", ready = { vm.detail.value?.text?.serverError != null }) { SourceDetailScreen(vm, onBack = {}) }
     }
 
     @Test
@@ -869,7 +869,7 @@ class ScreenshotTest {
             db.sources().setServerError(account, "2", "HTTP Code: 404")
             db.sources().setServerError(account, "15", "Couldn't download feed: connection timed out")
         }
-        shoot("08o-sources-server-feed-cant-fetch", ready = { vm.screen.value?.server?.cantFetch?.size == 2 && vm.folded.value != null }) { SourcesScreen(vm) }
+        shoot("08q-sources-server-feed-cant-fetch", ready = { vm.screen.value?.server?.cantFetch?.size == 2 && vm.folded.value != null }) { SourcesScreen(vm) }
     }
 
     @Test
