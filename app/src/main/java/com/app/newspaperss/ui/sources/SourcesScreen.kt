@@ -207,6 +207,9 @@ fun SourcesScreen(
                 Column(Modifier.heightIn(max = bannerMax).verticalScroll(rememberScrollState())) {
                     if (srv != null && shown.needsSignIn) SignInBanner(onOpenAccount)
                     else account?.let { accountProblem(it, locale, is24Hour) }?.let { AccountProblemBanner(it, onOpenAccount) }
+                        // The account itself is fine but some of its feeds aren't: named here, as their
+                        // rows can be under folded categories, and each is fixed in tt-rss.
+                        ?: srv?.cantFetch?.let(::cantFetchLine)?.let { AccountProblemBanner(it, onOpen = null, announce = false) }
                 }
                 SourceList(shown, viewModel, onOpenReadingList, onOpenSource, onOpenFeed, onOpenLeftOut, onOpenNotInPaper)
             }
@@ -326,7 +329,7 @@ private fun EmptySources(modifier: Modifier) {
 
 /** The problem with the tt-rss account, and the way to Settings, where it's put right. */
 @Composable
-private fun AccountProblemBanner(problem: String, onOpen: () -> Unit) {
+private fun AccountProblemBanner(problem: String, onOpen: (() -> Unit)?, announce: Boolean = true) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.medium,
@@ -334,9 +337,12 @@ private fun AccountProblemBanner(problem: String, onOpen: () -> Unit) {
     ) {
         Column(Modifier.padding(16.dp)) {
             // A heading, so TalkBack can jump to it, and announced when it appears while Sources is open.
-            Text(problem, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite })
-            OutlinedButton(onClick = onOpen, modifier = Modifier.padding(top = 8.dp).semantics { contentDescription = "Your tt-rss settings" }) {
-                Text("Settings")
+            // Announced when the account fails; a standing list of feeds, which changes as they do, isn't.
+            Text(problem, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.semantics { heading(); if (announce) liveRegion = LiveRegionMode.Polite })
+            if (onOpen != null) {
+                OutlinedButton(onClick = onOpen, modifier = Modifier.padding(top = 8.dp).semantics { contentDescription = "Your tt-rss settings" }) {
+                    Text("Settings")
+                }
             }
         }
     }
@@ -488,6 +494,26 @@ internal fun accountProblem(account: SourceEntity, locale: Locale, is24Hour: Boo
     else -> null
 }
 
+/**
+ * The paper's feeds tt-rss can't fetch, by name: at most three, then how many more. Null when
+ * there are none.
+ */
+internal fun cantFetchLine(titles: List<String>): String? {
+    if (titles.isEmpty()) return null
+    val named = titles.take(MAX_NAMED_FEEDS)
+    val more = titles.size - named.size
+    val list = when {
+        more > 0 -> named.joinToString(", ") + " and $more more"
+        named.size == 1 -> named.single()
+        else -> named.dropLast(1).joinToString(", ") + " and " + named.last()
+    }
+    val feeds = if (titles.size == 1) "one of your feeds" else "${titles.size} of your feeds"
+    val their = if (titles.size == 1) "its address" else "their addresses"
+    return "⚠ tt-rss couldn't fetch $feeds last time it tried: $list. If this stays, check $their in tt-rss."
+}
+
+private const val MAX_NAMED_FEEDS = 3
+
 /** "Since 6:10 AM" today, or "Since Sep 30". */
 private fun failingSinceLine(since: Instant, locale: Locale, is24Hour: Boolean, now: Instant, zone: ZoneId): String {
     val date = since.atZone(zone)
@@ -503,13 +529,20 @@ private fun failingSinceLine(since: Instant, locale: Locale, is24Hour: Boolean, 
 internal const val WAITING_FOR_FIRST_FETCH = "Not fetched by tt-rss yet"
 
 /**
- * A line under a feed only when it has something to say: a first fetch still to come, or its own
- * settings. A line under all of them would be noise.
+ * A feed tt-rss's own fetcher failed on the last time it tried: dead, moved, turning the server
+ * away, or just a timeout that the next try gets past. "Last time": tt-rss reports even a one-off.
+ */
+internal const val SERVER_CANT_FETCH = "tt-rss couldn't fetch it last time"
+
+/**
+ * A line under a feed only when it has something to say: tt-rss failing to fetch it, a first
+ * fetch still to come, or its own settings. A line under all of them would be noise.
  */
 internal fun feedNote(feed: FeedChoice): String? {
     val p = feed.publication
     return listOfNotNull(
-        WAITING_FOR_FIRST_FETCH.takeIf { p?.awaitingFirstFetch == true },
+        SERVER_CANT_FETCH.takeIf { p?.serverError != null },
+        WAITING_FOR_FIRST_FETCH.takeIf { p?.awaitingFirstFetch == true && p.serverError == null },
         when (p?.chosenMode) {
             ContentMode.FEED -> "Feed's text"
             ContentMode.PAGE -> "Full page"

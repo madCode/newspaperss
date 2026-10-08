@@ -52,25 +52,48 @@ internal object PageExtractor {
     // Where webcomic engines put the comic: ComicControl (Hiveworks sites), xkcd and similar.
     private const val COMIC_IMAGE = "img#cc-comic, #cc-comicbody img, #comic img, img#comic, #comic-image img"
 
+    // The paywalls whose pitch can outweigh the free part, so Readability would take it for the
+    // article. Not Substack's or Ghost's: Readability already passes those over, and without them
+    // there it reaches further, for the post's header.
+    private const val PAYWALL_PITCH = ".mepr-unauthorized-message, .passport-marketing-page"
     // What platforms put in place of the rest of a paid post: Ghost's upgrade box (from its
-    // {{content}} helper, so every theme has it) and Substack's paywall.
-    private const val PAYWALL = ".gh-post-upgrade-cta, [data-testid=paywall]"
+    // {{content}} helper, so every theme has it), Substack's paywall, and the sales pitches of
+    // MemberPress (a WordPress membership plugin) and Passport (Stratechery's).
+    private const val PAYWALL = ".gh-post-upgrade-cta, [data-testid=paywall], $PAYWALL_PITCH"
+    // A sign-in form in the article itself, where a site with its own paywall (a magazine's) puts it
+    // after the free part. Only in a lone <article>: a site's header or a modal can hold one anywhere.
+    private const val SIGN_IN_IN_ARTICLE = "input[type=password]"
+    private const val SIGN_IN_BOX_MAX_WORDS = 300
 
     private val NOT_MAIN_IMAGE = setOf("logo", "avatar", "headshot", "author", "profile", "icon", "icons")
     private const val JSON_LD_PREFERENCE_RATIO = 1.5
+    private const val FREE_PART_PROBE = 60
 
     fun extract(html: String, url: String): PageContent {
         val doc = Jsoup.parse(html, url)
         val jsonLd = jsonLdObjects(doc)
         val siteName = doc.metaContent("og:site_name") ?: jsonLd.firstNotNullOfOrNull { (it["publisher"] as? JsonObject)?.string("name") }
-        // Not schema.org's isAccessibleForFree: metered sites set it false and serve the whole story.
-        val paywalled = doc.selectFirst(PAYWALL) != null
         // Once JSON-LD is read, nothing needs these, and Readability clones the whole document:
         // on script-heavy sites inline scripts are most of the page, parsed and copied for nothing.
         // Declarative shadow DOM is shown on the page, so its templates stay.
         doc.select("script, style, svg, template:not([shadowrootmode])").remove()
         removeOverlays(doc)
+        // Not schema.org's isAccessibleForFree: metered sites set it false and serve the whole story.
+        // After the overlays go, so a sign-in dialog inside the article doesn't count.
+        val paywalled = doc.selectFirst(PAYWALL) != null || signInPaywall(doc)
         HtmlCleaner.removeScreenReaderOnly(doc.body())
+        // Readability drops every <footer> and <aside>, footnotes and quotes' credits too.
+        HtmlCleaner.keepFootnoteContainers(doc.body())
+        HtmlCleaner.keepQuoteCredits(doc.body())
+        // Readability drops classes and styles, and with them the small capitals.
+        HtmlCleaner.capitalizeSmallCaps(doc.body())
+        // After the passes above, as Readability's pick it's compared with comes after them too.
+        val pitches = doc.select(PAYWALL_PITCH)
+        // What comes before the pitch in its box, the free part, if the box holds it at all.
+        val freePart = pitches.firstOrNull()?.let { pitch ->
+            Element("div").apply { pitch.parent()?.children()?.takeWhile { it !== pitch }?.forEach { appendChild(it.clone()) } }
+        }
+        pitches.remove()
 
         val readability = runCatching { Readability4JExtended(url, doc.clone()).parse() }.getOrNull()
         val author = listOfNotNull(
@@ -78,13 +101,7 @@ internal object PageExtractor {
             jsonLd.firstNotNullOfOrNull { authorName(it["author"]) },
             readability?.byline?.replace(BY_PREFIX, ""),
         ).firstNotNullOfOrNull { cleanAuthor(it) }
-        val rawTitle = listOfNotNull(
-            doc.metaContent("og:title"),
-            jsonLd.firstNotNullOfOrNull { it.string("headline") },
-            doc.metaContent("twitter:title"),
-            doc.title(),
-        ).firstOrNull { it.isNotBlank() }
-        val title = rawTitle?.let { cleanTitle(it, siteName.orEmpty(), url, author.orEmpty()) }
+        val title = title(doc, jsonLd, siteName.orEmpty(), url, author.orEmpty())
 
         fun candidate(name: String, content: String?) = content?.takeIf { it.isNotBlank() }
             ?.let { PageContent(it, title, author, name, HtmlCleaner.countWords(it)) }
@@ -104,10 +121,15 @@ internal object PageExtractor {
             else -> listOfNotNull(fromReadability, fromJsonLd).maxByOrNull { it.wordCount }
                 ?: PageContent(doc.body().html(), title, author, "body", HtmlCleaner.countWords(doc.body()))
         }
+        // With next to nothing free, Readability can pass over the free part for a sidebar.
+        val freeText = freePart?.text()?.trim().orEmpty()
+        val withFreePart = if (freeText.isNotEmpty() && freeText.takeLast(FREE_PART_PROBE) !in Jsoup.parseBodyFragment(chosen.html).text()) {
+            candidate("paywall", freePart!!.html()) ?: chosen
+        } else chosen
         // <main>, or a lone <article>: several <article>s are usually related-story cards, whose
         // thumbnails aren't this page's.
         val main = doc.selectFirst("main") ?: doc.select("article").singleOrNull()
-        return chosen.copy(
+        return withFreePart.copy(
             mainImage = main?.let(::mainImage),
             articleText = main?.text()?.takeIf { it.isNotBlank() },
             description = doc.metaContent("og:description"),
@@ -162,6 +184,61 @@ internal object PageExtractor {
         }
     }
 
+    /**
+     * A sign-in form in a lone `<article>` with an offer to subscribe or buy around it: a
+     * magazine's own paywall. A form to log in and comment has no such offer.
+     */
+    private fun signInPaywall(doc: Document): Boolean {
+        val article = doc.select("article").singleOrNull() ?: return false
+        val field = article.selectFirst(SIGN_IN_IN_ARTICLE) ?: return false
+        return field.parents().takeWhile { it !== article }
+            .takeWhile { HtmlCleaner.countWords(it) <= SIGN_IN_BOX_MAX_WORDS }
+            .any { PAYWALL_OFFER.containsMatchIn(it.text()) }
+    }
+
+    /**
+     * The page's title: its og:title, JSON-LD headline, twitter:title or `<title>`, without a
+     * trailing site or author name. Where the og:title wraps the page's own headline in more
+     * ("Donald Sassoon, Changing the Guard, NLR 160"), the headline alone.
+     */
+    fun title(doc: Document, jsonLd: List<JsonObject> = jsonLdObjects(doc), siteName: String = "", url: String = "", author: String = ""): String? {
+        val jsonLdHeadline = jsonLd.firstNotNullOfOrNull { it.string("headline") }
+        val raw = listOfNotNull(doc.metaContent("og:title"), jsonLdHeadline, doc.metaContent("twitter:title"), doc.title())
+            .firstOrNull { it.isNotBlank() } ?: return null
+        // Microdata only to shorten a title: a page's first itemprop=headline can be a related story's.
+        val headline = (jsonLdHeadline ?: microdataHeadline(doc))?.replace(WHITESPACE, " ")?.trim()
+        // Who wrote it, as the page names them anywhere: the og:title may name them where nothing else does.
+        val names = listOf(siteName, author) + doc.select("meta[itemprop=author], meta[name=author]").map { it.attr("content") } + url
+        if (headline != null && wrapsHeadline(raw.replace(WHITESPACE, " ").trim(), headline, names)) return headline
+        return cleanTitle(raw, siteName, url, author)
+    }
+
+    // The page's own heading only: a related story's card can carry itemprop=headline too.
+    private fun microdataHeadline(doc: Document): String? = doc.selectFirst("h1[itemprop=headline]")?.text()
+
+    /**
+     * Whether [title] is [headline] with more around it, set off by punctuation, and the more names
+     * the author, the site or the address ("Donald Sassoon, Changing the Guard, NLR 160"): not a
+     * subtitle ("The Long Goodbye: Britain after Brexit"), and not a headline cut short (JSON-LD's
+     * is often limited to 110 characters), which runs on without punctuation.
+     */
+    private fun wrapsHeadline(title: String, headline: String, names: List<String>): Boolean {
+        val at = title.indexOf(headline)
+        if (at < 0 || title.length == headline.length || headline.split(' ').size < 2) return false
+        val before = title.substring(0, at)
+        val after = title.substring(at + headline.length)
+        if (!((before.isEmpty() || WRAPPER_BEFORE.matches(before)) && (after.isEmpty() || WRAPPER_AFTER.matches(after)))) return false
+        // The extra must be mostly names, numbers and dates: "Why It's Time to Act Now" (on
+        // time.com) has the site's name in it, but it's a subtitle.
+        val extra = words(before + after)
+        val hostWords = runCatching { URI(names.last()).host }.getOrNull().orEmpty().lowercase().split('.', '-')
+            .filter { it.length > 2 && it !in HOST_NOISE && it != "the" }
+        val nameWords = names.dropLast(1).flatMap(::words).filter { it.length > 1 }.toSet() + hostWords
+        val named = extra.count { it in nameWords }
+        val other = extra.count { it !in nameWords && !it.all(Char::isDigit) && it !in MONTHS }
+        return named > 0 && other <= WRAPPER_OTHER_WORDS
+    }
+
     /** Removes a trailing site or author name: "E-reader - Wikipedia" becomes "E-reader". */
     fun cleanTitle(title: String, siteName: String = "", url: String = "", author: String = ""): String {
         val t = title.replace(WHITESPACE, " ").trim()
@@ -189,10 +266,12 @@ internal object PageExtractor {
 
     private fun key(s: String) = s.lowercase().replace(NON_ALNUM, "")
 
+    private fun words(s: String) = s.lowercase().split(NON_ALNUM).filter { it.isNotEmpty() }
+
     private fun Document.metaContent(name: String): String? =
         selectFirst("meta[property=\"$name\"], meta[name=\"$name\"]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
 
-    private fun jsonLdObjects(doc: Document): List<JsonObject> {
+    internal fun jsonLdObjects(doc: Document): List<JsonObject> {
         val found = mutableListOf<JsonObject>()
         for (script in doc.select("script[type=application/ld+json]")) {
             val root = runCatching { Json.parseToJsonElement(script.data()) }.getOrNull() ?: continue
@@ -228,7 +307,15 @@ internal object PageExtractor {
     // class/id substrings of cookie and consent banners, including common consent-management plugins.
     private val OVERLAY_MARKERS = listOf("cookie", "consent", "gdpr", "cmplz", "onetrust", "didomi", "usercentrics", "truste")
     private val DIALOG_ROLES = setOf("dialog", "alertdialog")
+    private const val WRAPPER_OTHER_WORDS = 2
+    private val MONTHS = setOf(
+        "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+        "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec", "issue", "vol", "no",
+    )
+    private val PAYWALL_OFFER = Regex("\\bsubscri|\\bbuy\\b|\\bpurchase\\b", RegexOption.IGNORE_CASE)
     private val TITLE_SEPARATORS = Regex("\\s+[|\\-–—:·•]\\s+")
+    private val WRAPPER_BEFORE = Regex(".*\\S\\s*[,|\\-–—:·•]\\s+")
+    private val WRAPPER_AFTER = Regex("\\s*[,|\\-–—:·•]\\s+\\S.*")
     private val HOST_NOISE = setOf("www", "com", "org", "net")
     private val WHITESPACE = Regex("\\s+")
     private val NON_ALNUM = Regex("[^a-z0-9]")

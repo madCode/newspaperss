@@ -11,8 +11,15 @@ import org.junit.Test
 import java.io.IOException
 
 class FeedFinderTest {
-    private class FakeHttp(private val pages: Map<String, String>, private val codes: Map<String, Int> = emptyMap()) : HttpClient {
+    private class FakeHttp(
+        private val pages: Map<String, String>,
+        private val codes: Map<String, Int> = emptyMap(),
+        private val cutShort: Set<String> = emptySet(),
+    ) : HttpClient {
         val requested = mutableListOf<String>()
+        override suspend fun getFeed(url: String): HttpResponse = get(url).let {
+            if (url in cutShort) HttpResponse(it.code, it.finalUrl, it.contentType, it.body, truncated = true) else it
+        }
         override suspend fun get(url: String): HttpResponse {
             requested += url
             if (url.contains("unreachable")) throw IOException("no route")
@@ -25,6 +32,67 @@ class FeedFinderTest {
     }
 
     private val feedXml = "<rss version=\"2.0\"><channel><title>Site feed</title></channel></rss>"
+
+    /** Shaped like Current Affairs on HubSpot: the front page advertises nothing, its blog's page does. */
+    @Test
+    fun aFeedAdvertisedOnlyOnTheSitesBlogPageIsFound() = runTest {
+        val links = (1..30).joinToString("") { "<a href=\"/news/story-$it?hsLang=en\">Story $it</a>" } +
+            (1..20).joinToString("") { "<img src=\"/hubfs/pic-$it.jpg\"><a href=\"/hubfs/pic-$it.jpg\">pic</a>" } + "<a href=\"/about\">About</a>"
+        val blog = """<html><head><link rel="alternate" type="application/rss+xml" href="https://mag.example/news/rss.xml"></head></html>"""
+        val http = FakeHttp(mapOf("https://mag.example" to "<html><body>$links</body></html>", "https://mag.example/news" to blog))
+        val found = FeedFinder(http).find("mag.example") as FindResult.Found
+        assertEquals("https://mag.example/news/rss.xml", found.feeds.single().url)
+        // Only from a front page: an article's links are the article's.
+        assertNull(FeedFinder.mainSection("<html><body>$links</body></html>", "https://mag.example/news/story-1"))
+        // And only with a clear section: a few links say nothing, nor a biggest of many, a year or a language.
+        assertNull(FeedFinder.mainSection("<a href=\"/news/a\">A</a><a href=\"/news/b\">B</a>", "https://mag.example/"))
+        fun many(section: String, n: Int) = (1..n).joinToString("") { "<a href=\"/$section/$it\">$it</a>" }
+        assertNull(FeedFinder.mainSection(many("news", 12) + many("ideas", 11) + many("arts", 11), "https://mag.example/"))
+        assertNull(FeedFinder.mainSection(many("2026", 30), "https://mag.example/"))
+        assertNull(FeedFinder.mainSection(many("fr", 30), "https://mag.example/"))
+        assertNull(FeedFinder.mainSection(many("episodes", 30), "https://mag.example/"))
+        assertEquals("kept as written", "https://mag.example/News", FeedFinder.mainSection(many("News", 30), "https://mag.example/"))
+
+        // A section sent elsewhere is someone else's site, and its feed isn't this one's.
+        val elsewhere = FakeHttp(mapOf("https://away.example" to "<html><body>${many("blog", 30)}</body></html>", "https://writer.example/" to blog))
+        val redirecting = object : HttpClient by elsewhere {
+            override suspend fun get(url: String): HttpResponse =
+                if (url == "https://away.example/blog") HttpResponse(200, "https://writer.example/", null, blog) else elsewhere.get(url)
+        }
+        assertTrue(FeedFinder(redirecting).find("away.example") is FindResult.NotFound)
+    }
+
+    /** HTML's rel="feed" names a feed with or without a type; rel="alternate" needs a feed's type. */
+    @Test
+    fun aRelFeedLinkIsAFeed() {
+        val head = """<link rel="feed" href="/posts.xml" title="Posts"><link rel="alternate" href="/fr/" hreflang="fr">"""
+        assertEquals(listOf("https://hand.example/posts.xml"), FeedFinder.advertisedFeeds(head, "https://hand.example/").map { it.url })
+    }
+
+    /** A WordPress page's REST API link is typed as JSON but isn't a feed. */
+    @Test
+    fun wordPressApiLinksArentFeeds() {
+        val head = """<link rel="alternate" type="application/json" title="JSON" href="https://wp.example/wp-json/wp/v2/pages/7">"""
+        assertTrue(FeedFinder.advertisedFeeds(head, "https://wp.example/").isEmpty())
+    }
+
+    /** A feed over the size limit comes cut short, and is still a feed; a page that big is not a site. */
+    @Test
+    fun aFeedTooLargeToReadWholeIsStillFound() = runTest {
+        val feed = "https://big.example/index.xml"
+        val page = "https://big.example/video"
+        val http = FakeHttp(
+            mapOf(feed to "<rss version=\"2.0\"><channel><title>Big</title>" + (1..3).joinToString("") { "<item><title>$it</title><link>https://big.example/$it</link></item>" } + "<item><title>Fo", page to "<html><body>"),
+            cutShort = setOf(feed, page),
+        )
+        val found = FeedFinder(http).find(feed) as FindResult.Found
+        assertEquals("Big", found.feeds.single().title)
+        assertTrue(FeedFinder(http).find(page) is FindResult.NotFound)
+        // A JSON Feed can't be read in part: adding it would fail on every sync.
+        val json = "https://big.example/feed.json"
+        val jsonHttp = FakeHttp(mapOf(json to "{\"version\":\"https://jsonfeed.org/version/1.1\",\"title\":\"Big\",\"items\":[{\"id\":\"1\""), cutShort = setOf(json))
+        assertTrue(FeedFinder(jsonHttp).find(json) is FindResult.NotFound)
+    }
 
     @Test
     fun bareDomainWithAdvertisedFeeds() = runTest {

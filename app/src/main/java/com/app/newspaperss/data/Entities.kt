@@ -211,6 +211,11 @@ data class PublicationEntity(
      * A feed added from here has nothing to give until tt-rss's own schedule gets to it.
      */
     @ColumnInfo(defaultValue = "0") val awaitingFirstFetch: Boolean = false,
+    /**
+     * tt-rss only: why tt-rss's own latest try to fetch the feed failed, as it words it; null
+     * when it worked. tt-rss fetches its feeds itself, so without this a dead feed just goes quiet.
+     */
+    val serverError: String? = null,
 ) {
     companion object {
         /** The key of a source's own feed, and of an article with no [ArticleEntity.originId]. */

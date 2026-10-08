@@ -146,6 +146,20 @@ class PlatformCorpusTest(private val post: Post, @Suppress("unused") private val
         for (id in players) assertTrue("no link to $id", doc.select("a[href=https://www.youtube.com/watch?v=$id]").isNotEmpty())
     }
 
+    /** Every note the page's text links to comes along, wherever the page keeps its notes. */
+    @Test
+    fun theNotesComeAlong() {
+        assumeTrue(!article.usedFeedContent && !article.paidPost && post.page != null)
+        val page = Jsoup.parse(post.page!!)
+        val ids = page.select("[id]").map { it.id() }.toSet()
+        val notes = page.select("a[href^=#]").filter { it.text().trim().matches(Regex("\\d{1,3}")) && it.attr("href").drop(1) in ids }
+            .map { it.attr("href").drop(1) }.toSet()
+        assumeTrue(notes.size >= 3)
+        val inBook = doc.select("[id]").map { it.id() }.toSet()
+        val missing = notes.filter { it !in inBook }
+        assertTrue("notes missing: $missing", missing.isEmpty())
+    }
+
     /** Longreads' picks point at a story on another site: the story is the article, not the pitch. */
     @Test
     fun linkPostsReadTheStory() {
@@ -162,11 +176,12 @@ class PlatformCorpusTest(private val post: Post, @Suppress("unused") private val
     }
 
     companion object {
-        private val FURNITURE = Regex(
+        internal val FURNITURE = Regex(
             "^(share|subscribe( now)?|(add|leave) a comment:?|upgrade to paid|restack|give a gift subscription|" +
                 "read in app|sign up|read more|continue reading|listen to this|get the app|start writing|newsletter)$|" +
                 "consider becoming a (free or )?paid subscriber|reader-supported publication|subscribe to .{1,60} to keep reading|" +
-                "subscribe to [^.!?]{1,60}:$|newsletter\\b.{0,200}\\bsign up\\.?$",
+                "subscribe to [^.!?]{1,60}:$|newsletter\\b.{0,200}\\bsign up\\.?$|available to paid subscribers|^forgot password$|" +
+                "\\d+ likes\\b",
             RegexOption.IGNORE_CASE,
         )
         private val TRACKER = Regex("/_/stat\\?|pixel\\.wp\\.com|stats\\.wordpress\\.com|feedburner\\.com/~r/")
@@ -178,6 +193,11 @@ class PlatformCorpusTest(private val post: Post, @Suppress("unused") private val
             "www.slowboring.com-math-needs-a-phonics-style-reckoning" to false,
             "www.slowboring.com-tuesday-discussion-post-cc1" to true,
             "www.platformer.news-open-ai-model-release-canceled" to true,
+            "newleftreview.org-donald-sassoon-changing-the-guard" to false,
+            "janefriedman.com-links-of-interest-oct-7-2026" to true,
+            "janefriedman.com-you-can-now-talk-to-characters-in-audibl" to true,
+            "stratechery.com-apple-and-lg-the-house-for-everyone-else" to true,
+            "stratechery.com-game-decompilation-is-this-legal-a-well-" to true,
         )
 
         @JvmStatic

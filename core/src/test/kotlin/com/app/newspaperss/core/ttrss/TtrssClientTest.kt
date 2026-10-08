@@ -474,4 +474,19 @@ class TtrssClientTest {
             {"id":6,"title":"Old","unread":2,"cat_id":0,"last_updated":1759125600},{"id":7,"title":"Older version","unread":0}]"""))
         assertEquals(listOf(0L, 1_759_125_600L, null), client().allFeeds().map { it.lastUpdated })
     }
+
+    /** tt-rss sends "" for a feed it fetched fine, and its fetcher's whole message, lines and all, for one it couldn't. */
+    @Test
+    fun aFeedsFetchErrorIsRead() = runTest {
+        server.reply(loggedIn)
+        server.reply(ok("""[{"id":5,"title":"Fine","unread":0,"last_error":""},{"id":6,"title":"Gone","unread":0,"last_error":"HTTP Code: 404\n  Not Found"},
+            {"id":7,"title":"Older version","unread":0},{"id":8,"title":"Long","unread":0,"last_error":"${"x".repeat(500)}"}]"""))
+        val errors = client().allFeeds().map { it.lastError }
+        assertEquals(listOf(null, "HTTP Code: 404 Not Found", null), errors.take(3))
+        assertEquals(200, errors[3]!!.length)
+        // Cut short, an emoji at the edge goes whole rather than leaving half of itself.
+        server.reply(loggedIn)
+        server.reply(ok("""[{"id":9,"title":"Emoji","unread":0,"last_error":"${"x".repeat(199)}😀 and more"}]"""))
+        assertEquals("x".repeat(199), client().allFeeds().single().lastError)
+    }
 }

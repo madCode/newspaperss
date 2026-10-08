@@ -80,12 +80,20 @@ module so it's all unit-tested without Android.
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
 - **Posts on a shared page.** An item linking to its spot on a page
-  (`05.html#a1`, one of a day's posts on a blog) is just its
-  feed text, when the page has that spot and the item's text: the page
-  holds the day's other posts too.
+  (`05.html#a1`, one of a day's posts on a blog), or whose address
+  redirects up its own path to a page holding all the posts (a microblog's
+  `/d/1291` to `/d`), is just its feed text, when the page has the item's
+  text: the page holds the other posts too. Where a feed links every item
+  to that one page and gives each its own address only as its id, the id
+  is the item's address.
 - **Paid posts.** A post for paying subscribers goes in as its free part,
   with a note saying so. It's known by what the platform puts on the page
-  in place of the rest: Ghost's upgrade box or Substack's paywall. Not
+  in place of the rest: Ghost's upgrade box, Substack's paywall, the sales
+  pitch of MemberPress (a WordPress plugin) or of Passport (Stratechery's),
+  or a sign-in form inside the article beside an offer to subscribe or buy
+  (a magazine's own paywall, like New Left Review's). Those two pitches are
+  removed before Readability runs, and when Readability then misses the
+  text just above the pitch, that text is the article. Not
   schema.org's `isAccessibleForFree`: metered news sites set it to false
   and serve the whole story. A feed text ending in "Read more" back to the
   post (Substack's paid openings, excerpt feeds) counts as an excerpt
@@ -185,7 +193,8 @@ module so it's all unit-tested without Android.
   - footnotes that work in the book, even from tt-rss, which strips the
     ids they point at (they're paired up again by number). A marker points
     at the whole footnote, so a Kindle's popup shows its text, and markers
-    side by side are split with a comma ("3, 4"). Substack
+    side by side are split with a comma ("3, 4"). Notes a page keeps in a
+    `<footer>` or `<aside>` come along when the text links to them. Substack
     Notes quoted where the post embeds them (from Substack's own feed: tt-rss
     strips the Note's text), and @-mentions keep the name the page's script
     would have filled in;
@@ -225,6 +234,14 @@ module so it's all unit-tested without Android.
 - **Fetching is polite and cheap.** An HTTP cache revalidates every feed
   (If-None-Match / If-Modified-Since), so an unchanged feed costs a small
   "not modified" reply. Requests use a browser-like mobile user agent.
+- **A feed over 10 MB is read up to 10 MB.** Some static sites put every
+  post they ever wrote in one feed, newest first; its start is plenty. The
+  last item before the cut may be only part of one, so it's left out. The
+  feed says it's too large instead when its start is its oldest posts (new
+  ones would never come), when nothing whole fits, or when it's a JSON Feed,
+  which can't be read in part. A page that big is refused. Reading stops at
+  the limit without storing the feed in the HTTP cache, which it would
+  overfill.
 
 ## 6. Delivery
 
@@ -578,10 +595,23 @@ whose Kindle and KOReader answers ask for more on the same page).
       heading folds the category to just that line, and folded categories
       stay folded, kept by name in the app's settings. Feeds with
       no category go under **Uncategorized**, last. A line under a feed only
-      when it says something: "Not fetched by tt-rss yet" for a feed
+      when it says something: "tt-rss couldn't fetch it last time" for a feed
+      tt-rss's own fetcher failed on, "Not fetched by tt-rss yet" for a feed
       just added, or its own settings ("Feed's text", "Full page", "At most
       2", "Skips paid posts"). Each opens its own page, which says "In your
-      tt-rss · category News". Right after Articles from changes,
+      tt-rss · category News", and for a feed tt-rss couldn't fetch, that if
+      this stays the feed may have moved or closed, with tt-rss's own words
+      ("HTTP Code: 404"). "Last time", as tt-rss reports even a one-off
+      timeout. A left-out feed doesn't say it: it isn't fetched for the paper.
+    - **Feeds tt-rss couldn't fetch** are also named in a banner above the list
+      ("⚠ tt-rss couldn't fetch 2 of your feeds last time it tried: Aeon and
+      Wired. If this stays, check their addresses in tt-rss."), as their rows
+      can be under folded categories. It's a heading, not announced as it
+      changes.
+      tt-rss fetches its feeds itself, so without this a dead feed just goes
+      quiet. The error comes from tt-rss's feed list (once a day) and is
+      updated at each sync for feeds with new articles, so a fixed feed
+      stops showing as soon as it has posts. Right after Articles from changes,
       until the next check lists the new category, it says "Your feeds in
       Science show here after the next check" instead.
     - **Curated lists**, a heading, when there are any. They and the
@@ -633,6 +663,11 @@ whose Kindle and KOReader answers ask for more on the same page).
   - **Without a server**, **Add a source** finds a site's feed and adds it
     to the phone, offers the curated lists, or saves a page with no feed to
     the reading list. The ⋮ menu imports or exports OPML.
+  - **The finder** looks for a feed in turn: the address itself, the feeds
+    the page advertises, feed links on the page, the usual feed addresses,
+    and, from a site's front page, the feeds advertised by the section most
+    of its links go into (a HubSpot magazine's `/news`), if that section
+    stays on the site and isn't a year, a language, a shop or a podcast.
   - **With a server**, **Add a site** puts the site into tt-rss, so other
     reader apps get it too:
     - The phone finds the feed first, with the same finder (and "Which

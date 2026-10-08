@@ -24,4 +24,7 @@ data class FeedItem(
     val published: Instant?,
 )
 
-class FeedParseException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class FeedParseException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+/** A feed over the size limit that can't be read in part; its message is fit to show the reader. */
+class FeedTooLargeException(message: String) : FeedParseException(message)
