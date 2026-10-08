@@ -12,6 +12,14 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
+## Thu 8 Oct
+
+### Extraction sweep: a magazine, paywalls, notes
+- **From you:** how New Left Review's "Changing the Guard" comes out against how it should, whether there's a list of articles to catch regressions, then: use your reading list to grow it and fix what else breaks.
+- **Found:** NLR's paywall went unnoticed and "footnote" (screen-reader text) showed beside each marker; its free articles lost all their notes (kept in a `<footer>`, which Readability and the cleaner drop); small capitals came out lower case ("Tory mps"); a saved link's title carried the author and issue. Across the reading list, run with the new `extractionSweep` tool: Stratechery's and Jane Friedman's paid posts came out as their sales pitch, unmarked; Substack's share and gift buttons and its embedded-post cards' "Read more · 12 likes" got through.
+- **Shipped:** all of the above fixed. The corpus gains NLR, Stratechery, Jane Friedman and Hamilton Nolan, with checks that the notes come along. The reading list itself stays out of the repository.
+- **Left:** a feed over 5 MB and a bot check answering a feed with a 202, both in the backlog.
+
 ## Tue 6 Oct
 
 ### Listen

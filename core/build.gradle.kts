@@ -26,6 +26,13 @@ tasks.register<JavaExec>("liveEdition") {
     workingDir = projectDir
 }
 
+// A developer tool, not part of the build: see ExtractionSweep.kt.
+tasks.register<JavaExec>("extractionSweep") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.app.newspaperss.core.tools.ExtractionSweepKt")
+    workingDir = projectDir
+}
+
 // A developer tool, not part of the build: see PlatformCorpus.kt.
 tasks.register<JavaExec>("platformCorpus") {
     classpath = sourceSets["test"].runtimeClasspath

@@ -85,7 +85,11 @@ module so it's all unit-tested without Android.
   holds the day's other posts too.
 - **Paid posts.** A post for paying subscribers goes in as its free part,
   with a note saying so. It's known by what the platform puts on the page
-  in place of the rest: Ghost's upgrade box or Substack's paywall. Not
+  in place of the rest: Ghost's upgrade box, Substack's paywall, the sales
+  pitch of MemberPress (a WordPress plugin) or of Passport (Stratechery's),
+  or a sign-in form inside the article (a magazine's own paywall, like New
+  Left Review's). A pitch is removed before Readability runs, and when it
+  shared a box with the free part, that box is the article. Not
   schema.org's `isAccessibleForFree`: metered news sites set it to false
   and serve the whole story. A feed text ending in "Read more" back to the
   post (Substack's paid openings, excerpt feeds) counts as an excerpt
@@ -185,7 +189,8 @@ module so it's all unit-tested without Android.
   - footnotes that work in the book, even from tt-rss, which strips the
     ids they point at (they're paired up again by number). A marker points
     at the whole footnote, so a Kindle's popup shows its text, and markers
-    side by side are split with a comma ("3, 4"). Substack
+    side by side are split with a comma ("3, 4"). Notes a page keeps in a
+    `<footer>` or `<aside>` come along when the text links to them. Substack
     Notes quoted where the post embeds them (from Substack's own feed: tt-rss
     strips the Note's text), and @-mentions keep the name the page's script
     would have filled in;

@@ -380,8 +380,72 @@ class HtmlCleanerTest {
     fun removesLeadingTitleAndDemotesHeadings() {
         assertEquals("<p>Intro</p><h2>Section</h2><h4>Sub</h4>", clean("<h1>The Title!</h1><p>Intro</p><h1>Section</h1><h3>Sub</h3>", "The title"))
         assertEquals("<p>Intro</p><h2>The Title</h2>", clean("<p>Intro</p><h2>The Title</h2>", "The title"))
+        // A feed's title can name the author first; a one-word heading could be the first section.
+        assertEquals("<p>Intro</p>", clean("<h2>Changing the Guard</h2><p>Intro</p>", "Donald Sassoon: Changing the Guard"))
+        assertEquals("<h2>Introduction</h2><p>Intro</p>", clean("<h2>Introduction</h2><p>Intro</p>", "Jane Doe: Introduction"))
         // Headings already starting at h2 stay as they are.
         assertEquals("<h2>A</h2><h3>B</h3>", clean("<h2>A</h2><h3>B</h3>"))
+    }
+
+    /** A magazine's notes sit in a <footer> after the text; a page footer nothing links into still goes. */
+    @Test
+    fun footnotesInAFooterStay() {
+        val html = clean(
+            """<p>$longText<a href="#note-1" id="ref-1"><sup>1</sup></a></p>""" +
+                """<footer><div id="note-1"><a href="#ref-1">1</a> Ibid., p. 4.</div></footer>""" +
+                """<footer><p>© Example Press. <a href="#top">Back to top</a></p></footer>""",
+        )
+        assertTrue(html, "Ibid., p. 4." in html)
+        assertTrue(html, """href="#note-1"""" in html)
+        assertFalse(html, "Example Press" in html)
+    }
+
+    /** Small capitals are written in lower case and styled; "us" set as small capitals is the US. */
+    @Test
+    fun smallCapitalsAreWrittenOutInCapitals() {
+        assertEquals("<p>Tory MPs and the US left.</p>", clean("""<p>Tory <span class="small-caps">mp</span>s and the <span style="font-variant: small-caps">us</span> left.</p>"""))
+        assertEquals("<div><p>İSTANBUL</p></div>", clean("""<div lang="tr"><p><span class="smallcaps">istanbul</span></p></div>"""))
+    }
+
+    /** Foundation's class for screen-reader text, here labelling a footnote marker. */
+    @Test
+    fun foundationScreenReaderTextGoes() {
+        assertEquals("<p>Text.<sup>1</sup></p>", clean("""<p>Text.<a href="#gone"><span class="show-for-sr">footnote</span><sup>1</sup></a></p>"""))
+    }
+
+    /** Substack's buttons, as the feed has them and as tt-rss passes them on without their classes. */
+    @Test
+    fun substackShareAndGiftButtonsGo() {
+        val post = "https://www.example.com/p/a-post"
+        for (button in listOf(
+            """<p class="button-wrapper"><a class="button primary" href="$post?utm_source=substack&amp;utm_content=share&amp;action=share"><span>Share</span></a></p>""",
+            """<p><a href="https://www.example.com/subscribe?&amp;gift=true">Give a gift subscription</a></p>""",
+            """<p><a href="$post/comments">Leave a comment</a></p>""",
+        )) {
+            assertEquals(button, "<p>$longText</p>".trim(), clean("<p>$longText</p>$button").trim())
+        }
+        val ownLink = """<p><a href="https://www.example.com/p/another-post">Another post</a></p>"""
+        assertTrue("a link of the author's own stays", "Another post" in clean("<p>$longText</p>$ownLink"))
+    }
+
+    /** Substack's card for another post keeps its title and summary but not its button or likes. */
+    @Test
+    fun anEmbeddedPostLosesItsButtonAndLikes() {
+        val card = """<div><a href="https://other.example.com/p/x"><div><img src="https://cdn.example.com/logo.png">Other Letter</div>""" +
+            """<div><div>The next chapter</div></div><div>Read more</div><div>4 years ago · 71 likes · 32 comments · A Writer</div></a></div>"""
+        val html = clean("<p>$longText</p>$card")
+        assertTrue(html, "The next chapter" in html)
+        assertFalse(html, "Read more" in html)
+        assertFalse(html, "likes" in html)
+    }
+
+    /** MemberPress's pitch in a feed passed on by tt-rss, which strips the classes that name it. */
+    @Test
+    fun aMembershipPitchGoesWithItsBox() {
+        val pitch = """<div><hr><p>This premium article is available to paid subscribers of the newsletter. Here's what subscribers get:</p>""" +
+            """<ul><li>Weekly news</li><li>The archive</li></ul><h2><a href="https://example.com/join">Subscribe now.</a></h2></div>""" +
+            """<div><div><a href="https://example.com/login/?action=forgot_password">Forgot Password</a></div></div>"""
+        assertEquals("<div><p>The free part.</p></div>", clean("<div><p>The free part.</p></div>$pitch"))
     }
 
     @Test
