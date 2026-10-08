@@ -35,6 +35,8 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
     var afterUnreadHeadlines: (() -> Unit)? = null
     /** [fetched]: tt-rss has fetched it at least once; a feed just subscribed to hasn't. */
     data class Feed(val title: String, val url: String, val categoryId: Int = 0, val fetched: Boolean = true)
+    /** Feeds tt-rss's own fetcher fails on, by id, with its last_error; tt-rss sends "" for the rest. */
+    val fetchErrors = mutableMapOf<Int, String>()
     /** getFeeds for every feed, read or not, answers with an HTTP 500. */
     var failFeedList = false
     /** Feeds subscribed to, by id: listed by getFeeds with their address, whether or not they have unread articles. */
@@ -121,6 +123,7 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                             buildJsonObject {
                                 put("id", id); put("title", items.first().feedTitle); put("unread", items.size); put("cat_id", items.first().categoryId)
                                 feeds[id]?.let { put("feed_url", it.url) }
+                                put("last_error", fetchErrors[id] ?: "")
                             },
                         )
                     }
@@ -130,6 +133,7 @@ class FakeTtrss(http: FakeHttp, val apiUrl: String = "https://rss.example.com/tt
                                 buildJsonObject {
                                     put("id", id); put("title", f.title); put("unread", 0); put("cat_id", f.categoryId); put("feed_url", f.url)
                                     put("last_updated", if (f.fetched) 1_759_125_600L else 0L)
+                                    put("last_error", fetchErrors[id] ?: "")
                                 },
                             )
                         }

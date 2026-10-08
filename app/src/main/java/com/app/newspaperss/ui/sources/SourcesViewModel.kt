@@ -63,6 +63,8 @@ data class ServerSources(
     val categories: List<FeedCategory> = emptyList(),
     val leftOut: Int = 0,
     val outside: List<FeedCategory> = emptyList(),
+    /** The paper's feeds tt-rss's own fetcher fails on, by name, A to Z. */
+    val cantFetch: List<String> = emptyList(),
 ) {
     /**
      * A category was chosen and its feeds haven't been listed yet. Until they are, the feeds
@@ -218,6 +220,7 @@ class SourcesViewModel(
                         byCategory(feeds.filter { it.inPaper }),
                         leftOut = feeds.count { !it.inPaper },
                         outside = byCategory(outside.map(::outsideFeed)),
+                        cantFetch = feeds.filter { it.inPaper && it.publication?.serverError != null }.map { it.title }.sortedBy(::sortTitle),
                     )
                 }
             }

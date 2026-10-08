@@ -593,10 +593,20 @@ whose Kindle and KOReader answers ask for more on the same page).
       heading folds the category to just that line, and folded categories
       stay folded, kept by name in the app's settings. Feeds with
       no category go under **Uncategorized**, last. A line under a feed only
-      when it says something: "Not fetched by tt-rss yet" for a feed
+      when it says something: "tt-rss can't fetch it" for a feed tt-rss's own
+      fetcher fails on, "Not fetched by tt-rss yet" for a feed
       just added, or its own settings ("Feed's text", "Full page", "At most
       2", "Skips paid posts"). Each opens its own page, which says "In your
-      tt-rss · category News". Right after Articles from changes,
+      tt-rss · category News", and for a feed tt-rss can't fetch, that the
+      feed may have moved or closed, with tt-rss's own words ("HTTP Code:
+      404").
+    - **Feeds tt-rss can't fetch** are also named in a banner above the list
+      ("⚠ tt-rss can't fetch 2 of your feeds: Aeon and Wired. Check their
+      addresses in tt-rss."), as their rows can be under folded categories.
+      tt-rss fetches its feeds itself, so without this a dead feed just goes
+      quiet. The error comes from tt-rss's feed list (once a day) and is
+      updated at each sync for feeds with new articles, so a fixed feed
+      stops showing as soon as it has posts. Right after Articles from changes,
       until the next check lists the new category, it says "Your feeds in
       Science show here after the next check" instead.
     - **Curated lists**, a heading, when there are any. They and the
