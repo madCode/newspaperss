@@ -32,6 +32,8 @@ data class ListenState(
     /** The page's language, when the phone has no voice for it and reads it in its own. */
     val missingLanguage: String? = null,
     val error: String? = null,
+    /** In the pause between one article and the next: [at] is already the next one's start. */
+    val between: Boolean = false,
 ) {
     /** About how far in, and how long the whole edition takes, in seconds at normal speed. */
     val secondsIn: Double get() = pages.take(at.page).sumOf { it.minutes * 60 } + secondsInPage
@@ -68,6 +70,8 @@ class ListenPlayer(
     private val savedSpeed: Flow<Float> = emptyFlow(),
     private val saveSpeed: suspend (Float) -> Unit = {},
     private val now: () -> Long = System::currentTimeMillis,
+    /** Played between articles when one runs into the next, not when the listener skips. */
+    private val chime: Chime = Chime.NONE,
 ) : Speaker.Listener {
     private val _state = MutableStateFlow(ListenState())
     val state: StateFlow<ListenState> = _state.asStateFlow()
@@ -81,6 +85,10 @@ class ListenPlayer(
     /** A page is being read out of the book: until it is, the script and position are the old page's. */
     private var turning = false
     private var turns = 0
+    /** The pause between articles is playing: the position is already the next article's start. */
+    private val chiming get() = _state.value.between
+    /** The page the pause came after, for ↶: empty pages may lie between it and [ListenState.at]. */
+    private var pausedAfter = 0
     private var savingSpeed = 0
 
     init {
@@ -131,8 +139,8 @@ class ListenPlayer(
             return
         }
         _state.update { it.copy(playing = true, error = null) }
-        // Mid-turn, the new page starts itself once it's read.
-        if (!turning) speakFrom(current.at.line)
+        // Mid-turn, the new page starts itself once it's read; mid-pause, once the pause ends.
+        if (!turning && !chiming) speakFrom(current.at.line)
     }
 
     fun pause() {
@@ -149,6 +157,8 @@ class ListenPlayer(
     fun back() {
         val current = _state.value
         if (turning) return
+        // In the pause, the last thing heard is the article before's end.
+        if (chiming) return move(ListenPosition(pausedAfter, Int.MAX_VALUE), play = true)
         val script = current.script ?: return
         val restart = current.playing && now() - lineStartedAt >= BACK_GRACE_MS
         val line = if (restart) current.at.line else current.at.line - 1
@@ -163,6 +173,8 @@ class ListenPlayer(
     fun forward() {
         val current = _state.value
         if (turning) return
+        // In the pause, on to the next article's first sentence, not past it.
+        if (chiming) return speakFrom(current.at.line)
         val script = current.script ?: return
         if (current.at.line < script.lines.lastIndex) goToLine(current.at.line + 1, script) else nextPage(current.playing)
     }
@@ -225,18 +237,21 @@ class ListenPlayer(
 
     fun release() {
         stop()
+        chime.release()
         speaker.release()
     }
 
     private fun applySpeed(speed: Float) {
         if (speed == _state.value.speed) return
         _state.update { it.copy(speed = speed) }
-        if (_state.value.playing && !turning) speakFrom(_state.value.at.line)
+        // Mid-pause, the next article starts at the new speed when the pause ends.
+        if (_state.value.playing && !turning && !chiming) speakFrom(_state.value.at.line)
     }
 
-    private fun nextPage(play: Boolean) {
+    private fun nextPage(play: Boolean, chimeFirst: Boolean = false) {
         val current = _state.value
-        if (current.at.page < current.pages.lastIndex) move(ListenPosition(current.at.page + 1, 0), play) else finish()
+        if (chimeFirst) pausedAfter = current.at.page
+        if (current.at.page < current.pages.lastIndex) move(ListenPosition(current.at.page + 1, 0), play, chimeFirst) else finish()
     }
 
     private fun goToLine(line: Int, script: ListenScript) {
@@ -247,7 +262,7 @@ class ListenPlayer(
         if (current.playing) speakFrom(at.line)
     }
 
-    private fun move(position: ListenPosition, play: Boolean) {
+    private fun move(position: ListenPosition, play: Boolean, chimeFirst: Boolean = false) {
         silence()
         job?.cancel()
         // Playing or not is decided now, so a pause while the page is read out of the book holds.
@@ -256,7 +271,7 @@ class ListenPlayer(
         val turn = ++turns
         job = scope.launch {
             try {
-                goTo(position)
+                goTo(position, chimeFirst)
             } finally {
                 // A cancelled turn ends after the one that replaced it began.
                 if (turn == turns) turning = false
@@ -264,7 +279,7 @@ class ListenPlayer(
         }
     }
 
-    private suspend fun goTo(position: ListenPosition) {
+    private suspend fun goTo(position: ListenPosition, chimeFirst: Boolean = false) {
         val opened = book ?: return
         val page = position.page.coerceIn(0, opened.pages.lastIndex)
         val current = _state.value
@@ -278,13 +293,24 @@ class ListenPlayer(
         }
         if (script.lines.isEmpty()) {
             // A page with nothing to say, like an article that's only a video, is passed over.
-            if (page < opened.pages.lastIndex) goTo(ListenPosition(page + 1, 0)) else finish()
+            if (page < opened.pages.lastIndex) goTo(ListenPosition(page + 1, 0), chimeFirst) else finish()
             return
         }
         val at = ListenPosition(page, position.line.coerceIn(0, script.lines.lastIndex))
         _state.update { it.copy(at = at, script = script, finished = false, missingLanguage = null, error = null) }
         save(at)
-        if (_state.value.playing) speakFrom(at.line)
+        if (!_state.value.playing) return
+        if (!chimeFirst) {
+            speakFrom(at.line)
+            return
+        }
+        // A pause, skip or stop during the chime moves the generation on, and the chime with it.
+        val chimed = generation
+        _state.update { it.copy(between = true) }
+        chime.play {
+            if (generation != chimed || !_state.value.playing) return@play
+            speakFrom(at.line)
+        }
     }
 
     private fun finish() {
@@ -297,6 +323,8 @@ class ListenPlayer(
     private fun silence() {
         generation++
         queued = -1
+        if (_state.value.between) _state.update { it.copy(between = false) }
+        chime.stop()
         speaker.stop()
     }
 
@@ -352,7 +380,7 @@ class ListenPlayer(
     override fun onDone(id: String) {
         val line = lineOf(id) ?: return
         val script = _state.value.script ?: return
-        if (line == script.lines.lastIndex) nextPage(play = true)
+        if (line == script.lines.lastIndex) nextPage(play = true, chimeFirst = true)
     }
 
     /** One line the voice can't say is passed over; three in a row, and it's the voice that's stuck. */

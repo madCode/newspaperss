@@ -145,4 +145,6 @@ The app includes [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
 (MIT), which run the podcast's voice. That voice,
 [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (Apache 2.0), is
 downloaded when chosen, with espeak-ng's pronunciation data (GPL 3.0);
-the four voice samples shipped in the app were made with it.
+the four voice samples shipped in the app were made with it. The page
+turning in Listen's pause between articles is from Kenney's
+[RPG Audio](https://kenney.nl/assets/rpg-audio) (CC0).

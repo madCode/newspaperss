@@ -48,7 +48,22 @@ class ListenPlayerTest {
             read = { pages.getOrNull(it) }, onClose = { closed++ },
         )
     }
-    private val player = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), now = { clock })
+    /**
+     * A chime that rings until the test says it's done. Stopped, it keeps its callback, as a
+     * finish already posted would still arrive: the player must ignore it.
+     */
+    private class HeldChime : Chime {
+        var ringing: (() -> Unit)? = null
+        var stopped = false
+        var rung = 0
+        override fun play(done: () -> Unit) { rung++; ringing = done; stopped = false }
+        override fun stop() { stopped = true }
+        override fun release() = stop()
+        fun end() = ringing?.also { ringing = null }?.invoke()
+    }
+
+    private val chime = HeldChime()
+    private val player = ListenPlayer(speaker, progress, open = openBook, scope = TestScope(UnconfinedTestDispatcher()), now = { clock }, chime = chime)
     private val state get() = player.state.value
 
     @Test
@@ -57,11 +72,107 @@ class ListenPlayerTest {
         // The line being read and the next, so there's no gap between them.
         assertEquals(listOf("A one.", "A two."), speaker.queue.map { it.text })
         val heard = mutableListOf<String>()
-        while (speaker.queue.isNotEmpty()) heard += speaker.sayNext()
+        while (speaker.queue.isNotEmpty() || (chime.ringing != null && !chime.stopped)) {
+            if (speaker.queue.isEmpty()) chime.end() else heard += speaker.sayNext()
+        }
         assertEquals(listOf("A one.", "A two.", "A three.", "B one.", "B two.", "That's all for today."), heard)
         assertTrue(state.finished)
         assertFalse(state.playing)
         assertTrue(progress.finished(7))
+    }
+
+    @Test
+    fun aChimeSitsBetweenOneArticleAndTheNextAndTheNextWaitsForIt() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext() // "A three.", the article's last
+        assertEquals(1, chime.rung)
+        assertTrue("the next article waits for the chime", speaker.queue.isEmpty())
+        assertEquals(ListenPosition(1, 0), state.at)
+        // The screen leaves the last article's notes out of the pause.
+        assertTrue(state.between)
+        chime.end()
+        assertEquals("B one.", speaker.queue.first().text)
+        assertFalse(state.between)
+    }
+
+    @Test
+    fun skippingToTheNextArticleHasNoChime() {
+        player.start(7)
+        player.next()
+        assertEquals("B one.", speaker.queue.first().text)
+        assertEquals(0, chime.rung)
+    }
+
+    @Test
+    fun pausedDuringTheChimeItHoldsAndPlayStartsTheNextArticle() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext()
+        player.pause()
+        assertTrue("pausing stops the chime", chime.stopped)
+        chime.end() // its finish, already on its way
+        assertTrue("a pause holds", speaker.queue.isEmpty())
+        player.play()
+        assertEquals("B one.", speaker.queue.first().text)
+        assertEquals(1, chime.rung)
+    }
+
+    @Test
+    fun backDuringThePauseGoesToTheEndOfTheArticleJustHeard() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext()
+        clock = 10_000
+        player.back()
+        assertEquals("A three.", speaker.queue.first().text)
+        assertEquals(ListenPosition(0, 2), state.at)
+    }
+
+    @Test
+    fun backDuringThePausePassesOverAnEmptyPageToTheArticleJustHeard() {
+        // A video-only article between them, passed over on the way.
+        val withVideo = listOf(script("A one.", "A two."), ListenScript(emptyList(), null), script("C one."))
+        val book: suspend (Long) -> ListenBook = { id ->
+            ListenBook(
+                id, "Thursday Morning Edition",
+                listOf(ListenPage("A", "Source A", 1.0), ListenPage("Video", "Source V", 1.0), ListenPage("C", "Source C", 1.0)),
+                read = { withVideo.getOrNull(it) }, onClose = {},
+            )
+        }
+        val held = HeldChime()
+        val p = ListenPlayer(speaker, progress, open = book, scope = TestScope(UnconfinedTestDispatcher()), now = { clock }, chime = held)
+        progress.set(8, ListenPosition(0, 1))
+        p.start(8)
+        speaker.sayNext() // "A two."
+        assertEquals(ListenPosition(2, 0), p.state.value.at)
+        clock = 10_000
+        p.back()
+        assertEquals("A two.", speaker.queue.first().text)
+    }
+
+    @Test
+    fun forwardDuringThePauseStartsTheNextArticleFromItsFirstSentence() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext()
+        player.forward()
+        assertTrue(chime.stopped)
+        assertEquals("B one.", speaker.queue.first().text)
+    }
+
+    @Test
+    fun aSpeedChangeOrAnotherPlayDuringThePauseLetsItFinish() {
+        progress.set(7, ListenPosition(0, 2))
+        player.start(7)
+        speaker.sayNext()
+        player.setSpeed(1.5f)
+        player.play()
+        assertFalse(chime.stopped)
+        assertTrue(speaker.queue.isEmpty())
+        chime.end()
+        assertEquals("B one.", speaker.queue.first().text)
+        assertEquals(1.5f, speaker.queue.first().rate)
     }
 
     @Test
