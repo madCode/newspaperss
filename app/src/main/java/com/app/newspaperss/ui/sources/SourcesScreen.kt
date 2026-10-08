@@ -171,10 +171,12 @@ fun SourcesScreen(
             )
         },
         floatingActionButton = {
+            val addLabel = if (server) "Add a site" else "Add a source"
             ExtendedFloatingActionButton(
                 onClick = viewModel::openAdd,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(if (server) "Add a site" else "Add a source") },
+                // This FAB hides its text from accessibility and announces the icon's description instead.
+                icon = { Icon(Icons.Default.Add, contentDescription = addLabel) },
+                text = { Text(addLabel) },
                 // Filled like the app's other main buttons: the default pale container turns
                 // almost white on e-ink.
                 containerColor = MaterialTheme.colorScheme.primary,
