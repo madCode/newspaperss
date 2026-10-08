@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -351,14 +352,19 @@ class ArticlePreviewScreenTest {
         val view = webView()
         val client = shadowOf(view).webViewClient
         client.doUpdateVisitedHistory(view, BOOK_ORIGIN + EpubPages.articleHref(1) + "#a2-fn1", false)
-        compose.waitForIdle()
+        idleUntil { compose.onNode(hasText("Two")).isDisplayed() }
+        idleUntil { compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Listen from here").performClick()
         assertEquals(listOf(0, 1), asked)
 
-        // The paper's closing page isn't an article to listen from.
-        client.doUpdateVisitedHistory(view, BOOK_ORIGIN + "end.xhtml", false)
-        compose.waitForIdle()
-        assertEquals(0, compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().size)
+        fun offered() = compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().isNotEmpty()
+        // The paper's closing page isn't an article to listen from; nor is a page the book doesn't
+        // have, which a link in a feed's article could point the preview at.
+        for (page in listOf("end.xhtml", "article-999.xhtml", "x/article-002.xhtml", "article-2.xhtml")) {
+            client.doUpdateVisitedHistory(view, BOOK_ORIGIN + page, false)
+            compose.waitForIdle()
+            idleUntil { !offered() }
+        }
     }
 
     @Test

@@ -176,15 +176,19 @@ fun ArticlePreviewScreen(
     // The page on screen can change under the preview: every article ends in a "Next" link.
     var link by remember(preview) { mutableStateOf((preview as? Preview.Ready)?.link) }
     var pageTitle by remember(preview) { mutableStateOf<String?>(null) }
-    // Which article is on screen, for Listen: null on the book's other pages, such as its contents.
-    var shownArticle by remember(preview) { mutableStateOf<Int?>(position) }
+    // Which article is on screen, for Listen: null on the book's other pages, such as its end,
+    // and on any page the book doesn't have, which a link in an article could point to.
+    // Kept across rotation: the restored page reports itself only once it has loaded again.
+    var shownArticle by rememberSaveable(position) { mutableStateOf<Int?>(position) }
     val shownTitle = pageTitle ?: title
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf<Job?>(null) }
     val onPage = { url: String, pages: EpubPages ->
         // Only book pages: the first page is loaded as data and may report about:blank.
         if (url.startsWith(BOOK_ORIGIN)) {
-            shownArticle = EpubPages.articleAt(url.removePrefix(BOOK_ORIGIN).substringBefore('#').substringBefore('?'))
+            val article = EpubPages.articleAt(url.removePrefix(BOOK_ORIGIN).substringBefore('#').substringBefore('?'))
+            // Hidden until the page is known to be one of the book's.
+            if (article != shownArticle) shownArticle = null
             reading?.cancel()
             reading = scope.launch {
                 val read = withContext(Dispatchers.IO) { bookPage(url, pages) }
@@ -195,6 +199,7 @@ fun ArticlePreviewScreen(
                     ensureActive()
                     link = read?.link
                     pageTitle = read?.title
+                    shownArticle = article.takeIf { read != null }
                 }
             }
         }
