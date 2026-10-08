@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import com.app.newspaperss.listen.ListenPosition
 import com.app.newspaperss.ui.listen.ListenScreen
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -250,6 +251,10 @@ private fun App(
                     onBack = { nav.navigateUp() },
                     textSize = textSize,
                     onTextSize = { size -> container.appScope.launch { container.settings.update { it.copy(previewTextSize = size) } } },
+                    onListen = { article ->
+                        container.listening.start(id, ListenPosition(article, 0))
+                        nav.navigate(LISTEN) { launchSingleTop = true }
+                    },
                 )
             }
             composable(LISTEN) {

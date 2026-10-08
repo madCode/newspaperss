@@ -225,6 +225,17 @@ class ListenAppTest {
     }
 
     @Test
+    fun listeningFromAnArticleStartsAtItsBeginningEvenPartWayThroughAnother() {
+        val id = edition()
+        progress.set(id, ListenPosition(0, 2))
+        listening.start(id, ListenPosition(1, 0))
+        idleUntil { player.state.value.script != null }
+        assertEquals(ListenPosition(1, 0), player.state.value.at)
+        assertEquals("Rest of World", speaker.queue.first().text)
+        assertEquals(1, connected)
+    }
+
+    @Test
     fun scrollingAwayStopsFollowingUntilAsked() {
         startAndWait(edition())
         compose.setContent { ListenScreen(player, onBack = {}) }

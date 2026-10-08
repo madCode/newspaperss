@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -152,6 +153,8 @@ fun ArticlePreviewScreen(
     onBack: () -> Unit,
     textSize: PreviewTextSize? = PreviewTextSize.DEFAULT,
     onTextSize: (PreviewTextSize) -> Unit = {},
+    /** Listens from the start of the article at this position; null offers no Listen. */
+    onListen: ((Int) -> Unit)? = null,
 ) {
     // Read in the background so the screen shows at once: reading a large edition during
     // composition holds up the frame, and the tap that opened it seems not to have registered.
@@ -173,12 +176,15 @@ fun ArticlePreviewScreen(
     // The page on screen can change under the preview: every article ends in a "Next" link.
     var link by remember(preview) { mutableStateOf((preview as? Preview.Ready)?.link) }
     var pageTitle by remember(preview) { mutableStateOf<String?>(null) }
+    // Which article is on screen, for Listen: null on the book's other pages, such as its contents.
+    var shownArticle by remember(preview) { mutableStateOf<Int?>(position) }
     val shownTitle = pageTitle ?: title
     val scope = rememberCoroutineScope()
     var reading by remember { mutableStateOf<Job?>(null) }
     val onPage = { url: String, pages: EpubPages ->
         // Only book pages: the first page is loaded as data and may report about:blank.
         if (url.startsWith(BOOK_ORIGIN)) {
+            shownArticle = EpubPages.articleAt(url.removePrefix(BOOK_ORIGIN).substringBefore('#').substringBefore('?'))
             reading?.cancel()
             reading = scope.launch {
                 val read = withContext(Dispatchers.IO) { bookPage(url, pages) }
@@ -203,6 +209,11 @@ fun ArticlePreviewScreen(
                 title = { Text(shownTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                 actions = {
+                    if (onListen != null && preview is Preview.Ready) {
+                        shownArticle?.let { article ->
+                            IconButton(onClick = { onListen(article) }) { Icon(Icons.Default.Headphones, contentDescription = "Listen from here") }
+                        }
+                    }
                     link?.let { l ->
                         IconButton(onClick = { runCatching { context.startActivity(shareIntent(l, shownTitle)) } }) {
                             Icon(Icons.Default.Share, contentDescription = "Share link")

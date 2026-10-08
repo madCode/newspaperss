@@ -336,6 +336,41 @@ class ArticlePreviewScreenTest {
     }
 
     @Test
+    fun listenFromHereStartsTheArticleOnScreen() {
+        val file = tmp.newFile("l.epub")
+        val articles = listOf("One", "Two").map {
+            EditionArticle(title = it, sourceTitle = "S", url = "https://a.example/$it", bodyHtml = "<p>x</p>", minutes = 30.0)
+        }
+        file.writeEpub(articles)
+        val asked = mutableListOf<Int>()
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}, onListen = { asked += it }) }
+        idleUntil { compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Listen from here").performClick()
+
+        // Followed "Next" to the second article: Listen starts there, not where the preview opened.
+        val view = webView()
+        val client = shadowOf(view).webViewClient
+        client.doUpdateVisitedHistory(view, BOOK_ORIGIN + EpubPages.articleHref(1) + "#a2-fn1", false)
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Listen from here").performClick()
+        assertEquals(listOf(0, 1), asked)
+
+        // The paper's closing page isn't an article to listen from.
+        client.doUpdateVisitedHistory(view, BOOK_ORIGIN + "end.xhtml", false)
+        compose.waitForIdle()
+        assertEquals(0, compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun withoutListeningThereIsNoListenButton() {
+        val file = tmp.newFile("q.epub")
+        file.writeEpub(listOf(EditionArticle(title = "One", sourceTitle = "S", url = "https://a.example/1", bodyHtml = "<p>x</p>", minutes = 2.0)))
+        compose.setContent { ArticlePreviewScreen(loadFile = { file }, position = 0, title = "One", onBack = {}) }
+        webView()
+        assertEquals(0, compose.onAllNodes(hasContentDescription("Listen from here")).fetchSemanticsNodes().size)
+    }
+
+    @Test
     fun sharingFollowsThePageOnScreen() {
         val file = tmp.newFile("n.epub")
         // Long enough that the first ends with a "Next" link to the second.

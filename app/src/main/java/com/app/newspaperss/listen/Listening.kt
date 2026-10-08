@@ -38,8 +38,9 @@ class Listening(
         return null
     }
 
-    fun start(editionId: Long) {
+    /** Plays [editionId] from [from], or from where it was left. */
+    fun start(editionId: Long, from: ListenPosition? = null) {
         connect()
-        player.start(editionId)
+        player.start(editionId, from)
     }
 }
