@@ -651,7 +651,8 @@ whose Kindle and KOReader answers ask for more on the same page).
   - **The finder** looks for a feed in turn: the address itself, the feeds
     the page advertises, feed links on the page, the usual feed addresses,
     and, from a site's front page, the feeds advertised by the section most
-    of its links go into (a HubSpot magazine's `/news`).
+    of its links go into (a HubSpot magazine's `/news`), if that section
+    stays on the site and isn't a year, a language, a shop or a podcast.
   - **With a server**, **Add a site** puts the site into tt-rss, so other
     reader apps get it too:
     - The phone finds the feed first, with the same finder (and "Which
