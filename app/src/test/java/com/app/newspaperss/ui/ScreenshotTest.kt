@@ -343,6 +343,18 @@ class ScreenshotTest {
         shoot("05-today", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm) }
     }
 
+    /** A tester's debug build with a newer one out. */
+    @Test
+    fun todayWithANewerBuild() {
+        runBlocking {
+            val latest = db.editions().insert(EditionEntity(title = "Tuesday Morning Edition", createdAt = Instant.parse("2026-09-29T06:30:00Z"), status = EditionStatus.DELIVERED, fileName = "x.epub", articleCount = 8, minutes = 33.4))
+            db.editions().insertArticles(sampleArticles(latest))
+        }
+        val files = tmp.newFolder().apply { resolve("x.epub").writeText("epub") }
+        val vm = TodayViewModel(EditionRepository(db, files), flowOf(null)) {}
+        shoot("05i-today-newer-build", ready = { vm.state.value.editions?.isNotEmpty() == true }) { TodayScreen(vm, newerBuild = 464) }
+    }
+
     /** The evening before, with the podcast in use on a Pixel 8: when the paper starts, and to leave the phone charging. */
     @Test
     fun todayWithThePodcast() {

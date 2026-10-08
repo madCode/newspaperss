@@ -435,6 +435,10 @@ whose Kindle and KOReader answers ask for more on the same page).
 - **Today** (home): when the next edition is due, how many starred articles
   will go in the next one (only when some will), and the latest edition's
   card. Tapping anywhere on the card opens the edition.
+  - On a debug build from CI, a line under the masthead says when a newer
+    test build is out, with a link to download it. The app asks GitHub when
+    it comes to the front, at most every three hours; a local or release
+    build never asks.
   - The card previews what's inside, as the book's contents page opens: the
     first three headlines in order, each with its source (★ if you starred
     it) and reading time, then "and N more". A failed edition shows none:

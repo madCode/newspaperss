@@ -146,6 +146,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Each time the app comes to the front, not just on a cold start: it can sit in recents for days.
+        val updates = application.container.debugUpdates
+        application.container.appScope.launch { updates.checkIfDue() }
+    }
+
     companion object {
         /** An intent extra: a screen to open, such as [OPEN_LISTENING] from the player's notification. */
         const val EXTRA_OPEN = "open"
@@ -209,7 +216,8 @@ private fun App(
             composable(Tab.TODAY.route) {
                 val context = LocalContext.current.applicationContext
                 val vm = viewModel { TodayViewModel(container.editions, EditionWorker.observe(context), container.settings.settings, online = Connectivity.online(context), lastDue = { EditionScheduler.lastDue(context) }, lastStart = { EditionScheduler.lastStart(context) }, sentToKindle = container.kindleSends.recent) { EditionWorker.buildNow(context) } }
-                TodayScreen(vm, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
+                val newerBuild by container.debugUpdates.newer.collectAsStateWithLifecycle()
+                TodayScreen(vm, newerBuild = newerBuild, onOpenEdition = { nav.navigate("edition/$it") { launchSingleTop = true } })
             }
             composable(EDITION, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 val id = entry.idArg
