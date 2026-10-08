@@ -31,6 +31,7 @@ object FeedParser {
     private val ENTITY_REF = Regex("&[A-Za-z_:]")
     private val ENTITY = Regex("<!ENTITY\\s+(%?)[^>]*?(\"[^\"]*\"|'[^']*'|>)", RegexOption.IGNORE_CASE)
     private const val MAX_PROLOG = 64 * 1024
+    private const val TOO_LARGE = "This feed is too large to read."
 
     /**
      * @param body the response body.
@@ -40,6 +41,7 @@ object FeedParser {
      */
     fun parse(body: String, feedUrl: String, truncated: Boolean = false): Feed {
         val text = body.trimStart('﻿', ' ', '\t', '\r', '\n')
+        if (truncated && text.startsWith("{")) throw FeedTooLargeException(TOO_LARGE)
         val feed = if (text.startsWith("{")) parseJson(text, feedUrl) else parseXml(text, feedUrl, truncated)
         return feed.copy(items = ownAddresses(feed.items))
     }
@@ -99,17 +101,26 @@ object FeedParser {
         private var sawRoot = false
 
         fun read(): Feed {
+            var stoppedAtCut = false
             try {
                 readAll()
             } catch (e: XmlPullParserException) {
-                // The relaxed parser takes the end of the text as the document's, but a cut inside
-                // a tag ("<descri") is an error. The items before it are whole.
+                // A cut inside a tag ("<descri") is an error; the items added before it are whole.
                 if (!truncated || items.isEmpty()) throw e
+                stoppedAtCut = true
             }
             if (!sawRoot) throw FeedParseException("Empty document")
-            // The relaxed parser closes what the cut left open, so the last item read may be only
-            // part of one: it goes. A whole one lost from a feed this long costs nothing.
-            return Feed(feedTitle, siteUrl, if (truncated) items.dropLast(1) else items)
+            if (!truncated) return Feed(feedTitle, siteUrl, items)
+            // Otherwise the parser took the cut for the document's end, closing what it left open
+            // (kxml on the JVM) or not (Android's): either way the last item read may be only part
+            // of one, so it goes. A whole one lost from a feed this long costs nothing.
+            val whole = if (stoppedAtCut) items.toList() else items.dropLast(1)
+            if (whole.isEmpty()) throw FeedTooLargeException(TOO_LARGE)
+            // Oldest first, the start of the feed is its oldest posts: new ones would never come.
+            val first = whole.first().published
+            val last = whole.last().published
+            if (first != null && last != null && first < last) throw FeedTooLargeException("$TOO_LARGE It lists its oldest posts first, so its new ones are past what can be read.")
+            return Feed(feedTitle, siteUrl, whole)
         }
 
         private fun readAll() {

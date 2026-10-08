@@ -2,6 +2,7 @@ package com.app.newspaperss.data
 
 import com.app.newspaperss.core.feed.FeedParseException
 import com.app.newspaperss.core.feed.FeedParser
+import com.app.newspaperss.core.feed.FeedTooLargeException
 import com.app.newspaperss.core.feed.LinkPosts
 import com.app.newspaperss.core.net.withoutTracking
 import com.app.newspaperss.core.lists.CuratedLists
@@ -86,6 +87,8 @@ class FeedSync(
             throw e
         } catch (e: IOException) {
             "Couldn't reach the site."
+        } catch (e: FeedTooLargeException) {
+            e.message ?: "This feed is too large to read."
         } catch (e: FeedParseException) {
             "We can't get new articles from this site any more. It may have moved; try adding it again."
         } catch (e: SQLiteConstraintException) {

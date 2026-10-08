@@ -39,12 +39,16 @@ class FeedFinderTest {
         val feed = "https://big.example/index.xml"
         val page = "https://big.example/video"
         val http = FakeHttp(
-            mapOf(feed to "<rss version=\"2.0\"><channel><title>Big</title><item><title>One</title></item><item><title>Tw", page to "<html><body>"),
+            mapOf(feed to "<rss version=\"2.0\"><channel><title>Big</title>" + (1..3).joinToString("") { "<item><title>$it</title><link>https://big.example/$it</link></item>" } + "<item><title>Fo", page to "<html><body>"),
             cutShort = setOf(feed, page),
         )
         val found = FeedFinder(http).find(feed) as FindResult.Found
         assertEquals("Big", found.feeds.single().title)
         assertTrue(FeedFinder(http).find(page) is FindResult.NotFound)
+        // A JSON Feed can't be read in part: adding it would fail on every sync.
+        val json = "https://big.example/feed.json"
+        val jsonHttp = FakeHttp(mapOf(json to "{\"version\":\"https://jsonfeed.org/version/1.1\",\"title\":\"Big\",\"items\":[{\"id\":\"1\""), cutShort = setOf(json))
+        assertTrue(FeedFinder(jsonHttp).find(json) is FindResult.NotFound)
     }
 
     @Test

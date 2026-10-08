@@ -98,6 +98,24 @@ class FeedParserTest {
         for (cut in listOf("$start<description>The first half of a long po", "$start<descri")) {
             assertEquals(cut, listOf("Post 1", "Post 2", "Post 3"), FeedParser.parse(cut, "https://c.example/feed", truncated = true).items.map { it.title })
         }
+        // An Atom entry cut inside its escaped content: the parser stops at the cut, and only that entry goes.
+        val atom = "<feed xmlns=\"http://www.w3.org/2005/Atom\"><title>A</title>" +
+            (1..2).joinToString("") { "<entry><id>https://a.example/$it</id><link href=\"https://a.example/$it\"/><title>E$it</title><content type=\"html\">&lt;p&gt;Text&lt;/p&gt;</content></entry>" } +
+            "<entry><id>https://a.example/3</id><link href=\"https://a.example/3\"/><title>E3</title><content type=\"html\">&lt;p&gt;Te&am"
+        assertEquals(listOf("E1", "E2"), FeedParser.parse(atom, "https://a.example/feed", truncated = true).items.map { it.title })
+    }
+
+    /** A cut feed that lists its oldest posts first, or leaves nothing whole, says it's too large rather than reading as empty or stale. */
+    @Test
+    fun aFeedCutShortThatCantBeReadSaysSo() {
+        fun item(n: Int, day: Int) = "<item><title>Post $n</title><link>https://c.example/$n</link><pubDate>$day Oct 2020 10:00:00 GMT</pubDate></item>"
+        val oldestFirst = "<rss version=\"2.0\"><channel><title>C</title>${(1..4).joinToString("") { item(it, it) }}<item><title>Po"
+        assertThrows(FeedTooLargeException::class.java) { FeedParser.parse(oldestFirst, "https://c.example/feed", truncated = true) }
+        val newestFirst = "<rss version=\"2.0\"><channel><title>C</title>${(1..4).joinToString("") { item(it, 10 - it) }}<item><title>Po"
+        assertEquals("the item the cut went through goes", 3, FeedParser.parse(newestFirst, "https://c.example/feed", truncated = true).items.size)
+        val nothingWhole = "<rss version=\"2.0\"><channel><title>C</title><item><title>One</title><link>https://c.example/1</link><description>${"x".repeat(50)}"
+        assertThrows(FeedTooLargeException::class.java) { FeedParser.parse(nothingWhole, "https://c.example/feed", truncated = true) }
+        assertThrows(FeedTooLargeException::class.java) { FeedParser.parse("{\"version\":\"https://jsonfeed.org/version/1.1\",\"items\":[{\"id\":\"1\"", "https://j.example/feed.json", truncated = true) }
     }
 
     /** Shaped like sive.rs: every short post links to the page holding them all; its own page is its id. */

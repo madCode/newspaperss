@@ -3,6 +3,7 @@ package com.app.newspaperss.core.feed
 import com.app.newspaperss.core.net.siteHost
 import com.app.newspaperss.core.net.ErrorAnswers
 import com.app.newspaperss.core.net.HttpClient
+import com.app.newspaperss.core.net.HttpResponse
 import org.jsoup.Jsoup
 import java.io.IOException
 import java.net.URI
@@ -36,8 +37,7 @@ class FeedFinder(private val http: HttpClient) {
         if (!response.isSuccessful) return FindResult.NotFound(ErrorAnswers.message(response.code, url))
 
         if (FeedParser.looksLikeFeed(response.body)) {
-            val title = runCatching { FeedParser.parse(response.body, response.finalUrl, response.truncated).title }.getOrNull()
-            return FindResult.Found(listOf(FoundFeed(response.finalUrl, title)))
+            return feedAt(response) ?: FindResult.NotFound("$url is too large a feed to read.")
         }
         // Only a feed may come cut short: a page that big is a video or a file, not a site.
         if (response.truncated) return FindResult.NotFound("$url is too large to be a web page or a feed.")
@@ -51,8 +51,7 @@ class FeedFinder(private val http: HttpClient) {
         for (candidate in linkedFeeds(response.body, response.finalUrl).take(MAX_LINKED_TRIES)) {
             val r = try { http.getFeed(candidate) } catch (_: IOException) { continue }
             if (r.isSuccessful && FeedParser.looksLikeFeed(r.body)) {
-                val title = runCatching { FeedParser.parse(r.body, r.finalUrl, r.truncated).title }.getOrNull()
-                return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)), page)
+                feedAt(r, page)?.let { return it }
             }
         }
 
@@ -60,11 +59,22 @@ class FeedFinder(private val http: HttpClient) {
             val candidate = resolveUrl(response.finalUrl, path)
             val r = try { http.getFeed(candidate) } catch (_: IOException) { continue }
             if (r.isSuccessful && FeedParser.looksLikeFeed(r.body)) {
-                val title = runCatching { FeedParser.parse(r.body, r.finalUrl, r.truncated).title }.getOrNull()
-                return FindResult.Found(listOf(FoundFeed(r.finalUrl, title)), page)
+                feedAt(r, page)?.let { return it }
             }
         }
         return FindResult.NotFound("No feed found at $url.", page = page)
+    }
+
+    /** [response] as the feed found, titled if it reads; null if it's too large to read even in part. */
+    private fun feedAt(response: HttpResponse, page: String? = null): FindResult.Found? {
+        val title = try {
+            FeedParser.parse(response.body, response.finalUrl, response.truncated).title
+        } catch (_: FeedTooLargeException) {
+            return null
+        } catch (_: FeedParseException) {
+            null
+        }
+        return FindResult.Found(listOf(FoundFeed(response.finalUrl, title)), page)
     }
 
     /**

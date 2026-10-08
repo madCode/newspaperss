@@ -86,7 +86,8 @@ class OkHttpHttpClient(
 
     // On IO throughout: closing a response it didn't read to the end reads the rest off the network.
     private suspend fun text(request: Request, via: OkHttpClient = client, truncate: Boolean = false): HttpResponse = withContext(Dispatchers.IO) {
-        via.newCall(request).await().use { r ->
+        val call = via.newCall(request)
+        call.await().use { r ->
             if (r.isRedirect) {
                 val location = r.header("Location")?.let { r.request.url.resolve(it)?.toString() } ?: r.request.url.toString()
                 return@use HttpResponse(r.code, location, r.header("Content-Type"), "")
@@ -96,6 +97,9 @@ class OkHttpHttpClient(
             val tooLarge = source.request(MAX_BYTES + 1)
             if (tooLarge && !truncate) throw IOException("Too large to be a feed or an article.")
             val bytes = if (tooLarge) source.readByteArray(MAX_BYTES) else source.readByteArray()
+            // Cancelled, not just closed: closing reads the rest to store the whole of it in the
+            // cache, more than the cache holds, which would push every other feed out of it.
+            if (tooLarge) call.cancel()
             HttpResponse(r.code, r.request.url.toString(), r.header("Content-Type"), decode(bytes, r.body.contentType()?.charset()), truncated = tooLarge)
         }
     }

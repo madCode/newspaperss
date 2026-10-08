@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -33,6 +34,17 @@ class HttpCacheTest {
             }
             exchange.close()
         }
+        // A site's whole archive in one feed, over the size limit, cacheable like the other.
+        server.createContext("/archive") { exchange ->
+            exchange.responseHeaders.add("ETag", "\"a1\"")
+            exchange.responseHeaders.add("Content-Type", "application/rss+xml")
+            exchange.responseHeaders.add("Cache-Control", "max-age=3600")
+            val item = "<item><title>Post</title><link>https://example.com/p</link><description>${"x".repeat(2000)}</description></item>"
+            val body = ("<rss version=\"2.0\"><channel><title>Archive</title>" + item.repeat((OkHttpHttpClient.MAX_BYTES / item.length + 50).toInt()) + "</channel></rss>").toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            runCatching { exchange.responseBody.use { it.write(body) } }
+            exchange.close()
+        }
         server.start()
     }
 
@@ -50,5 +62,17 @@ class HttpCacheTest {
         assertEquals("the cached copy stands in for the 304", feed, second.body)
         assertEquals(200, second.code)
         assertEquals(first.body, second.body)
+    }
+
+    /** Reading the start of a feed over the limit stores nothing, and leaves the other feeds' copies alone. */
+    @Test
+    fun aFeedOverTheLimitDoesntEmptyTheCache() = runTest {
+        val cache = tmp.newFolder("http")
+        val http = OkHttpHttpClient(OkHttpHttpClient.defaultClient(cache))
+        val base = "http://127.0.0.1:${server.address.port}"
+        http.get("$base/feed")
+        assertTrue(http.getFeed("$base/archive").truncated)
+        http.get("$base/feed")
+        assertEquals("the small feed was revalidated from its cached copy", listOf(null, "\"v1\""), requests)
     }
 }
