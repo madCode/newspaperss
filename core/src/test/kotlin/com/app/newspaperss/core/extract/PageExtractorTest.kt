@@ -139,7 +139,9 @@ class PageExtractorTest {
         val form = """<form action="/session"><input type="email"><input type="password"></form>"""
         fun page(body: String) = "<html><head><title>Story</title></head><body>$body</body></html>"
 
-        assertTrue(PageExtractor.extract(page("<article>$text<div id=\"access-options\">$form</div></article>"), url).paywalled)
+        val offer = "<ul><li><a href=\"/subscriptions/new\">Subscribe for instant access</a></li><li><a href=\"/buy\">Buy this article</a></li></ul>"
+        assertTrue(PageExtractor.extract(page("<article>$text<div id=\"access-options\"><div>$form</div>$offer</div></article>"), url).paywalled)
+        assertFalse("a form to log in and comment", PageExtractor.extract(page("<article>$text<div><h3>Log in to comment</h3>$form</div></article>"), url).paywalled)
         assertFalse("a sign-in form in the site's header", PageExtractor.extract(page("<header>$form</header><article>$text</article>"), url).paywalled)
         assertFalse("one of several articles, as on an index", PageExtractor.extract(page("<article>$text$form</article><article>$text</article>"), url).paywalled)
     }
@@ -157,5 +159,13 @@ class PageExtractorTest {
         assertTrue(page.paywalled)
         assertTrue(page.html, "Games are being decompiled" in page.html)
         assertFalse(page.html, "Episode" in page.html || "committee" in page.html)
+
+        // MemberPress's box holds just the pitch and a login form; the free part is outside, and Readability's pick stays.
+        val intro = (1..10).joinToString("") { "<p>$sentence</p>" }
+        val member = """<html><head><title>Members</title></head><body><main><div class="entry-content">$intro<div class="mp_wrapper">
+            <div class="mepr-unauthorized-message"><p>This premium article is available to paid subscribers.</p></div>
+            <div class="mepr-login-form-wrap"><form><label>Remember Me</label><input type="password"><a href="/login/?action=forgot_password">Forgot Password</a></form></div>
+            </div></div></main></body></html>"""
+        assertTrue(HtmlCleaner.countWords(PageExtractor.extract(member, url).html) >= 150)
     }
 }

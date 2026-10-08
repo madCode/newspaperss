@@ -34,6 +34,20 @@ class ArticleExtractorTest {
     private fun input(feedHtml: String?, mode: ContentMode = ContentMode.AUTO, feedTitle: String = "The Quiet Joy of Reading Slowly") =
         ExtractInput(url, feedTitle, feedHtml, feedAuthor = null, mode = mode)
 
+    /** Shaped like sive.rs: a short post's own address redirects to the page holding all of them. */
+    @Test
+    fun aPostRedirectedToThePageHoldingAllPostsIsItsFeedText() = runTest {
+        val all = "https://example.com/d"
+        val short = "When walking a city, what do different experts notice that you don't? Fun book on this."
+        val allPage = page("<html><body><div><p>${sentence.repeat(40)}</p></div><div><p>$short</p></div></body></html>", finalUrl = all)
+        val http = FakeHttp(mapOf("$all/1290" to allPage, "https://example.com/blog/essay" to page(finalUrl = "https://example.com/blog")))
+        val article = ArticleExtractor(http).extract(ExtractInput("$all/1290", "A post", "<p>$short</p>", null))
+        assertTrue(article.usedFeedContent)
+        assertFalse(article.html.contains("committee"))
+        // A post sent up to a page that doesn't have it (a deleted post, to the blog's front page) isn't one.
+        assertFalse(ArticleExtractor(http).extract(ExtractInput("https://example.com/blog/essay", "", "<p>$short</p>", null)).usedFeedContent)
+    }
+
     /** A blog's day page holds several posts; an untitled one linking to its spot there is only its own text. */
     @Test
     fun aPostLinkingToItsSpotOnADayPageIsItsFeedText() = runTest {

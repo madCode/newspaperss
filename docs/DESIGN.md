@@ -80,16 +80,20 @@ module so it's all unit-tested without Android.
   on a phone), the feed's text goes in with a note saying so; an article that fails entirely still goes in, so a broken
   source gets noticed.
 - **Posts on a shared page.** An item linking to its spot on a page
-  (`05.html#a1`, one of a day's posts on a blog) is just its
-  feed text, when the page has that spot and the item's text: the page
-  holds the day's other posts too.
+  (`05.html#a1`, one of a day's posts on a blog), or whose address
+  redirects up its own path to a page holding all the posts (a microblog's
+  `/d/1291` to `/d`), is just its feed text, when the page has the item's
+  text: the page holds the other posts too. Where a feed links every item
+  to that one page and gives each its own address only as its id, the id
+  is the item's address.
 - **Paid posts.** A post for paying subscribers goes in as its free part,
   with a note saying so. It's known by what the platform puts on the page
   in place of the rest: Ghost's upgrade box, Substack's paywall, the sales
   pitch of MemberPress (a WordPress plugin) or of Passport (Stratechery's),
-  or a sign-in form inside the article (a magazine's own paywall, like New
-  Left Review's). A pitch is removed before Readability runs, and when it
-  shared a box with the free part, that box is the article. Not
+  or a sign-in form inside the article beside an offer to subscribe or buy
+  (a magazine's own paywall, like New Left Review's). Those two pitches are
+  removed before Readability runs, and when Readability then misses the
+  text just above the pitch, that text is the article. Not
   schema.org's `isAccessibleForFree`: metered news sites set it to false
   and serve the whole story. A feed text ending in "Read more" back to the
   post (Substack's paid openings, excerpt feeds) counts as an excerpt

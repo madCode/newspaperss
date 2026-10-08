@@ -18,7 +18,9 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **From you:** how New Left Review's "Changing the Guard" comes out against how it should, whether there's a list of articles to catch regressions, then: use your reading list to grow it and fix what else breaks.
 - **Found:** NLR's paywall went unnoticed and "footnote" (screen-reader text) showed beside each marker; its free articles lost all their notes (kept in a `<footer>`, which Readability and the cleaner drop); small capitals came out lower case ("Tory mps"); a saved link's title carried the author and issue. Across the reading list, run with the new `extractionSweep` tool: Stratechery's and Jane Friedman's paid posts came out as their sales pitch, unmarked; Substack's share and gift buttons and its embedded-post cards' "Read more · 12 likes" got through.
 - **Shipped:** all of the above fixed. The corpus gains NLR, Stratechery, Jane Friedman and Hamilton Nolan, with checks that the notes come along. The reading list itself stays out of the repository.
-- **Left:** a feed over 5 MB and a bot check answering a feed with a 202, both in the backlog.
+- **Then, from you:** comb the web for a more varied set. `tools/sweep-feeds.opml` now lists 46 public feeds picked for variety; running it found a microblog whose posts all link to (or redirect to) the one page holding them all, Substack's site footer in a paid teaser, and newsletter pitches at the end of magazine articles. Fixed. Le Monde, El País, NHK and Tumblr turned the sandbox away, so they're unchecked.
+- **Review:** the fresh-eyes review found the free-part rule could throw away a MemberPress page's free text, a short post opening with a pitch could vanish, the notes check was quadratic on a hostile page, a note could become a paragraph inside a paragraph, "invisible" hid Tailwind's visible text, a log-in-to-comment form counted as a paywall, and the title rule dropped real subtitles. All fixed, each with a test.
+- **Left:** a feed over 5 MB and a bot check answering a feed with a 202, both in the backlog; "send this article for a look", a proposal waiting for you.
 
 ## Tue 6 Oct
 

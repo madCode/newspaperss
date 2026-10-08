@@ -398,6 +398,9 @@ class HtmlCleanerTest {
         assertTrue(html, "Ibid., p. 4." in html)
         assertTrue(html, """href="#note-1"""" in html)
         assertFalse(html, "Example Press" in html)
+        // A note with paragraphs of its own stays a div: a paragraph can't hold one.
+        val long = clean("""<p>$longText<a href="#fn1">1</a></p><footer><div id="fn1"><section><p>One.</p><p>Two.</p></section></div></footer>""")
+        assertFalse(long, Regex("<p[^>]*>[^<]*<p").containsMatchIn(long))
     }
 
     /** Small capitals are written in lower case and styled; "us" set as small capitals is the US. */
@@ -424,8 +427,12 @@ class HtmlCleanerTest {
         )) {
             assertEquals(button, "<p>$longText</p>".trim(), clean("<p>$longText</p>$button").trim())
         }
-        val ownLink = """<p><a href="https://www.example.com/p/another-post">Another post</a></p>"""
-        assertTrue("a link of the author's own stays", "Another post" in clean("<p>$longText</p>$ownLink"))
+        for (own in listOf(
+            """<p><a href="https://www.example.com/p/another-post">Another post</a></p>""",
+            """<p><a href="https://other.example.com/p/their-post/comments">A lively thread on their post</a></p>""",
+        )) assertTrue("a link of the author's own stays", "post" in clean("<p>$longText</p>$own"))
+        val chart = """<div><a href="https://www.example.com/subscribe"><img src="https://www.example.com/chart.png"></a></div>"""
+        assertTrue("an image that links somewhere stays", "chart.png" in clean("<p>$longText</p>$chart"))
     }
 
     /** Substack's card for another post keeps its title and summary but not its button or likes. */
@@ -446,6 +453,31 @@ class HtmlCleanerTest {
             """<ul><li>Weekly news</li><li>The archive</li></ul><h2><a href="https://example.com/join">Subscribe now.</a></h2></div>""" +
             """<div><div><a href="https://example.com/login/?action=forgot_password">Forgot Password</a></div></div>"""
         assertEquals("<div><p>The free part.</p></div>", clean("<div><p>The free part.</p></div>$pitch"))
+        // A short post that opens with a pitch is still a post.
+        val post = "<div><p>Consider becoming a paid subscriber to support my work.</p>" + "<p>${"A paragraph of the post itself, about walking. ".repeat(3)}</p>".repeat(4) + "</div>"
+        assertTrue(clean(post), "about walking" in clean(post))
+    }
+
+    /** Substack's site footer, which a paid post's short free part lets into Readability's pick. */
+    @Test
+    fun aSitesFooterGoes() {
+        val footer = """<div class="footer-wrap publication-footer"><div class="footer-terms"><a href="https://substack.com/privacy">Privacy</a> ∙ """ +
+            """<a href="https://substack.com/tos">Terms</a></div><div><a href="https://substack.com/signup">Start your Substack</a>""" +
+            """<a href="https://substack.com/app/app-store-redirect">Get the app</a></div></div>"""
+        assertEquals("<p>$longText</p>".trim(), clean("<p>$longText</p>$footer").trim())
+    }
+
+    /** A magazine's line asking for sign-ups, at the end of an article or in a box within it. */
+    @Test
+    fun aNewsletterPitchGoes() {
+        for (pitch in listOf(
+            """<p><em>Enjoying</em> <a href="https://n.example/">Nautilus</a><em>? Subscribe to our free</em> <a href="https://n.example/newsletter/">newsletter</a>.</p>""",
+            """<div><div>🌘</div><div><a href="https://m.example/signup/">Subscribe</a> to Example Media to get The Abstract, our newsletter about science news.</div></div>""",
+        )) {
+            assertEquals(pitch, "<p>$longText</p>".trim(), clean("<p>$longText</p>$pitch").trim())
+        }
+        val aboutNewsletters = "<p>I subscribe to a newsletter about birds, and it changed how I walk.</p>"
+        assertTrue("an author's own sentence about a newsletter stays", "birds" in clean("<p>$longText</p>$aboutNewsletters"))
     }
 
     @Test

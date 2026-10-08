@@ -253,16 +253,19 @@ object HtmlCleaner {
      * short note with its link back is.
      */
     internal fun keepFootnoteContainers(root: Element) {
-        for (box in root.select("footer, aside")) {
-            val ids = box.select("[id]").map { it.id() }.toSet()
-            if (ids.isEmpty()) continue
-            val targets = root.select("a[href^=#]").filter { link ->
-                link.attr("href").drop(1) in ids && link.text().trim().length <= FOOTNOTE_MARKER_MAX && link.parents().none { it === box }
-            }.map { it.attr("href").drop(1) }.toSet()
+        val boxes = root.select("footer, aside")
+        if (boxes.isEmpty()) return
+        // Once for the page, not per box: a hostile page can have thousands of both.
+        val markers = root.select("a[href^=#]").filter { it.text().trim().length <= FOOTNOTE_MARKER_MAX }
+            .groupBy { it.attr("href").drop(1) }
+        for (box in boxes) {
+            val targets = box.select("[id]").map { it.id() }.filter { id ->
+                markers[id].orEmpty().any { link -> link.parents().none { it === box } }
+            }.toSet()
             if (targets.isEmpty()) continue
             box.tagName("div")
             for (note in box.select("div[id]")) {
-                if (note.id() in targets && note.children().none { it.tagName() in BLOCK_TAGS }) note.tagName("p")
+                if (note.id() in targets && note.select("*").all { it === note || it.tagName() in INLINE_TAGS }) note.tagName("p")
             }
         }
     }
@@ -361,9 +364,8 @@ object HtmlCleaner {
             val text = el.text().trim()
             val words = text.split(WHITESPACE).size
             if (words <= BOILERPLATE_MAX_WORDS && BOILERPLATE.containsMatchIn(text) || words <= PITCH_MAX_WORDS && isPitch(el, text)) {
-                // A paywall's pitch opens its box: what follows in it (what subscribers get, a login) goes too.
-                val box = el.parent()?.takeIf { it !== body && it.tagName() == "div" && it.firstElementChild()?.let { c -> c === el || c.tagName() == "hr" && c.nextElementSibling() === el } == true }
-                if (box != null && SUBSCRIBE_PITCH.containsMatchIn(text) && countWords(box) <= PAYWALL_BOX_MAX_WORDS) box.remove() else el.remove()
+                val box = el.parent()?.takeIf { SUBSCRIBE_PITCH.containsMatchIn(text) && isPaywallBox(it, el, body) }
+                (box ?: el).remove()
             }
         }
     }
@@ -383,8 +385,11 @@ object HtmlCleaner {
     private fun removeSiteButtons(body: Element) {
         for (link in body.select("p > a[href], div > a[href]")) {
             val p = link.parent() ?: continue
-            if (!p.isAttached() || p.text().trim() != link.text().trim()) continue
-            if (SITE_ACTION.containsMatchIn(link.attr("href"))) p.remove()
+            val label = link.text().trim()
+            // Not an image that links somewhere: it has no label to match.
+            if (!p.isAttached() || label.isEmpty() || p.text().trim() != label) continue
+            val href = link.attr("href")
+            if (SITE_ACTION.containsMatchIn(href) || COMMENTS_LINK.containsMatchIn(href) && "comment" in label.lowercase()) p.remove()
         }
     }
 
@@ -396,9 +401,26 @@ object HtmlCleaner {
         for (card in body.select("a:has(div)")) {
             card.select("div, span").filter { el ->
                 val text = el.text().trim()
-                el.isAttached() && (CARD_CTA.matches(text) || CARD_META.matches(text)) && el.select("div").size <= 1
+                el.isAttached() && text.length <= CARD_LINE_MAX && (CARD_CTA.matches(text) || CARD_META.matches(text)) && el.select("div").size <= 1
             }.forEach { it.remove() }
         }
+    }
+
+    /**
+     * Whether [box], opened by the pitch [pitch], is a paywall's box: the pitch alone, or with what
+     * subscribers get and a link to subscribe or log in, nothing longer than a line. A short post
+     * that opens with a pitch isn't.
+     */
+    private fun isPaywallBox(box: Element, pitch: Element, body: Element): Boolean {
+        if (box === body || box.tagName() != "div" || countWords(box) > PAYWALL_BOX_MAX_WORDS) return false
+        // Only a rule or an emoji before the pitch.
+        val before = box.children().takeWhile { it !== pitch }
+        if (before.size == box.children().size || before.any { it.selectFirst("img") != null || LETTER_OR_DIGIT.containsMatchIn(it.text()) }) return false
+        // Just the pitch and a decoration (404 Media's moon).
+        if (box.children().last() === pitch) return true
+        val lines = box.select("p, li, h2, h3, h4").filter { it !== pitch }
+        return lines.all { countWords(it) <= PAYWALL_BOX_LINE_MAX_WORDS } &&
+            box.select("a").any { it !== pitch && pitch.select("a").none { a -> a === it } && PAYWALL_LINK.containsMatchIn(it.text()) }
     }
 
     private fun isPitch(el: Element, text: String): Boolean {
@@ -794,6 +816,8 @@ object HtmlCleaner {
     private const val BOILERPLATE_MAX_WORDS = 12
     private const val PITCH_MAX_WORDS = 40
     private const val PAYWALL_BOX_MAX_WORDS = 150
+    private const val PAYWALL_BOX_LINE_MAX_WORDS = 25
+    private const val CARD_LINE_MAX = 120
 
     private val REMOVE_TAGS = setOf(
         "script", "style", "noscript", "iframe", "object", "embed", "applet", "form", "input", "button",
@@ -823,15 +847,16 @@ object HtmlCleaner {
         "ad", "ads", "advert", "advertisement", "adsbygoogle", "promo", "promotion", "newsletter", "subscribe",
         "subscription", "signup", "share", "sharing", "social", "related", "recommended", "recommendations",
         "comments", "comment", "sidebar", "popup", "modal", "cookie", "cookies", "banner", "sponsored",
-        "outbrain", "taboola", "breadcrumb", "breadcrumbs", "toolbar",
+        "outbrain", "taboola", "breadcrumb", "breadcrumbs", "toolbar", "footer",
     )
     private val SCREEN_READER_ONLY = setOf(
         "screen-reader-text", "screen-reader-only", "sr-only", "sr-text", "visually-hidden", "visuallyhidden", "a11y-hidden",
         // Foundation's.
         "show-for-sr",
     )
-    // Not shown on screen at all: Bootstrap's and Foundation's "invisible", and text for printing only.
-    private val HIDDEN_ON_SCREEN = setOf("invisible", "show-for-print", "print-only")
+    // Text for printing only. Not "invisible": Tailwind's "invisible md:visible" is shown on wider
+    // screens, and scripts reveal elements marked so as the page scrolls.
+    private val HIDDEN_ON_SCREEN = setOf("show-for-print", "print-only")
     private val SMALL_CAPS = setOf("small-caps", "smallcaps")
     private val SMALL_CAPS_STYLE = Regex("font-variant(-caps)?\\s*:\\s*(all-)?small-caps", RegexOption.IGNORE_CASE)
     // Headings that name a site's box of links, never a section of the article itself. "Related" and
@@ -867,6 +892,10 @@ object HtmlCleaner {
     // Wrappers that can hold just an image, and blocks a <figure> may go in.
     private val SOLE_IMAGE_WRAPPERS = setOf("a", "p", "div")
     private val FIGURE_PARENTS = setOf("div", "blockquote", "li", "dd", "td", "th")
+    // What a <p> may hold, for a note turned into one.
+    private val INLINE_TAGS = setOf(
+        "a", "em", "i", "strong", "b", "u", "s", "span", "sup", "sub", "small", "code", "cite", "abbr", "q", "br", "mark", "time", "img",
+    )
     private val BLOCK_TAGS = setOf(
         "p", "div", "figure", "ul", "ol", "dl", "blockquote", "pre", "table", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
     )
@@ -880,16 +909,21 @@ object HtmlCleaner {
         RegexOption.IGNORE_CASE,
     )
 
+    private val LETTER_OR_DIGIT = Regex("[\\p{L}\\p{N}]")
+    private val PAYWALL_LINK = Regex("subscribe|sign up|join|log ?in|forgot", RegexOption.IGNORE_CASE)
+
     // Substack's share, subscribe and comment buttons and a login's "forgot password", by where they go.
-    private val SITE_ACTION = Regex("[?&]action=(share|forgot_password|lostpassword)\\b|/subscribe(\\?|$)|/p/[^/?#]+/comments(\\?|$)")
+    private val SITE_ACTION = Regex("[?&]action=(share|forgot_password|lostpassword)\\b|/subscribe(\\?|$)")
+    // Only with a label saying so: a link roundup can point at another post's discussion.
+    private val COMMENTS_LINK = Regex("/p/[^/?#]+/comments(\\?|$)")
     private val CARD_CTA = Regex("read more|read full story|continue reading", RegexOption.IGNORE_CASE)
     private val CARD_META = Regex(".{0,40}·\\s*\\d[\\d,.]*k?\\s+likes?\\b.*", RegexOption.IGNORE_CASE)
 
     // Substack's own wording anywhere in the block; the rest only as the block's opening.
     private val SUBSCRIBE_PITCH = Regex(
-        "consider becoming a (free or )?paid subscriber|is a reader-supported publication|" +
+        "consider becoming a (free or )?paid subscriber|is a reader-supported publication|subscribe to our (free )?newsletter|" +
             "subscribe (for free )?to receive new posts and support|" +
-            "^(subscribe to .{1,60} to keep reading|this post is for (paid |paying )?subscribers|" +
+            "^(subscribe to .{1,60} to keep reading|subscribe to .{1,60}\\bnewsletter\\b|this post is for (paid |paying )?subscribers|" +
             "this (premium )?(article|post|story) is (only )?available (only )?to (paid |paying )?(subscribers|members)|" +
             "([^.!?]{1,30}[.!?] )?subscribe to [^.!?]{1,60}:$)",
         RegexOption.IGNORE_CASE,

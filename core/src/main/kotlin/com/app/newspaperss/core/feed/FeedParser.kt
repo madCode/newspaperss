@@ -38,8 +38,27 @@ object FeedParser {
      */
     fun parse(body: String, feedUrl: String): Feed {
         val text = body.trimStart('﻿', ' ', '\t', '\r', '\n')
-        return if (text.startsWith("{")) parseJson(text, feedUrl) else parseXml(text, feedUrl)
+        val feed = if (text.startsWith("{")) parseJson(text, feedUrl) else parseXml(text, feedUrl)
+        return feed.copy(items = ownAddresses(feed.items))
     }
+    /**
+     * Gives each item of a microblog its own address: some link every entry to the one page that
+     * holds them all (sive.rs/d), with the entry's own page only in its id (sive.rs/d/1291). That
+     * page would be fetched as each entry's article, and the entries taken for one story. Only an
+     * id on the same site, and only where items share a link.
+     */
+    private fun ownAddresses(items: List<FeedItem>): List<FeedItem> {
+        val shared = items.groupingBy { it.url }.eachCount().filterValues { it > 1 }.keys
+        if (shared.isEmpty()) return items
+        return items.map { item ->
+            val id = item.guid
+            val sameSite = runCatching { host(URI(id)) == host(URI(item.url)) }.getOrDefault(false)
+            if (item.url in shared && id != item.url && id.startsWith("http") && sameSite) item.copy(url = id) else item
+        }
+    }
+
+    private fun host(uri: URI) = uri.host?.lowercase()?.removePrefix("www.")
+
 
     /** True if [body] looks like a feed rather than an HTML page. */
     fun looksLikeFeed(body: String): Boolean {

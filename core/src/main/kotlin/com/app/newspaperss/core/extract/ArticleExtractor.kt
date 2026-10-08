@@ -237,9 +237,22 @@ class ArticleExtractor(private val http: HttpClient) {
         // A tracking tag (#ref=rss) names nothing on the page. Searched before parsing: pages can be megabytes.
         // The whole page, not the extracted article: extraction may settle on a longer entry than this one.
         val anchoredText = response.body.takeIf {
-            fragment.isNotEmpty() && Regex("""\b(?:id|name)\s*=\s*["']?${Regex.escape(fragment)}["'\s>]""").containsMatchIn(it)
+            fragment.isNotEmpty() && Regex("""\b(?:id|name)\s*=\s*["']?${Regex.escape(fragment)}["'\s>]""").containsMatchIn(it) ||
+                redirectedUp(input.url, response.finalUrl)
         }?.let { normalized(Jsoup.parse(it).text()) }
         return PageResult.Fetched(content, HtmlCleaner.clean(content.html, response.finalUrl, title), response.finalUrl, anchoredText)
+    }
+
+    /**
+     * The address sent on to a page up its own path, on the same site: a microblog's post
+     * (sive.rs/d/1291) answered by the page holding all of them (sive.rs/d). Like a spot on a
+     * page, the item is then its feed text, if the page has it.
+     */
+    private fun redirectedUp(requested: String, final: String): Boolean {
+        val from = runCatching { URI(requested) }.getOrNull() ?: return false
+        val to = runCatching { URI(final) }.getOrNull() ?: return false
+        val path = to.path.orEmpty().trimEnd('/')
+        return from.host.equals(to.host, ignoreCase = true) && from.path.orEmpty().trimEnd('/').startsWith("$path/")
     }
 
     private fun unusable(response: HttpResponse): PageResult.Failed? {

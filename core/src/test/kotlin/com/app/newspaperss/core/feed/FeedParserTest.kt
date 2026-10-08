@@ -90,6 +90,22 @@ class FeedParserTest {
         assertEquals(Instant.parse("2026-09-01T10:00:00Z"), e.published)
     }
 
+    /** Shaped like sive.rs: every short post links to the page holding them all; its own page is its id. */
+    @Test
+    fun microblogEntriesSharingOneLinkTakeTheirIds() {
+        fun entry(n: Int, id: String) = """<entry><id>$id</id><title>Post $n</title><link rel="alternate" href="https://m.example/d"/>
+            <content type="html">&lt;p&gt;Short post $n.&lt;/p&gt;</content></entry>"""
+        val atom = """<feed xmlns="http://www.w3.org/2005/Atom"><title>M</title>
+            ${entry(1, "https://m.example/d/1291")}${entry(2, "https://www.m.example/d/1290")}${entry(3, "tag:m.example,2026:3")}${entry(4, "https://elsewhere.example/4")}</feed>"""
+        val urls = FeedParser.parse(atom, "https://m.example/feed.xml").items.map { it.url }
+        assertEquals(listOf("https://m.example/d/1291", "https://www.m.example/d/1290", "https://m.example/d", "https://m.example/d"), urls)
+
+        val ownLinks = atom.replace(Regex("<link rel=\"alternate\" href=\"https://m.example/d\"/>(\\s*)<content type=\"html\">&lt;p&gt;Short post (\\d)")) {
+            "<link rel=\"alternate\" href=\"https://m.example/p/${it.groupValues[2]}\"/>${it.groupValues[1]}<content type=\"html\">&lt;p&gt;Short post ${it.groupValues[2]}"
+        }
+        assertEquals("a link of its own stays", "https://m.example/p/1", FeedParser.parse(ownLinks, "https://m.example/feed.xml").items.first().url)
+    }
+
     @Test
     fun rdf() {
         val rdf = """

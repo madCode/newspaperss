@@ -63,6 +63,7 @@ internal object PageExtractor {
     // A sign-in form in the article itself, where a site with its own paywall (a magazine's) puts it
     // after the free part. Only in a lone <article>: a site's header or a modal can hold one anywhere.
     private const val SIGN_IN_IN_ARTICLE = "input[type=password]"
+    private const val SIGN_IN_BOX_MAX_WORDS = 300
 
     private val NOT_MAIN_IMAGE = setOf("logo", "avatar", "headshot", "author", "profile", "icon", "icons")
     private const val JSON_LD_PREFERENCE_RATIO = 1.5
@@ -79,9 +80,12 @@ internal object PageExtractor {
         removeOverlays(doc)
         // Not schema.org's isAccessibleForFree: metered sites set it false and serve the whole story.
         // After the overlays go, so a sign-in dialog inside the article doesn't count.
-        val paywalled = doc.selectFirst(PAYWALL) != null || doc.select("article").singleOrNull()?.selectFirst(SIGN_IN_IN_ARTICLE) != null
+        val paywalled = doc.selectFirst(PAYWALL) != null || signInPaywall(doc)
         val pitches = doc.select(PAYWALL_PITCH)
-        val freePart = pitches.firstOrNull()?.parent()
+        // What comes before the pitch in its box, the free part, if the box holds it at all.
+        val freePart = pitches.firstOrNull()?.let { pitch ->
+            Element("div").apply { pitch.parent()?.children()?.takeWhile { it !== pitch }?.forEach { appendChild(it.clone()) } }
+        }
         pitches.remove()
         HtmlCleaner.removeScreenReaderOnly(doc.body())
         // Readability drops every <footer> and <aside>, footnotes too.
@@ -115,9 +119,7 @@ internal object PageExtractor {
             else -> listOfNotNull(fromReadability, fromJsonLd).maxByOrNull { it.wordCount }
                 ?: PageContent(doc.body().html(), title, author, "body", HtmlCleaner.countWords(doc.body()))
         }
-        // With next to nothing free, Readability can pass over the free part for a sidebar: the free
-        // part is what shared the pitch's box. Found by its end, the text just above the pitch, as
-        // the box can also hold the post's header.
+        // With next to nothing free, Readability can pass over the free part for a sidebar.
         val freeText = freePart?.text()?.trim().orEmpty()
         val withFreePart = if (freeText.isNotEmpty() && freeText.takeLast(FREE_PART_PROBE) !in Jsoup.parseBodyFragment(chosen.html).text()) {
             candidate("paywall", freePart!!.html()) ?: chosen
@@ -181,6 +183,18 @@ internal object PageExtractor {
     }
 
     /**
+     * A sign-in form in a lone `<article>` with an offer to subscribe or buy around it: a
+     * magazine's own paywall. A form to log in and comment has no such offer.
+     */
+    private fun signInPaywall(doc: Document): Boolean {
+        val article = doc.select("article").singleOrNull() ?: return false
+        val field = article.selectFirst(SIGN_IN_IN_ARTICLE) ?: return false
+        return field.parents().takeWhile { it !== article }
+            .takeWhile { HtmlCleaner.countWords(it) <= SIGN_IN_BOX_MAX_WORDS }
+            .any { PAYWALL_OFFER.containsMatchIn(it.text()) }
+    }
+
+    /**
      * The page's title: its og:title, JSON-LD headline, twitter:title or `<title>`, without a
      * trailing site or author name. Where the og:title wraps the page's own headline in more
      * ("Donald Sassoon, Changing the Guard, NLR 160"), the headline alone.
@@ -191,24 +205,30 @@ internal object PageExtractor {
             .firstOrNull { it.isNotBlank() } ?: return null
         // Microdata only to shorten a title: a page's first itemprop=headline can be a related story's.
         val headline = (jsonLdHeadline ?: microdataHeadline(doc))?.replace(WHITESPACE, " ")?.trim()
-        if (headline != null && wrapsHeadline(raw.replace(WHITESPACE, " ").trim(), headline)) return headline
+        // Who wrote it, as the page names them anywhere: the og:title may name them where nothing else does.
+        val names = listOf(siteName, author) + doc.select("meta[itemprop=author], meta[name=author]").map { it.attr("content") } + url
+        if (headline != null && wrapsHeadline(raw.replace(WHITESPACE, " ").trim(), headline, names)) return headline
         return cleanTitle(raw, siteName, url, author)
     }
 
-    private fun microdataHeadline(doc: Document): String? = doc.selectFirst("[itemprop=headline]")
-        ?.let { if (it.tagName() == "meta") it.attr("content") else it.text() }
+    // The page's own heading only: a related story's card can carry itemprop=headline too.
+    private fun microdataHeadline(doc: Document): String? = doc.selectFirst("h1[itemprop=headline]")?.text()
 
     /**
-     * Whether [title] is [headline] with more around it, set off by punctuation. A headline cut
-     * short (JSON-LD's is often limited to 110 characters) runs on in [title] without any, so it
-     * doesn't count.
+     * Whether [title] is [headline] with more around it, set off by punctuation, and the more names
+     * the author, the site or the address ("Donald Sassoon, Changing the Guard, NLR 160"): not a
+     * subtitle ("The Long Goodbye: Britain after Brexit"), and not a headline cut short (JSON-LD's
+     * is often limited to 110 characters), which runs on without punctuation.
      */
-    private fun wrapsHeadline(title: String, headline: String): Boolean {
+    private fun wrapsHeadline(title: String, headline: String, names: List<String>): Boolean {
         val at = title.indexOf(headline)
         if (at < 0 || title.length == headline.length || headline.split(' ').size < 2) return false
         val before = title.substring(0, at)
         val after = title.substring(at + headline.length)
-        return (before.isEmpty() || WRAPPER_BEFORE.matches(before)) && (after.isEmpty() || WRAPPER_AFTER.matches(after))
+        if (!((before.isEmpty() || WRAPPER_BEFORE.matches(before)) && (after.isEmpty() || WRAPPER_AFTER.matches(after)))) return false
+        val extra = key(before + after)
+        val hostWords = runCatching { URI(names.last()).host }.getOrNull().orEmpty().lowercase().split('.', '-').filter { it.length > 2 && it !in HOST_NOISE }
+        return names.dropLast(1).map(::key).any { it.length > 3 && it in extra } || hostWords.any { it in extra }
     }
 
     /** Removes a trailing site or author name: "E-reader - Wikipedia" becomes "E-reader". */
@@ -277,6 +297,7 @@ internal object PageExtractor {
     // class/id substrings of cookie and consent banners, including common consent-management plugins.
     private val OVERLAY_MARKERS = listOf("cookie", "consent", "gdpr", "cmplz", "onetrust", "didomi", "usercentrics", "truste")
     private val DIALOG_ROLES = setOf("dialog", "alertdialog")
+    private val PAYWALL_OFFER = Regex("\\bsubscri|\\bbuy\\b|\\bpurchase\\b", RegexOption.IGNORE_CASE)
     private val TITLE_SEPARATORS = Regex("\\s+[|\\-–—:·•]\\s+")
     private val WRAPPER_BEFORE = Regex(".*\\S\\s*[,|\\-–—:·•]\\s+")
     private val WRAPPER_AFTER = Regex("\\s*[,|\\-–—:·•]\\s+\\S.*")
