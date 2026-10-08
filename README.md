@@ -122,7 +122,8 @@ The newest debug build is always at
 (Android 8 or later). It installs beside a release build, and Settings shows
 which build it is. The [release page](https://github.com/madCode/newspaperss/releases/tag/latest-debug)
 names the newest build, its commit and date, and has the same file under the
-build's number.
+build's number. Today says when a newer build is out (the app asks GitHub at
+most every three hours).
 
 ## Building
 
@@ -145,4 +146,6 @@ The app includes [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
 (MIT), which run the podcast's voice. That voice,
 [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (Apache 2.0), is
 downloaded when chosen, with espeak-ng's pronunciation data (GPL 3.0);
-the four voice samples shipped in the app were made with it.
+the four voice samples shipped in the app were made with it. The page
+turning in Listen's pause between articles is from Kenney's
+[RPG Audio](https://kenney.nl/assets/rpg-audio) (CC0).

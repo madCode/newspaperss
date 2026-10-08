@@ -69,6 +69,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import com.app.newspaperss.settings.ListenVoice
 import com.app.newspaperss.listen.MediaPlayerAudio
+import com.app.newspaperss.listen.MediaPlayerChime
 import com.app.newspaperss.listen.PodcastSpeaker
 
 /** Manual dependency injection: one instance of each service for the app's lifetime. */
@@ -88,6 +89,7 @@ class AppContainer(
     // pointed at its own server, since the real files are 325 MB and come from Hugging Face.
     private val newKokoroDownload: (KokoroInstall) -> KokoroDownload =
         { KokoroDownload(OkHttpClient.Builder().readTimeout(1, TimeUnit.MINUTES).build(), it) },
+    installedBuild: Int? = DebugUpdates.buildOf(runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()),
 ) {
     private val editionsDir = File(context.filesDir, "editions")
     /** For work that must outlive the screen that started it, like saving a shared link. */
@@ -121,6 +123,7 @@ class AppContainer(
     }
     val editionBuilder = EditionBuilder(db, content, editionsDir, cover = CoverRenderer()::render, retiring = feedMoves::retiringIds)
     val settings = SettingsStore(context)
+    val debugUpdates = DebugUpdates(http, context.getSharedPreferences("debug-updates", Context.MODE_PRIVATE), installedBuild)
     val editionNotes = EditionNotes(db, File(context.filesDir, "notes"))
     private val folderDelivery = FolderDelivery(context.contentResolver)
     val editionRun = EditionRun(settings, feedSync, editionBuilder, editions, folderDelivery, notifier,
@@ -153,6 +156,7 @@ class AppContainer(
             listenSpeaker, listenProgress, open = { ListenBook.open(editions, it) }, appScope,
             savedSpeed = settings.settings.map { it.listenSpeed }.distinctUntilChanged(),
             saveSpeed = { speed -> settings.update { it.copy(listenSpeed = speed) } },
+            chime = MediaPlayerChime(context),
         )
     }
     val listen: ListenPlayer by listenMade

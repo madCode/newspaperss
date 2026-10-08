@@ -7,6 +7,9 @@ on:
   pull_request:
     paths:
       - 'app/src/androidTest/**'
+      - 'epubsink/**'
+      - 'app/src/main/java/com/app/newspaperss/delivery/**'
+      - 'app/src/main/res/xml/file_paths.xml'
       - 'app/src/sharedTest/**'
       - 'app/src/main/java/com/app/newspaperss/ui/**'
       - 'core/src/main/kotlin/**/epub/**'
@@ -23,11 +26,11 @@ jobs:
   device:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: '21'
           distribution: temurin
@@ -50,11 +53,13 @@ jobs:
           # The animations a test would otherwise wait on, and a window that never shows.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest
+          # :epubsink is a second app, so the delivery test has another process to
+          # hand an edition to. It is installed, never shipped.
+          script: ./gradlew :epubsink:installDebug :app:connectedDebugAndroidTest
 
       - name: Keep the report when it fails
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: device-test-report
           path: app/build/reports/androidTests/

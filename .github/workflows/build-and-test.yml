@@ -16,13 +16,13 @@ jobs:
     # A build takes about four minutes; a hung test would otherwise hold a PR for GitHub's six hours.
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The build runs plugins and dependencies' code: it gets no token to push with.
           persist-credentials: false
           # Changed-line coverage diffs against the base branch, which needs a merge base.
           fetch-depth: 0
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: '21'
           distribution: temurin
@@ -31,21 +31,47 @@ jobs:
         run: ./gradlew build koverXmlReport koverHtmlReport koverVerify
       - name: Coverage of the lines this branch changed
         if: github.event_name == 'pull_request'
-        # Through the environment, not interpolated into the command: a branch name is not
-        # guaranteed to be free of shell metacharacters.
+        # diff-cover, as rss-to-e-reader uses: one tool rather than one of ours to maintain.
+        # --src-roots is needed because kover names packages, not paths, so without it every
+        # diff reads as "no lines with coverage information" and the check can never fail.
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: python3 tools/changed-line-coverage.py 80 "origin/$BASE_REF"
+        run: |
+          # Without pipefail the exit code below comes from tee, and a coverage failure passes.
+          set -o pipefail
+          pipx install diff-cover || pip install --quiet diff-cover
+          roots="app/src/main/java core/src/main/kotlin"
+          # Below 20 changed lines the percentage describes the denominator, not the tests: one
+          # uncovered default argument in a four-line diff is 75%. Reported, not enforced.
+          # grep exits 1 when it filters everything out, which pipefail would turn into a
+          # failed step on any PR that changes no production Kotlin.
+          changed=$(git diff --numstat "origin/$BASE_REF...HEAD" -- '*.kt' \
+            | { grep -vE '/(test|androidTest|sharedTest)/' || true; } \
+            | awk '{ s += $1 } END { print s + 0 }')
+          if [ "${changed:-0}" -lt 20 ]; then
+            echo "Under 20 changed Kotlin lines outside tests: reporting without enforcing."
+            diff-cover build/reports/kover/report.xml --compare-branch="origin/$BASE_REF" --src-roots $roots || true
+          else
+            diff-cover build/reports/kover/report.xml --compare-branch="origin/$BASE_REF" \
+              --src-roots $roots --fail-under=80 | tee /tmp/diffcover.txt
+            # Kover names packages, not paths. If --src-roots ever stops matching, diff-cover
+            # finds nothing and passes everything: a check that cannot fail. With this many
+            # changed lines it should have found some, so say so rather than go quiet.
+            if grep -q "No lines with coverage information" /tmp/diffcover.txt; then
+              echo "::error::$changed Kotlin lines changed but diff-cover matched none of them. --src-roots is probably wrong for this layout."
+              exit 1
+            fi
+          fi
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: newspaperss-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
       - name: Upload test and coverage reports
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: reports
           path: |
@@ -70,7 +96,7 @@ jobs:
       group: latest-debug
       cancel-in-progress: true
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: newspaperss-debug-apk
       - name: Update the latest-debug release

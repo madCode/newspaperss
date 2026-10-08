@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "newspaperss"
 include(":app", ":core")
+include(":epubsink")

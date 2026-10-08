@@ -435,6 +435,10 @@ whose Kindle and KOReader answers ask for more on the same page).
 - **Today** (home): when the next edition is due, how many starred articles
   will go in the next one (only when some will), and the latest edition's
   card. Tapping anywhere on the card opens the edition.
+  - On a debug build from CI, a line under the masthead says when a newer
+    test build is out, with a link to download it. The app asks GitHub when
+    it comes to the front, at most every three hours; a local or release
+    build never asks.
   - The card previews what's inside, as the book's contents page opens: the
     first three headlines in order, each with its source (★ if you starred
     it) and reading time, then "and N more". A failed edition shows none:
@@ -491,6 +495,12 @@ whose Kindle and KOReader answers ask for more on the same page).
     caption or alt text ("Image: Tait's table of knots"), or "An image."
     The date, reading time, link to the original and "Next" line aren't
     read; nor are footnote markers.
+  - Between one article and the next, in either voice, a pause of about
+    4 seconds: a moment's quiet, a soft breath of sound with a page
+    turning, then the next article, so the listener can change contexts.
+    Skipping with ⏭ has no pause. During it, ↶ goes back to the end of
+    the article just heard and ↷ starts the next at once; pausing stops
+    it, and Play starts the next article.
   - It reads a sentence at a time. ↶ goes back to the start of the
     sentence, or the one before if it has only just started; ↷ skips one;
     ⏮ ⏭ move by article (⏮ restarts the article after its first few
