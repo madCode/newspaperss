@@ -89,8 +89,11 @@ class ListenPlayerTest {
         assertEquals(1, chime.rung)
         assertTrue("the next article waits for the chime", speaker.queue.isEmpty())
         assertEquals(ListenPosition(1, 0), state.at)
+        // The screen leaves the last article's notes out of the pause.
+        assertTrue(state.between)
         chime.end()
         assertEquals("B one.", speaker.queue.first().text)
+        assertFalse(state.between)
     }
 
     @Test
@@ -124,6 +127,28 @@ class ListenPlayerTest {
         player.back()
         assertEquals("A three.", speaker.queue.first().text)
         assertEquals(ListenPosition(0, 2), state.at)
+    }
+
+    @Test
+    fun backDuringThePausePassesOverAnEmptyPageToTheArticleJustHeard() {
+        // A video-only article between them, passed over on the way.
+        val withVideo = listOf(script("A one.", "A two."), ListenScript(emptyList(), null), script("C one."))
+        val book: suspend (Long) -> ListenBook = { id ->
+            ListenBook(
+                id, "Thursday Morning Edition",
+                listOf(ListenPage("A", "Source A", 1.0), ListenPage("Video", "Source V", 1.0), ListenPage("C", "Source C", 1.0)),
+                read = { withVideo.getOrNull(it) }, onClose = {},
+            )
+        }
+        val held = HeldChime()
+        val p = ListenPlayer(speaker, progress, open = book, scope = TestScope(UnconfinedTestDispatcher()), now = { clock }, chime = held)
+        progress.set(8, ListenPosition(0, 1))
+        p.start(8)
+        speaker.sayNext() // "A two."
+        assertEquals(ListenPosition(2, 0), p.state.value.at)
+        clock = 10_000
+        p.back()
+        assertEquals("A two.", speaker.queue.first().text)
     }
 
     @Test

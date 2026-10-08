@@ -152,7 +152,7 @@ fun ListenScreen(
                 state.editionId == null -> Message("Nothing is playing. Open an edition and tap Listen.")
                 script == null -> Message("Opening…")
                 // Only while playing, as the voice's name: paused, the next article's voice isn't chosen yet.
-                else -> Page(state, script, player, voiceNote.takeIf { state.playing }, textSize)
+                else -> Page(state, script, player, voiceNote.takeIf { state.playing && !state.between }, textSize)
             }
         }
     }

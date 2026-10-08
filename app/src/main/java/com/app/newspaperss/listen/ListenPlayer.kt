@@ -32,6 +32,8 @@ data class ListenState(
     /** The page's language, when the phone has no voice for it and reads it in its own. */
     val missingLanguage: String? = null,
     val error: String? = null,
+    /** In the pause between one article and the next: [at] is already the next one's start. */
+    val between: Boolean = false,
 ) {
     /** About how far in, and how long the whole edition takes, in seconds at normal speed. */
     val secondsIn: Double get() = pages.take(at.page).sumOf { it.minutes * 60 } + secondsInPage
@@ -84,7 +86,9 @@ class ListenPlayer(
     private var turning = false
     private var turns = 0
     /** The pause between articles is playing: the position is already the next article's start. */
-    private var chiming = false
+    private val chiming get() = _state.value.between
+    /** The page the pause came after, for ↶: empty pages may lie between it and [ListenState.at]. */
+    private var pausedAfter = 0
     private var savingSpeed = 0
 
     init {
@@ -154,7 +158,7 @@ class ListenPlayer(
         val current = _state.value
         if (turning) return
         // In the pause, the last thing heard is the article before's end.
-        if (chiming) return move(ListenPosition(current.at.page - 1, Int.MAX_VALUE), play = true)
+        if (chiming) return move(ListenPosition(pausedAfter, Int.MAX_VALUE), play = true)
         val script = current.script ?: return
         val restart = current.playing && now() - lineStartedAt >= BACK_GRACE_MS
         val line = if (restart) current.at.line else current.at.line - 1
@@ -246,6 +250,7 @@ class ListenPlayer(
 
     private fun nextPage(play: Boolean, chimeFirst: Boolean = false) {
         val current = _state.value
+        if (chimeFirst) pausedAfter = current.at.page
         if (current.at.page < current.pages.lastIndex) move(ListenPosition(current.at.page + 1, 0), play, chimeFirst) else finish()
     }
 
@@ -301,10 +306,9 @@ class ListenPlayer(
         }
         // A pause, skip or stop during the chime moves the generation on, and the chime with it.
         val chimed = generation
-        chiming = true
+        _state.update { it.copy(between = true) }
         chime.play {
             if (generation != chimed || !_state.value.playing) return@play
-            chiming = false
             speakFrom(at.line)
         }
     }
@@ -319,7 +323,7 @@ class ListenPlayer(
     private fun silence() {
         generation++
         queued = -1
-        chiming = false
+        if (_state.value.between) _state.update { it.copy(between = false) }
         chime.stop()
         speaker.stop()
     }

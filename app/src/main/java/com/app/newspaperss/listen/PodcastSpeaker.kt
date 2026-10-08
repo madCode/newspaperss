@@ -223,8 +223,6 @@ class PodcastSpeaker(
     override fun stop() {
         stopAudio()
         _voice.value = null
-        // Not left up through the pause before the next article, which may well have its podcast.
-        _instead.value = null
         phone.stop()
     }
 

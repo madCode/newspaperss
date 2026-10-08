@@ -270,19 +270,6 @@ class PodcastSpeakerTest {
     }
 
     @Test
-    fun theWordAboutThePhonesVoiceGoesWhenItStops() {
-        made(page = 0)
-        speaker.speak(id(0, page = 2), "Rest of World", null, 1f, flush = true)
-        assertEquals(PodcastSpeaker.Instead.NOT_MADE_YET, speaker.instead.value)
-        // The pause before the next article: that one may well have its podcast.
-        speaker.stop()
-        assertNull(speaker.instead.value)
-        // Played again, the article says it once more.
-        speaker.speak(id(0, page = 2), "Rest of World", null, 1f, flush = true)
-        assertEquals(PodcastSpeaker.Instead.NOT_MADE_YET, speaker.instead.value)
-    }
-
-    @Test
     fun theListenPlayerFollowsThePodcastThenReadsTheNextArticleInThePhonesVoice() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val editionsDir = tmp.newFolder("editions")
