@@ -8,6 +8,11 @@ kotlin { jvmToolchain(21) }
 dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.jsoup)
+    // jsoup's nullability annotations are JSpecify's, and jsoup keeps that jar off its
+    // consumers' classpath (provided scope). Kotlin needs to read the annotation on an
+    // inferred jsoup type, so the compiler has to see it: a warning on 2.3, an error from
+    // language version 2.4 (KT-80247). compileOnly, because nothing needs it at runtime.
+    compileOnly(libs.jspecify)
     implementation(libs.readability4j)
     implementation(libs.serialization.json)
     implementation(libs.okhttp)
