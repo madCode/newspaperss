@@ -291,6 +291,10 @@ class MediaPlayerAudio(
     private var speed = 1f
     private var lastMs = -1L
     private var lastAt = 0L
+    /** The player that played to its end, and those still sounding their last moment. */
+    private var finished: MediaPlayer? = null
+    private val lingering = mutableListOf<MediaPlayer>()
+
     /** When the player started, by the clock, and from where in the file: to tell when it has really been heard. */
     private var startedAt = 0L
     private var startedFromMs = 0L
@@ -347,6 +351,7 @@ class MediaPlayerAudio(
             durationMs = p.duration.toLong()
             p.setOnCompletionListener {
                 lastMs = -1
+                finished = p
                 // The player can say it has finished while its last second is still waiting to be
                 // heard, and releasing it for the next piece cuts that off. Judged by the clock,
                 // it stays until the whole file has had time to play.
@@ -408,11 +413,24 @@ class MediaPlayerAudio(
         plays++
         lastMs = -1
         main.removeCallbacks(tick)
-        player?.release()
+        val p = player
         player = null
+        if (p != null && p === finished) {
+            // A piece that played to its end may still be sounding its last moment: the phone's
+            // output runs a little behind the player. It's let go a second later, not now.
+            lingering += p
+            main.postDelayed({ if (lingering.remove(p)) p.release() }, LINGER_MS)
+        } else {
+            p?.release()
+        }
+        finished = null
     }
 
-    override fun release() = stop()
+    override fun release() {
+        stop()
+        lingering.forEach { it.release() }
+        lingering.clear()
+    }
 
     private companion object {
         const val TICK_MS = 50L
@@ -421,6 +439,9 @@ class MediaPlayerAudio(
 
         /** The longest the end of a piece is waited for: a player that stalled mustn't hold Listen up for long. */
         const val MAX_TAIL_MS = 3_000L
+
+        /** How long a finished piece's player is kept once the next has started: more than the phone's output lags. */
+        const val LINGER_MS = 1_000L
         const val MAX_ODDITIES = 30
 
         /** MediaPlayer's info codes an audio file can get, by their constants' names. */

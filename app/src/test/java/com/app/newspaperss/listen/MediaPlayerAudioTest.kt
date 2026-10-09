@@ -139,6 +139,43 @@ class MediaPlayerAudioTest {
     }
 
     @Test
+    fun aFinishedPieceIsLetGoASecondAfterTheNextStarts() {
+        audio.play(piece, 119_000, 1f)
+        idle(1_010)
+        val finished = players.last()
+        audio.play(piece, 0, 1f)
+
+        // Still sounding its last moment while the next begins.
+        assertTrue(shadowOf(finished).state != ShadowMediaPlayer.State.END)
+        idle(1_010)
+        assertEquals(ShadowMediaPlayer.State.END, shadowOf(finished).state)
+        assertTrue(players.last().isPlaying)
+    }
+
+    @Test
+    fun theLastPieceOfAnArticleGetsItsLastMomentTooButReleaseEndsEverything() {
+        audio.play(piece, 119_000, 1f)
+        idle(1_010)
+        val finished = players.last()
+        // The article's end: Listen stops rather than playing on.
+        audio.stop()
+        assertTrue(shadowOf(finished).state != ShadowMediaPlayer.State.END)
+
+        audio.release()
+        assertEquals(ShadowMediaPlayer.State.END, shadowOf(finished).state)
+    }
+
+    @Test
+    fun aPieceStoppedPartWayIsLetGoAtOnce() {
+        audio.play(piece, 0, 1f)
+        idle(1_000)
+        val playing = players.last()
+        audio.play(piece, 5_000, 1f)
+
+        assertEquals(ShadowMediaPlayer.State.END, shadowOf(playing).state)
+    }
+
+    @Test
     fun aFasterSpeedPlaysToo() {
         audio.play(piece, 0, 1.5f)
         idle(1_000)
