@@ -357,12 +357,22 @@ class Media3Audio(private val log: (String) -> Unit = {}, private val newPlayer:
         playing = true
         names = files.map { it.name }
         this.index = index
-        p.setMediaItems(files.map { MediaItem.fromUri(Uri.fromFile(it)) }, index, fromMs)
+        p.setMediaItems(files.map(::item), index, fromMs)
         p.playbackParameters = PlaybackParameters(speed)
         p.prepare()
         p.play()
         main.post(tick)
     }
+
+    /**
+     * A piece without the silence Android's AAC encoder puts before the audio. Unclipped, it's a
+     * pause at every join, and every position runs that far ahead of the line starts kept with
+     * the piece, which count only the speech fed in.
+     */
+    private fun item(file: File) = MediaItem.Builder()
+        .setUri(Uri.fromFile(file))
+        .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(ENCODER_DELAY_MS).build())
+        .build()
 
     override fun stop() {
         plays++
@@ -383,5 +393,12 @@ class Media3Audio(private val log: (String) -> Unit = {}, private val newPlayer:
 
         /** This close to a file's end, it has been heard. */
         const val END_MS = 500L
+
+        /**
+         * The encoder's lead-in: 2048 samples, two frames, at the 24 kHz Kokoro speaks at. The
+         * file doesn't record it (MediaMuxer writes no edit list), so the player can't skip it
+         * by itself. Every piece the encoder kept was two frames longer than its speech.
+         */
+        const val ENCODER_DELAY_MS = 85L
     }
 }

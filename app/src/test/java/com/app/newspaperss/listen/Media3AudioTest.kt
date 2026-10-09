@@ -139,6 +139,8 @@ class Media3AudioTest {
         idle()
 
         assertEquals(pieces.map { Uri.fromFile(it) }, player.items.map { it.localConfiguration!!.uri })
+        // Without the encoder's lead-in, so joins have no pause and positions match the line starts.
+        assertEquals(listOf(85L, 85L, 85L), player.items.map { it.clippingConfiguration.startPositionMs })
         assertEquals(1, player.index)
         assertEquals(1.5f, player.speed)
         assertTrue(player.prepared && player.playing)
