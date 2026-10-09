@@ -123,7 +123,8 @@ class PodcastSpeakerTest {
         made()
         listen()
         speaker.speak(id(0), "Quanta", null, 1f, flush = true)
-        audio.listener!!.onPosition(0, 4_600)
+        // The first piece's last line came and went between two ticks.
+        audio.listener!!.onPosition(0, 2_100)
         audio.listener!!.onPosition(1, 0)
 
         assertEquals(listOf("start ${id(0)}", "start ${id(1)}", "start ${id(2)}", "start ${id(3)}"), heard)
@@ -228,11 +229,12 @@ class PodcastSpeakerTest {
         listen()
         speaker.speak(id(0), "Quanta", null, 1f, flush = true)
         speaker.speak(id(1), "Counting Knots", null, 1f, flush = false)
-        audio.listener!!.onPosition(0, 4_600)
+        audio.listener!!.onPosition(0, 2_100)
         speaker.speak(id(3), "It took a week.", null, 1f, flush = false)
-        // The first piece played through; the second fails to start.
+        // The first piece played through, its last line after the last tick; the second fails to start.
         audio.listener!!.onError(1, "ERROR_CODE_IO_FILE_NOT_FOUND")
 
+        assertEquals("start ${id(2)}", heard.last())
         assertEquals(listOf("It took a week."), phone.said.map { it.text })
         assertEquals(id(3), phone.said.single().id)
     }

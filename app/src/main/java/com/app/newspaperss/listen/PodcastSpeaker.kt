@@ -134,6 +134,8 @@ class PodcastSpeaker(
      */
     private fun audioFailed(index: Int, code: String) {
         val at = playing ?: return
+        // The pieces before it were heard to their end, even a last line too short for a tick.
+        if (index > 0) reach(index - 1, Long.MAX_VALUE / 2)
         val first = pieces.getOrNull(index)?.firstLine ?: 0
         val line = maxOf(reported, at.line, first)
         article?.let { failed += it }

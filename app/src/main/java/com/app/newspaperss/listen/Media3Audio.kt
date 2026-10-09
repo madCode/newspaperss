@@ -56,8 +56,10 @@ class Media3Audio(private val newPlayer: () -> Player) : PodcastAudio {
     private val tick = object : Runnable {
         override fun run() {
             val p = made?.takeIf { playing } ?: return
+            val play = plays
             if (p.isPlaying) listener?.onPosition(p.currentMediaItemIndex, p.currentPosition)
-            main.postDelayed(this, TICK_MS)
+            // A new play in answer has started its own ticks.
+            if (plays == play) main.postDelayed(this, TICK_MS)
         }
     }
 

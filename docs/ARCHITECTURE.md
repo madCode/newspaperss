@@ -273,8 +273,8 @@ flowchart LR
   plays on, and one in the phone's voice is chosen again at the next play
   or jump. A podcast plays through `Media3Audio`: an article's pieces as
   one list for a Media3 player, so they run on unbroken. From the player's
-  piece and position, it reports each line's start by the times kept with
-  each piece, so the player tints and saves sentences the same way. Line ids
+  piece and position, the speaker reports each line's start by the times
+  kept with each piece, so the player tints and saves sentences the same way. Line ids
   (`LineId`) carry the edition, page and line, and the page's line count:
   a podcast made from other lines isn't used. Its `voice` is the name the
   playing screen shows, and `instead` why an article of an edition with a
