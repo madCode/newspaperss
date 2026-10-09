@@ -291,6 +291,9 @@ class MediaPlayerAudio(
     private var speed = 1f
     private var lastMs = -1L
     private var lastAt = 0L
+    /** When the player started, by the clock, and from where in the file: to tell when it has really been heard. */
+    private var startedAt = 0L
+    private var startedFromMs = 0L
     /** Skips and stalls logged since the app started: a phone whose position always lags mustn't fill the log. */
     private var oddities = 0
 
@@ -343,11 +346,15 @@ class MediaPlayerAudio(
             p.prepare()
             durationMs = p.duration.toLong()
             p.setOnCompletionListener {
-                // How far the ticks got before the end: well short of the length means the file's
-                // last words were never heard.
-                log("Playing: $name ended at ${lastMs}ms of ${durationMs}ms")
                 lastMs = -1
-                later { onEnded() }
+                // The player can say it has finished while its last second is still waiting to be
+                // heard, and releasing it for the next piece cuts that off. Judged by the clock,
+                // it stays until the whole file has had time to play.
+                val heardMs = ((SystemClock.elapsedRealtime() - startedAt) * this.speed).toLong()
+                val shortMs = durationMs - startedFromMs - heardMs
+                val waitMs = (shortMs / this.speed).toLong().coerceIn(0, MAX_TAIL_MS)
+                log("Playing: $name ended after ${heardMs}ms of its ${durationMs - startedFromMs}ms" + if (waitMs > 0) "; waiting ${waitMs}ms for the rest" else "")
+                main.postDelayed({ if (plays == play) listener?.onEnded() }, waitMs)
             }
             p.setOnInfoListener { _, what, extra ->
                 log("Playing: $name says ${INFO[what] ?: what} ($extra)")
@@ -371,6 +378,8 @@ class MediaPlayerAudio(
                     // second off. Only the fields set are applied, so this changes the speed alone.
                     if (speed != 1f) p.playbackParams = PlaybackParams().setSpeed(speed)
                     p.start()
+                    startedAt = SystemClock.elapsedRealtime()
+                    startedFromMs = p.currentPosition.toLong()
                     main.post(tick)
                 } catch (e: Exception) {
                     // A speed this phone's audio can't play, or a player that failed while seeking.
@@ -409,6 +418,9 @@ class MediaPlayerAudio(
         const val TICK_MS = 50L
         const val SEEK_WAIT_MS = 2_000L
         const val SLACK_MS = 300L
+
+        /** The longest the end of a piece is waited for: a player that stalled mustn't hold Listen up for long. */
+        const val MAX_TAIL_MS = 3_000L
         const val MAX_ODDITIES = 30
 
         /** MediaPlayer's info codes an audio file can get, by their constants' names. */

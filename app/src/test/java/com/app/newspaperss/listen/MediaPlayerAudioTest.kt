@@ -79,20 +79,63 @@ class MediaPlayerAudioTest {
     }
 
     @Test
-    fun aStopNothingAskedForIsLoggedAndTheEndOfThePieceSaysHowFarItGot() {
+    fun aStopNothingAskedForIsLogged() {
         audio.play(piece, 0, 1f)
         idle(1_000)
         players.last().pause()
         idle(100)
-        assertEquals(listOf("Playing: 4-59.m4a stopped at 1000ms of 120000ms, unasked"), logged)
 
-        logged.clear()
-        audio.play(piece, 119_900, 1f)
-        idle(1_000)
+        assertEquals(listOf("Playing: 4-59.m4a stopped at 1000ms of 120000ms, unasked"), logged)
+    }
+
+    @Test
+    fun aPieceThatPlaysToItsEndGoesStraightOnToTheNext() {
+        audio.play(piece, 119_000, 1f)
+        idle(999)
+        assertEquals(emptyList<String>(), heard)
+        idle(2)
+
         assertEquals(listOf("ended"), heard)
-        // The last tick before the end, against the file's length: not "stopped, unasked" as well.
-        assertEquals(1, logged.size)
-        assertTrue(logged.single(), Regex("Playing: 4-59\\.m4a ended at 1199\\d\\dms of 120000ms").matches(logged.single()))
+        assertEquals(listOf("Playing: 4-59.m4a ended after 1000ms of its 1000ms"), logged)
+    }
+
+    @Test
+    fun aPlayerThatSaysItHasFinishedEarlyIsGivenTimeForItsLastWords() {
+        audio.play(piece, 118_000, 1f)
+        idle(1_000)
+        // As a phone does with the file's last second still in its output buffer.
+        players.last().pause()
+        player.invokeCompletionListener()
+
+        assertEquals(listOf("Playing: 4-59.m4a ended after 1000ms of its 2000ms; waiting 1000ms for the rest"), logged)
+        idle(990)
+        assertEquals(emptyList<String>(), heard)
+        idle(20)
+        assertEquals(listOf("ended"), heard)
+    }
+
+    @Test
+    fun theWaitForAPlayerThatEndedFarTooSoonIsCapped() {
+        audio.play(piece, 0, 1f)
+        idle(1_000)
+        players.last().pause()
+        player.invokeCompletionListener()
+        idle(3_010)
+
+        assertTrue(logged.single(), logged.single().endsWith("; waiting 3000ms for the rest"))
+        assertEquals(listOf("ended"), heard)
+    }
+
+    @Test
+    fun aStopWhileWaitingForTheEndMeansNoEnd() {
+        audio.play(piece, 118_000, 1f)
+        idle(1_000)
+        players.last().pause()
+        player.invokeCompletionListener()
+        audio.stop()
+        idle(2_000)
+
+        assertEquals(emptyList<String>(), heard)
     }
 
     @Test
