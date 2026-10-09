@@ -138,7 +138,7 @@ class AppContainer(
 
     /** Listen's voice: a made podcast where there is one, the phone's elsewhere. */
     private val listenSpeaker by lazy {
-        PodcastSpeaker(speaker(), podcastStore, MediaPlayerAudio()) {
+        PodcastSpeaker(speaker(), podcastStore, MediaPlayerAudio(podcastLog::add), log = podcastLog::add) {
             // Just after the app starts, before the store's first value: read it, or a made
             // article would play in the phone's voice.
             (listenSettings.value ?: runCatching { runBlocking { settings.current() } }.getOrNull())?.listenVoice == ListenVoice.PODCAST

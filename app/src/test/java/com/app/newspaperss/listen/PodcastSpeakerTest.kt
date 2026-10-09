@@ -49,7 +49,8 @@ class PodcastSpeakerTest {
         override fun release() {}
     }
 
-    private val speaker by lazy { PodcastSpeaker(phone, store, audio) { inUse } }
+    private val logged = mutableListOf<String>()
+    private val speaker by lazy { PodcastSpeaker(phone, store, audio, logged::add) { inUse } }
     private val heard = mutableListOf<String>()
 
     private fun listen() {
@@ -98,6 +99,20 @@ class PodcastSpeakerTest {
         audio.listener!!.onPosition(3_100)
         audio.listener!!.onEnded()
         assertEquals(listOf("start ${id(3)}", "start ${id(4)}", "done ${id(4)}"), heard.drop(3))
+    }
+
+    @Test
+    fun theLogSaysWhereEachPlayStartedAndWhenOnePieceGaveWayToTheNext() {
+        made()
+        listen()
+        speaker.speak(id(1), "Counting Knots", null, 1f, flush = true)
+        audio.listener!!.onEnded()
+
+        // A play from a line nobody asked for is what a skip in the audio would look like.
+        assertEquals(
+            listOf("Playing edition 7 page 0 from line 1: 0-0.m4a at 2.00s, speed 1.0", "Playing: 0-0.m4a ended, on to 0-3.m4a"),
+            logged,
+        )
     }
 
     @Test

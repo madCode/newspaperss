@@ -4,11 +4,14 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import com.app.newspaperss.settings.PodcastVoice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import java.util.Locale
+import kotlin.math.abs
 
 /**
  * Where a line [ListenPlayer] asks for is: its edition, page and line, of how many [lines] on
@@ -46,6 +49,8 @@ class PodcastSpeaker(
     private val phone: Speaker,
     private val podcasts: PodcastStore,
     private val audio: PodcastAudio,
+    /** For the podcast log: where each play starts, and what interrupted one. */
+    private val log: (String) -> Unit = {},
     private val inUse: () -> Boolean,
 ) : Speaker {
     override var listener: Speaker.Listener? = null
@@ -162,6 +167,7 @@ class PodcastSpeaker(
         // Failing to start the next piece, the last line reported was heard whole: on from the next.
         val line = if (between) reported + 1 else reported.coerceAtLeast(at.line)
         article?.let { failed += it }
+        log("Playing: piece ${pieces.getOrNull(piece)?.audio?.name} failed; the phone's voice from line $line")
         toPhone()
         val now = asked[line]
         if (now == null) {
@@ -182,6 +188,7 @@ class PodcastSpeaker(
         reported = from.line - 1
         between = false
         this.rate = rate
+        log("Playing edition ${from.editionId} page ${from.page} from line ${from.line}: ${pieces[index].audio.name} at ${"%.2f".format(Locale.ROOT, start)}s, speed $rate")
         // Its lines are reported from the audio's first tick, not from inside this call.
         audio.play(pieces[index].audio, (start * 1000).toLong(), rate)
     }
@@ -206,6 +213,7 @@ class PodcastSpeaker(
         if (piece < pieces.lastIndex) {
             piece++
             between = true
+            log("Playing: ${current.audio.name} ended, on to ${pieces[piece].audio.name}")
             audio.play(pieces[piece].audio, 0, rate)
             return
         }
@@ -264,7 +272,7 @@ interface PodcastAudio {
  * [PodcastAudio] through Android's MediaPlayer, whose speed keeps the voice's pitch. Audio focus,
  * the lock screen and headphones are [ListenService]'s, as for the phone's voice.
  */
-class MediaPlayerAudio : PodcastAudio {
+class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
     override var listener: PodcastAudio.Listener? = null
     private val main = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
@@ -272,12 +280,45 @@ class MediaPlayerAudio : PodcastAudio {
     /** Bumped by each play and stop, so an end or error posted for an earlier one is dropped. */
     private var plays = 0
 
+    /** The file playing, its speed, and the last tick's position and time: to log a skip or a stall. */
+    private var name = ""
+    private var speed = 1f
+    private var lastMs = -1L
+    private var lastAt = 0L
+    /** Skips and stalls logged in this play: a phone whose position always lags mustn't fill the log. */
+    private var oddities = 0
+
     private val tick = object : Runnable {
         override fun run() {
             val p = player ?: return
-            if (p.isPlaying) listener?.onPosition(p.currentPosition.toLong())
+            if (p.isPlaying) {
+                val ms = p.currentPosition.toLong()
+                watch(ms)
+                listener?.onPosition(ms)
+            } else if (lastMs >= 0) {
+                // At its end, the next piece follows; anywhere else, nothing here asked it to stop.
+                if (lastMs < p.duration - SLACK_MS) log("Playing: $name stopped at ${lastMs}ms of ${p.duration}ms, unasked")
+                lastMs = -1
+            }
             main.postDelayed(this, TICK_MS)
         }
+    }
+
+    /**
+     * Logs the audio's position moving other than with the clock: a jump skips audio, a stall
+     * holds it. Ticks come 50 ms apart; a busy main thread delays them, which the clock allows for.
+     */
+    private fun watch(ms: Long) {
+        val at = SystemClock.elapsedRealtime()
+        if (lastMs >= 0) {
+            val expected = ((at - lastAt) * speed).toLong()
+            val moved = ms - lastMs
+            if (abs(moved - expected) > SLACK_MS && ++oddities <= MAX_ODDITIES) {
+                log("Playing: $name went from ${lastMs}ms to ${ms}ms in ${at - lastAt}ms" + if (oddities == MAX_ODDITIES) "; no more of these this play" else "")
+            }
+        }
+        lastMs = ms
+        lastAt = at
     }
 
     override fun play(file: File, fromMs: Long, speed: Float) {
@@ -285,13 +326,22 @@ class MediaPlayerAudio : PodcastAudio {
         val play = plays
         fun later(call: PodcastAudio.Listener.() -> Unit) = main.post { if (plays == play) listener?.call() }
         val p = MediaPlayer()
+        name = file.name
+        this.speed = speed
+        lastMs = -1
+        oddities = 0
         try {
             p.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             p.setDataSource(file.path)
             // A local file of a couple of minutes: quick enough to prepare in place.
             p.prepare()
             p.setOnCompletionListener { later { onEnded() } }
-            p.setOnErrorListener { _, _, _ ->
+            p.setOnInfoListener { _, what, extra ->
+                log("Playing: $name says $what ($extra)")
+                false
+            }
+            p.setOnErrorListener { _, what, extra ->
+                log("Playing: $name failed, $what ($extra)")
                 later { onError() }
                 true
             }
@@ -331,6 +381,7 @@ class MediaPlayerAudio : PodcastAudio {
 
     override fun stop() {
         plays++
+        lastMs = -1
         main.removeCallbacks(tick)
         player?.release()
         player = null
@@ -341,5 +392,7 @@ class MediaPlayerAudio : PodcastAudio {
     private companion object {
         const val TICK_MS = 50L
         const val SEEK_WAIT_MS = 2_000L
+        const val SLACK_MS = 300L
+        const val MAX_ODDITIES = 10
     }
 }
