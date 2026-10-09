@@ -79,7 +79,7 @@ class MediaPlayerAudioTest {
     }
 
     @Test
-    fun aStopNothingAskedForIsLoggedButTheEndOfThePieceIsNot() {
+    fun aStopNothingAskedForIsLoggedAndTheEndOfThePieceSaysHowFarItGot() {
         audio.play(piece, 0, 1f)
         idle(1_000)
         players.last().pause()
@@ -90,7 +90,18 @@ class MediaPlayerAudioTest {
         audio.play(piece, 119_900, 1f)
         idle(1_000)
         assertEquals(listOf("ended"), heard)
-        assertEquals(emptyList<String>(), logged)
+        // The last tick before the end, against the file's length: not "stopped, unasked" as well.
+        assertEquals(1, logged.size)
+        assertTrue(logged.single(), Regex("Playing: 4-59\\.m4a ended at 1199\\d\\dms of 120000ms").matches(logged.single()))
+    }
+
+    @Test
+    fun aFasterSpeedPlaysToo() {
+        audio.play(piece, 0, 1.5f)
+        idle(1_000)
+
+        assertTrue(players.last().isPlaying)
+        assertEquals(emptyList<String>(), heard)
     }
 
     @Test

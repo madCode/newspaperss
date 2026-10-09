@@ -342,7 +342,13 @@ class MediaPlayerAudio(
             // A local file of a couple of minutes: quick enough to prepare in place.
             p.prepare()
             durationMs = p.duration.toLong()
-            p.setOnCompletionListener { later { onEnded() } }
+            p.setOnCompletionListener {
+                // How far the ticks got before the end: well short of the length means the file's
+                // last words were never heard.
+                log("Playing: $name ended at ${lastMs}ms of ${durationMs}ms")
+                lastMs = -1
+                later { onEnded() }
+            }
             p.setOnInfoListener { _, what, extra ->
                 log("Playing: $name says ${INFO[what] ?: what} ($extra)")
                 false
@@ -360,8 +366,10 @@ class MediaPlayerAudio(
                 if (plays != play || begun) return@begin
                 begun = true
                 try {
-                    // Only the fields set are applied, so a new one changes the speed alone.
-                    p.playbackParams = PlaybackParams().setSpeed(speed)
+                    // Not at normal speed: with a speed set, the player says it has finished while
+                    // the file's last second is still to be heard, and releasing it then cuts that
+                    // second off. Only the fields set are applied, so this changes the speed alone.
+                    if (speed != 1f) p.playbackParams = PlaybackParams().setSpeed(speed)
                     p.start()
                     main.post(tick)
                 } catch (e: Exception) {
