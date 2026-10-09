@@ -154,12 +154,18 @@ class EditionSchedulerTest {
 
     @Test
     fun aTimeZoneChangeMovesTheTimerToTheNewLocalTime() = runTest {
+        // On the real clock, as the receiver is. A fixed time would fall inside the lead in Tokyo
+        // for half an hour a day: the timer would run at once and outlive the test's work database.
+        // Six hours ahead in Tokyo is 19 or 20 hours ahead in New York, far from now in both.
+        val tokyo = java.time.ZoneId.of("Asia/Tokyo")
+        val due = LocalTime.now(tokyo).plusHours(6).withSecond(0).withNano(0)
+        val farOff = settings.copy(schedule = Schedule(time = due))
         val app = ApplicationProvider.getApplicationContext<TestApp>()
-        app.container.settings.update { settings }
+        app.container.settings.update { farOff }
         val original = java.util.TimeZone.getDefault()
         try {
             java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"))
-            EditionScheduler.reschedule(context, settings)
+            EditionScheduler.reschedule(context, farOff)
             val before = prefs.getLong(EditionScheduler.PENDING, 0)
 
             java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Tokyo"))
@@ -167,7 +173,7 @@ class EditionSchedulerTest {
 
             com.app.newspaperss.testutil.idleUntil { prefs.getLong(EditionScheduler.PENDING, 0) != before }
             val after = java.time.Instant.ofEpochMilli(prefs.getLong(EditionScheduler.PENDING, 0))
-            assertEquals(LocalTime.of(6, 30), after.atZone(java.time.ZoneId.of("Asia/Tokyo")).toLocalTime())
+            assertEquals(due, after.atZone(tokyo).toLocalTime())
         } finally {
             java.util.TimeZone.setDefault(original)
         }
