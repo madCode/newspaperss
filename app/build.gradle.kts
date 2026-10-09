@@ -145,6 +145,8 @@ dependencies {
     // Compose UI test pulls an older Espresso that crashes on API 37.
     testImplementation(libs.espresso.core)
 
+    // The tail probe compares MediaPlayer with one ExoPlayer over a playlist; test-only for now.
+    androidTestImplementation(libs.media3.exoplayer)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(platform(libs.compose.bom))
