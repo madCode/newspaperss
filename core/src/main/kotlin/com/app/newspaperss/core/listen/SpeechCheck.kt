@@ -70,6 +70,19 @@ object SpeechCheck {
         return found.joinToString("; ").ifEmpty { null }
     }
 
+    /**
+     * [text] as Kokoro was given it, with everything outside printable ASCII written as its code
+     * point: a curly quote, a no-break space or an invisible character looks like nothing in a log.
+     */
+    fun exactly(text: String): String = buildString {
+        var i = 0
+        while (i < text.length) {
+            val c = text.codePointAt(i)
+            if (c in 0x20..0x7E && c != '\\'.code) appendCodePoint(c) else append("\\u{").append(Integer.toHexString(c).uppercase()).append('}')
+            i += Character.charCount(c)
+        }
+    }
+
     private fun seconds(samples: Int, rate: Int) = round(samples.toDouble() / rate)
 
     private fun round(seconds: Double) = Math.round(seconds * 100) / 100.0

@@ -52,4 +52,12 @@ class SpeechCheckTest {
         assertEquals("no sound in 0.5s", SpeechCheck.problems(FloatArray(rate / 2), rate, 20))
         assertEquals("1 samples not numbers; no sound in 0.5s", SpeechCheck.problems(FloatArray(rate / 2).also { it[0] = Float.NaN }, rate, 20))
     }
+
+    @Test
+    fun theTextIsWrittenExactlyWithAnythingBeyondPlainAsciiAsItsCodePoint() {
+        assertEquals(
+            "said: \\u{201C}Get a\\u{A0}hair\\u{AD}cut.\\u{201D} \\u{1F600} a\\u{5C}b",
+            SpeechCheck.exactly("said: “Get a\u00A0hair\u00ADcut.” 😀 a\\b"),
+        )
+    }
 }

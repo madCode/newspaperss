@@ -161,7 +161,7 @@ class PodcastMaker(
                 if (i > 0 && lines[i - 1].block != lines[i].block) current.write(FloatArray((current.rate * PAUSE).toInt()))
                 current.starts += current.seconds
                 SpeechCheck.problems(speech.samples, speech.sampleRate, lines[i].spoken.length)?.let {
-                    log.add("Page $page line $i, ${"%.1f".format(Locale.ROOT, current.seconds)}s into piece ${current.firstLine}: $it (“${lines[i].spoken.take(40)}”)")
+                    log.add("Page $page line $i, ${"%.1f".format(Locale.ROOT, current.seconds)}s into piece ${current.firstLine}: $it; Kokoro was given: ${SpeechCheck.exactly(lines[i].spoken)}")
                 }
                 current.write(speech.samples)
                 current.spoken += speech.samples.size
