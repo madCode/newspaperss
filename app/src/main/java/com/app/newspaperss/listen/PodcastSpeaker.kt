@@ -2,6 +2,7 @@ package com.app.newspaperss.listen
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -272,7 +273,11 @@ interface PodcastAudio {
  * [PodcastAudio] through Android's MediaPlayer, whose speed keeps the voice's pitch. Audio focus,
  * the lock screen and headphones are [ListenService]'s, as for the phone's voice.
  */
-class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
+class MediaPlayerAudio(
+    private val log: (String) -> Unit = {},
+    /** Tests hand out players they can steer. */
+    private val newPlayer: () -> MediaPlayer = ::MediaPlayer,
+) : PodcastAudio {
     override var listener: PodcastAudio.Listener? = null
     private val main = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
@@ -327,7 +332,7 @@ class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
         stop()
         val play = plays
         fun later(call: PodcastAudio.Listener.() -> Unit) = main.post { if (plays == play) listener?.call() }
-        val p = MediaPlayer()
+        val p = newPlayer()
         name = file.name
         this.speed = speed
         lastMs = -1
@@ -355,7 +360,8 @@ class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
                 if (plays != play || begun) return@begin
                 begun = true
                 try {
-                    p.playbackParams = p.playbackParams.setSpeed(speed)
+                    // Only the fields set are applied, so a new one changes the speed alone.
+                    p.playbackParams = PlaybackParams().setSpeed(speed)
                     p.start()
                     main.post(tick)
                 } catch (e: Exception) {
