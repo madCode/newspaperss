@@ -280,12 +280,13 @@ class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
     /** Bumped by each play and stop, so an end or error posted for an earlier one is dropped. */
     private var plays = 0
 
-    /** The file playing, its speed, and the last tick's position and time: to log a skip or a stall. */
+    /** The file playing, its length and speed, and the last tick's position and time: to log a skip or a stall. */
     private var name = ""
+    private var durationMs = 0L
     private var speed = 1f
     private var lastMs = -1L
     private var lastAt = 0L
-    /** Skips and stalls logged in this play: a phone whose position always lags mustn't fill the log. */
+    /** Skips and stalls logged since the app started: a phone whose position always lags mustn't fill the log. */
     private var oddities = 0
 
     private val tick = object : Runnable {
@@ -297,7 +298,8 @@ class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
                 listener?.onPosition(ms)
             } else if (lastMs >= 0) {
                 // At its end, the next piece follows; anywhere else, nothing here asked it to stop.
-                if (lastMs < p.duration - SLACK_MS) log("Playing: $name stopped at ${lastMs}ms of ${p.duration}ms, unasked")
+                // Its length is kept from before: asked of a player that failed, it would throw.
+                if (lastMs < durationMs - SLACK_MS) log("Playing: $name stopped at ${lastMs}ms of ${durationMs}ms, unasked")
                 lastMs = -1
             }
             main.postDelayed(this, TICK_MS)
@@ -314,7 +316,7 @@ class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
             val expected = ((at - lastAt) * speed).toLong()
             val moved = ms - lastMs
             if (abs(moved - expected) > SLACK_MS && ++oddities <= MAX_ODDITIES) {
-                log("Playing: $name went from ${lastMs}ms to ${ms}ms in ${at - lastAt}ms" + if (oddities == MAX_ODDITIES) "; no more of these this play" else "")
+                log("Playing: $name went from ${lastMs}ms to ${ms}ms in ${at - lastAt}ms" + if (oddities == MAX_ODDITIES) "; no more of these until the app restarts" else "")
             }
         }
         lastMs = ms
@@ -329,15 +331,15 @@ class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
         name = file.name
         this.speed = speed
         lastMs = -1
-        oddities = 0
         try {
             p.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             p.setDataSource(file.path)
             // A local file of a couple of minutes: quick enough to prepare in place.
             p.prepare()
+            durationMs = p.duration.toLong()
             p.setOnCompletionListener { later { onEnded() } }
             p.setOnInfoListener { _, what, extra ->
-                log("Playing: $name says $what ($extra)")
+                log("Playing: $name says ${INFO[what] ?: what} ($extra)")
                 false
             }
             p.setOnErrorListener { _, what, extra ->
@@ -393,6 +395,18 @@ class MediaPlayerAudio(private val log: (String) -> Unit = {}) : PodcastAudio {
         const val TICK_MS = 50L
         const val SEEK_WAIT_MS = 2_000L
         const val SLACK_MS = 300L
-        const val MAX_ODDITIES = 10
+        const val MAX_ODDITIES = 30
+
+        /** MediaPlayer's info codes an audio file can get, by their constants' names. */
+        val INFO = mapOf(
+            MediaPlayer.MEDIA_INFO_UNKNOWN to "unknown",
+            MediaPlayer.MEDIA_INFO_STARTED_AS_NEXT to "started as next",
+            MediaPlayer.MEDIA_INFO_BUFFERING_START to "buffering start",
+            MediaPlayer.MEDIA_INFO_BUFFERING_END to "buffering end",
+            MediaPlayer.MEDIA_INFO_BAD_INTERLEAVING to "bad interleaving",
+            MediaPlayer.MEDIA_INFO_NOT_SEEKABLE to "not seekable",
+            MediaPlayer.MEDIA_INFO_METADATA_UPDATE to "metadata update",
+            MediaPlayer.MEDIA_INFO_AUDIO_NOT_PLAYING to "audio not playing",
+        )
     }
 }
