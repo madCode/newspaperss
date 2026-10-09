@@ -160,6 +160,8 @@ class AppContainer(
     private val podcastPlayer: () -> Player = {
         ExoPlayer.Builder(context)
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), false)
+            // It decodes in this app's process, which may sleep with the screen off.
+            .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
     }
 

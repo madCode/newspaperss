@@ -97,7 +97,7 @@ class PodcastSpeaker(
     private var rate = 1f
     /** The voice the article was chosen to play in: shown while it plays. */
     private var chosen: PodcastVoice? = null
-    /** A piece ended and the next is starting: every line reported so far was heard to its end. */
+    /** The audio has moved on to the next piece: every line reported so far was heard to its end. */
     private var between = false
 
     init {
@@ -166,7 +166,7 @@ class PodcastSpeaker(
      */
     private fun audioFailed() {
         val at = playing ?: return
-        // Failing to start the next piece, the last line reported was heard whole: on from the next.
+        // The next piece failed to start: the last line reported was heard whole, on from the next.
         val line = if (between) reported + 1 else reported.coerceAtLeast(at.line)
         article?.let { failed += it }
         log("Playing: piece ${pieces.getOrNull(piece)?.audio?.name} failed; the phone's voice from line $line")
@@ -277,19 +277,23 @@ interface PodcastAudio {
 }
 
 /**
- * [PodcastAudio] through a Media3 player given the whole list: one decoder and one audio output
- * carry on from file to file, so nothing is stopped between pieces. A MediaPlayer per file says it
- * has finished while the file's last moment is still to be heard, and stopping it to start the
- * next cuts that moment off. Media3's player says it has ended only once the audio has been
- * played out, and keeps the voice's pitch at other speeds. Audio focus, the lock
- * screen and headphones are [ListenService]'s, as for the phone's voice.
+ * [PodcastAudio] through one Media3 player given the whole list: one decoder and one audio
+ * output carry on from file to file, so nothing is stopped between pieces. A player per file
+ * would have to be stopped to start the next, and Android's says it has finished while its last
+ * moment is still to be heard. Media3's says it has ended only once the audio is out, and keeps
+ * the voice's pitch at other speeds. Audio focus, the lock screen and headphones are
+ * [ListenService]'s, as for the phone's voice.
  *
- * @param newPlayer makes the player for each play: an ExoPlayer, or a fake in tests.
+ * @param newPlayer makes the player, once: an ExoPlayer, or a fake in tests.
  */
 class Media3Audio(private val log: (String) -> Unit = {}, private val newPlayer: () -> Player) : PodcastAudio {
     override var listener: PodcastAudio.Listener? = null
     private val main = Handler(Looper.getMainLooper())
-    private var player: Player? = null
+
+    // Kept from play to play: making and releasing one takes long enough to hold up the screen,
+    // and every pause, skip and change of speed is a new play.
+    private var made: Player? = null
+    private var playing = false
     private var names: List<String> = emptyList()
 
     /** The file the listener was last told of: it hears of each one the player moves on to, in turn. */
@@ -300,7 +304,7 @@ class Media3Audio(private val log: (String) -> Unit = {}, private val newPlayer:
 
     private val tick = object : Runnable {
         override fun run() {
-            val p = player ?: return
+            val p = made?.takeIf { playing } ?: return
             follow(p.currentMediaItemIndex)
             if (p.isPlaying) listener?.onPosition(p.currentPosition)
             main.postDelayed(this, TICK_MS)
@@ -316,33 +320,43 @@ class Media3Audio(private val log: (String) -> Unit = {}, private val newPlayer:
         }
     }
 
-    override fun play(files: List<File>, index: Int, fromMs: Long, speed: Float) {
-        stop()
+    /** Posted rather than told at once: the speaker may stop the player in answer. */
+    private fun later(call: PodcastAudio.Listener.() -> Unit) {
         val play = plays
-        // Posted rather than told at once: the speaker may stop and release this player in answer.
-        fun later(call: PodcastAudio.Listener.() -> Unit) = main.post { if (plays == play) listener?.call() }
-        val p = newPlayer()
-        player = p
-        names = files.map { it.name }
-        this.index = index
+        main.post { if (plays == play) listener?.call() }
+    }
+
+    private fun player(): Player = made ?: newPlayer().also { p ->
+        made = p
         p.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                if (plays == play) follow(p.currentMediaItemIndex)
+                if (playing) follow(p.currentMediaItemIndex)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (plays != play || playbackState != Player.STATE_ENDED) return
+                if (!playing || playbackState != Player.STATE_ENDED) return
                 follow(names.lastIndex)
                 log("Playing: ${names.lastOrNull()} ended")
                 later { onEnded() }
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                if (plays != play) return
-                log("Playing: ${names.getOrNull(p.currentMediaItemIndex)} failed, ${error.errorCodeName}")
+                if (!playing) return
+                // The next file fails to open only once the one before has been played to its
+                // end, and before the player moves on: it's that file that failed, not this one.
+                if (p.duration > 0 && p.currentPosition >= p.duration - END_MS) follow(index + 1)
+                log("Playing: ${names.getOrNull(index)} failed, ${error.errorCodeName}")
                 later { onError() }
             }
         })
+    }
+
+    override fun play(files: List<File>, index: Int, fromMs: Long, speed: Float) {
+        stop()
+        val p = player()
+        playing = true
+        names = files.map { it.name }
+        this.index = index
         p.setMediaItems(files.map { MediaItem.fromUri(Uri.fromFile(it)) }, index, fromMs)
         p.playbackParameters = PlaybackParameters(speed)
         p.prepare()
@@ -353,13 +367,21 @@ class Media3Audio(private val log: (String) -> Unit = {}, private val newPlayer:
     override fun stop() {
         plays++
         main.removeCallbacks(tick)
-        player?.release()
-        player = null
+        if (!playing) return
+        playing = false
+        made?.stop()
     }
 
-    override fun release() = stop()
+    override fun release() {
+        stop()
+        made?.release()
+        made = null
+    }
 
     private companion object {
         const val TICK_MS = 50L
+
+        /** This close to a file's end, it has been heard. */
+        const val END_MS = 500L
     }
 }

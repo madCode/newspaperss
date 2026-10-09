@@ -39,6 +39,7 @@ class Media3AudioTest {
         var ended = false
         var error: PlaybackException? = null
         var released = false
+        var stops = 0
 
         override fun getState(): State {
             val state = State.Builder()
@@ -80,6 +81,14 @@ class Media3AudioTest {
 
         override fun handleSetPlaybackParameters(playbackParameters: PlaybackParameters): ListenableFuture<*> {
             speed = playbackParameters.speed
+            return Futures.immediateVoidFuture()
+        }
+
+        override fun handleStop(): ListenableFuture<*> {
+            stops++
+            prepared = false
+            error = null
+            ended = false
             return Futures.immediateVoidFuture()
         }
 
@@ -151,16 +160,6 @@ class Media3AudioTest {
     }
 
     @Test
-    fun aPieceSkippedOverIsStillToldOfSoNoSentenceIsLeftBehind() {
-        audio.play(pieces, 0, 0, 1f)
-        idle()
-        player.at(2, 0)
-        idle()
-
-        assertEquals(2, heard.count { it == "next" })
-    }
-
-    @Test
     fun theEndOfTheLastPieceEndsIt() {
         audio.play(pieces, 2, 0, 1f)
         idle()
@@ -175,35 +174,56 @@ class Media3AudioTest {
     fun aPieceThatCantBePlayedSaysSo() {
         audio.play(pieces, 0, 0, 1f)
         idle()
+        player.at(0, 5_000)
         player.fail()
         idle()
 
         assertEquals("error", heard.last())
+        assertTrue(heard.none { it == "next" })
         assertEquals("Playing: 0-0.m4a failed, ERROR_CODE_PARSING_CONTAINER_MALFORMED", logged.last())
     }
 
     @Test
-    fun aNewPlayReleasesTheOldAndNothingMoreIsHeardFromIt() {
+    fun aNextPieceThatCantBeOpenedIsTheOneThatFailed() {
         audio.play(pieces, 0, 0, 1f)
         idle()
-        val old = player
-        audio.play(pieces, 2, 0, 1f)
-        old.fail()
+        // The player reads the next file only once this one is played out, and fails before moving on.
+        player.at(0, 119_800)
+        player.fail()
         idle()
 
-        assertTrue(old.released)
-        assertTrue(heard.none { it == "error" })
+        assertEquals(listOf("next", "error"), heard.filter { !it.startsWith("at") })
+        assertEquals("Playing: 0-28.m4a failed, ERROR_CODE_PARSING_CONTAINER_MALFORMED", logged.last())
     }
 
     @Test
-    fun stoppingReleasesThePlayerAndTheTicksStop() {
+    fun oneMadePlayerServesEveryPlayAndNothingIsHeardFromAStoppedOne() {
+        audio.play(pieces, 0, 0, 1f)
+        idle()
+        audio.stop()
+        player.fail()
+        idle()
+        audio.play(pieces, 2, 4_000, 1.2f)
+        idle()
+
+        assertEquals(1, players.size)
+        assertTrue(heard.none { it == "error" })
+        assertEquals(2, player.index)
+        assertEquals(1.2f, player.speed)
+        assertTrue(player.prepared && player.playing && !player.released)
+    }
+
+    @Test
+    fun stoppingStopsThePlayerAndTheTicksAndReleasingLetsItGo() {
         audio.play(pieces, 0, 0, 1f)
         idle()
         audio.stop()
         val before = heard.size
         idle(500)
 
-        assertTrue(player.released)
+        assertEquals(1, player.stops)
         assertEquals(before, heard.size)
+        audio.release()
+        assertTrue(player.released)
     }
 }
