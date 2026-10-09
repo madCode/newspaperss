@@ -1,18 +1,18 @@
 package com.app.newspaperss.listen
 
-import android.media.AudioAttributes
-import android.media.MediaPlayer
-import android.media.PlaybackParams
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.Player
 import com.app.newspaperss.settings.PodcastVoice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.util.Locale
-import kotlin.math.abs
 
 /**
  * Where a line [ListenPlayer] asks for is: its edition, page and line, of how many [lines] on
@@ -103,7 +103,8 @@ class PodcastSpeaker(
     init {
         audio.listener = object : PodcastAudio.Listener {
             override fun onPosition(ms: Long) = reach(ms)
-            override fun onEnded() = pieceEnded()
+            override fun onNext() = nextPiece()
+            override fun onEnded() = lastPieceEnded()
             override fun onError() = audioFailed()
         }
     }
@@ -190,8 +191,9 @@ class PodcastSpeaker(
         between = false
         this.rate = rate
         log("Playing edition ${from.editionId} page ${from.page} from line ${from.line}: ${pieces[index].audio.name} at ${"%.2f".format(Locale.ROOT, start)}s, speed $rate")
-        // Its lines are reported from the audio's first tick, not from inside this call.
-        audio.play(pieces[index].audio, (start * 1000).toLong(), rate)
+        // Its lines are reported from the audio's first tick, not from inside this call. The
+        // article's pieces go as one list, so the audio runs on from one to the next unbroken.
+        audio.play(pieces.map { it.audio }, index, (start * 1000).toLong(), rate)
     }
 
     /** Reports every line the audio has reached since the last. */
@@ -207,17 +209,18 @@ class PodcastSpeaker(
         }
     }
 
-    private fun pieceEnded() {
+    /** The audio has run on into the next piece: every line of the one before was heard. */
+    private fun nextPiece() {
+        if (playing == null || piece >= pieces.lastIndex) return
+        reach(Long.MAX_VALUE / 2)
+        piece++
+        between = true
+    }
+
+    private fun lastPieceEnded() {
         val at = playing ?: return
         val current = pieces.getOrNull(piece) ?: return
         reach(Long.MAX_VALUE / 2)
-        if (piece < pieces.lastIndex) {
-            piece++
-            between = true
-            log("Playing: ${current.audio.name} ended, on to ${pieces[piece].audio.name}")
-            audio.play(pieces[piece].audio, 0, rate)
-            return
-        }
         val last = current.firstLine + current.starts.lastIndex
         stopAudio()
         listener?.onDone(at.copy(line = last).toString())
@@ -247,12 +250,12 @@ class PodcastSpeaker(
     }
 }
 
-/** Plays a podcast's audio, one file at a time, telling how far in it is as it goes. */
+/** Plays a podcast's audio, a list of files one after another, telling how far in it is as it goes. */
 interface PodcastAudio {
     var listener: Listener?
 
-    /** Plays [file] from [fromMs] at [speed] (1.0 normal), stopping whatever was playing. */
-    fun play(file: File, fromMs: Long, speed: Float)
+    /** Plays [files] in turn from [fromMs] into the one at [index], at [speed] (1.0 normal), stopping whatever was playing. */
+    fun play(files: List<File>, index: Int, fromMs: Long, speed: Float)
 
     fun stop()
 
@@ -260,9 +263,13 @@ interface PodcastAudio {
 
     /** Called on the main thread. */
     interface Listener {
-        /** Every few tens of milliseconds while playing: how far into the file, in milliseconds. */
+        /** Every few tens of milliseconds while playing: how far into the current file, in milliseconds. */
         fun onPosition(ms: Long)
 
+        /** The audio ran on from one file into the next. */
+        fun onNext()
+
+        /** The last file has been heard to its end. */
         fun onEnded()
 
         fun onError()
@@ -270,190 +277,89 @@ interface PodcastAudio {
 }
 
 /**
- * [PodcastAudio] through Android's MediaPlayer, whose speed keeps the voice's pitch. Audio focus,
- * the lock screen and headphones are [ListenService]'s, as for the phone's voice.
+ * [PodcastAudio] through a Media3 player given the whole list: one decoder and one audio output
+ * carry on from file to file, so nothing is stopped between pieces. A MediaPlayer per file says it
+ * has finished while the file's last moment is still to be heard, and stopping it to start the
+ * next cuts that moment off. Media3's player says it has ended only once the audio has been
+ * played out, and keeps the voice's pitch at other speeds. Audio focus, the lock
+ * screen and headphones are [ListenService]'s, as for the phone's voice.
+ *
+ * @param newPlayer makes the player for each play: an ExoPlayer, or a fake in tests.
  */
-class MediaPlayerAudio(
-    private val log: (String) -> Unit = {},
-    /** Tests hand out players they can steer. */
-    private val newPlayer: () -> MediaPlayer = ::MediaPlayer,
-) : PodcastAudio {
+class Media3Audio(private val log: (String) -> Unit = {}, private val newPlayer: () -> Player) : PodcastAudio {
     override var listener: PodcastAudio.Listener? = null
     private val main = Handler(Looper.getMainLooper())
-    private var player: MediaPlayer? = null
+    private var player: Player? = null
+    private var names: List<String> = emptyList()
 
-    /** Bumped by each play and stop, so an end or error posted for an earlier one is dropped. */
+    /** The file the listener was last told of: it hears of each one the player moves on to, in turn. */
+    private var index = 0
+
+    /** Bumped by each play and stop, so news posted for an earlier one is dropped. */
     private var plays = 0
-
-    /** The file playing, its length and speed, and the last tick's position and time: to log a skip or a stall. */
-    private var name = ""
-    private var durationMs = 0L
-    private var speed = 1f
-    private var lastMs = -1L
-    private var lastAt = 0L
-    /** The player that played to its end, and those still sounding their last moment. */
-    private var finished: MediaPlayer? = null
-    private val lingering = mutableListOf<MediaPlayer>()
-
-    /** When the player started, by the clock, and from where in the file: to tell when it has really been heard. */
-    private var startedAt = 0L
-    private var startedFromMs = 0L
-    /** Skips and stalls logged since the app started: a phone whose position always lags mustn't fill the log. */
-    private var oddities = 0
 
     private val tick = object : Runnable {
         override fun run() {
             val p = player ?: return
-            if (p.isPlaying) {
-                val ms = p.currentPosition.toLong()
-                watch(ms)
-                listener?.onPosition(ms)
-            } else if (lastMs >= 0) {
-                // At its end, the next piece follows; anywhere else, nothing here asked it to stop.
-                // Its length is kept from before: asked of a player that failed, it would throw.
-                if (lastMs < durationMs - SLACK_MS) log("Playing: $name stopped at ${lastMs}ms of ${durationMs}ms, unasked")
-                lastMs = -1
-            }
+            follow(p.currentMediaItemIndex)
+            if (p.isPlaying) listener?.onPosition(p.currentPosition)
             main.postDelayed(this, TICK_MS)
         }
     }
 
-    /**
-     * Logs the audio's position moving other than with the clock: a jump skips audio, a stall
-     * holds it. Ticks come 50 ms apart; a busy main thread delays them, which the clock allows for.
-     */
-    private fun watch(ms: Long) {
-        val at = SystemClock.elapsedRealtime()
-        if (lastMs >= 0) {
-            val expected = ((at - lastAt) * speed).toLong()
-            val moved = ms - lastMs
-            if (abs(moved - expected) > SLACK_MS && ++oddities <= MAX_ODDITIES) {
-                log("Playing: $name went from ${lastMs}ms to ${ms}ms in ${at - lastAt}ms" + if (oddities == MAX_ODDITIES) "; no more of these until the app restarts" else "")
-            }
+    /** Tells of each file the player has moved on to, whether a tick or the player noticed first. */
+    private fun follow(now: Int) {
+        while (index < now && index < names.lastIndex) {
+            index++
+            log("Playing: on to ${names[index]}")
+            listener?.onNext()
         }
-        lastMs = ms
-        lastAt = at
     }
 
-    override fun play(file: File, fromMs: Long, speed: Float) {
+    override fun play(files: List<File>, index: Int, fromMs: Long, speed: Float) {
         stop()
         val play = plays
+        // Posted rather than told at once: the speaker may stop and release this player in answer.
         fun later(call: PodcastAudio.Listener.() -> Unit) = main.post { if (plays == play) listener?.call() }
         val p = newPlayer()
-        name = file.name
-        this.speed = speed
-        lastMs = -1
-        try {
-            p.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-            p.setDataSource(file.path)
-            // A local file of a couple of minutes: quick enough to prepare in place.
-            p.prepare()
-            durationMs = p.duration.toLong()
-            p.setOnCompletionListener {
-                lastMs = -1
-                finished = p
-                // The player can say it has finished while its last second is still waiting to be
-                // heard, and releasing it for the next piece cuts that off. Judged by the clock,
-                // it stays until the whole file has had time to play.
-                val heardMs = ((SystemClock.elapsedRealtime() - startedAt) * this.speed).toLong()
-                val shortMs = durationMs - startedFromMs - heardMs
-                val waitMs = (shortMs / this.speed).toLong().coerceIn(0, MAX_TAIL_MS)
-                log("Playing: $name ended after ${heardMs}ms of its ${durationMs - startedFromMs}ms" + if (waitMs > 0) "; waiting ${waitMs}ms for the rest" else "")
-                main.postDelayed({ if (plays == play) listener?.onEnded() }, waitMs)
+        player = p
+        names = files.map { it.name }
+        this.index = index
+        p.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                if (plays == play) follow(p.currentMediaItemIndex)
             }
-            p.setOnInfoListener { _, what, extra ->
-                log("Playing: $name says ${INFO[what] ?: what} ($extra)")
-                false
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (plays != play || playbackState != Player.STATE_ENDED) return
+                follow(names.lastIndex)
+                log("Playing: ${names.lastOrNull()} ended")
+                later { onEnded() }
             }
-            p.setOnErrorListener { _, what, extra ->
-                log("Playing: $name failed, $what ($extra)")
+
+            override fun onPlayerError(error: PlaybackException) {
+                if (plays != play) return
+                log("Playing: ${names.getOrNull(p.currentMediaItemIndex)} failed, ${error.errorCodeName}")
                 later { onError() }
-                true
             }
-            // Setting a speed starts playback, so only once the seek has landed: before, a moment
-            // from the piece's start would be heard.
-            player = p
-            var begun = false
-            val begin = begin@{
-                if (plays != play || begun) return@begin
-                begun = true
-                try {
-                    // Not at normal speed: with a speed set, the player says it has finished while
-                    // the file's last second is still to be heard, and releasing it then cuts that
-                    // second off. Only the fields set are applied, so this changes the speed alone.
-                    if (speed != 1f) p.playbackParams = PlaybackParams().setSpeed(speed)
-                    p.start()
-                    startedAt = SystemClock.elapsedRealtime()
-                    startedFromMs = p.currentPosition.toLong()
-                    main.post(tick)
-                } catch (e: Exception) {
-                    // A speed this phone's audio can't play, or a player that failed while seeking.
-                    main.removeCallbacks(tick)
-                    if (player === p) player = null
-                    p.release()
-                    later { onError() }
-                }
-            }
-            if (fromMs > 0) {
-                p.setOnSeekCompleteListener { begin() }
-                p.seekTo(fromMs, MediaPlayer.SEEK_CLOSEST)
-                // A seek that never says it's done mustn't leave Listen silent.
-                main.postDelayed({ begin() }, SEEK_WAIT_MS)
-            } else {
-                begin()
-            }
-        } catch (e: Exception) {
-            if (player === p) player = null
-            p.release()
-            later { onError() }
-        }
+        })
+        p.setMediaItems(files.map { MediaItem.fromUri(Uri.fromFile(it)) }, index, fromMs)
+        p.playbackParameters = PlaybackParameters(speed)
+        p.prepare()
+        p.play()
+        main.post(tick)
     }
 
     override fun stop() {
         plays++
-        lastMs = -1
         main.removeCallbacks(tick)
-        val p = player
+        player?.release()
         player = null
-        if (p != null && p === finished) {
-            // A piece that played to its end may still be sounding its last moment: the phone's
-            // output runs a little behind the player. It's let go a second later, not now.
-            lingering += p
-            main.postDelayed({ if (lingering.remove(p)) p.release() }, LINGER_MS)
-        } else {
-            p?.release()
-        }
-        finished = null
     }
 
-    override fun release() {
-        stop()
-        lingering.forEach { it.release() }
-        lingering.clear()
-    }
+    override fun release() = stop()
 
     private companion object {
         const val TICK_MS = 50L
-        const val SEEK_WAIT_MS = 2_000L
-        const val SLACK_MS = 300L
-
-        /** The longest the end of a piece is waited for: a player that stalled mustn't hold Listen up for long. */
-        const val MAX_TAIL_MS = 3_000L
-
-        /** How long a finished piece's player is kept once the next has started: more than the phone's output lags. */
-        const val LINGER_MS = 1_000L
-        const val MAX_ODDITIES = 30
-
-        /** MediaPlayer's info codes an audio file can get, by their constants' names. */
-        val INFO = mapOf(
-            MediaPlayer.MEDIA_INFO_UNKNOWN to "unknown",
-            MediaPlayer.MEDIA_INFO_STARTED_AS_NEXT to "started as next",
-            MediaPlayer.MEDIA_INFO_BUFFERING_START to "buffering start",
-            MediaPlayer.MEDIA_INFO_BUFFERING_END to "buffering end",
-            MediaPlayer.MEDIA_INFO_BAD_INTERLEAVING to "bad interleaving",
-            MediaPlayer.MEDIA_INFO_NOT_SEEKABLE to "not seekable",
-            MediaPlayer.MEDIA_INFO_METADATA_UPDATE to "metadata update",
-            MediaPlayer.MEDIA_INFO_AUDIO_NOT_PLAYING to "audio not playing",
-        )
     }
 }
