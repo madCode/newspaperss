@@ -745,7 +745,7 @@ whose Kindle and KOReader answers ask for more on the same page).
     slow", offering only Remove and the paper size that would fit. A 32-bit
     phone sees the option greyed, with why. In use, it lists Heart,
     Michael, Emma and George, each with a clip shipped in the app,
-    **Remove Kokoro**, and **Podcast log**: what the making did, run by run,
+    **Remove Kokoro**, and **Podcast log**: what the making and playing did,
     newest first, with Share to send it to whoever's fixing it. While it's in use, each scheduled edition's podcast
     is made after the book, only while the phone charges: unplugged, it
     stops and keeps what's made. It's made in the foreground, with a

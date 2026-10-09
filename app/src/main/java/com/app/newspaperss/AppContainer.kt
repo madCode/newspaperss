@@ -149,7 +149,7 @@ class AppContainer(
 
     /** Listen's voice: a made podcast where there is one, the phone's elsewhere. */
     private val listenSpeaker by lazy {
-        PodcastSpeaker(speaker(), podcastStore, Media3Audio(logPlaying, podcastPlayer), log = logPlaying) {
+        PodcastSpeaker(speaker(), podcastStore, Media3Audio(podcastPlayer), log = logPlaying) {
             // Just after the app starts, before the store's first value: read it, or a made
             // article would play in the phone's voice.
             (listenSettings.value ?: runCatching { runBlocking { settings.current() } }.getOrNull())?.listenVoice == ListenVoice.PODCAST
@@ -197,7 +197,7 @@ class AppContainer(
         )
     }
 
-    /** What the podcast's making did, shown in Settings › Listening while the podcast is debug-only. */
+    /** What the podcast's making and playing did, shown in Settings › Listening while the podcast is debug-only. */
     val podcastLog = PodcastLog(File(context.filesDir, "podcast-log.txt"))
     private val podcastEngine = { voice: PodcastVoice -> KokoroEngine(kokoroInstall, voice) }
     private val podcastStore = PodcastStore(File(context.filesDir, "podcasts"))

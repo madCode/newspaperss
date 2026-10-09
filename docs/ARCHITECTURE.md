@@ -271,9 +271,10 @@ flowchart LR
   starts, it picks its voice: the podcast if that article is made and
   Kokoro is in use, else `SystemSpeaker`; the choice holds while the article
   plays on, and one in the phone's voice is chosen again at the next play
-  or jump. Playing a podcast (`Media3Audio`: an article's pieces as one
-  list for a Media3 player, so they run on unbroken), it reports each line's start from the times kept with each
-  piece, so the player tints and saves sentences the same way. Line ids
+  or jump. A podcast plays through `Media3Audio`: an article's pieces as
+  one list for a Media3 player, so they run on unbroken. From the player's
+  piece and position, it reports each line's start by the times kept with
+  each piece, so the player tints and saves sentences the same way. Line ids
   (`LineId`) carry the edition, page and line, and the page's line count:
   a podcast made from other lines isn't used. Its `voice` is the name the
   playing screen shows, and `instead` why an article of an edition with a
@@ -325,7 +326,9 @@ flowchart LR
     scheduled editions start (`PodcastPace.earlier`).
 - **`PodcastLog`** records what the making did: each run's start, whether
   it got the foreground, why it stopped, each piece kept (seconds of audio
-  and of work), lines over 30 s, and the unkept audio a stop dropped. It
+  and of work), lines over 30 s or that sound wrong (`SpeechCheck`), and
+  the unkept audio a stop dropped. Playing adds where each play started
+  and which piece failed. It
   keeps the last 400 entries in `files/podcast-log.txt` for Settings ›
   Listening to show and share, and writes the same to logcat (`PodcastLog`).
 - **`ListenProgress`** keeps where each of the ten most recent editions

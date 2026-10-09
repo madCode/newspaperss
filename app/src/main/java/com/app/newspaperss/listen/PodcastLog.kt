@@ -7,8 +7,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * What the podcast's making did, run by run: when each run started and stopped and why, what it
- * kept, and the sentences that took long. Kept in [file] (the last [keep] entries) so a phone
+ * What the podcast's making did, run by run (when each run started and stopped and why, what it
+ * kept, the sentences that took long or sound wrong), and where each play started and what
+ * stopped one. Kept in [file] (the last [keep] entries) so a phone
  * without a computer attached can show it, and written to logcat for one with.
  *
  * @param file null to write to logcat only.

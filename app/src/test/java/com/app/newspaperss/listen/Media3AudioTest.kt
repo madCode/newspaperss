@@ -115,8 +115,7 @@ class Media3AudioTest {
     }
 
     private val players = mutableListOf<FakePlayer>()
-    private val logged = mutableListOf<String>()
-    private val audio = Media3Audio(logged::add) { FakePlayer().also { players += it } }
+    private val audio = Media3Audio { FakePlayer().also { players += it } }
     private val heard = mutableListOf<String>()
     private val player get() = players.last()
     private val pieces = listOf(File("0-0.m4a"), File("0-28.m4a"), File("0-59.m4a"))
@@ -124,10 +123,9 @@ class Media3AudioTest {
     @Before
     fun listen() {
         audio.listener = object : PodcastAudio.Listener {
-            override fun onPosition(ms: Long) { heard += "at $ms" }
-            override fun onNext() { heard += "next" }
+            override fun onPosition(index: Int, ms: Long) { heard += "at $index $ms" }
             override fun onEnded() { heard += "ended" }
-            override fun onError() { heard += "error" }
+            override fun onError(index: Int, code: String) { heard += "error $index $code" }
         }
     }
 
@@ -144,21 +142,17 @@ class Media3AudioTest {
         assertEquals(1, player.index)
         assertEquals(1.5f, player.speed)
         assertTrue(player.prepared && player.playing)
-        assertTrue(heard.first(), heard.first().startsWith("at 3"))
+        assertTrue(heard.first(), heard.first().startsWith("at 1 3"))
     }
 
     @Test
-    fun runningOnIntoTheNextPieceIsToldOnceAndPositionsAreWithinIt() {
+    fun positionsSayWhichPieceTheyAreWithin() {
         audio.play(pieces, 0, 0, 1f)
-        idle()
-        player.at(1, 0)
         idle()
         player.at(1, 7_000)
         idle()
 
-        assertEquals(1, heard.count { it == "next" })
-        assertTrue(heard.toString(), heard.indexOf("next") < heard.indexOfFirst { it.startsWith("at 70") })
-        assertEquals(listOf("Playing: on to 0-28.m4a"), logged)
+        assertTrue(heard.last(), heard.last().startsWith("at 1 70"))
     }
 
     @Test
@@ -169,7 +163,6 @@ class Media3AudioTest {
         idle()
 
         assertEquals("ended", heard.last())
-        assertEquals("Playing: 0-59.m4a ended", logged.last())
     }
 
     @Test
@@ -180,9 +173,7 @@ class Media3AudioTest {
         player.fail()
         idle()
 
-        assertEquals("error", heard.last())
-        assertTrue(heard.none { it == "next" })
-        assertEquals("Playing: 0-0.m4a failed, ERROR_CODE_PARSING_CONTAINER_MALFORMED", logged.last())
+        assertEquals("error 0 ERROR_CODE_PARSING_CONTAINER_MALFORMED", heard.last())
     }
 
     @Test
@@ -194,8 +185,7 @@ class Media3AudioTest {
         player.fail()
         idle()
 
-        assertEquals(listOf("next", "error"), heard.filter { !it.startsWith("at") })
-        assertEquals("Playing: 0-28.m4a failed, ERROR_CODE_PARSING_CONTAINER_MALFORMED", logged.last())
+        assertEquals("error 1 ERROR_CODE_PARSING_CONTAINER_MALFORMED", heard.last())
     }
 
     @Test
@@ -209,7 +199,7 @@ class Media3AudioTest {
         idle()
 
         assertEquals(1, players.size)
-        assertTrue(heard.none { it == "error" })
+        assertTrue(heard.none { it.startsWith("error") })
         assertEquals(2, player.index)
         assertEquals(1.2f, player.speed)
         assertTrue(player.prepared && player.playing && !player.released)
