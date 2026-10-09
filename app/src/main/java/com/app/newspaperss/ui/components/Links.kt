@@ -5,13 +5,18 @@ import android.content.Intent
 import android.net.Uri
 
 /**
- * Opens [url] in the browser if it's a web address. Links come from feeds, and a feed's `intent:`,
- * `market:` or `tel:` link would otherwise go to whichever app claims it.
+ * Whether [url] is a web address. Links come from feeds, and a feed's `intent:`, `market:` or
+ * `tel:` link would otherwise go to whichever app claims it.
+ */
+fun isWebAddress(url: String): Boolean = Uri.parse(url.trim()).scheme?.lowercase() in setOf("http", "https")
+
+/**
+ * Opens [url] in the browser if it's a web address ([isWebAddress]).
  *
  * @return whether a browser took it: some e-readers have none.
  */
 fun openInBrowser(context: Context, url: String): Boolean {
+    if (!isWebAddress(url)) return false
     val uri = Uri.parse(url.trim())
-    if (uri.scheme?.lowercase() !in setOf("http", "https")) return false
     return runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
 }
