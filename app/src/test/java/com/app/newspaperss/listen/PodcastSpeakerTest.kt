@@ -43,8 +43,12 @@ class PodcastSpeakerTest {
     private val audio = object : PodcastAudio {
         override var listener: PodcastAudio.Listener? = null
         val played = mutableListOf<Triple<String, Long, Float>>()
+        var files = emptyList<String>()
         var stopped = 0
-        override fun play(file: File, fromMs: Long, speed: Float) { played += Triple(file.name, fromMs, speed) }
+        override fun play(files: List<File>, index: Int, fromMs: Long, speed: Float) {
+            played += Triple(files[index].name, fromMs, speed)
+            this.files = files.map { it.name }
+        }
         override fun stop() { stopped++ }
         override fun release() {}
     }
@@ -86,6 +90,8 @@ class PodcastSpeakerTest {
         assertTrue(speaker.speak(id(1), "Counting Knots", null, 1.2f, flush = false))
 
         assertEquals(listOf(Triple("0-0.m4a", 0L, 1.2f)), audio.played)
+        // The whole article's pieces, so the audio runs on from one to the next.
+        assertEquals(listOf("0-0.m4a", "0-3.m4a"), audio.files)
         assertTrue(phone.said.isEmpty())
         assertEquals(PodcastVoice.EMMA, speaker.voice.value)
 
@@ -93,26 +99,36 @@ class PodcastSpeakerTest {
         audio.listener!!.onPosition(4_600)
         assertEquals(listOf("start ${id(0)}", "start ${id(1)}", "start ${id(2)}"), heard)
 
-        // The first piece ends: the next plays on, and the last line's end ends the article.
-        audio.listener!!.onEnded()
-        assertEquals(Triple("0-3.m4a", 0L, 1.2f), audio.played.last())
+        // The audio runs on into the next piece, unasked; the last one's end ends the article.
+        audio.listener!!.onNext()
         audio.listener!!.onPosition(3_100)
         audio.listener!!.onEnded()
+        assertEquals(1, audio.played.size)
         assertEquals(listOf("start ${id(3)}", "start ${id(4)}", "done ${id(4)}"), heard.drop(3))
     }
 
     @Test
-    fun theLogSaysWhereEachPlayStartedAndWhenOnePieceGaveWayToTheNext() {
+    fun theLogSaysWhereEachPlayStarted() {
         made()
         listen()
         speaker.speak(id(1), "Counting Knots", null, 1f, flush = true)
-        audio.listener!!.onEnded()
 
         // A play from a line nobody asked for is what a skip in the audio would look like.
-        assertEquals(
-            listOf("Playing edition 7 page 0 from line 1: 0-0.m4a at 2.00s, speed 1.0", "Playing: 0-0.m4a ended, on to 0-3.m4a"),
-            logged,
-        )
+        assertEquals(listOf("Playing edition 7 page 0 from line 1: 0-0.m4a at 2.00s, speed 1.0"), logged)
+    }
+
+    @Test
+    fun runningOnIntoTheNextPieceReportsItsFirstSentence() {
+        made()
+        listen()
+        speaker.speak(id(0), "Quanta", null, 1f, flush = true)
+        audio.listener!!.onPosition(4_600)
+        audio.listener!!.onNext()
+        // News of a next piece past the last is nothing to act on.
+        audio.listener!!.onNext()
+        audio.listener!!.onPosition(0)
+
+        assertEquals(listOf("start ${id(0)}", "start ${id(1)}", "start ${id(2)}", "start ${id(3)}"), heard)
     }
 
     @Test
@@ -217,7 +233,7 @@ class PodcastSpeakerTest {
         audio.listener!!.onPosition(4_600)
         speaker.speak(id(3), "It took a week.", null, 1f, flush = false)
         // The first piece played through; the second fails to start.
-        audio.listener!!.onEnded()
+        audio.listener!!.onNext()
         audio.listener!!.onError()
 
         assertEquals(listOf("It took a week."), phone.said.map { it.text })

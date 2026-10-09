@@ -271,8 +271,8 @@ flowchart LR
   starts, it picks its voice: the podcast if that article is made and
   Kokoro is in use, else `SystemSpeaker`; the choice holds while the article
   plays on, and one in the phone's voice is chosen again at the next play
-  or jump. Playing a podcast (`MediaPlayerAudio`, pieces one after
-  another), it reports each line's start from the times kept with each
+  or jump. Playing a podcast (`Media3Audio`: an article's pieces as one
+  list for a Media3 player, so they run on unbroken), it reports each line's start from the times kept with each
   piece, so the player tints and saves sentences the same way. Line ids
   (`LineId`) carry the edition, page and line, and the page's line count:
   a podcast made from other lines isn't used. Its `voice` is the name the

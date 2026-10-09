@@ -122,6 +122,7 @@ dependencies {
     implementation(libs.work.runtime)
     implementation(libs.media3.session)
     implementation(libs.media3.common)
+    implementation(libs.media3.exoplayer)
     implementation(libs.datastore.preferences)
     implementation(libs.coroutines.android)
     implementation(libs.okhttp)

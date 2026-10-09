@@ -56,6 +56,10 @@ import com.app.newspaperss.work.ReadingListTitleWorker
 import com.app.newspaperss.work.TtrssMarkReadWorker
 import java.io.File
 import android.util.Log
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,7 +72,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import com.app.newspaperss.settings.ListenVoice
-import com.app.newspaperss.listen.MediaPlayerAudio
+import com.app.newspaperss.listen.Media3Audio
 import com.app.newspaperss.listen.MediaPlayerChime
 import com.app.newspaperss.listen.PodcastSpeaker
 
@@ -145,11 +149,20 @@ class AppContainer(
 
     /** Listen's voice: a made podcast where there is one, the phone's elsewhere. */
     private val listenSpeaker by lazy {
-        PodcastSpeaker(speaker(), podcastStore, MediaPlayerAudio(logPlaying), log = logPlaying) {
+        PodcastSpeaker(speaker(), podcastStore, Media3Audio(logPlaying, podcastPlayer), log = logPlaying) {
             // Just after the app starts, before the store's first value: read it, or a made
             // article would play in the phone's voice.
             (listenSettings.value ?: runCatching { runBlocking { settings.current() } }.getOrNull())?.listenVoice == ListenVoice.PODCAST
         }
+    }
+
+    /** Plays a podcast's pieces as speech. Focus is [ListenService]'s, as for the phone's voice. */
+    private val podcastPlayer: () -> Player = {
+        ExoPlayer.Builder(context)
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_SPEECH).build(), false)
+            // It decodes in this app's process, which may sleep with the screen off.
+            .setWakeMode(C.WAKE_MODE_LOCAL)
+            .build()
     }
 
     /** The podcast's voice while an article plays from it; null in the phone's voice. */

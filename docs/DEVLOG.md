@@ -12,6 +12,16 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Watching:** two tests that failed CI now and then: a settings test on a DataStore rename (#66, #81) and a source-page test on a closed database (#89). Both now stop what they opened only after the screen is torn down; watching whether that was it.
 - **Waiting on you:** [#18](https://github.com/madCode/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
+## Fri 9 Oct
+
+### Podcasts: the end of every piece was cut
+- **From you:** some sentences in podcasts clip, always in the same place: "simply said: 'Get a haircut'" in the Glen Campbell piece, and somewhere in Elysian's.
+- **Found, one log at a time:** the encoder kept every frame (#214), Kokoro made no quiet gap and playback didn't skip (#219). Your EPUB showed the clipped sentence was the last line of its two-minute piece, and listening to another piece's last line ("…more than a whole day's work.", cut at "more") confirmed it. Each piece was played by its own MediaPlayer, which said it had finished while the last 0.15–0.9 s was still to be heard; releasing it for the next piece cut that off.
+- **Shipped (#220):** an article's pieces now go to one Media3 player as a list, which plays them back to back through one audio output and says it has ended only once the sound is out. Each piece skips the encoder's 85 ms lead-in, so the joins have no pause. On the way: waiting by the clock and keeping a finished player a second, which fixed most of it on your phone but left a little.
+- **With help:** your local Claude session measured it on an emulator with audio on: MediaPlayer always holds 0.3–0.5 s unplayed; Media3's playlist keeps one audio output across the join, with no underruns; it ends only once that output has drained; the encoder's lead-in is exactly two frames, and clipping it keeps the join gapless. The emulator didn't reproduce the phone's early "finished", so Bluetooth or offloaded audio on the phone is the suspect.
+- **Also (#219):** the podcast log follows playback, flags faint noise where words should be, and logs a flagged line's exact text.
+- **Left:** a smaller APK (per-ABI), in the backlog.
+
 ## Thu 8 Oct
 
 ### Extraction sweep: a magazine, paywalls, notes
