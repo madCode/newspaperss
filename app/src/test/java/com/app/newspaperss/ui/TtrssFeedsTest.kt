@@ -41,6 +41,7 @@ import com.app.newspaperss.ui.sources.SourceDetailScreen
 import com.app.newspaperss.ui.sources.SourceDetailViewModel
 import com.app.newspaperss.ui.sources.SourcesScreen
 import com.app.newspaperss.ui.sources.SourcesViewModel
+import com.app.newspaperss.ui.sources.cantFetchLine
 import com.app.newspaperss.ui.sources.feedNote
 import com.app.newspaperss.data.sameFeed
 import com.app.newspaperss.core.extract.ContentMode
@@ -363,6 +364,21 @@ class TtrssFeedsTest {
         idleUntil { compose.waitForIdle(); back }
     }
 
+    /** The banner names the feeds tt-rss can't fetch, so they're found under folded categories too. */
+    @Test
+    fun theFeedsTtrssCantFetchAreNamed() {
+        assertNull(cantFetchLine(emptyList()))
+        assertEquals("⚠ tt-rss couldn't fetch one of your feeds last time it tried: Aeon. If this stays, check its address in tt-rss.", cantFetchLine(listOf("Aeon")))
+        assertEquals(
+            "⚠ tt-rss couldn't fetch 2 of your feeds last time it tried: Aeon and Wired. If this stays, check their addresses in tt-rss.",
+            cantFetchLine(listOf("Aeon", "Wired")),
+        )
+        assertEquals(
+            "⚠ tt-rss couldn't fetch 5 of your feeds last time it tried: A, B, C and 2 more. If this stays, check their addresses in tt-rss.",
+            cantFetchLine(listOf("A", "B", "C", "D", "E")),
+        )
+    }
+
     @Test
     fun aFeedsLineSaysOnlyWhatsWorthSaying() {
         fun feed(publication: PublicationEntity?) = FeedChoice("7", "Q", inPaper = true, publication)
@@ -373,6 +389,11 @@ class TtrssFeedsTest {
             feedNote(feed(PublicationEntity(1, "7", chosenMode = ContentMode.FEED, maxArticles = 1, skipPaidPosts = true))),
         )
         assertEquals("Full page", feedNote(feed(PublicationEntity(1, "7", chosenMode = ContentMode.PAGE))))
+        // A feed tt-rss can't fetch says so first; waiting for a first fetch that failed is the same news.
+        assertEquals(
+            "tt-rss couldn't fetch it last time · Full page",
+            feedNote(feed(PublicationEntity(1, "7", chosenMode = ContentMode.PAGE, awaitingFirstFetch = true, serverError = "HTTP Code: 404"))),
+        )
         assertTrue(sameFeed("https://www.Example.com/feed/", "http://example.com/feed"))
         assertFalse(sameFeed("https://example.com/feed", "https://example.com/rss"))
     }

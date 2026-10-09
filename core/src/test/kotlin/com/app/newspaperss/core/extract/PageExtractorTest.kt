@@ -119,4 +119,53 @@ class PageExtractorTest {
         assertNull(PageExtractor.cleanAuthor("x".repeat(81)))
         assertNull(PageExtractor.cleanAuthor(" "))
     }
+
+    /** Shaped like New Left Review: notes in the article's <footer>, each mostly its link back, which Readability drops. */
+    @Test
+    fun footnotesInTheArticlesFooterAllCome() {
+        val refs = (1..12).joinToString("") { "<p>$sentence<a href=\"#note-$it\" id=\"reference-$it\"><sup>$it</sup></a></p>" }
+        val notes = (1..12).joinToString("") { "<div id=\"note-$it\"><a href=\"#reference-$it\">$it</a> Raymond Williams, <em>Culture and Society</em>, London 1958, p. $it.</div>" }
+        val html = """<html><head><title>Story</title></head><body><article><h1>Story</h1><div class="article-body">$refs</div>
+            <footer class="article-footnotes">$notes</footer></article><footer id="site-footer"><p>About us</p></footer></body></html>"""
+
+        val page = PageExtractor.extract(html, url)
+        for (n in 1..12) assertTrue("note $n", "id=\"note-$n\"" in page.html)
+    }
+
+    /** A magazine's own paywall: the free part, then a sign-in form inside the article. */
+    @Test
+    fun aSignInFormInTheArticleIsAPaywall() {
+        val text = (1..8).joinToString("") { "<p>$sentence</p>" }
+        val form = """<form action="/session"><input type="email"><input type="password"></form>"""
+        fun page(body: String) = "<html><head><title>Story</title></head><body>$body</body></html>"
+
+        val offer = "<ul><li><a href=\"/subscriptions/new\">Subscribe for instant access</a></li><li><a href=\"/buy\">Buy this article</a></li></ul>"
+        assertTrue(PageExtractor.extract(page("<article>$text<div id=\"access-options\"><div>$form</div>$offer</div></article>"), url).paywalled)
+        assertFalse("a form to log in and comment", PageExtractor.extract(page("<article>$text<div><h3>Log in to comment</h3>$form</div></article>"), url).paywalled)
+        assertFalse("a sign-in form in the site's header", PageExtractor.extract(page("<header>$form</header><article>$text</article>"), url).paywalled)
+        assertFalse("one of several articles, as on an index", PageExtractor.extract(page("<article>$text$form</article><article>$text</article>"), url).paywalled)
+    }
+
+    /** Shaped like Stratechery: a sentence free, a pricing box, and a podcast list in the header Readability prefers once the box is gone. */
+    @Test
+    fun theFreePartIsWhatSharesThePaywallsBox() {
+        val podcasts = (1..6).joinToString("") { "<li><a href=\"/p$it\"><h4>Episode $it, about the week in technology and media</h4></a><p>Podcast | Oct $it</p></li>" }
+        val pricing = (1..10).joinToString("") { "<p>$sentence</p>" }
+        val html = """<html><head><title>Update</title></head><body><header><ul>$podcasts</ul></header><main>
+            <div class="entry-content"><p>Games are being decompiled, but the real risk is new games.</p>
+            <div class="passport-marketing-page">$pricing</div></div></main></body></html>"""
+
+        val page = PageExtractor.extract(html, url)
+        assertTrue(page.paywalled)
+        assertTrue(page.html, "Games are being decompiled" in page.html)
+        assertFalse(page.html, "Episode" in page.html || "committee" in page.html)
+
+        // MemberPress's box holds just the pitch and a login form; the free part is outside, and Readability's pick stays.
+        val intro = (1..10).joinToString("") { "<p>$sentence</p>" }
+        val member = """<html><head><title>Members</title></head><body><main><div class="entry-content">$intro<div class="mp_wrapper">
+            <div class="mepr-unauthorized-message"><p>This premium article is available to paid subscribers.</p></div>
+            <div class="mepr-login-form-wrap"><form><label>Remember Me</label><input type="password"><a href="/login/?action=forgot_password">Forgot Password</a></form></div>
+            </div></div></main></body></html>"""
+        assertTrue(HtmlCleaner.countWords(PageExtractor.extract(member, url).html) >= 150)
+    }
 }

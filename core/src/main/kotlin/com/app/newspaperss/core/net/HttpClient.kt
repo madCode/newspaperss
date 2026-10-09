@@ -24,6 +24,8 @@ class HttpResponse(
     val finalUrl: String,
     val contentType: String?,
     val body: String,
+    /** The body is only the start of a longer one: see [HttpClient.getFeed]. */
+    val truncated: Boolean = false,
 ) {
     val isSuccessful get() = code in 200..299
 }
@@ -39,6 +41,13 @@ class HttpBytes(
 interface HttpClient {
     /** Fetches [url]; throws IOException on network failure, never on an HTTP error status. */
     suspend fun get(url: String): HttpResponse
+
+    /**
+     * Fetches a feed at [url] like [get], except that one over the size limit comes back cut
+     * short, marked [HttpResponse.truncated], rather than refused: some sites put every post they
+     * ever wrote in one feed, newest first, so its start is all an app needs.
+     */
+    suspend fun getFeed(url: String): HttpResponse = get(url)
 
     /**
      * Fetches [url] as raw bytes, for images, sending [headers] as well; throws IOException on
@@ -70,21 +79,28 @@ class OkHttpHttpClient(
     // posts. Not no-cache, which in OkHttp skips the cache and its validators altogether.
     override suspend fun get(url: String): HttpResponse = text(request(url, emptyMap()) { cacheControl(REVALIDATE) })
 
+    override suspend fun getFeed(url: String): HttpResponse = text(request(url, emptyMap()) { cacheControl(REVALIDATE) }, truncate = true)
+
     override suspend fun postJson(url: String, body: String): HttpResponse =
         text(request(url, emptyMap()) { post(body.toRequestBody(JSON)) }, postClient)
 
     // On IO throughout: closing a response it didn't read to the end reads the rest off the network.
-    private suspend fun text(request: Request, via: OkHttpClient = client): HttpResponse = withContext(Dispatchers.IO) {
-        via.newCall(request).await().use { r ->
+    private suspend fun text(request: Request, via: OkHttpClient = client, truncate: Boolean = false): HttpResponse = withContext(Dispatchers.IO) {
+        val call = via.newCall(request)
+        call.await().use { r ->
             if (r.isRedirect) {
                 val location = r.header("Location")?.let { r.request.url.resolve(it)?.toString() } ?: r.request.url.toString()
                 return@use HttpResponse(r.code, location, r.header("Content-Type"), "")
             }
             val source = r.body.source()
             // Someone may paste a link to a video or a huge file; don't read it all into memory.
-            if (source.request(MAX_BYTES + 1)) throw IOException("Too large to be a feed or an article.")
-            val bytes = source.readByteArray()
-            HttpResponse(r.code, r.request.url.toString(), r.header("Content-Type"), decode(bytes, r.body.contentType()?.charset()))
+            val tooLarge = source.request(MAX_BYTES + 1)
+            if (tooLarge && !truncate) throw IOException("Too large to be a feed or an article.")
+            val bytes = if (tooLarge) source.readByteArray(MAX_BYTES) else source.readByteArray()
+            // Cancelled, not just closed: closing reads the rest to store the whole of it in the
+            // cache, more than the cache holds, which would push every other feed out of it.
+            if (tooLarge) call.cancel()
+            HttpResponse(r.code, r.request.url.toString(), r.header("Content-Type"), decode(bytes, r.body.contentType()?.charset()), truncated = tooLarge)
         }
     }
 

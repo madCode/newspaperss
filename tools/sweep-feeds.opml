@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Well-known public feeds picked for variety, for ./gradlew :core:extractionSweep: platforms,
+     news sites, other languages and scripts, footnote and sidenote styles, galleries, embeds. -->
+<opml version="2.0">
+<head><title>Extraction sweep: public feeds</title></head>
+<body>
+<outline text="Platforms">
+  <outline text="Tumblr: staff" xmlUrl="https://staff.tumblr.com/rss"/>
+  <outline text="WordPress.com: Longreads" xmlUrl="https://longreads.com/feed/"/>
+  <outline text="Squarespace: Seth Godin" xmlUrl="https://seths.blog/feed/"/>
+  <outline text="Hugo: Go blog" xmlUrl="https://go.dev/blog/feed.atom"/>
+  <outline text="Jekyll: GitHub blog" xmlUrl="https://github.blog/feed/"/>
+  <outline text="Drupal: Drupal.org news" xmlUrl="https://www.drupal.org/planet/rss.xml"/>
+  <outline text="Write.as" xmlUrl="https://write.as/matt/feed/"/>
+  <outline text="Microblog: Derek Sivers" xmlUrl="https://sive.rs/en.atom"/>
+  <outline text="Substack: Astral Codex Ten" xmlUrl="https://www.astralcodexten.com/feed"/>
+  <outline text="Ghost: 404 Media" xmlUrl="https://www.404media.co/rss/"/>
+</outline>
+<outline text="News">
+  <outline text="The Guardian" xmlUrl="https://www.theguardian.com/world/rss"/>
+  <outline text="BBC News" xmlUrl="https://feeds.bbci.co.uk/news/rss.xml"/>
+  <outline text="Ars Technica" xmlUrl="https://feeds.arstechnica.com/arstechnica/index"/>
+  <outline text="The Verge" xmlUrl="https://www.theverge.com/rss/index.xml"/>
+  <outline text="ProPublica" xmlUrl="https://www.propublica.org/feeds/propublica/main"/>
+  <outline text="The Atlantic" xmlUrl="https://www.theatlantic.com/feed/all/"/>
+  <outline text="The New Yorker" xmlUrl="https://www.newyorker.com/feed/everything"/>
+  <outline text="Quanta" xmlUrl="https://www.quantamagazine.org/feed/"/>
+  <outline text="Aeon" xmlUrl="https://aeon.co/feed.rss"/>
+  <outline text="London Review of Books" xmlUrl="https://www.lrb.co.uk/feeds/rss"/>
+  <outline text="Nautilus" xmlUrl="https://nautil.us/feed/"/>
+</outline>
+<outline text="Other languages">
+  <outline text="Le Monde" xmlUrl="https://www.lemonde.fr/rss/une.xml"/>
+  <outline text="Der Spiegel" xmlUrl="https://www.spiegel.de/schlagzeilen/index.rss"/>
+  <outline text="El País" xmlUrl="https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"/>
+  <outline text="NHK" xmlUrl="https://www3.nhk.or.jp/rss/news/cat0.xml"/>
+  <outline text="Al Jazeera Arabic" xmlUrl="https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"/>
+  <outline text="Meduza" xmlUrl="https://meduza.io/rss/all"/>
+  <outline text="Folha de S.Paulo" xmlUrl="https://feeds.folha.uol.com.br/emcimadahora/rss091.xml"/>
+</outline>
+<outline text="Notes, sidenotes, long form">
+  <outline text="Gwern" xmlUrl="https://gwern.substack.com/feed"/>
+  <outline text="Daring Fireball" xmlUrl="https://daringfireball.net/feeds/main"/>
+  <outline text="Paul Graham" xmlUrl="https://www.paulgraham.com/rss.html"/>
+  <outline text="Simon Willison" xmlUrl="https://simonwillison.net/atom/everything/"/>
+  <outline text="LessWrong" xmlUrl="https://www.lesswrong.com/feed.xml?view=curated-rss"/>
+  <outline text="The Marginalian" xmlUrl="https://www.themarginalian.org/feed/"/>
+  <outline text="Kottke" xmlUrl="https://feeds.kottke.org/main"/>
+  <outline text="Marginal Revolution" xmlUrl="https://marginalrevolution.com/feed"/>
+  <outline text="Public Domain Review" xmlUrl="https://publicdomainreview.org/rss.xml"/>
+  <outline text="Low-tech Magazine" xmlUrl="https://solar.lowtechmagazine.com/posts/index.xml"/>
+  <outline text="Wait But Why" xmlUrl="https://waitbutwhy.com/feed"/>
+  <outline text="xkcd" xmlUrl="https://xkcd.com/atom.xml"/>
+</outline>
+</body>
+</opml>

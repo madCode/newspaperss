@@ -104,7 +104,7 @@ class MigrationTest {
 
         helper.runMigrationsAndValidate(DB, 3, true, AppDatabase.MIGRATION_2_3).close()
         val room = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), AppDatabase::class.java, DB)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8, AppDatabase.MIGRATION_8_9).allowMainThreadQueries().build()
         try {
             runBlocking {
                 assertEquals(7000L, room.articles().byId(4)!!.starredAt?.toEpochMilli())
@@ -305,5 +305,24 @@ class MigrationTest {
 
     private companion object {
         const val DB = "migration-test.db"
+    }
+
+    @Test
+    fun version9KeepsPublicationsWithNoErrorFromTtrss() {
+        helper.createDatabase(DB, 8).use { db ->
+            db.execSQL(
+                "INSERT INTO sources (id, kind, url, title, position, contentMode, contentModeChosen, fullTextStreak, paused, markReadOnServer, addedAt) " +
+                    "VALUES (1, 'TTRSS', 'https://rss.example/api/', 'tt-rss', 0, 'AUTO', 0, 0, 0, 1, 0)",
+            )
+            db.execSQL("INSERT INTO publications (sourceId, `key`, contentMode, fullTextStreak, title, listed) VALUES (1, '7', 'AUTO', 0, 'Quarterly', 1)")
+        }
+        helper.runMigrationsAndValidate(DB, 9, true, AppDatabase.MIGRATION_8_9).use { db ->
+            db.query("SELECT title, listed, serverError FROM publications WHERE sourceId = 1 AND `key` = '7'").use { c ->
+                c.moveToFirst()
+                assertEquals("Quarterly", c.getString(0))
+                assertEquals(1, c.getInt(1))
+                assertTrue(c.isNull(2))
+            }
+        }
     }
 }

@@ -289,7 +289,7 @@ fun SourceDetailScreen(viewModel: SourceDetailViewModel, onBack: () -> Unit, onG
 }
 
 /**
- * A tt-rss feed's address, then whether it's waiting or left out, then the details: its account
+ * A tt-rss feed's address, then whether it's left out, failing or waiting, then the details: its account
  * and category, and where its article text comes from.
  */
 @Composable
@@ -300,15 +300,25 @@ private fun FeedHeader(publication: PublicationEntity?, onCopied: (String) -> Un
         publication?.feedUrl?.let { url ->
             AddressLink(url, SourceRepository.hostOf(url), MaterialTheme.typography.bodyMedium, onCopied, Modifier.padding(bottom = 12.dp))
         }
-        val state = when {
-            publication?.leftOut == true -> "Left out of the paper. It stays in your tt-rss and isn't fetched. Starred articles from it still go in."
-            publication?.awaitingFirstFetch == true -> "$WAITING_FOR_FIRST_FETCH. Its first articles come once tt-rss has fetched it, usually within the hour."
-            else -> null
+        // Not for a feed left out: it isn't fetched for the paper, so its fetching doesn't matter here.
+        val serverError = publication?.serverError?.takeIf { !publication.leftOut }
+        val leftOut = publication?.leftOut == true
+        if (leftOut || serverError != null || publication?.awaitingFirstFetch == true) Column(Modifier.padding(bottom = 12.dp)) {
+            when {
+                leftOut ->
+                    Text("Left out of the paper. It stays in your tt-rss and isn't fetched. Starred articles from it still go in.", style = MaterialTheme.typography.bodyLarge)
+                serverError != null -> {
+                    // tt-rss's own words, which can be technical ("HTTP Code: 404"): what to do comes first.
+                    Text("$SERVER_CANT_FETCH. If this stays, nothing new comes from it: the feed may have moved or closed, so check its address in tt-rss.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
+                    Text("tt-rss says: $serverError", style = MaterialTheme.typography.bodyMedium, color = muted)
+                }
+                else ->
+                    Text("$WAITING_FOR_FIRST_FETCH. Its first articles come once tt-rss has fetched it, usually within the hour.", style = MaterialTheme.typography.bodyLarge)
+            }
         }
-        state?.let { Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 12.dp)) }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(listOfNotNull("In your tt-rss", publication?.category?.let { "category $it" }).joinToString(" · "), style = details, color = muted)
-            if (publication?.leftOut != true) Text(textLine(publication), style = details, color = muted)
+            if (!leftOut) Text(textLine(publication), style = details, color = muted)
         }
     }
 }

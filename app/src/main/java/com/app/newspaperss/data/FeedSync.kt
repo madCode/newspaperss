@@ -2,6 +2,7 @@ package com.app.newspaperss.data
 
 import com.app.newspaperss.core.feed.FeedParseException
 import com.app.newspaperss.core.feed.FeedParser
+import com.app.newspaperss.core.feed.FeedTooLargeException
 import com.app.newspaperss.core.feed.LinkPosts
 import com.app.newspaperss.core.net.withoutTracking
 import com.app.newspaperss.core.lists.CuratedLists
@@ -66,9 +67,9 @@ class FeedSync(
         if (source.kind == SourceKind.LIST) return syncList(source)
         val now = clock.instant()
         val error = try {
-            val response = http.get(source.url)
+            val response = http.getFeed(source.url)
             if (response.isSuccessful) {
-                val feed = FeedParser.parse(response.body, response.finalUrl)
+                val feed = FeedParser.parse(response.body, response.finalUrl, response.truncated)
                 val added = db.articles().insertFetched(
                     feed.items.map {
                         ArticleEntity(
@@ -86,6 +87,8 @@ class FeedSync(
             throw e
         } catch (e: IOException) {
             "Couldn't reach the site."
+        } catch (e: FeedTooLargeException) {
+            e.message ?: "This feed is too large to read."
         } catch (e: FeedParseException) {
             "We can't get new articles from this site any more. It may have moved; try adding it again."
         } catch (e: SQLiteConstraintException) {
@@ -184,8 +187,10 @@ class FeedSync(
                 // fill those 200, and a feed that posts monthly would never reach the paper.
                 val leftOut = db.sources().leftOut(source.id).map { it.key }.toSet()
                 val withUnread = client.unreadFeeds(category).filter { it.unread > 0 }
-                // A feed with articles has been fetched, without waiting for tomorrow's feed list to say so.
+                // A feed with articles has been fetched, without waiting for tomorrow's feed list to say so,
+                // and its fetching error is current: one fixed in tt-rss stops showing as soon as it has posts.
                 db.sources().fetchedByServer(source.id, withUnread.map { it.id.toString() })
+                db.withTransaction { withUnread.forEach { db.sources().setServerError(source.id, it.id.toString(), it.lastError) } }
                 val unreadFeeds = withUnread.filter { it.id.toString() !in leftOut }
                 val headlines = fromEachFeed(client, unreadFeeds)
                 val articles = headlines.map {
@@ -362,6 +367,7 @@ internal suspend fun listTtrssFeeds(db: AppDatabase, client: TtrssClient, source
                     listed = inPaperCategory,
                     outsideCategory = !inPaperCategory,
                     awaitingFirstFetch = feed.lastUpdated == 0L,
+                    serverError = feed.lastError,
                 ),
             )
         }

@@ -174,6 +174,36 @@ class TtrssSyncTest {
         assertEquals("unsubscribed in tt-rss", listOf("Quarterly Review", "Subscribed Today"), sources.observeFeeds(source.id).first().map { it.title })
     }
 
+    /** tt-rss fetches its feeds itself: one it can't is said so, until it's fetched again. */
+    @Test
+    fun aFeedTtrssCantFetchSaysSoUntilItsArticlesComeAgain() = runTest {
+        server.feeds[7] = FakeTtrss.Feed("Moved Magazine", "https://moved.example/feed")
+        server.feeds[8] = FakeTtrss.Feed("Working Blog", "https://working.example/rss")
+        server.fetchErrors[7] = "HTTP Code: 404"
+        server.add(1, "A post", feedId = 8, feedTitle = "Working Blog")
+        val source = connect()
+
+        sync.syncAll()
+
+        assertEquals("HTTP Code: 404", db.sources().publication(source.id, "7")!!.serverError)
+        assertNull(db.sources().publication(source.id, "8")!!.serverError)
+
+        // Its address fixed in tt-rss, it sends articles again: the same day, before the next full list.
+        server.fetchErrors.remove(7)
+        server.add(2, "Back again", feedId = 7, feedTitle = "Moved Magazine")
+        sync.syncAll()
+        assertNull(db.sources().publication(source.id, "7")!!.serverError)
+
+        // Unsubscribed in tt-rss with its error standing: the next day's list drops the feed, and the error with it.
+        server.fetchErrors[8] = "HTTP Code: 410"
+        sync.syncAll()
+        assertEquals("HTTP Code: 410", db.sources().publication(source.id, "8")!!.serverError)
+        server.feeds.remove(8)
+        server.unread.removeAll { it.feedId == 8 }
+        FeedSync(db, http, Clock.fixed(now.plus(Duration.ofDays(1)), ZoneOffset.UTC), Duration.ofDays(7), accounts).syncAll()
+        assertNull(db.sources().publication(source.id, "8")!!.serverError)
+    }
+
     @Test
     fun anotherCategoryListsItsOwnFeedsAtTheNextSync() = runTest {
         server.categories[2] = "Essays"

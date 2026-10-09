@@ -31,15 +31,38 @@ object FeedParser {
     private val ENTITY_REF = Regex("&[A-Za-z_:]")
     private val ENTITY = Regex("<!ENTITY\\s+(%?)[^>]*?(\"[^\"]*\"|'[^']*'|>)", RegexOption.IGNORE_CASE)
     private const val MAX_PROLOG = 64 * 1024
+    private const val TOO_LARGE = "This feed is too large to read."
 
     /**
      * @param body the response body.
      * @param feedUrl where it was fetched from; relative links resolve against it.
+     * @param truncated [body] is only the start of the feed (see [com.app.newspaperss.core.net.HttpClient.getFeed]):
+     *   the items read before the cut are the feed. Not for a JSON Feed, which can't be read in part.
      */
-    fun parse(body: String, feedUrl: String): Feed {
+    fun parse(body: String, feedUrl: String, truncated: Boolean = false): Feed {
         val text = body.trimStart('﻿', ' ', '\t', '\r', '\n')
-        return if (text.startsWith("{")) parseJson(text, feedUrl) else parseXml(text, feedUrl)
+        if (truncated && text.startsWith("{")) throw FeedTooLargeException(TOO_LARGE)
+        val feed = if (text.startsWith("{")) parseJson(text, feedUrl) else parseXml(text, feedUrl, truncated)
+        return feed.copy(items = ownAddresses(feed.items))
     }
+    /**
+     * Gives each item of a microblog its own address: some link every entry to the one page that
+     * holds them all (sive.rs/d), with the entry's own page only in its id (sive.rs/d/1291). That
+     * page would be fetched as each entry's article, and the entries taken for one story. Only an
+     * id on the same site, and only where items share a link.
+     */
+    private fun ownAddresses(items: List<FeedItem>): List<FeedItem> {
+        val shared = items.groupingBy { it.url }.eachCount().filterValues { it > 1 }.keys
+        if (shared.isEmpty()) return items
+        return items.map { item ->
+            val id = item.guid
+            val sameSite = runCatching { host(URI(id)) == host(URI(item.url)) }.getOrDefault(false)
+            if (item.url in shared && id != item.url && id.startsWith("http") && sameSite) item.copy(url = id) else item
+        }
+    }
+
+    private fun host(uri: URI) = uri.host?.lowercase()?.removePrefix("www.")
+
 
     /** True if [body] looks like a feed rather than an HTML page. */
     fun looksLikeFeed(body: String): Boolean {
@@ -48,7 +71,7 @@ object FeedParser {
         return Regex("<(rss|feed|rdf:RDF)[\\s>]", RegexOption.IGNORE_CASE).containsMatchIn(head)
     }
 
-    private fun parseXml(text: String, feedUrl: String): Feed {
+    private fun parseXml(text: String, feedUrl: String, truncated: Boolean): Feed {
         // Entities that expand into other entities are refused before parsing: nested, they can
         // grow to gigabytes ("billion laughs"). Plain ones (an old CMS declaring &nbsp;) are read.
         val root = ROOT.find(text)?.range?.first ?: text.length
@@ -65,19 +88,42 @@ object FeedParser {
         }
         parser.setInput(StringReader(text))
         try {
-            return XmlFeedReader(parser, feedUrl).read()
+            return XmlFeedReader(parser, feedUrl, truncated).read()
         } catch (e: XmlPullParserException) {
             throw FeedParseException("Not a readable feed: ${e.message}", e)
         }
     }
 
-    private class XmlFeedReader(private val p: XmlPullParser, private val feedUrl: String) {
+    private class XmlFeedReader(private val p: XmlPullParser, private val feedUrl: String, private val truncated: Boolean) {
         private var feedTitle: String? = null
         private var siteUrl: String? = null
         private val items = mutableListOf<FeedItem>()
         private var sawRoot = false
 
         fun read(): Feed {
+            var stoppedAtCut = false
+            try {
+                readAll()
+            } catch (e: XmlPullParserException) {
+                // A cut inside a tag ("<descri") is an error; the items added before it are whole.
+                if (!truncated || items.isEmpty()) throw e
+                stoppedAtCut = true
+            }
+            if (!sawRoot) throw FeedParseException("Empty document")
+            if (!truncated) return Feed(feedTitle, siteUrl, items)
+            // Otherwise the parser took the cut for the document's end, closing what it left open
+            // (kxml on the JVM) or not (Android's): either way the last item read may be only part
+            // of one, so it goes. A whole one lost from a feed this long costs nothing.
+            val whole = if (stoppedAtCut) items.toList() else items.dropLast(1)
+            if (whole.isEmpty()) throw FeedTooLargeException(TOO_LARGE)
+            // Oldest first, the start of the feed is its oldest posts: new ones would never come.
+            val first = whole.first().published
+            val last = whole.last().published
+            if (first != null && last != null && first < last) throw FeedTooLargeException("$TOO_LARGE It lists its oldest posts first, so its new ones are past what can be read.")
+            return Feed(feedTitle, siteUrl, whole)
+        }
+
+        private fun readAll() {
             while (p.next() != XmlPullParser.END_DOCUMENT) {
                 if (p.eventType != XmlPullParser.START_TAG) continue
                 val name = p.name
@@ -94,8 +140,6 @@ object FeedParser {
                     name == "link" && siteUrl == null && p.depth <= 3 -> readLink()?.let { siteUrl = it }
                 }
             }
-            if (!sawRoot) throw FeedParseException("Empty document")
-            return Feed(feedTitle, siteUrl, items)
         }
 
         private fun readItem(tag: String): FeedItem? {

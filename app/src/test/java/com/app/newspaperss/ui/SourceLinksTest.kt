@@ -164,6 +164,20 @@ class SourceLinksTest {
     }
 
     @Test
+    fun aTtrssFeedTtrssCantFetchSaysSoBesideItsLink() {
+        val account = runBlocking {
+            val account = repo.addTtrss("https://rss.example.org/tt-rss/api/")
+            db.sources().savePublication(PublicationEntity(account, "5", title = "Quanta Magazine", feedUrl = "https://www.quantamagazine.org/feed/", listed = true, serverError = "HTTP Code: 404"))
+            account
+        }
+        show(account, key = "5", until = "tt-rss says: HTTP Code: 404")
+
+        assertTrue(visible("couldn't fetch it last time"))
+        compose.onNodeWithText("quantamagazine.org").performClick()
+        assertEquals("https://www.quantamagazine.org/feed/", opened())
+    }
+
+    @Test
     fun anAddressReadsWithoutItsSchemeOrHiddenReordering() {
         assertEquals("example.org", shownAddress("https://example.org/"))
         assertEquals("example.org/a/", shownAddress("HTTP://example.org/a/"))

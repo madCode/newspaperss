@@ -55,9 +55,12 @@ object HtmlCleaner {
         // Before players become links: a hidden player stays hidden.
         removeHidden(body)
         keepVideosAsLinks(body)
+        keepFootnoteContainers(body)
+        keepQuoteCredits(body)
         body.select(REMOVE_TAGS.joinToString(",")).remove()
         expandSubstackNotes(body)
         removeScreenReaderOnly(body)
+        capitalizeSmallCaps(body)
         removeJunk(body)
         removeRelatedLinks(body)
         removeBoilerplate(body)
@@ -226,8 +229,8 @@ object HtmlCleaner {
     }
 
     /**
-     * Removes text meant only for screen readers ("list 1 of 4", "Skip to content"), which
-     * sites hide with CSS the EPUB doesn't carry. Readability drops class names, so page
+     * Removes text meant only for screen readers ("list 1 of 4", "Skip to content") or for printing,
+     * which sites hide with CSS the EPUB doesn't carry. Readability drops class names, so page
      * extraction calls this before running it.
      */
     internal fun removeScreenReaderOnly(root: Element) {
@@ -235,11 +238,58 @@ object HtmlCleaner {
             if (el === root || !el.isAttached()) continue
             // By length, not share of the page: before Readability the page includes navigation and
             // comments, and a paywalled article body can sit in one of these classes.
-            if (el.classNames().any { it.lowercase() in SCREEN_READER_ONLY } && countWords(el) <= SCREEN_READER_MAX_WORDS &&
+            if (el.classNames().any { it.lowercase() in SCREEN_READER_ONLY || it.lowercase() in HIDDEN_ON_SCREEN } && countWords(el) <= SCREEN_READER_MAX_WORDS &&
                 el.selectFirst("img") == null && !isOnlyLabel(el)
             ) {
                 el.remove()
             }
+        }
+    }
+
+    /**
+     * Turns a `<footer>` or `<aside>` holding the article's footnotes into a `<div>`, so it isn't
+     * taken for the page's footer or a sidebar and dropped. It counts as footnotes when the text
+     * outside it links to an id inside it with a short marker ("1", "[2]", "*"). A note that's a
+     * `<div>` of running text becomes a `<p>`: Readability drops divs that are mostly link, as a
+     * short note with its link back is.
+     */
+    internal fun keepFootnoteContainers(root: Element) {
+        val boxes = root.select("footer, aside")
+        if (boxes.isEmpty()) return
+        // Once for the page, not per box: a hostile page can have thousands of both.
+        val markers = root.select("a[href^=#]").filter { it.text().trim().length <= FOOTNOTE_MARKER_MAX }
+            .groupBy { it.attr("href").drop(1) }
+        for (box in boxes) {
+            val targets = box.select("[id]").map { it.id() }.filter { id ->
+                markers[id].orEmpty().any { link -> link.parents().none { it === box } }
+            }.toSet()
+            if (targets.isEmpty()) continue
+            box.tagName("div")
+            for (note in box.select("div[id]")) {
+                if (note.id() in targets && note.select("*").all { it === note || it.tagName() in INLINE_TAGS }) note.tagName("p")
+            }
+        }
+    }
+
+    /** A `<footer>` in a quote or figure is its credit ("— Ada Lovelace, Notes"), not the page's footer. */
+    internal fun keepQuoteCredits(root: Element) {
+        root.select("blockquote footer, figure footer").forEach { it.tagName("div") }
+    }
+
+    /**
+     * Writes out in capitals what a page sets in small capitals, as the EPUB doesn't keep the
+     * styling. Sites that write "nato" or "us" in lower case for small capitals would otherwise
+     * read as a word ("us") or a typo; the opening words of an essay become capitals, as printed.
+     */
+    internal fun capitalizeSmallCaps(root: Element) {
+        for (el in root.select("*")) {
+            val small = el.classNames().any { it.lowercase() in SMALL_CAPS } || SMALL_CAPS_STYLE.containsMatchIn(el.attr("style"))
+            if (!small) continue
+            // The page's language: Turkish "i" is "İ" in capitals.
+            val lang = generateSequence(el) { it.parent() }.map { it.attr("lang").ifBlank { it.attr("xml:lang") } }.firstOrNull { it.isNotBlank() }
+            val locale = lang?.let { Locale.forLanguageTag(it) } ?: Locale.ROOT
+            // select includes el itself.
+            el.select("*").forEach { child -> child.textNodes().forEach { it.text(it.text().uppercase(locale)) } }
         }
     }
 
@@ -301,10 +351,17 @@ object HtmlCleaner {
         val total = countWords(body).coerceAtLeast(1)
         for (el in body.select("*")) {
             if (el === body || el.tagName() == "img" || !el.isAttached()) continue
-            val isJunk = el.attr("role") in JUNK_ROLES || classAndIdTokens(el).any { it in JUNK_TOKENS }
+            val isJunk = el.attr("role") in JUNK_ROLES || classAndIdTokens(el).any { it in JUNK_TOKENS } || isSiteFooter(el)
             if (isJunk && isSmallPart(el, total)) el.remove()
         }
     }
+
+    /**
+     * A page's footer by its whole class or id (Substack's is a `div.footer`). Not a word of one:
+     * "blockquote-footer" holds a quote's credit, "post-footer" can hold notes.
+     */
+    private fun isSiteFooter(el: Element): Boolean =
+        (el.classNames() + el.id()).any { it.lowercase() in SITE_FOOTERS } && el.parents().none { it.tagName() == "blockquote" || it.tagName() == "figure" }
 
     /** Safety net: an unlucky class name must never take most of the article with it. */
     internal fun isSmallPart(el: Element, totalWords: Int) = countWords(el).toDouble() / totalWords < SAFETY_NET_SHARE
@@ -313,11 +370,16 @@ object HtmlCleaner {
         "${el.className()} ${el.id()}".lowercase().split(TOKEN_SEPARATOR).filter { it.isNotEmpty() }
 
     private fun removeBoilerplate(body: Element) {
+        removeSiteButtons(body)
+        removeCardFurniture(body)
         for (el in body.select("p, div, li, span, h2, h3, h4, h5, h6")) {
             if (!el.isAttached()) continue
             val text = el.text().trim()
             val words = text.split(WHITESPACE).size
-            if (words <= BOILERPLATE_MAX_WORDS && BOILERPLATE.containsMatchIn(text) || words <= PITCH_MAX_WORDS && isPitch(el, text)) el.remove()
+            if (words <= BOILERPLATE_MAX_WORDS && BOILERPLATE.containsMatchIn(text) || words <= PITCH_MAX_WORDS && isPitch(el, text)) {
+                val box = el.parent()?.takeIf { SUBSCRIBE_PITCH.containsMatchIn(text) && isPaywallBox(it, el, body) }
+                (box ?: el).remove()
+            }
         }
     }
 
@@ -327,6 +389,53 @@ object HtmlCleaner {
      * "Sign up" link. Only a block of its own, not one holding others: a short post can be one
      * paragraph and a pitch in the same wrapper.
      */
+    /**
+     * Removes a paragraph that is only a link to the platform's own actions: share this post, a
+     * (gift) subscription, the comments, a forgotten password. Substack's buttons and a membership
+     * plugin's login, by address, as tt-rss strips their classes; the label varies ("Share", "Give
+     * a gift subscription", "Leave a comment").
+     */
+    private fun removeSiteButtons(body: Element) {
+        for (link in body.select("p > a[href], div > a[href]")) {
+            val p = link.parent() ?: continue
+            val label = link.text().trim()
+            // Not an image that links somewhere: it has no label to match.
+            if (!p.isAttached() || label.isEmpty() || p.text().trim() != label) continue
+            val href = link.attr("href")
+            if (SITE_ACTION.containsMatchIn(href) || COMMENTS_LINK.containsMatchIn(href) && "comment" in label.lowercase()) p.remove()
+        }
+    }
+
+    /**
+     * Strips a card linking to another post (Substack's embedded post) down to its title and
+     * summary: its "Read more" and its "3 days ago · 12 likes" line are the card's, not the article's.
+     */
+    private fun removeCardFurniture(body: Element) {
+        for (card in body.select("a:has(div)")) {
+            card.select("div, span").filter { el ->
+                val text = el.text().trim()
+                el.isAttached() && text.length <= CARD_LINE_MAX && (CARD_CTA.matches(text) || CARD_META.matches(text)) && el.select("div").size <= 1
+            }.forEach { it.remove() }
+        }
+    }
+
+    /**
+     * Whether [box], opened by the pitch [pitch], is a paywall's box: the pitch alone, or with what
+     * subscribers get and a link to subscribe or log in, nothing longer than a line. A short post
+     * that opens with a pitch isn't.
+     */
+    private fun isPaywallBox(box: Element, pitch: Element, body: Element): Boolean {
+        if (box === body || box.tagName() != "div" || countWords(box) > PAYWALL_BOX_MAX_WORDS) return false
+        // Only a rule or an emoji before the pitch.
+        val before = box.children().takeWhile { it !== pitch }
+        if (before.size == box.children().size || before.any { it.selectFirst("img") != null || LETTER_OR_DIGIT.containsMatchIn(it.text()) }) return false
+        // Just the pitch and a decoration (404 Media's moon).
+        if (box.children().last() === pitch) return true
+        val lines = box.select("p, li, h2, h3, h4").filter { it !== pitch }
+        return lines.all { countWords(it) <= PAYWALL_BOX_LINE_MAX_WORDS } &&
+            box.select("a").any { it !== pitch && pitch.select("a").none { a -> a === it } && PAYWALL_LINK.containsMatchIn(it.text()) }
+    }
+
     private fun isPitch(el: Element, text: String): Boolean {
         if (el.children().any { it.tagName() in BLOCK_TAGS || it.tagName() == "li" }) return false
         if (SUBSCRIBE_PITCH.containsMatchIn(text)) return true
@@ -641,7 +750,19 @@ object HtmlCleaner {
         val textBefore = all.take(headingIndex)
             .filter { it.tagName() in setOf("p", "li", "blockquote") }
             .any { it.text().isNotBlank() }
-        if (!textBefore && normalizedText(heading.text()) == normalizedText(title)) heading.remove()
+        if (!textBefore && isTheTitle(heading.text(), title)) heading.remove()
+    }
+
+    /**
+     * [heading] is [title], or its headline where the title also names the author ("Jane Doe: Headline").
+     * A one-word headline doesn't count that way: it could as well be the article's first section.
+     */
+    private fun isTheTitle(heading: String, title: String): Boolean {
+        val h = normalizedText(heading)
+        if (h.isEmpty()) return false
+        if (h == normalizedText(title)) return true
+        val parts = AUTHOR_SEPARATOR.split(title, limit = 2)
+        return parts.size == 2 && normalizedText(parts[1]) == h && ' ' in h
     }
 
     /** The article title is the chapter's only h1, so content headings shift down to start at h2. */
@@ -707,6 +828,9 @@ object HtmlCleaner {
     private const val LAYOUT_TABLE_CELL_WORDS = 80
     private const val BOILERPLATE_MAX_WORDS = 12
     private const val PITCH_MAX_WORDS = 40
+    private const val PAYWALL_BOX_MAX_WORDS = 150
+    private const val PAYWALL_BOX_LINE_MAX_WORDS = 25
+    private const val CARD_LINE_MAX = 120
 
     private val REMOVE_TAGS = setOf(
         "script", "style", "noscript", "iframe", "object", "embed", "applet", "form", "input", "button",
@@ -740,7 +864,14 @@ object HtmlCleaner {
     )
     private val SCREEN_READER_ONLY = setOf(
         "screen-reader-text", "screen-reader-only", "sr-only", "sr-text", "visually-hidden", "visuallyhidden", "a11y-hidden",
+        // Foundation's.
+        "show-for-sr",
     )
+    // Text for printing only. Not "invisible": Tailwind's "invisible md:visible" is shown on wider
+    // screens, and scripts reveal elements marked so as the page scrolls.
+    private val HIDDEN_ON_SCREEN = setOf("show-for-print", "print-only")
+    private val SMALL_CAPS = setOf("small-caps", "smallcaps")
+    private val SMALL_CAPS_STYLE = Regex("font-variant(-caps)?\\s*:\\s*(all-)?small-caps", RegexOption.IGNORE_CASE)
     // Headings that name a site's box of links, never a section of the article itself. "Related" and
     // "Further reading" aren't here: authors use them for their own references.
     private val FURNITURE_HEADING = Regex(
@@ -774,6 +905,10 @@ object HtmlCleaner {
     // Wrappers that can hold just an image, and blocks a <figure> may go in.
     private val SOLE_IMAGE_WRAPPERS = setOf("a", "p", "div")
     private val FIGURE_PARENTS = setOf("div", "blockquote", "li", "dd", "td", "th")
+    // What a <p> may hold, for a note turned into one.
+    private val INLINE_TAGS = setOf(
+        "a", "em", "i", "strong", "b", "u", "s", "span", "sup", "sub", "small", "code", "cite", "abbr", "q", "br", "mark", "time", "img",
+    )
     private val BLOCK_TAGS = setOf(
         "p", "div", "figure", "ul", "ol", "dl", "blockquote", "pre", "table", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
     )
@@ -787,11 +922,23 @@ object HtmlCleaner {
         RegexOption.IGNORE_CASE,
     )
 
+    private val SITE_FOOTERS = setOf("footer", "site-footer", "page-footer", "publication-footer")
+    private val LETTER_OR_DIGIT = Regex("[\\p{L}\\p{N}]")
+    private val PAYWALL_LINK = Regex("subscribe|sign up|join|log ?in|forgot", RegexOption.IGNORE_CASE)
+
+    // Substack's share, subscribe and comment buttons and a login's "forgot password", by where they go.
+    private val SITE_ACTION = Regex("[?&]action=(share|forgot_password|lostpassword)\\b|/subscribe(\\?|$)")
+    // Only with a label saying so: a link roundup can point at another post's discussion.
+    private val COMMENTS_LINK = Regex("/p/[^/?#]+/comments(\\?|$)")
+    private val CARD_CTA = Regex("read more|read full story|continue reading", RegexOption.IGNORE_CASE)
+    private val CARD_META = Regex(".{0,40}·\\s*\\d[\\d,.]*k?\\s+likes?\\b.*", RegexOption.IGNORE_CASE)
+
     // Substack's own wording anywhere in the block; the rest only as the block's opening.
     private val SUBSCRIBE_PITCH = Regex(
         "consider becoming a (free or )?paid subscriber|is a reader-supported publication|" +
             "subscribe (for free )?to receive new posts and support|" +
-            "^(subscribe to .{1,60} to keep reading|this post is for (paid |paying )?subscribers|" +
+            "^(subscribe to .{1,60} to keep reading|subscribe to .{1,60}\\bnewsletter\\b|(enjoying [^?]{1,60}\\? )?subscribe to our (free )?newsletter|this post is for (paid |paying )?subscribers|" +
+            "this (premium )?(article|post|story) is (only )?available (only )?to (paid |paying )?(subscribers|members)|" +
             "([^.!?]{1,30}[.!?] )?subscribe to [^.!?]{1,60}:$)",
         RegexOption.IGNORE_CASE,
     )
@@ -809,6 +956,7 @@ object HtmlCleaner {
     private val NEWLINES = Regex("\\n+")
     private val TRAILING_NUMBER = Regex("\\d+$")
     private const val FOOTNOTE_MARKER_MAX = 4
+    private val AUTHOR_SEPARATOR = Regex(":\\s+|\\s+[|–—]\\s+")
     private const val STEM_PREFIX_MIN = 2
     private val TOKEN_SEPARATOR = Regex("[\\s_\\-]+")
     private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")

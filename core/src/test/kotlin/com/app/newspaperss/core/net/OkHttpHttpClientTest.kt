@@ -75,6 +75,23 @@ class OkHttpHttpClientTest {
         assertTrue(OkHttpHttpClient.decode(bytes, Charsets.UTF_8).endsWith("\u00e9"))
     }
 
+    /** A site's whole archive in one feed, newest first: its start comes back, and the parser keeps its whole items. */
+    @Test
+    fun aFeedOverTheLimitIsReadUpToIt() = runTest {
+        val item = "<item><title>Post</title><link>https://example.com/p</link><description>${"x".repeat(2000)}</description></item>"
+        val count = (OkHttpHttpClient.MAX_BYTES / item.length + 10).toInt()
+        val feed = "<rss version=\"2.0\"><channel><title>Archive</title>" + item.repeat(count) + "</channel></rss>"
+        server.enqueue(MockResponse.Builder().body(feed).build())
+        server.enqueue(MockResponse.Builder().body("<rss version=\"2.0\"><channel>$item</channel></rss>").build())
+
+        val response = OkHttpHttpClient().getFeed(server.url("/feed").toString())
+        assertTrue(response.truncated)
+        assertEquals(OkHttpHttpClient.MAX_BYTES, response.body.length.toLong())
+        val items = com.app.newspaperss.core.feed.FeedParser.parse(response.body, response.finalUrl, response.truncated).items
+        assertTrue("${items.size} of $count", items.size in count - 20 until count)
+        assertFalse("a feed within the limit is whole", OkHttpHttpClient().getFeed(server.url("/small").toString()).truncated)
+    }
+
     @Test(expected = IOException::class)
     fun oversizedBodiesAreRefused() = runTest {
         server.enqueue(MockResponse.Builder().body(okio.Buffer().write(ByteArray((OkHttpHttpClient.MAX_BYTES + 1).toInt()))).build())
