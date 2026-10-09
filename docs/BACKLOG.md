@@ -90,6 +90,10 @@ A full pass over the app and the book, not just spot fixes:
 - [ ] A floor device: Android 8, 2 GB RAM, slow CPU and storage (a 2018 budget phone or an older Boox). Measure on an emulator with that profile how long a 30-minute edition takes, peak memory, whether timed editions still arrive under Doze, and whether long lists and the preview stay smooth; set budgets from the numbers *(you asked)*
 - [ ] Load build candidates without feedHtml; fetch it per article
 - [ ] EPUB zip: buffered output, JPEGs stored uncompressed
+- [ ] A smaller APK *(you asked)*. It went from 20–40 MB to 94 MB with the podcast, because sherpa-onnx's native code is in it twice, stored uncompressed: about 32 MB for arm64-v8a and 36 MB for x86_64. Three ways, with what each costs:
+  - **One APK per ABI** (preferred): about 57 MB for a phone, and nothing stops working. The cost: two files on the release page, CI and the `latest-debug` publish adjusted, and F-Droid's build recipe given the split.
+  - **Drop x86_64**: one APK of about 57 MB, but no podcast on emulators and x86 Chromebooks. First check whether the device tests' emulator needs it.
+  - **Compress the native code** (`useLegacyPackaging`): about 50 MB to download, but Android unpacks a copy on install, so it takes more room on the phone than now.
 
 ### Recurring reviews *(audit)*
 Whole-codebase passes for what a review of one PR can't see. Each follows the audit's pattern: fresh-eyes reviewers, each finding checked, a PR per area.

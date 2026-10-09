@@ -1,14 +1,19 @@
 package com.app.newspaperss.core.listen
 
 /**
- * What looks wrong in the audio Kokoro made of a line, for the podcast log: a gap of silence
- * inside it, a long one after it, audio too short for its text, or samples that aren't numbers.
- * Speech Kokoro makes properly pauses at most about 0.2 s inside a line and says 15 to 25
- * characters a second, so the limits here sit well clear of it.
+ * What looks wrong in the audio Kokoro made of a line, for the podcast log: a quiet gap inside
+ * it, a long one after it, audio too short for its text, or samples that aren't numbers. Quiet
+ * is judged against the line's own loudness, so a stretch of faint noise where words should be
+ * counts as well as true silence. Speech Kokoro makes properly drops that low for at most about
+ * a quarter of a second inside a line, and says 15 to 25 characters a second, so the limits here
+ * sit well clear of it.
  */
 object SpeechCheck {
-    /** Below this, a 10 ms window counts as silence: Kokoro's own silence is near zero. */
-    private const val QUIET = 0.005f
+    /** A 20 ms window this far below the line's typical loudness counts as quiet. */
+    private const val QUIET = 0.1
+
+    /** Loudness (RMS) below which a window is no sound at all: Kokoro's own silence is near zero. */
+    private const val SILENT = 0.01
     private const val QUIET_GAP_SECONDS = 0.5
     private const val QUIET_END_SECONDS = 0.5
     private const val MAX_CHARACTERS_A_SECOND = 30.0
@@ -18,24 +23,29 @@ object SpeechCheck {
 
     /** What's odd about [samples], made from text [characters] long, or null if nothing is. */
     fun problems(samples: FloatArray, rate: Int, characters: Int): String? {
-        val window = maxOf(1, rate / 100)
+        val window = maxOf(1, rate / 50)
         val windows = (samples.size + window - 1) / window
         // NaN would pass for silence: the encoder turns it into zeros.
         var broken = 0
-        val loud = BooleanArray(windows)
-        for (w in 0 until windows) {
-            for (i in w * window until minOf(samples.size, (w + 1) * window)) {
+        val loudness = DoubleArray(windows) { w ->
+            var sum = 0.0
+            val end = minOf(samples.size, (w + 1) * window)
+            for (i in w * window until end) {
                 val s = samples[i]
-                if (!s.isFinite()) broken++ else if (s > QUIET || s < -QUIET) loud[w] = true
+                if (s.isFinite()) sum += s * s else broken++
             }
+            Math.sqrt(sum / (end - w * window))
         }
         val found = mutableListOf<String>()
         if (broken > 0) found += "$broken samples not numbers"
-        val first = loud.indexOfFirst { it }
-        if (first < 0) {
+        val sounding = loudness.filter { it >= SILENT }.sorted()
+        if (sounding.isEmpty()) {
             if (characters > 0) found += "no sound in ${seconds(samples.size, rate)}s"
             return found.joinToString("; ").ifEmpty { null }
         }
+        val quiet = sounding[sounding.size / 2] * QUIET
+        val loud = BooleanArray(windows) { loudness[it] >= quiet }
+        val first = loud.indexOfFirst { it }
         val last = loud.indexOfLast { it }
         var run = 0
         var longest = 0
@@ -49,15 +59,28 @@ object SpeechCheck {
         }
         val step = window.toDouble() / rate
         if (longest * step >= QUIET_GAP_SECONDS) {
-            found += "${round(longest * step)}s silent from ${round((longestEnd - longest + 1) * step)}s of ${seconds(samples.size, rate)}s"
+            found += "${round(longest * step)}s quiet from ${round((longestEnd - longest + 1) * step)}s of ${seconds(samples.size, rate)}s"
         }
         val after = (windows - 1 - last) * step
-        if (after >= QUIET_END_SECONDS) found += "${round(after)}s silent at the end"
+        if (after >= QUIET_END_SECONDS) found += "${round(after)}s quiet at the end"
         val pace = characters / ((last - first + 1) * step)
         if (characters >= PACE_FROM_CHARACTERS && pace > MAX_CHARACTERS_A_SECOND) {
             found += "${round((last - first + 1) * step)}s of sound for $characters characters"
         }
         return found.joinToString("; ").ifEmpty { null }
+    }
+
+    /**
+     * [text] as Kokoro was given it, with everything outside printable ASCII written as its code
+     * point: a curly quote, a no-break space or an invisible character looks like nothing in a log.
+     */
+    fun exactly(text: String): String = buildString {
+        var i = 0
+        while (i < text.length) {
+            val c = text.codePointAt(i)
+            if (c in 0x20..0x7E && c != '\\'.code) appendCodePoint(c) else append("\\u{").append(Integer.toHexString(c).uppercase()).append('}')
+            i += Character.charCount(c)
+        }
     }
 
     private fun seconds(samples: Int, rate: Int) = round(samples.toDouble() / rate)

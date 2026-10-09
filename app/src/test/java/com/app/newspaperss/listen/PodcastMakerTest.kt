@@ -210,7 +210,7 @@ class PodcastMakerTest {
         assertTrue(entries.toString(), entries.any { it.contains("Kept page 0 lines 0–4") })
         assertTrue(entries.toString(), entries.any { it.contains("Page 0 made") })
         // The fake Kokoro says nothing: each line's silence is named, with where it sits in its piece.
-        assertTrue(entries.toString(), entries.any { it.contains("  Page 0 line 1, ") && it.contains("s into piece 0: no sound in ") })
+        assertTrue(entries.toString(), entries.any { it.contains("  Page 0 line 1, ") && it.contains("s into piece 0: no sound in ") && it.contains("; Kokoro was given: ") })
         // Where it left off, and what it lost by stopping: the clue to runs that never keep a piece.
         assertTrue(entries.toString(), entries.last().contains("Stopped on page 1 before line 1; 0s of unkept audio dropped, resumes at line 0"))
     }

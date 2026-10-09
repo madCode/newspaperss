@@ -136,9 +136,16 @@ class AppContainer(
     private val listenProgress = StoredListenProgress(context)
     private val listenSettings by lazy { settings.settings.stateIn(appScope, SharingStarted.Eagerly, null) }
 
+    /**
+     * Playback's entries in the podcast log, written off the main thread (the maker may hold the
+     * log's lock), one at a time so they stay in order.
+     */
+    private val logWriter = Dispatchers.IO.limitedParallelism(1)
+    private val logPlaying: (String) -> Unit = { message -> appScope.launch(logWriter) { podcastLog.add(message) } }
+
     /** Listen's voice: a made podcast where there is one, the phone's elsewhere. */
     private val listenSpeaker by lazy {
-        PodcastSpeaker(speaker(), podcastStore, MediaPlayerAudio()) {
+        PodcastSpeaker(speaker(), podcastStore, MediaPlayerAudio(logPlaying), log = logPlaying) {
             // Just after the app starts, before the store's first value: read it, or a made
             // article would play in the phone's voice.
             (listenSettings.value ?: runCatching { runBlocking { settings.current() } }.getOrNull())?.listenVoice == ListenVoice.PODCAST
