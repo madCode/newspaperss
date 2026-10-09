@@ -9,9 +9,10 @@ class SpeechCheckTest {
     private val rate = 24_000
 
     /** A tone standing in for speech, with silence where [quiet] says, in seconds. */
-    private fun audio(seconds: Double, vararg quiet: ClosedFloatingPointRange<Double>) = FloatArray((seconds * rate).toInt()) { i ->
+    private fun audio(seconds: Double, vararg quiet: ClosedFloatingPointRange<Double>, faint: Double = 0.0) = FloatArray((seconds * rate).toInt()) { i ->
         val t = i.toDouble() / rate
-        if (quiet.any { t in it }) 0f else (0.3 * sin(t * 2 * Math.PI * 220)).toFloat()
+        val level = if (quiet.any { t in it }) faint else 0.3
+        (level * sin(t * 2 * Math.PI * 220)).toFloat()
     }
 
     @Test
@@ -21,12 +22,18 @@ class SpeechCheckTest {
 
     @Test
     fun aGapOfSilenceInsideTheLineIsReported() {
-        assertEquals("1.5s silent from 1.0s of 4.0s", SpeechCheck.problems(audio(4.0, 1.0..2.5), rate, 60))
+        assertEquals("1.5s quiet from 1.0s of 4.0s", SpeechCheck.problems(audio(4.0, 1.0..2.5), rate, 60))
+    }
+
+    @Test
+    fun faintNoiseWhereWordsShouldBeIsReportedAsQuiet() {
+        // Above any fixed floor for silence, but a twentieth of the speech around it.
+        assertEquals("1.5s quiet from 1.0s of 4.0s", SpeechCheck.problems(audio(4.0, 1.0..2.5, faint = 0.015), rate, 60))
     }
 
     @Test
     fun silenceAtTheEndIsReported() {
-        assertEquals("1.0s silent at the end", SpeechCheck.problems(audio(3.0, 2.0..3.0), rate, 30))
+        assertEquals("1.0s quiet at the end", SpeechCheck.problems(audio(3.0, 2.0..3.0), rate, 30))
     }
 
     @Test
