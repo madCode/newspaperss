@@ -297,7 +297,8 @@ article without leaving the page.
   stops following until "Back to where it's reading"). Going to another article while listening,
   by "Next", a link in the book or the contents, moves the voice to its start; when the voice
   finishes an article, the view turns to the next. So the bar never has to show an article other
-  than the one on screen.
+  than the one on screen. Nothing else can move it: the view only shows this edition's book, and
+  other links open in the browser.
 - **Rotation and restore:** the WebView is rebuilt; it re-tints from the player's line when the page loads.
 - **Images:** an image's description is a line with no text on the page; tint the picture's frame.
 
