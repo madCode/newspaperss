@@ -95,26 +95,27 @@ class PodcastSpeakerTest {
         assertTrue(phone.said.isEmpty())
         assertEquals(PodcastVoice.EMMA, speaker.voice.value)
 
-        audio.listener!!.onPosition(100)
-        audio.listener!!.onPosition(4_600)
+        audio.listener!!.onPosition(0, 100)
+        audio.listener!!.onPosition(0, 4_600)
         assertEquals(listOf("start ${id(0)}", "start ${id(1)}", "start ${id(2)}"), heard)
 
         // The audio runs on into the next piece, unasked; the last one's end ends the article.
-        audio.listener!!.onNext()
-        audio.listener!!.onPosition(3_100)
+        audio.listener!!.onPosition(1, 3_100)
         audio.listener!!.onEnded()
         assertEquals(1, audio.played.size)
         assertEquals(listOf("start ${id(3)}", "start ${id(4)}", "done ${id(4)}"), heard.drop(3))
     }
 
     @Test
-    fun theLogSaysWhereEachPlayStarted() {
+    fun theLogSaysWhereEachPlayStartedAndWhatFailed() {
         made()
         listen()
         speaker.speak(id(1), "Counting Knots", null, 1f, flush = true)
+        assertEquals(1, logged.size)
+        assertTrue(logged.single(), "line 1" in logged.single() && "0-0.m4a" in logged.single())
 
-        // A play from a line nobody asked for is what a skip in the audio would look like.
-        assertEquals(listOf("Playing edition 7 page 0 from line 1: 0-0.m4a at 2.00s, speed 1.0"), logged)
+        audio.listener!!.onError(1, "ERROR_CODE_IO_FILE_NOT_FOUND")
+        assertTrue(logged.last(), "0-3.m4a" in logged.last() && "ERROR_CODE_IO_FILE_NOT_FOUND" in logged.last())
     }
 
     @Test
@@ -122,11 +123,9 @@ class PodcastSpeakerTest {
         made()
         listen()
         speaker.speak(id(0), "Quanta", null, 1f, flush = true)
-        audio.listener!!.onPosition(4_600)
-        audio.listener!!.onNext()
-        // News of a next piece past the last is nothing to act on.
-        audio.listener!!.onNext()
-        audio.listener!!.onPosition(0)
+        // The first piece's last line came and went between two ticks.
+        audio.listener!!.onPosition(0, 2_100)
+        audio.listener!!.onPosition(1, 0)
 
         assertEquals(listOf("start ${id(0)}", "start ${id(1)}", "start ${id(2)}", "start ${id(3)}"), heard)
     }
@@ -138,7 +137,7 @@ class PodcastSpeakerTest {
         speaker.speak(id(4), "It took a week.", null, 1f, flush = true)
 
         assertEquals(listOf(Triple("0-3.m4a", 3_000L, 1f)), audio.played)
-        audio.listener!!.onPosition(3_000)
+        audio.listener!!.onPosition(1, 3_000)
         // Only from the sentence asked for.
         assertEquals(listOf("start ${id(4)}"), heard)
     }
@@ -206,9 +205,9 @@ class PodcastSpeakerTest {
         // The player queues each line as the one before starts.
         speaker.speak(id(0), "Quanta", null, 1f, flush = true)
         speaker.speak(id(1), "Counting Knots", null, 1f, flush = false)
-        audio.listener!!.onPosition(2_100)
+        audio.listener!!.onPosition(0, 2_100)
         speaker.speak(id(2), "Nobody knew.", null, 1f, flush = false)
-        audio.listener!!.onError()
+        audio.listener!!.onError(0, "ERROR_CODE_PARSING_CONTAINER_MALFORMED")
 
         // From the sentence it had reached, with the one queued behind it.
         assertEquals(listOf("Counting Knots", "Nobody knew."), phone.said.map { it.text })
@@ -216,7 +215,7 @@ class PodcastSpeakerTest {
         assertNull(speaker.voice.value)
         // A tick from the stopped audio reports nothing.
         val before = heard.size
-        audio.listener!!.onPosition(5_000)
+        audio.listener!!.onPosition(0, 5_000)
         assertEquals(before, heard.size)
         // Played again, it stays in the phone's voice rather than failing the same way.
         speaker.speak(id(0, generation = 2), "Quanta", null, 1f, flush = true)
@@ -230,12 +229,12 @@ class PodcastSpeakerTest {
         listen()
         speaker.speak(id(0), "Quanta", null, 1f, flush = true)
         speaker.speak(id(1), "Counting Knots", null, 1f, flush = false)
-        audio.listener!!.onPosition(4_600)
+        audio.listener!!.onPosition(0, 2_100)
         speaker.speak(id(3), "It took a week.", null, 1f, flush = false)
-        // The first piece played through; the second fails to start.
-        audio.listener!!.onNext()
-        audio.listener!!.onError()
+        // The first piece played through, its last line after the last tick; the second fails to start.
+        audio.listener!!.onError(1, "ERROR_CODE_IO_FILE_NOT_FOUND")
 
+        assertEquals("start ${id(2)}", heard.last())
         assertEquals(listOf("It took a week."), phone.said.map { it.text })
         assertEquals(id(3), phone.said.single().id)
     }
@@ -324,7 +323,7 @@ class PodcastSpeakerTest {
         val player = ListenPlayer(speaker, StoredListenProgress(app), open = { ListenBook.open(repo, it) }, CoroutineScope(SupervisorJob() + Dispatchers.Main))
         player.start(editionId)
         idleUntil { audio.played.isNotEmpty() }
-        audio.listener!!.onPosition(4_100)
+        audio.listener!!.onPosition(0, 4_100)
         assertEquals(2, player.state.value.at.line)
 
         audio.listener!!.onEnded()

@@ -228,7 +228,7 @@ class PodcastMaker(
             sink.close()
             store.keep(editionId, page, firstLine, file, starts)
             store.addCost(editionId, work + now() - began, spoken.toDouble() / rate)
-            log.add("Kept page $page lines $firstLine–${firstLine + starts.size - 1}: ${seconds.toInt()}s of audio in ${seconds(work + now() - began)}s" + (sink.report?.let { "; $it" } ?: ""))
+            log.add("Kept page $page lines $firstLine–${firstLine + starts.size - 1}: ${seconds.toInt()}s of audio in ${seconds(work + now() - began)}s")
         }
 
         fun drop() {
