@@ -258,45 +258,6 @@ The phone's voice reading an edition, and Settings › Listening for it, are bui
 - **A sleep timer**, and a way in from Today's card.
 - **Save as audio:** the edition as a file with a chapter per article, for a podcast or audiobook app. With a podcast made, it's already most of the way there.
 
-### Listening in the reading view *(you asked)*
-Today the article preview (the book's own page in a WebView, with Aa, pinch zoom and quote sharing)
-and the playing screen (the same article redrawn in Compose, one sentence at a time) are separate.
-They split because the playing screen tints and taps single sentences, which a WebView with
-JavaScript off can't do. Two steps, the first useful alone:
-
-**1. A mini player in the reading view (small, one PR).** The preview's 🎧 starts Listen from that
-article without leaving the page.
-- A bar at the bottom of the preview while Listen plays: the article playing, play/pause, ↶ ↷, and
-  a tap to open the full playing screen. The playing screen stays as it is.
-- The page doesn't follow the voice: reading on, or opening another article, leaves the bar playing.
-- The same bar could later sit on the edition page and Today.
-- Cost: the playing screen's dock, made smaller; the player already outlives screens.
-- Open questions: whether ⏮ ⏭ belong on the bar; on e-ink, no progress bar that redraws every second.
-
-**2. One view for both (larger, two or three PRs).** The playing screen goes; the preview becomes it.
-- While listening, the sentence being read is tinted on the book's page and the page follows it;
-  scrolling away stops following, as now. Tapping a sentence reads from there.
-- The bar from step 1 is the player; the playing screen's chapters and contents move to the
-  preview's top bar.
-- Gains: one place to read and listen, the book's own look, Aa and quote sharing while listening.
-- **Marking the sentences:** before the page goes to the WebView, wrap each sentence in a tagged
-  `<span>`. A sentence can cross inline markup (a link, italics, a note marker), so it may take several
-  spans with the same number. It must split sentences exactly as `ListenScript` does: one walker in
-  `:core` for both, or a test that the counts match on the extraction corpus. Made podcasts are keyed to
-  the line count, so a drift would send articles back to the phone's voice.
-- **Tapping** needs no JavaScript: each span is a `listen:<line>` link, caught like the book's "Next".
-- **The tint** does: moving it means `evaluateJavascript`, so JavaScript goes on for pages of feed
-  content. The WebView loads only from the book and `ArticleBody` strips scripts; a
-  Content-Security-Policy blocking the page's own scripts would add a second wall. The other way,
-  reloading the page per sentence, flickers and loses the scroll.
-- **Clashes:** a sentence tap against a real link and against long-press quote sharing; tap-to-play only
-  while listening may be enough.
-- **E-ink:** following scrolls a lot, each a full refresh. Follow by page there, or not at all.
-- **Rotation and restore:** the WebView is rebuilt; it re-tints from the player's line when the page loads.
-- **Images:** an image's description is a line with no text on the page; tint the picture's frame.
-
-Recommendation: build step 1, use it for a week, then decide on step 2.
-
 ### Backup *(you asked)*
 Android's Auto Backup already copies the database and settings (sources, reading list, edition
 history) to the reader's Google account, within its 25 MB quota. Past EPUBs, the schedule timer and
