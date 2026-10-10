@@ -273,24 +273,24 @@ article without leaving the page.
 - Cost: the playing screen's dock, made smaller; the player already outlives screens.
 - Open questions: whether ⏮ ⏭ belong on the bar; on e-ink, no progress bar that redraws every second.
 
-**2. One view for both (larger, two or three PRs).** The playing screen goes; the preview becomes it.
-- While listening, the sentence being read is tinted on the book's page and the page follows it;
-  scrolling away stops following, as now. Tapping a sentence reads from there.
-- The bar from step 1 is the player; the playing screen's chapters and contents move to the
-  preview's top bar.
+**2. One view for both (about two PRs).** The playing screen goes; the preview becomes it.
+- While listening, the paragraph being read is tinted on the book's page and the page follows it;
+  scrolling away stops following, as now.
+- The bar from step 1 is the player; the playing screen's chapters and contents move to a sheet.
 - Gains: one place to read and listen, the book's own look, Aa and quote sharing while listening.
-- **Marking the sentences:** before the page goes to the WebView, wrap each sentence in a tagged
-  `<span>`. A sentence can cross inline markup (a link, italics, a note marker), so it may take several
-  spans with the same number. It must split sentences exactly as `ListenScript` does: one walker in
-  `:core` for both, or a test that the counts match on the extraction corpus. Made podcasts are keyed to
-  the line count, so a drift would send articles back to the phone's voice.
-- **Tapping** needs no JavaScript: each span is a `listen:<line>` link, caught like the book's "Next".
-- **The tint** does: moving it means `evaluateJavascript`, so JavaScript goes on for pages of feed
-  content. The WebView loads only from the book and `ArticleBody` strips scripts; a
-  Content-Security-Policy blocking the page's own scripts would add a second wall. The other way,
-  reloading the page per sentence, flickers and loses the scroll.
-- **Clashes:** a sentence tap against a real link and against long-press quote sharing; tap-to-play only
-  while listening may be enough.
+- **Decided: tint the paragraph, not the sentence.** ↶ ↷ still move by sentence. The walk that
+  builds `ListenScript` also marks the page, wrapping each piece of text in a `<span>` numbered with
+  its paragraph: text never crosses tags, so the wrapping is always valid, and one walk means the page
+  and the podcast can't disagree. Sentence tints later only if paragraphs feel too coarse; that needs
+  the text split at sentence boundaries too.
+- **Decided: JavaScript on, with no bridge.** Moving the tint without reloading needs JavaScript,
+  and it is safe here: the preview already answers every request from the book or with nothing, and
+  article HTML has its scripts and `on…` attributes stripped. Page code talks to the app only by
+  going to a made-up `listen:` address, which the WebView client catches, so even hostile markup
+  could only colour text. To confirm when building: `javascript:` links are dropped.
+- **Decided: tapping.** While Listen plays, a tap on text plays from its paragraph; real links still
+  open. When it isn't playing, taps work as now, and the long-press menu gets "Listen from here"
+  beside quote sharing.
 - **E-ink:** following scrolls a lot, each a full refresh. Follow by page there, or not at all.
 - **Rotation and restore:** the WebView is rebuilt; it re-tints from the player's line when the page loads.
 - **Images:** an image's description is a line with no text on the page; tint the picture's frame.
