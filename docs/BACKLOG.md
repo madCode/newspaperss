@@ -276,7 +276,10 @@ article without leaving the page.
 **2. One view for both (about two PRs).** The playing screen goes; the preview becomes it.
 - While listening, the paragraph being read is tinted on the book's page and the page follows it;
   scrolling away stops following, as now.
-- The bar from step 1 is the player; the playing screen's chapters and contents move to a sheet.
+- The bar from step 1 is the player, with the playing screen's edition bar and times.
+- **Decided: contents stay a pop-up** over the article, opened from the top bar, as on the playing
+  screen now: the voice plays on while it's open, and picking an article moves both. The book's own
+  contents page would be a page of its own, breaking "the view and the voice stay on one article".
 - Gains: one place to read and listen, the book's own look, Aa and quote sharing while listening.
 - **Decided: tint the paragraph, not the sentence.** ↶ ↷ still move by sentence. The walk that
   builds `ListenScript` also marks the page, wrapping each piece of text in a `<span>` numbered with
