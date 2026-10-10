@@ -293,6 +293,11 @@ article without leaving the page.
   beside quote sharing.
 - **Decided: on e-ink, turn a whole screen at a time** when the voice reaches the bottom, rather
   than scrolling with it: each scroll there is a full refresh.
+- **Decided: the view and the voice stay on the same article.** Scrolling within it is free (it
+  stops following until "Back to where it's reading"). Going to another article while listening,
+  by "Next", a link in the book or the contents, moves the voice to its start; when the voice
+  finishes an article, the view turns to the next. So the bar never has to show an article other
+  than the one on screen.
 - **Rotation and restore:** the WebView is rebuilt; it re-tints from the player's line when the page loads.
 - **Images:** an image's description is a line with no text on the page; tint the picture's frame.
 
