@@ -291,7 +291,8 @@ article without leaving the page.
 - **Decided: tapping.** While Listen plays, a tap on text plays from its paragraph; real links still
   open. When it isn't playing, taps work as now, and the long-press menu gets "Listen from here"
   beside quote sharing.
-- **E-ink:** following scrolls a lot, each a full refresh. Follow by page there, or not at all.
+- **Decided: on e-ink, turn a whole screen at a time** when the voice reaches the bottom, rather
+  than scrolling with it: each scroll there is a full refresh.
 - **Rotation and restore:** the WebView is rebuilt; it re-tints from the player's line when the page loads.
 - **Images:** an image's description is a line with no text on the page; tint the picture's frame.
 
