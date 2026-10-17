@@ -168,4 +168,7 @@ The store text and screenshots come from `fastlane/metadata/android/en-US/`.
   browser at 1024×500 and screenshot it to change it.
 - **Forms:** Data safety (nothing collected or shared), the content rating
   questionnaire, the target audience, and the privacy policy:
-  https://github.com/Seafloor-Studio/newspaperss/blob/main/docs/PRIVACY.md
+  https://seafloor-studio.github.io/newspaperss/privacy/. That page is a copy
+  of [PRIVACY.md](PRIVACY.md), kept in
+  [seafloor-studio.github.io](https://github.com/Seafloor-Studio/seafloor-studio.github.io):
+  a change to one goes in the other.
