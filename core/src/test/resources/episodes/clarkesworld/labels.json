@@ -1,0 +1,66 @@
+{
+  "items": {
+    "https://clarkesworldmagazine.com/singer_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines",
+      "pair": "https://clarkesworldmagazine.com/audio_10_26/"
+    },
+    "https://clarkesworldmagazine.com/audio_10_26/": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "a story's narration, titled \"(audio)\", beside the written story",
+      "pair": "https://clarkesworldmagazine.com/singer_10_26/"
+    },
+    "https://clarkesworldmagazine.com/moore_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines"
+    },
+    "https://clarkesworldmagazine.com/shi_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines"
+    },
+    "https://clarkesworldmagazine.com/bear_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines"
+    },
+    "https://clarkesworldmagazine.com/hall_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines"
+    },
+    "https://clarkesworldmagazine.com/theodoridou_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines"
+    },
+    "https://clarkesworldmagazine.com/tashiro_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines"
+    },
+    "https://clarkesworldmagazine.com/dewinter_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines"
+    },
+    "https://clarkesworldmagazine.com/talabi_interview_2026/": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview"
+    },
+    "https://clarkesworldmagazine.com/lee_interview_2026/": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview"
+    },
+    "https://clarkesworldmagazine.com/clarke_10_26/": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story whose feed item carries only its opening lines"
+    }
+  }
+}

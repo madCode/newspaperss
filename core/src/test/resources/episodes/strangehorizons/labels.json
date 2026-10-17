@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://strangehorizons.com/wordpress/?p=60934": {
+      "kind": "article",
+      "shape": "review",
+      "why": "a book review"
+    },
+    "https://strangehorizons.com/wordpress/?p=61193": {
+      "kind": "article",
+      "shape": "review",
+      "why": "a book review"
+    },
+    "https://strangehorizons.com/wordpress/?p=61358": {
+      "kind": "article",
+      "shape": "review",
+      "why": "a book review"
+    },
+    "https://strangehorizons.com/wordpress/?p=61270": {
+      "kind": "article",
+      "shape": "fiction",
+      "why": "a story, with dialogue"
+    },
+    "https://strangehorizons.com/wordpress/?p=60849": {
+      "kind": "article",
+      "shape": "fiction",
+      "why": "a story, with dialogue"
+    },
+    "https://strangehorizons.com/wordpress/?p=60249": {
+      "kind": "article",
+      "shape": "fiction",
+      "why": "a story, with dialogue"
+    },
+    "https://strangehorizons.com/wordpress/?p=61240": {
+      "kind": "article",
+      "shape": "review",
+      "why": "a book review"
+    },
+    "https://strangehorizons.com/wordpress/?p=61106": {
+      "kind": "article",
+      "shape": "review",
+      "why": "a book review"
+    },
+    "https://strangehorizons.com/wordpress/?p=61347": {
+      "kind": "article",
+      "shape": "fiction",
+      "why": "a story, with dialogue"
+    },
+    "https://strangehorizons.com/wordpress/?p=61292": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the criticism podcast's audio and its full transcript, \"Name: ...\""
+    },
+    "https://strangehorizons.com/wordpress/?p=61060": {
+      "kind": "article",
+      "shape": "fiction",
+      "why": "a story, with dialogue"
+    },
+    "https://strangehorizons.com/wordpress/?p=60658": {
+      "kind": "article",
+      "shape": "review",
+      "why": "a book review"
+    }
+  }
+}

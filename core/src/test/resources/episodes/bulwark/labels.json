@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://www.thebulwark.com/p/trump-friendly-influencer-has-major": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.thebulwark.com/p/brendan-carr-the-hackiest-hack-in-hackville-nathan-fielder-elizabeth-holmes-whalefall-haunted-hotel": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid post: only its opening"
+    },
+    "https://www.thebulwark.com/p/sunday-were-going-live-with-pete": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.thebulwark.com/p/alan-cumming-and-robert-garcia-the": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.thebulwark.com/p/breaking-trump-fires-new-press-secretary": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.thebulwark.com/p/the-trump-corruption-poll-that-should": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.thebulwark.com/p/trump-administration-kink-tigers-eating-faces": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid post: only its opening"
+    },
+    "https://www.thebulwark.com/p/election-defenders-ice-midterms-democrats-wargaming-what-would-stephen-miller-do": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.thebulwark.com/p/katie-zacharias-problem-bad-at-lying-press-secretary-lawyer-attorney-hannity-no-kings-protests-trump": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.thebulwark.com/p/book-a-room-at-the-haunted-hotel": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.thebulwark.com/p/gops-top-gotv-operative-employed-organizer-convicted-of-strangulation-scott-presler-pennsylvania": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid post: only its opening"
+    },
+    "https://www.thebulwark.com/p/so-many-bad-things": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    }
+  }
+}

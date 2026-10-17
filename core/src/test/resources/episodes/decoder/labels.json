@@ -1,0 +1,54 @@
+{
+  "items": {
+    "https://www.theverge.com/?p=1011170": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    },
+    "https://www.theverge.com/?p=1008733": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    },
+    "https://www.theverge.com/?p=1007408": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    },
+    "https://www.theverge.com/?p=1004286": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    },
+    "https://www.theverge.com/?p=1002851": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    },
+    "https://www.theverge.com/?p=1000914": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    },
+    "https://www.theverge.com/?p=1000344": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    },
+    "https://www.theverge.com/?p=999383": {
+      "kind": "transcript",
+      "shape": "transcript-monologue",
+      "why": "a solo episode's transcript: the host talking over clips, few turns"
+    },
+    "https://www.theverge.com/?p=996874": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    },
+    "https://www.theverge.com/?p=997382": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's player and its full transcript, \"Name: ...\""
+    }
+  }
+}

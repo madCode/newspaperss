@@ -1,0 +1,68 @@
+{
+  "items": {
+    "https://www.dwarkesh.com/p/si-sheppard": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio, timestamps, then the whole conversation with speaker names on lines of their own"
+    },
+    "https://www.dwarkesh.com/p/noam-brown": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio, timestamps, then the whole conversation with speaker names on lines of their own"
+    },
+    "https://www.dwarkesh.com/p/john-beren-charlie": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio, timestamps, then the whole conversation with speaker names on lines of their own"
+    },
+    "https://www.dwarkesh.com/p/pretraining-progress-is-mostly-data": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.dwarkesh.com/p/ajeya-cotra": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio, timestamps, then the whole conversation with speaker names on lines of their own"
+    },
+    "https://www.dwarkesh.com/p/openai-huggingface-narration": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "\"a video recording of a post I wrote\": the audio of a written post in the feed",
+      "pair": "https://www.dwarkesh.com/p/openai-huggingface"
+    },
+    "https://www.dwarkesh.com/p/openai-huggingface": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the written post beside its recording",
+      "pair": "https://www.dwarkesh.com/p/openai-huggingface-narration"
+    },
+    "https://www.dwarkesh.com/p/dylan-patel-3": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio, timestamps, then the whole conversation with speaker names on lines of their own"
+    },
+    "https://www.dwarkesh.com/p/ryan-greenblatt": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio, timestamps, then the whole conversation with speaker names on lines of their own"
+    },
+    "https://www.dwarkesh.com/p/era-of-continual-learning": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay with the author's reading attached"
+    },
+    "https://www.dwarkesh.com/p/why-compute-might-get-10x-more-expensive-video": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "\"a video recording of a post I wrote\": the audio of a written post in the feed",
+      "pair": "https://www.dwarkesh.com/p/why-compute-might-get-10x-more-expensive"
+    },
+    "https://www.dwarkesh.com/p/why-compute-might-get-10x-more-expensive": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the written post beside its recording",
+      "pair": "https://www.dwarkesh.com/p/why-compute-might-get-10x-more-expensive-video"
+    }
+  }
+}

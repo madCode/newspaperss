@@ -46,18 +46,24 @@ One reading list isn't enough to decide on. The plan below widens it, and keeps 
 A fixed set of real posts, each labelled with what it is. Every change to detection runs against
 it, and every mistake found later is added to it. It's the thing to fall back to.
 
-- **Built like the platform corpus.** It lives in `core/src/test/resources/episodes`, collected
-  by a tool like `PlatformCorpus`. Each post keeps three things:
-  - the feed item, including its enclosures and podcast tags;
-  - what tt-rss passes on for it, including attachments;
-  - the post's page.
-- **Labelled.** Each post has an `expect.json`:
-  - its kind;
+- **Built like the platform corpus.** It lives in `core/src/test/resources/episodes`, one folder
+  per feed, collected by `EpisodeCorpus` (`./gradlew :core:episodeCorpus`). A folder keeps the
+  feed's newest items as one snapshot, with enclosures and podcast tags, because pairs and
+  audio-only feeds only show across a feed's posts. What tt-rss passes on, and each post's page,
+  are still to add (R4).
+- **Labelled.** Each folder's `labels.json` gives every item in the snapshot:
+  - its kind: article, notes, transcript, or audio-version (the audio of a written post);
+  - its shape, the row of the table below it stands for, which the test tallies by;
   - its pair, if it has one (the other post of the same episode);
   - why, in a line.
-  The label is the claim the test checks, so a reader can tell what each case is for.
+  The label is the claim the test checks, so a reader can tell what each case is for. A
+  narrated essay or an episode's write-up is an article: it's printed as one.
 - **Scrambled, as the platform corpus is.** Words are swapped for made-up ones so no one's
-  writing is republished. The words detection reads must survive the scramble: "transcript",
+  writing is republished. The snapshot keeps only what detection reads (titles, links, guids,
+  enclosures, the post's HTML stripped to links and players), so the names and addresses feeds
+  carry elsewhere stay out. Detection gives the same answer on the scrambled snapshot as on the
+  real feed, which is worth checking again whenever a rule starts comparing words with
+  addresses: titles are scrambled, addresses aren't. The words detection reads must survive the scramble: "transcript",
   "episode", "listen", "show notes", the hosts' names in embeds, and timestamps (numbers already
   survive).
 - **Public, well-known feeds only.** Taken from public directories of podcasts and newsletters,
@@ -93,6 +99,8 @@ it, and every mistake found later is added to it. It's the thing to fall back to
 - Find public examples of each shape. Label them by reading each one.
 - Exit: about 60 labelled posts covering every row of the table; the test runs, with no
   detector yet, as a list of what's expected.
+- **Done, October 2026:** 421 posts from 41 public feeds, 139 of them episode posts or
+  transcripts and the rest look-alikes and ordinary posts.
 
 ### R2. A detector as a tool, not in the app (about a cycle)
 - A classifier in `core` that the corpus test runs, using the signals measured so far:
@@ -107,6 +115,22 @@ it, and every mistake found later is added to it. It's the thing to fall back to
   - no article misclassed;
   - at least 9 in 10 notes posts and transcripts caught;
   - pairs found where they exist.
+- **Done, October 2026:** `EpisodeDetector`, in core's tests. No article misclassed; 73 of 75
+  notes, 51 of 53 transcripts and all 21 pairs found. Every miss errs toward an article. What
+  the corpus taught it:
+  - audio counts only from a podcast host, or in a podcast's own feed: blogs attach video clips
+    and music sessions the same way;
+  - audio uploaded into a Substack post is a reading or a song as often as a show;
+  - a player for someone else's episode is a mention, unless a list of timestamps comes with it;
+  - pairs show as the same audio file, a stub linking to its post, the same title less "(audio)",
+    a transcript titled after its episode, or the same video;
+  - a transcript inside an episode post shows as a conversation: "Name:" turns, names on their
+    own lines, or questions as headings or in bold. Without the episode's audio or player in the
+    post, that never makes a transcript;
+  - timestamps count only as a list gives them, opening a line or in brackets: a clock time in a
+    sentence isn't one.
+- **Still missed:** transcripts whose audio is only in a paid feed, a solo episode's transcript,
+  and players the feed strips but the page keeps. The last wants the post's page.
 
 ### R3. Sweep wider (a few days)
 - Run the detector over `tools/sweep-feeds.opml` and a public list of podcast-heavy feeds.

@@ -1,0 +1,34 @@
+{
+  "items": {
+    "https://fivebooks.com/?post_type=interview&p=106777": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    },
+    "https://fivebooks.com/?post_type=interview&p=106656": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    },
+    "https://fivebooks.com/?post_type=interview&p=106711": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    },
+    "https://fivebooks.com/?post_type=interview&p=106663": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    },
+    "https://fivebooks.com/?post_type=interview&p=106636": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    },
+    "https://fivebooks.com/?post_type=interview&p=106615": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    }
+  }
+}

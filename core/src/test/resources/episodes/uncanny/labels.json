@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://www.uncannymagazine.com/?post_type=article&p=8724": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story or essay whose feed item carries only its opening lines"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8715": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story or essay whose feed item carries only its opening lines"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8767": {
+      "kind": "notes",
+      "shape": "audio-only",
+      "why": "the magazine's podcast episode: a list of what it reads"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8725": {
+      "kind": "article",
+      "shape": "story-with-episode-audio",
+      "why": "a story's opening lines, with the audio of the podcast episode that reads it attached"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8716": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story or essay whose feed item carries only its opening lines"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8701": {
+      "kind": "article",
+      "shape": "story-with-episode-audio",
+      "why": "a story's opening lines, with the audio of the podcast episode that reads it attached"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8728": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story or essay whose feed item carries only its opening lines"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8727": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8730": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story or essay whose feed item carries only its opening lines"
+    },
+    "https://www.uncannymagazine.com/?p=8758": {
+      "kind": "article",
+      "shape": "excerpt",
+      "why": "a story or essay whose feed item carries only its opening lines"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8700": {
+      "kind": "article",
+      "shape": "story-with-episode-audio",
+      "why": "a story's opening lines, with the audio of the podcast episode that reads it attached"
+    },
+    "https://www.uncannymagazine.com/?post_type=article&p=8714": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "items": {
+    "https://www.lennysnewsletter.com/p/metas-new-muse-wonder-model-good": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, a guest bio, timestamps and sponsors"
+    },
+    "https://www.lennysnewsletter.com/p/how-to-tell-if-a-startup-has-a-moat": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.lennysnewsletter.com/p/how-i-ai-how-meta-designed-muse-with": {
+      "kind": "notes",
+      "shape": "episode-promo",
+      "why": "the newsletter's post about an episode, embedding the same video as the episode's own post",
+      "pair": "https://www.lennysnewsletter.com/p/how-meta-designed-muse-an-ai-agent"
+    },
+    "https://www.lennysnewsletter.com/p/how-meta-designed-muse-an-ai-agent": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, a guest bio, timestamps and sponsors",
+      "pair": "https://www.lennysnewsletter.com/p/how-i-ai-how-meta-designed-muse-with"
+    },
+    "https://www.lennysnewsletter.com/p/why-every-company-now-needs-to-think": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, a guest bio and a link to the takeaways"
+    },
+    "https://www.lennysnewsletter.com/p/community-wisdom-community-wisdom": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid post: only its opening"
+    },
+    "https://www.lennysnewsletter.com/p/how-i-ai-8-real-jev-use-cases-how": {
+      "kind": "notes",
+      "shape": "episode-promo",
+      "why": "the weekly digest of three episodes in the feed, embedding their videos"
+    },
+    "https://www.lennysnewsletter.com/p/how-openai-uses-chatgpt-sites-live": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, a guest bio, timestamps and sponsors"
+    },
+    "https://www.lennysnewsletter.com/p/openais-head-of-chatgpt-were-entering": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, a guest bio and a link to the takeaways"
+    },
+    "https://www.lennysnewsletter.com/p/community-wisdom-getting-value-from": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid post: only its opening"
+    },
+    "https://www.lennysnewsletter.com/p/openai-dev-day-2026-the-releases": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, a guest bio, timestamps and sponsors"
+    },
+    "https://www.lennysnewsletter.com/p/jev-8-real-use-cases-for-the-fastest": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, a guest bio, timestamps and sponsors"
+    }
+  }
+}

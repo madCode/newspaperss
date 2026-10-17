@@ -1,0 +1,72 @@
+{
+  "items": {
+    "https://heathercoxrichardson.substack.com/p/october-16-2026": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://heathercoxrichardson.substack.com/p/corruption-as-a-driving-force": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "the author reading a letter posted separately: \"to read this letter, click here\"",
+      "pair": "https://heathercoxrichardson.substack.com/p/october-15-2026"
+    },
+    "https://heathercoxrichardson.substack.com/p/october-15-2026": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the letter beside its reading",
+      "pair": "https://heathercoxrichardson.substack.com/p/corruption-as-a-driving-force"
+    },
+    "https://heathercoxrichardson.substack.com/p/politics-chat-october-15-2026": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "a live video chat's audio, with links to watch"
+    },
+    "https://heathercoxrichardson.substack.com/p/taking-authoritarianism-out-for-a": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "the author reading a letter posted separately: \"to read this letter, click here\"",
+      "pair": "https://heathercoxrichardson.substack.com/p/october-14-2026"
+    },
+    "https://heathercoxrichardson.substack.com/p/october-14-2026": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the letter beside its reading",
+      "pair": "https://heathercoxrichardson.substack.com/p/taking-authoritarianism-out-for-a"
+    },
+    "https://heathercoxrichardson.substack.com/p/desperate-for-distraction": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "the author reading a letter posted separately: \"to read this letter, click here\"",
+      "pair": "https://heathercoxrichardson.substack.com/p/october-13-2026"
+    },
+    "https://heathercoxrichardson.substack.com/p/october-13-2026": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the letter beside its reading",
+      "pair": "https://heathercoxrichardson.substack.com/p/desperate-for-distraction"
+    },
+    "https://heathercoxrichardson.substack.com/p/politics-chat-october-13-2026-741": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "a live video chat's audio, with links to watch"
+    },
+    "https://heathercoxrichardson.substack.com/p/politics-chat-october-13-2026": {
+      "kind": "notes",
+      "shape": "video-post",
+      "why": "the same chat as a bare video post, no words"
+    },
+    "https://heathercoxrichardson.substack.com/p/radicalism": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "the author reading a letter posted separately: \"to read this letter, click here\"",
+      "pair": "https://heathercoxrichardson.substack.com/p/october-12-2026"
+    },
+    "https://heathercoxrichardson.substack.com/p/october-12-2026": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the letter beside its reading",
+      "pair": "https://heathercoxrichardson.substack.com/p/radicalism"
+    }
+  }
+}

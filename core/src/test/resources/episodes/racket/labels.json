@@ -1,0 +1,70 @@
+{
+  "items": {
+    "https://www.racket.news/p/note-on-roger-waters-and-other-superior": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.racket.news/p/art-is-more-important-than-politics": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.racket.news/p/beware-the-modern-wimp-man": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.racket.news/p/listen-to-this-article-writing-is": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "\"Listen to This Article\": a narration of a written post in the feed",
+      "pair": "https://www.racket.news/p/writing-is-good-he-said-controversially"
+    },
+    "https://www.racket.news/p/listen-to-this-article-marriage-is": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "\"Listen to This Article\": a narration of a written post in the feed",
+      "pair": "https://www.racket.news/p/marriage-is-wonderful-he-said-controversially"
+    },
+    "https://www.racket.news/p/writing-is-good-he-said-controversially": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the written post beside its narration",
+      "pair": "https://www.racket.news/p/listen-to-this-article-writing-is"
+    },
+    "https://www.racket.news/p/marriage-is-wonderful-he-said-controversially": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the written post beside its narration",
+      "pair": "https://www.racket.news/p/listen-to-this-article-marriage-is"
+    },
+    "https://www.racket.news/p/free-speech-discussion-a-recording": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "the recording of a live interview, no words"
+    },
+    "https://www.racket.news/p/live-free-speech-discussion-200-pm": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.racket.news/p/listen-to-this-article-trump-is-wrong": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "\"Listen to This Article\": a narration of a written post in the feed",
+      "pair": "https://www.racket.news/p/trump-is-wrong-on-speech-dont-forget"
+    },
+    "https://www.racket.news/p/note-on-trump-and-the-first-amendment": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.racket.news/p/trump-is-wrong-on-speech-dont-forget": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the written post beside its narration",
+      "pair": "https://www.racket.news/p/listen-to-this-article-trump-is-wrong"
+    }
+  }
+}

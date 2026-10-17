@@ -1,0 +1,68 @@
+{
+  "items": {
+    "https://andrewsullivan.substack.com/p/vfyw-no-way-this-nature": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://andrewsullivan.substack.com/p/a-question-of-decency-ctd": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://andrewsullivan.substack.com/p/evan-barker-on-wokeness-hijacking": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and a \"Transcript\" section"
+    },
+    "https://andrewsullivan.substack.com/p/vfyw-a-hidden-gate-has-the-answer": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://andrewsullivan.substack.com/p/the-floundering-anglo-american-right": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://andrewsullivan.substack.com/p/michael-lewis-on-the-civil-servants": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and a \"Transcript\" section"
+    },
+    "https://andrewsullivan.substack.com/p/vfyw-no-nukes-given": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://andrewsullivan.substack.com/p/emily-eakin-on-what-postmodernism": {
+      "kind": "article",
+      "shape": "post-with-episode",
+      "why": "a blog post opening with the week's episode, then other sections; its transcript is a separate post",
+      "pair": "https://andrewsullivan.substack.com/p/transcript-emily-eakin-on-what-postmodernism"
+    },
+    "https://andrewsullivan.substack.com/p/transcript-emily-eakin-on-what-postmodernism": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript:\" in the title; a paid post, so only its opening",
+      "pair": "https://andrewsullivan.substack.com/p/emily-eakin-on-what-postmodernism"
+    },
+    "https://andrewsullivan.substack.com/p/vfyw-the-oil-engine-that-could": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://andrewsullivan.substack.com/p/jacob-weisberg-on-trumps-collaborators": {
+      "kind": "article",
+      "shape": "post-with-episode",
+      "why": "a blog post opening with the week's episode, then other sections; its transcript is a separate post",
+      "pair": "https://andrewsullivan.substack.com/p/transcript-jake-weisberg-on-trumps"
+    },
+    "https://andrewsullivan.substack.com/p/transcript-jake-weisberg-on-trumps": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript:\" in the title; a paid post, so only its opening",
+      "pair": "https://andrewsullivan.substack.com/p/jacob-weisberg-on-trumps-collaborators"
+    }
+  }
+}

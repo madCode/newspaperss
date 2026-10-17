@@ -1,0 +1,72 @@
+{
+  "items": {
+    "https://lexfridman.com/?p=6554": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode: audio, sponsors and 15+ timestamps; its transcript is posted separately",
+      "pair": "https://lexfridman.com/?p=6556"
+    },
+    "https://lexfridman.com/?p=6556": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript for\" in the title; no audio of its own, the episode is a separate post",
+      "pair": "https://lexfridman.com/?p=6554"
+    },
+    "https://lexfridman.com/?p=6517": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript for\" an old episode not in the feed any more"
+    },
+    "https://lexfridman.com/?p=6505": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript for\" an old episode not in the feed any more"
+    },
+    "https://lexfridman.com/?p=6516": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript for\" an old episode not in the feed any more"
+    },
+    "https://lexfridman.com/?p=6506": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode: audio, sponsors and 15+ timestamps; its transcript is posted separately",
+      "pair": "https://lexfridman.com/?p=6512"
+    },
+    "https://lexfridman.com/?p=6512": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript for\" in the title; no audio of its own, the episode is a separate post",
+      "pair": "https://lexfridman.com/?p=6506"
+    },
+    "https://lexfridman.com/?p=6494": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode: audio, sponsors and 15+ timestamps; its transcript is posted separately",
+      "pair": "https://lexfridman.com/?p=6492"
+    },
+    "https://lexfridman.com/?p=6492": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript for\" in the title; no audio of its own, the episode is a separate post",
+      "pair": "https://lexfridman.com/?p=6494"
+    },
+    "https://lexfridman.com/?p=6496": {
+      "kind": "article",
+      "shape": "short",
+      "why": "downloads for an episode: a few links"
+    },
+    "https://lexfridman.com/?p=6474": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode: audio, sponsors and 15+ timestamps; its transcript is posted separately",
+      "pair": "https://lexfridman.com/?p=6477"
+    },
+    "https://lexfridman.com/?p=6477": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcript for\" in the title; no audio of its own, the episode is a separate post",
+      "pair": "https://lexfridman.com/?p=6474"
+    }
+  }
+}

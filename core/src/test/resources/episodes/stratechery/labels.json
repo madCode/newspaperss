@@ -1,0 +1,54 @@
+{
+  "items": {
+    "https://stratechery.com/?p=20315": {
+      "kind": "article",
+      "shape": "roundup",
+      "why": "the week's roundup"
+    },
+    "https://stratechery.com/?p=20319": {
+      "kind": "transcript",
+      "shape": "transcript-no-audio",
+      "why": "an interview's transcript, \"AE:\" turns; its audio is only in the members' podcast feed"
+    },
+    "https://stratechery.com/?p=20306": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a member's post: a line or two of it"
+    },
+    "https://stratechery.com/?p=20297": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a member's post: a line or two of it"
+    },
+    "https://stratechery.com/?p=20267": {
+      "kind": "article",
+      "shape": "roundup",
+      "why": "the week's roundup"
+    },
+    "https://stratechery.com/?p=20257": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a member's post: a line or two of it"
+    },
+    "https://stratechery.com/?p=20245": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a member's post: a line or two of it"
+    },
+    "https://stratechery.com/?p=20236": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a member's post: a line or two of it"
+    },
+    "https://stratechery.com/?p=20208": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay whose reading is in the members' podcast feed"
+    },
+    "https://stratechery.com/?p=20180": {
+      "kind": "article",
+      "shape": "roundup",
+      "why": "the week's roundup"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://www.latent.space/p/ainews-agents-disprove-polysemanticity": {
+      "kind": "article",
+      "shape": "roundup",
+      "why": "a daily news roundup quoting people as \"Name: ...\""
+    },
+    "https://www.latent.space/p/ainews-modals-1b-arr-16b-series-d": {
+      "kind": "article",
+      "shape": "roundup",
+      "why": "a daily news roundup quoting people as \"Name: ...\""
+    },
+    "https://www.latent.space/p/crossing-the-threshold": {
+      "kind": "article",
+      "shape": "conference-write-up",
+      "why": "a write-up of a conference talk, with quotes"
+    },
+    "https://www.latent.space/p/lab-in-the-loop-at-compute-speed": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio with a short introduction"
+    },
+    "https://www.latent.space/p/ainews-ai-engineer-nyc-gemini-4-argon": {
+      "kind": "article",
+      "shape": "roundup",
+      "why": "a daily news roundup quoting people as \"Name: ...\""
+    },
+    "https://www.latent.space/p/dyna": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the conversation as \"Name [time]: ...\""
+    },
+    "https://www.latent.space/p/ainews-meta-muse-wonder-and-wonder": {
+      "kind": "article",
+      "shape": "roundup",
+      "why": "a daily news roundup quoting people as \"Name: ...\""
+    },
+    "https://www.latent.space/p/claude-dynamic-workflows": {
+      "kind": "article",
+      "shape": "conference-write-up",
+      "why": "a write-up of a conference talk, with quotes"
+    },
+    "https://www.latent.space/p/nyc2026": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid post: only its opening"
+    },
+    "https://www.latent.space/p/standard-bots": {
+      "kind": "article",
+      "shape": "conference-write-up",
+      "why": "a write-up of a conference talk, with quotes"
+    },
+    "https://www.latent.space/p/ainews-typesafejev-at-100m-arr-75b": {
+      "kind": "article",
+      "shape": "roundup",
+      "why": "a daily news roundup quoting people as \"Name: ...\""
+    },
+    "https://www.latent.space/p/biohub-deepmind": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the conversation as \"Name [time]: ...\""
+    }
+  }
+}

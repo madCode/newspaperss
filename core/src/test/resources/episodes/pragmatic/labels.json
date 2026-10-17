@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://newsletter.pragmaticengineer.com/p/the-pulse-openai-software-engineer": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://newsletter.pragmaticengineer.com/p/ubers-ai-infra-from-the-inside": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, sponsors, 16+ timestamps and links: long notes"
+    },
+    "https://newsletter.pragmaticengineer.com/p/building-resilient-systems": {
+      "kind": "article",
+      "shape": "write-up",
+      "why": "a long essay drawn from an episode, without its audio"
+    },
+    "https://newsletter.pragmaticengineer.com/p/the-pulse-new-trend-of-building-internal": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://newsletter.pragmaticengineer.com/p/building-resilient-systems-with-sam": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, sponsors, 16+ timestamps and links: long notes"
+    },
+    "https://newsletter.pragmaticengineer.com/p/the-state-of-the-tech-industry-in": {
+      "kind": "article",
+      "shape": "talk-write-up",
+      "why": "a keynote written up, with quoted speakers"
+    },
+    "https://newsletter.pragmaticengineer.com/p/the-pulse-firebases-global-outage": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://newsletter.pragmaticengineer.com/p/distributed-databases-with-peter": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, sponsors, 16+ timestamps and links: long notes"
+    },
+    "https://newsletter.pragmaticengineer.com/p/shopify-native-mobile": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://newsletter.pragmaticengineer.com/p/the-pulse-end-of-coding-by-hand": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://newsletter.pragmaticengineer.com/p/design-engineering-with-maggie-appleton": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio, sponsors, 16+ timestamps and links: long notes"
+    },
+    "https://newsletter.pragmaticengineer.com/p/windows-and-ai": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    }
+  }
+}

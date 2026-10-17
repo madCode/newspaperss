@@ -12,6 +12,13 @@ caught, and what got in the way. Newest first. Times are Pacific.
 - **Watching:** `PodcastSettingsTest` timed out once in six full runs under load (backlog). The older settings and source-page flakes' likely causes were fixed on 16 Oct (#245, #246); neither reproduced locally in 10 runs before, so they're watched rather than counted. #245 itself made main's tests fail now and then for about an hour, until #267.
 - **Waiting on you:** reading times for saved links (a call on the morning page; titled imports have none either); the `extraction` label for Send for a look. [#18](https://github.com/Seafloor-Studio/newspaperss/issues/18), a Dropbox app key (only matters for Kobo). Five rss-to-e-reader PRs (#24–#28) are open for your batch review.
 
+## Sat 17 Oct
+
+### Podcast episodes: the corpus and a prototype detector
+- **Research plan phases R1 and R2** ([podcast-episodes.md](research/podcast-episodes.md)): 421 labelled posts from 41 public feeds, scrambled, and a detector in core's tests that the corpus test holds to the plan's bar. No article misclassed; 9 in 10 notes and transcripts caught; every pair found.
+- **Checked beyond the corpus:** 15 public feeds it hadn't seen, and one reader's own list, locally (its results stay out of the repository). Neither showed an article called anything else.
+- **Not in the app yet:** the feed parser and tt-rss sync still drop attachments, which detection needs first.
+
 ## Fri 16 Oct
 
 ### Today, area D (tt-rss, extraction, the book), closing

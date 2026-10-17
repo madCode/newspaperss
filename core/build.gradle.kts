@@ -44,3 +44,17 @@ tasks.register<JavaExec>("platformCorpus") {
     mainClass.set("com.app.newspaperss.core.tools.PlatformCorpusKt")
     workingDir = projectDir
 }
+
+// A developer tool, not part of the build: see EpisodeCorpus.kt.
+tasks.register<JavaExec>("episodeCorpus") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.app.newspaperss.core.tools.EpisodeCorpusKt")
+    workingDir = projectDir
+}
+
+// A developer tool, not part of the build: see EpisodeSweep.kt.
+tasks.register<JavaExec>("episodeSweep") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.app.newspaperss.core.tools.EpisodeSweepKt")
+    workingDir = projectDir
+}

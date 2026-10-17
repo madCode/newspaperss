@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://www.statecraft.pub/p/how-to-build-a-policy-school": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/how-to-build-an-authoritarian-regime": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/the-james-c-scott-memorial-episode": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/merit-vs-tenure-reforming-federal": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/the-strongman-presidency": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/what-trump-can-learn-from-nixon": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.statecraft.pub/p/how-the-national-security-strategy": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/ten-thoughts-on-government-data": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay with a reading attached"
+    },
+    "https://www.statecraft.pub/p/when-fafsa-broke-they-called-this": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/how-a-congressional-office-actually": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/how-to-rewire-city-hall": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    },
+    "https://www.statecraft.pub/p/whats-wrong-with-nonprofits": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation, questions set as headings"
+    }
+  }
+}

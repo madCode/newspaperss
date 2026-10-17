@@ -1,0 +1,54 @@
+{
+  "items": {
+    "https://aquariumdrunkard.com/?p=126180": {
+      "kind": "article",
+      "shape": "music-embed",
+      "why": "a music post: a track or album to play, not an episode"
+    },
+    "https://aquariumdrunkard.com/?p=126047": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, only its opening"
+    },
+    "https://aquariumdrunkard.com/?p=126134": {
+      "kind": "article",
+      "shape": "music-embed",
+      "why": "a music post: a track or album to play, not an episode"
+    },
+    "https://aquariumdrunkard.com/?p=126126": {
+      "kind": "article",
+      "shape": "music-embed",
+      "why": "a music post: a track or album to play, not an episode"
+    },
+    "https://aquariumdrunkard.com/?p=126277": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "the site's own podcast episode, with its audio"
+    },
+    "https://aquariumdrunkard.com/?p=125141": {
+      "kind": "article",
+      "shape": "music-audio",
+      "why": "a recorded music session attached as an mp3: audio, not an episode"
+    },
+    "https://aquariumdrunkard.com/?p=126213": {
+      "kind": "article",
+      "shape": "music-embed",
+      "why": "a music post: a track or album to play, not an episode"
+    },
+    "https://aquariumdrunkard.com/?p=126146": {
+      "kind": "article",
+      "shape": "music-embed",
+      "why": "a music post: a track or album to play, not an episode"
+    },
+    "https://aquariumdrunkard.com/?p=126208": {
+      "kind": "article",
+      "shape": "music-embed",
+      "why": "a music post: a track or album to play, not an episode"
+    },
+    "https://aquariumdrunkard.com/?p=126162": {
+      "kind": "article",
+      "shape": "music-embed",
+      "why": "a music post: a track or album to play, not an episode"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://tim.blog/?p=117275": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcripts\" in the title, the same audio as the episode's notes post",
+      "pair": "https://tim.blog/?p=117249"
+    },
+    "https://tim.blog/?p=117249": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode's notes: sponsors, timestamps, links; its transcript is posted separately",
+      "pair": "https://tim.blog/?p=117275"
+    },
+    "https://tim.blog/?p=117227": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcripts\" in the title, the same audio as the episode's notes post",
+      "pair": "https://tim.blog/?p=117189"
+    },
+    "https://tim.blog/?p=117189": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode's notes: sponsors, timestamps, links; its transcript is posted separately",
+      "pair": "https://tim.blog/?p=117227"
+    },
+    "https://tim.blog/?p=117133": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcripts\" in the title, the same audio as the episode's notes post",
+      "pair": "https://tim.blog/?p=117126"
+    },
+    "https://tim.blog/?p=117126": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode's notes: sponsors, timestamps, links; its transcript is posted separately",
+      "pair": "https://tim.blog/?p=117133"
+    },
+    "https://tim.blog/?p=116856": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcripts\" in the title, the same audio as the episode's notes post",
+      "pair": "https://tim.blog/?p=116838"
+    },
+    "https://tim.blog/?p=116838": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode's notes: sponsors, timestamps, links; its transcript is posted separately",
+      "pair": "https://tim.blog/?p=116856"
+    },
+    "https://tim.blog/?p=116151": {
+      "kind": "transcript",
+      "shape": "transcript-own-post",
+      "why": "\"Transcripts\" in the title, the same audio as the episode's notes post",
+      "pair": "https://tim.blog/?p=116136"
+    },
+    "https://tim.blog/?p=116136": {
+      "kind": "notes",
+      "shape": "notes-beside-transcript",
+      "why": "the episode's notes: sponsors, timestamps, links; its transcript is posted separately",
+      "pair": "https://tim.blog/?p=116151"
+    }
+  }
+}

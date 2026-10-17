@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://www.persuasion.community/p/the-art-of-defection": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.persuasion.community/p/not-to-be-a-pessimist-but-these-midterms": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.persuasion.community/p/this-week-at-persuasion-b92": {
+      "kind": "article",
+      "shape": "short",
+      "why": "a weekly note"
+    },
+    "https://www.persuasion.community/p/i-lost-my-job-to-ai": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.persuasion.community/p/the-moral-bankruptcy-of-livestreaming": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.persuasion.community/p/the-search-for-a-post-enlightenment": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.persuasion.community/p/david-deming": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation as \"Name: ...\""
+    },
+    "https://www.persuasion.community/p/thymos-and-american-foreign-policy": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.persuasion.community/p/two-visions-of-postwar-liberalism": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.persuasion.community/p/five-scenarios-for-israels-election": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.persuasion.community/p/owen-zidar-eric-zwick": {
+      "kind": "transcript",
+      "shape": "transcript-in-episode",
+      "why": "the episode's audio and the edited conversation as \"Name: ...\""
+    },
+    "https://www.persuasion.community/p/is-it-time-to-end-the-pentagon": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    }
+  }
+}

@@ -156,6 +156,8 @@ internal object Scrambler {
             "podcast transcript video audio photo image caption credit getty editor update updated published " +
             "receive support work consider becoming become reader supported publication thanks thank gift forward friend " +
             "reply web website weekly week daily email inbox expect offers already account log in trial days access " +
-            "archive archives full keep get paying sponsor sponsors sponsored advertise advertising watch youtube add story picks available"
+            "archive archives full keep get paying sponsor sponsors sponsored advertise advertising watch youtube add story picks available " +
+            // The words the episode detector reads in titles and headings (EpisodeDetector.kt).
+            "episodes podcasts transcripts transcription narrated voiceover version ep"
         ).split(' ').toSet()
 }

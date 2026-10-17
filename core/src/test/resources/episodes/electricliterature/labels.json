@@ -1,0 +1,44 @@
+{
+  "items": {
+    "https://electricliterature.com/?p=317253": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://electricliterature.com/?p=317328": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://electricliterature.com/?p=317635": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://electricliterature.com/?p=316938": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://electricliterature.com/?p=317442": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview, initials as turns"
+    },
+    "https://electricliterature.com/?p=317219": {
+      "kind": "article",
+      "shape": "qa-interview",
+      "why": "a written interview"
+    },
+    "https://electricliterature.com/?p=317230": {
+      "kind": "article",
+      "shape": "fiction",
+      "why": "a story, with dialogue"
+    },
+    "https://electricliterature.com/?p=316923": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    }
+  }
+}

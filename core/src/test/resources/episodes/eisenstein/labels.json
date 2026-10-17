@@ -1,0 +1,91 @@
+{
+  "items": {
+    "https://charleseisenstein.substack.com/p/speaking-in-asheville-nc-on-thursday": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/lindsay-clancy-a-siren-in-the-theater": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/the-lost-subject-ai-and-the-human": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/oops-story-not-essay": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/the-ancestors-are-watching": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/in-person-events-in-new-york-spain": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/more-beautiful-world-for-chamber": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/the-myth-of-tara": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/it-takes-two-to-speak-the-truth": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/writing-a-new-book": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/memories-of-the-future": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/a-few-offerings-and-notes": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/preparing-for-the-future-or-preparing": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/mindsight-and-the-polycrisis": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/speaking-in-portugal-next-week": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://charleseisenstein.substack.com/p/audio-version-of-when-the-rituals": {
+      "kind": "audio-version",
+      "shape": "narrated-stub",
+      "why": "\"Audio version of\" an essay in the feed, the audio uploaded into the post",
+      "pair": "https://charleseisenstein.substack.com/p/when-the-rituals-stop-working"
+    },
+    "https://charleseisenstein.substack.com/p/when-the-rituals-stop-working": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "the essay beside its audio version",
+      "pair": "https://charleseisenstein.substack.com/p/audio-version-of-when-the-rituals"
+    }
+  }
+}

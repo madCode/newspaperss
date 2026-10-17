@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://joecarlsmith.substack.com/p/video-and-transcript-of-talk-on-writing": {
+      "kind": "transcript",
+      "shape": "talk-transcript",
+      "why": "\"video and transcript of a talk\": the title says so; no podcast"
+    },
+    "https://joecarlsmith.substack.com/p/on-restraining-ai-development-for": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay whose reading lives in a separate podcast feed; quoted dialogue in places"
+    },
+    "https://joecarlsmith.substack.com/p/building-ais-that-do-human-like-philosophy": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay whose reading lives in a separate podcast feed; quoted dialogue in places"
+    },
+    "https://joecarlsmith.substack.com/p/video-and-transcript-of-talk-on-human": {
+      "kind": "transcript",
+      "shape": "talk-transcript",
+      "why": "\"video and transcript of a talk\", with its audio attached"
+    },
+    "https://joecarlsmith.substack.com/p/how-human-like-do-safe-ai-motivations": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay whose reading lives in a separate podcast feed; quoted dialogue in places"
+    },
+    "https://joecarlsmith.substack.com/p/leaving-open-philanthropy-going-to": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay whose reading lives in a separate podcast feed; quoted dialogue in places"
+    },
+    "https://joecarlsmith.substack.com/p/controlling-the-options-ais-can-pursue": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay whose reading lives in a separate podcast feed; quoted dialogue in places"
+    },
+    "https://joecarlsmith.substack.com/p/video-and-transcript-of-talk-on-giving": {
+      "kind": "transcript",
+      "shape": "talk-transcript",
+      "why": "\"video and transcript of a talk\": the title says so; no podcast"
+    },
+    "https://joecarlsmith.substack.com/p/giving-ais-safe-motivations": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay whose reading lives in a separate podcast feed; quoted dialogue in places"
+    },
+    "https://joecarlsmith.substack.com/p/video-and-transcript-of-talk-on-can": {
+      "kind": "transcript",
+      "shape": "talk-transcript",
+      "why": "\"video and transcript of a talk\": the title says so; no podcast"
+    },
+    "https://joecarlsmith.substack.com/p/video-and-transcript-of-talk-on-ai": {
+      "kind": "transcript",
+      "shape": "talk-transcript",
+      "why": "\"video and transcript of a talk\": the title says so; no podcast"
+    },
+    "https://joecarlsmith.substack.com/p/the-stakes-of-ai-moral-status": {
+      "kind": "article",
+      "shape": "narrated",
+      "why": "an essay whose reading lives in a separate podcast feed; quoted dialogue in places"
+    }
+  }
+}

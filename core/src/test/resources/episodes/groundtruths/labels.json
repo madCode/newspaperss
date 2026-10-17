@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://erictopol.substack.com/p/a-tale-of-two-t-cells": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://erictopol.substack.com/p/michael-lewis-the-nih-murder-mystery": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio with a guest introduction; the transcript is behind a link"
+    },
+    "https://erictopol.substack.com/p/loss-of-cell-identity-drives-human": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://erictopol.substack.com/p/the-big-holes-in-wearable-heart-rate": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://erictopol.substack.com/p/why-did-two-major-clinical-trials": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio with a guest introduction; the transcript is behind a link"
+    },
+    "https://erictopol.substack.com/p/the-coronary-artery-inflammation": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://erictopol.substack.com/p/two-landmark-studies-challenge-dogma": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio meant to go with an earlier post"
+    },
+    "https://erictopol.substack.com/p/deborah-cohen-the-wellness-industrial": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio with a guest introduction; the transcript is behind a link"
+    },
+    "https://erictopol.substack.com/p/why-our-memory-slips-after-age-50": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://erictopol.substack.com/p/predicting-your-health-arc": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio with a longer guest introduction and figures"
+    },
+    "https://erictopol.substack.com/p/how-is-ai-catalyzing-life-science": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio with a guest introduction; the transcript is behind a link"
+    },
+    "https://erictopol.substack.com/p/medicine-is-moving-from-calendars": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    }
+  }
+}

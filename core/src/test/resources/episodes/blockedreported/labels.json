@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://www.blockedandreported.org/p/bonus-jesses-conversation-with-talarico": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.blockedandreported.org/p/premium-a-truly-talafreaky-magasphere": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.blockedandreported.org/p/weekly-open-thread-101426": {
+      "kind": "article",
+      "shape": "short",
+      "why": "an open-thread post"
+    },
+    "https://www.blockedandreported.org/p/ask-brad-polumbo-anything": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.blockedandreported.org/p/blocked-and-reported-is-hiring-an": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.blockedandreported.org/p/episode-327-rock-opera-revolts-over": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.blockedandreported.org/p/weekly-open-thread-10726": {
+      "kind": "article",
+      "shape": "short",
+      "why": "an open-thread post"
+    },
+    "https://www.blockedandreported.org/p/live-with-katie-herzog-and-sarah": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.blockedandreported.org/p/episode-326-the-case-thats-shaking": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.blockedandreported.org/p/premium-the-erin-reed-story-its-not": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph about the episode"
+    },
+    "https://www.blockedandreported.org/p/sarah-hepola-live-on-the-computer": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.blockedandreported.org/p/weekly-open-thread-93026": {
+      "kind": "article",
+      "shape": "short",
+      "why": "an open-thread post"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "items": {
+    "https://www.theargumentmag.com/p/liberalism-let-me-change-my-mind": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.theargumentmag.com/p/how-sean-trendes-outback-order-explains": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid post: only its opening"
+    },
+    "https://www.theargumentmag.com/p/the-book-is-not-about-you": {
+      "kind": "article",
+      "shape": "write-up",
+      "why": "an essay drawn from a podcast episode, without its audio"
+    },
+    "https://www.theargumentmag.com/p/cancel-columbus-save-jefferson": {
+      "kind": "notes",
+      "shape": "notes-in-newsletter",
+      "why": "podcast audio and a paragraph"
+    },
+    "https://www.theargumentmag.com/p/concentration-killed-the-internet": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid podcast post: only its opening, with nothing saying it is one"
+    },
+    "https://www.theargumentmag.com/p/magas-talarico-conspiracy-theory": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.theargumentmag.com/p/trumps-student-loan-rule-doesnt-go": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.theargumentmag.com/p/the-fox-in-liberalisms-henhouse-38e": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.theargumentmag.com/p/marco-rubio-flunks-western-civ": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.theargumentmag.com/p/do-trump-and-xi-need-to-agree-on": {
+      "kind": "article",
+      "shape": "paywalled",
+      "why": "a paid podcast post: only its opening, with nothing saying it is one"
+    },
+    "https://www.theargumentmag.com/p/let-them-have-slop": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    },
+    "https://www.theargumentmag.com/p/the-maga-realignment-realigns": {
+      "kind": "article",
+      "shape": "plain",
+      "why": "an ordinary post, no episode"
+    }
+  }
+}
